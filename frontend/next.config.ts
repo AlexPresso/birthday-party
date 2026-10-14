@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
+import { uploadProxyBodyLimit } from "./runtime/upload-limits.ts";
 
 const frontendRoot = fileURLToPath(new URL(".", import.meta.url));
 
@@ -8,7 +9,10 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: frontendRoot,
   turbopack: { root: frontendRoot },
   poweredByHeader: false,
-  experimental: { proxyClientMaxBodySize: "20mb", proxyTimeout: 120000 },
+  experimental: {
+    proxyClientMaxBodySize: uploadProxyBodyLimit(),
+    proxyTimeout: 600000,
+  },
   async rewrites() {
     return [
       {

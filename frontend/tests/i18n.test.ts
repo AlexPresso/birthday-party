@@ -91,7 +91,7 @@ test("all catalogs contain the same nonempty keys and interpolation parameters",
       french["nav.guestbook"],
       french["nav.settings"],
     ],
-    ["photos", "programme", "livre d'or", "paramètres"],
+    ["Médias", "Programme", "Livre d'or", "Paramètres"],
   );
 });
 
@@ -228,7 +228,7 @@ test("network failures are translated while request cancellations remain cancell
   );
 });
 
-test("date labels use the selected language and the party timezone", () => {
+test("date labels use the selected language and party timezone without zone suffixes", () => {
   const instant = "2026-07-01T00:30:00Z";
   const months = {
     en: "July",
@@ -243,10 +243,10 @@ test("date labels use the selected language and the party timezone", () => {
     assert.match(value, /\b1\b/);
     assert.doesNotMatch(value, /\d:\d/);
   }
-  assert.match(formatDate(instant, "Europe/Zurich", true, "fr"), /02:30/);
+  assert.match(formatDate(instant, "Europe/Zurich", true, "fr"), /02:30$/);
   const previousDay = formatDate(instant, "America/Los_Angeles", true, "fr");
   assert.match(previousDay, /30 juin/);
-  assert.match(previousDay, /17:30/);
+  assert.match(previousDay, /17:30$/);
 });
 
 test("birthday defaults follow the selected language and validate the age", () => {

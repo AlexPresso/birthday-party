@@ -71,7 +71,7 @@ func run() error {
 			return fmt.Errorf("create startup administrator invitation: %w", err)
 		}
 	}
-	server := &http.Server{Addr: config.ListenAddr, Handler: application.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 2 * time.Minute, WriteTimeout: 2 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := &http.Server{Addr: config.ListenAddr, Handler: application.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Minute, WriteTimeout: 10 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	serverErrors := make(chan error, 1)
 	go func() { serverErrors <- server.Serve(listener) }()
 	log.Printf("Birthday API listening on %s", listener.Addr())

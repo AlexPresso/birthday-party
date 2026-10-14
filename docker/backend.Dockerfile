@@ -6,7 +6,7 @@ COPY backend/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /server ./cmd/server
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates \
+RUN apk add --no-cache ca-certificates ffmpeg \
     && addgroup -S -g 10001 app \
     && adduser -S -D -H -u 10001 -G app app \
     && mkdir /data \

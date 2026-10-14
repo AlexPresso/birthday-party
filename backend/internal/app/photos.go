@@ -15,15 +15,66 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/disintegration/imaging"
 	_ "golang.org/x/image/webp"
 )
 
-const maxPhotoBytes = 15 << 20
 const maxPhotoPixels = 40_000_000
 const maxStoredPhotoBytes = 10 << 30
+
+type preparedMedia struct {
+	path, thumbnailPath, mimeType, extension string
+	width, height                            int
+}
+
+type mediaValidationError struct {
+	status int
+	code   string
+}
+
+func (e *mediaValidationError) Error() string { return e.code }
+
+func prepareImage(input *os.File, thumbnailPath string) (preparedMedia, error) {
+	config, format, err := image.DecodeConfig(input)
+	if err != nil || (format != "jpeg" && format != "png" && format != "webp") {
+		return preparedMedia{}, &mediaValidationError{415, "unsupported_photo_type"}
+	}
+	if config.Width <= 0 || config.Height <= 0 || int64(config.Width)*int64(config.Height) > maxPhotoPixels {
+		return preparedMedia{}, &mediaValidationError{413, "photo_dimensions_too_large"}
+	}
+	if _, err = input.Seek(0, io.SeekStart); err != nil {
+		return preparedMedia{}, err
+	}
+	// Apply phone EXIF orientation, then flatten transparency onto dark plum.
+	decoded, err := imaging.Decode(input, imaging.AutoOrientation(true))
+	if err != nil {
+		return preparedMedia{}, &mediaValidationError{415, "unreadable_photo"}
+	}
+	thumbnail := imaging.Fit(decoded, 720, 720, imaging.Linear)
+	flat := image.NewRGBA(thumbnail.Bounds())
+	draw.Draw(flat, flat.Bounds(), &image.Uniform{C: color.RGBA{R: 32, G: 19, B: 31, A: 255}}, image.Point{}, draw.Src)
+	draw.Draw(flat, flat.Bounds(), thumbnail, thumbnail.Bounds().Min, draw.Over)
+	thumb, err := os.OpenFile(thumbnailPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return preparedMedia{}, err
+	}
+	encodeErr := jpeg.Encode(thumb, flat, &jpeg.Options{Quality: 82})
+	closeErr := thumb.Close()
+	if encodeErr != nil {
+		return preparedMedia{}, encodeErr
+	}
+	if closeErr != nil {
+		return preparedMedia{}, closeErr
+	}
+	return preparedMedia{
+		path: input.Name(), thumbnailPath: thumbnailPath, mimeType: "image/" + format,
+		extension: map[string]string{"jpeg": "jpg", "png": "png", "webp": "webp"}[format],
+		width:     decoded.Bounds().Dx(), height: decoded.Bounds().Dy(),
+	}, nil
+}
 
 type Photo struct {
 	ID           int64  `json:"id"`
@@ -33,9 +84,15 @@ type Photo struct {
 	CreatedAt    string `json:"createdAt"`
 	URL          string `json:"url"`
 	ThumbnailURL string `json:"thumbnailUrl"`
+	Kind         string `json:"kind"`
+	MimeType     string `json:"mimeType"`
 }
 
 func (p *Photo) urls() {
+	p.Kind = "image"
+	if strings.HasPrefix(p.MimeType, "video/") {
+		p.Kind = "video"
+	}
 	p.URL = "/api/photos/" + strconv.FormatInt(p.ID, 10) + "/image"
 	p.ThumbnailURL = p.URL + "?size=thumb"
 }
@@ -45,7 +102,7 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
 	if !ok {
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT p.id,g.id,g.name,p.width,p.height,p.created_at FROM photos p JOIN guests g ON p.guest_id=g.id WHERE (?=0 OR p.id<?) ORDER BY p.id DESC LIMIT ?`, before, before, limit+1)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT p.id,g.id,g.name,p.width,p.height,p.created_at,p.mime FROM photos p JOIN guests g ON p.guest_id=g.id WHERE (?=0 OR p.id<?) ORDER BY p.id DESC LIMIT ?`, before, before, limit+1)
 	if err != nil {
 		internal(w, err)
 		return
@@ -54,7 +111,7 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
 	items := []Photo{}
 	for rows.Next() {
 		var photo Photo
-		if err := rows.Scan(&photo.ID, &photo.Author.ID, &photo.Author.Name, &photo.Width, &photo.Height, &photo.CreatedAt); err != nil {
+		if err := rows.Scan(&photo.ID, &photo.Author.ID, &photo.Author.Name, &photo.Width, &photo.Height, &photo.CreatedAt, &photo.MimeType); err != nil {
 			internal(w, err)
 			return
 		}
@@ -70,7 +127,10 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
 		items = items[:limit]
 		next = cursor(items[len(items)-1].ID)
 	}
-	respond(w, 200, map[string]any{"items": items, "nextCursor": next})
+	respond(w, 200, map[string]any{
+		"items": items, "nextCursor": next,
+		"limits": map[string]int64{"imageBytes": a.config.MaxImageBytes, "videoBytes": a.config.MaxVideoBytes},
+	})
 }
 
 func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
@@ -82,7 +142,7 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 429, "upload_busy")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxPhotoBytes+(64<<10))
+	r.Body = http.MaxBytesReader(w, r.Body, max(a.config.MaxImageBytes, a.config.MaxVideoBytes)+(64<<10))
 	reader, err := r.MultipartReader()
 	if err != nil {
 		fail(w, 400, "photo_required")
@@ -93,16 +153,37 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 400, "single_photo_required")
 		return
 	}
-	temp, err := os.CreateTemp(filepath.Join(a.config.DataDir, "tmp"), "upload-*")
+	workDir, err := os.MkdirTemp(filepath.Join(a.config.DataDir, "tmp"), "upload-*")
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	defer os.Remove(temp.Name())
+	defer os.RemoveAll(workDir)
+	temp, err := os.OpenFile(filepath.Join(workDir, "input"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	if err != nil {
+		internal(w, err)
+		return
+	}
 	defer temp.Close()
-	size, err := io.Copy(temp, io.LimitReader(part, maxPhotoBytes+1))
-	if size > maxPhotoBytes {
-		fail(w, 413, "photo_too_large")
+	header := make([]byte, 512)
+	headerSize, err := io.ReadFull(part, header)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		fail(w, 400, "photo_upload_failed")
+		return
+	}
+	header = header[:headerSize]
+	videoFormat := detectVideoFormat(header)
+	limit, sizeError := a.config.MaxImageBytes, "photo_too_large"
+	if videoFormat != "" {
+		limit, sizeError = a.config.MaxVideoBytes, "video_too_large"
+	}
+	if _, err := temp.Write(header); err != nil {
+		internal(w, err)
+		return
+	}
+	written, err := io.Copy(temp, io.LimitReader(part, limit-int64(headerSize)+1))
+	if written+int64(headerSize) > limit {
+		fail(w, 413, sizeError)
 		return
 	}
 	if err != nil {
@@ -117,40 +198,42 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		internal(w, err)
 		return
 	}
-	config, format, err := image.DecodeConfig(temp)
-	if err != nil || (format != "jpeg" && format != "png" && format != "webp") {
-		fail(w, 415, "unsupported_photo_type")
-		return
+	var media preparedMedia
+	if videoFormat == "" {
+		media, err = prepareImage(temp, filepath.Join(workDir, "thumb.jpg"))
+	} else {
+		err = temp.Close()
+		if err == nil {
+			media, err = prepareVideo(r.Context(), temp.Name(), workDir, videoFormat, a.config.MaxVideoBytes)
+		}
 	}
-	if config.Width <= 0 || config.Height <= 0 || int64(config.Width)*int64(config.Height) > maxPhotoPixels {
-		fail(w, 413, "photo_dimensions_too_large")
-		return
-	}
-	if _, err = temp.Seek(0, io.SeekStart); err != nil {
-		internal(w, err)
-		return
-	}
-	// imaging applies the EXIF orientation so phone thumbnails match originals.
-	decoded, err := imaging.Decode(temp, imaging.AutoOrientation(true))
 	if err != nil {
-		fail(w, 415, "unreadable_photo")
+		if r.Context().Err() != nil {
+			return
+		}
+		var validation *mediaValidationError
+		if errors.As(err, &validation) {
+			fail(w, validation.status, validation.code)
+		} else {
+			internal(w, err)
+		}
 		return
 	}
 	if r.Context().Err() != nil {
 		return
 	}
-	thumbnail := imaging.Fit(decoded, 720, 720, imaging.Linear)
-	// Composite transparent PNG/WebP pixels onto the app's dark plum background.
-	flat := image.NewRGBA(thumbnail.Bounds())
-	draw.Draw(flat, flat.Bounds(), &image.Uniform{C: color.RGBA{R: 32, G: 19, B: 31, A: 255}}, image.Point{}, draw.Src)
-	draw.Draw(flat, flat.Bounds(), thumbnail, thumbnail.Bounds().Min, draw.Over)
+	if videoFormat == "" {
+		if err := temp.Close(); err != nil {
+			internal(w, err)
+			return
+		}
+	}
 	key, err := newToken()
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	extension := map[string]string{"jpeg": "jpg", "png": "png", "webp": "webp"}[format]
-	filename, thumbname := key+"."+extension, key+"-thumb.jpg"
+	filename, thumbname := key+"."+media.extension, key+"-thumb.jpg"
 	originalPath := filepath.Join(a.config.DataDir, "photos", filename)
 	thumbPath := filepath.Join(a.config.DataDir, "photos", thumbname)
 	committed := false
@@ -160,30 +243,24 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 			_ = os.Remove(thumbPath)
 		}
 	}()
-	thumb, err := os.OpenFile(thumbPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
+	if err = os.Rename(media.path, originalPath); err != nil {
 		internal(w, err)
 		return
 	}
-	encodeErr := jpeg.Encode(thumb, flat, &jpeg.Options{Quality: 82})
-	closeErr := thumb.Close()
-	if encodeErr != nil {
-		internal(w, encodeErr)
-		return
-	}
-	if closeErr != nil {
-		internal(w, closeErr)
-		return
-	}
-	if err = temp.Close(); err != nil {
+	if err = os.Rename(media.thumbnailPath, thumbPath); err != nil {
 		internal(w, err)
 		return
 	}
-	if err = os.Rename(temp.Name(), originalPath); err != nil {
-		internal(w, err)
-		return
+	var size int64
+	for _, path := range []string{originalPath, thumbPath} {
+		info, err := os.Stat(path)
+		if err != nil {
+			internal(w, err)
+			return
+		}
+		size += info.Size()
 	}
-	photo := Photo{Author: Author{ID: guest.ID, Name: guest.Name}, Width: decoded.Bounds().Dx(), Height: decoded.Bounds().Dy(), CreatedAt: stamp(a.now())}
+	photo := Photo{Author: Author{ID: guest.ID, Name: guest.Name}, Width: media.width, Height: media.height, CreatedAt: stamp(a.now()), MimeType: media.mimeType}
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		internal(w, err)
@@ -200,7 +277,7 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 409, "album_full")
 		return
 	}
-	// Recheck active status after expensive image processing, so revocation wins.
+	// Recheck active status after expensive media processing, so revocation wins.
 	var active bool
 	if err := tx.QueryRowContext(r.Context(), "SELECT active FROM guests WHERE id=?", guest.ID).Scan(&active); err != nil {
 		internal(w, err)
@@ -210,7 +287,7 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 401, "access_revoked")
 		return
 	}
-	result, err := tx.ExecContext(r.Context(), "INSERT INTO photos(guest_id,width,height,created_at,filename,thumbnail,mime,byte_size) VALUES(?,?,?,?,?,?,?,?)", guest.ID, photo.Width, photo.Height, photo.CreatedAt, filename, thumbname, "image/"+format, size)
+	result, err := tx.ExecContext(r.Context(), "INSERT INTO photos(guest_id,width,height,created_at,filename,thumbnail,mime,byte_size) VALUES(?,?,?,?,?,?,?,?)", guest.ID, photo.Width, photo.Height, photo.CreatedAt, filename, thumbname, photo.MimeType, size)
 	if err != nil {
 		internal(w, err)
 		return
@@ -258,7 +335,7 @@ func (a *App) servePhoto(w http.ResponseWriter, r *http.Request, _ Guest) {
 	}
 	defer file.Close()
 	w.Header().Set("Content-Type", mime)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"photo-%d.%s\"", id, filepath.Ext(filename)[1:]))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"media-%d.%s\"", id, filepath.Ext(filename)[1:]))
 	w.Header().Set("Cache-Control", "private, no-store")
 	http.ServeContent(w, r, filename, time.Time{}, file)
 }

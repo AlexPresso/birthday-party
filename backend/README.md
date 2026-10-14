@@ -8,6 +8,10 @@ private when deploying. The API contract is [docs/api.md](../docs/api.md).
 
 From `backend/`, with Go 1.26 or newer:
 
+Video uploads also require `ffmpeg` and `ffprobe` on `PATH`, including the
+H.264 (`libx264`) and AAC encoders. The Docker image includes them. For local
+development, install a build from the [FFmpeg download page](https://ffmpeg.org/download.html).
+
 ```sh
 go mod download
 go run ./cmd/server invite-admin --name "Your name"
@@ -30,6 +34,13 @@ See [.env.example](.env.example). Defaults are:
 | `DATA_DIR` | `./data` | Private persistent SQLite database, originals, thumbnails |
 | `COOKIE_SECURE` | Determined by `PUBLIC_URL` | HTTPS requires `true`; local HTTP uses `false` |
 | `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup |
+| `MAX_IMAGE_SIZE_MB` | `15` | Maximum uploaded image size in MiB, integer 1–1024 |
+| `MAX_VIDEO_SIZE_MB` | `100` | Maximum uploaded video size in MiB, integer 1–1024 |
+
+Missing or empty upload limits use their defaults. Invalid values stop startup.
+One MiB is 1,048,576 bytes. The gallery API returns the effective limits so the
+frontend validates against the server settings. Compose applies changes from
+the root `.env` when containers are recreated, without rebuilding images.
 
 With `PRINT_ADMIN_INVITATION=true`, each server start prints
 `Administrator invitation: <url>` after binding its listening socket. The oldest
@@ -62,16 +73,27 @@ HTTP request logs never include these tokens.
   custom header (CLI/testing); cross-origin browser preflights are not allowed.
 - Invitation preview/accept are globally limited to 120 requests/minute. The
   limiter has constant memory and does not trust proxy address headers.
-- All active guests can see everyone's photos and messages. Only their author or
+- All active guests can see everyone's photos, videos and messages. Only their author or
   a host can delete them. Every image request, including thumbnails, checks the
   current session; private media responses are not cached.
-- Uploads allow JPEG, PNG and WebP, at most 15 MiB and 40 megapixels. Two images can
+- Image uploads allow JPEG, PNG and WebP, at most `MAX_IMAGE_SIZE_MB` MiB
+  (15 by default) and 40 megapixels. Two files can
   be processed concurrently. Files stream into a private temporary directory;
   invalid uploads are removed. Filenames are generated server-side.
 - Thumbnails are JPEG, at most 720px on the longest side. Phone EXIF orientation is
   applied. Originals are retained unchanged, including embedded metadata, and
   remain accessible only to authenticated guests.
-- The album is capped at 5000 photos and 10 GiB of originals. Lists are paginated
+- Video uploads allow MP4, MOV and WebM up to `MAX_VIDEO_SIZE_MB` MiB
+  (100 by default), 5 minutes and 4K input.
+  FFmpeg converts them to H.264/AAC MP4, at most 1280×720 and 30 fps, and creates
+  a JPEG thumbnail. The input video is discarded after conversion. Video
+  processing has a five-minute timeout, bounded threads and restricted input
+  formats/protocols. Each byte-range request checks the current session.
+  Input limits apply before conversion. Converted output is bounded by the
+  larger of 100 MiB and the configured video input limit; it may exceed the
+  input limit for a small uploaded clip. Shortened conversions are rejected.
+- The gallery is capped at 5000 files and 10 GiB. New upload accounting includes
+  originals or normalized videos plus their thumbnails. Lists are paginated
   at 24 items by default, maximum 48. Hosts can manage up to 500 guest identities
   and 200 programme entries. These are initial explicit bounds, not performance
   claims.
@@ -79,6 +101,9 @@ HTTP request logs never include these tokens.
   One connection serializes writes for this single-party app. WAL mode supports
   local CLI access while the service runs. Back up the complete data directory
   with the service stopped or use a consistent SQLite backup procedure.
+- Guestbook posts can be anonymous. Their owner remains in SQLite for deletion
+  permissions, but no API response includes that identity, even for hosts.
+  The version 2 migration keeps existing entries named by default.
 - Dates are normalized to UTC. The party starts with `Europe/Zurich` as its
   explicit, editable IANA timezone and an empty title on new databases. Existing
   titles remain unchanged; the frontend supplies a localized title when needed.

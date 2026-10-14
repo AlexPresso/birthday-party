@@ -17,6 +17,8 @@ ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/runtime ./runtime
+COPY --from=build --chown=node:node /app/startup.mjs ./startup.mjs
 USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "startup.mjs"]
