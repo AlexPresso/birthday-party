@@ -1,0 +1,16 @@
+{
+  "name": "birthday-party-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "backend": "node scripts/backend.mjs",
+    "check": "node scripts/check.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,35 @@
+# Dependencies and generated builds
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+frontend/next-env.d.ts
+backend/server
+backend/server.exe
+backend/.cache/
+
+# Private runtime data and configuration
+data/
+.test-data/
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+
+# Browser verification output
+test-results/
+playwright-report/
+artifacts/
+
+# Local editor/system files
+.idea/
+.DS_Store
+Thumbs.db
