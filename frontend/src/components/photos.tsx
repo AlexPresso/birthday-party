@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  Camera,
   ImagePlus,
   Upload,
   Check,
@@ -12,6 +11,7 @@ import {
   ChevronRight,
   Images,
   Download,
+  Play,
 } from "lucide-react";
 import {
   api,
@@ -52,6 +52,9 @@ export function PhotoGallery({
   const { locale, t } = useI18n();
   const numbers = new Intl.NumberFormat(locale);
   const plurals = new Intl.PluralRules(locale);
+  const limits = initial.limits;
+  const imageSize = numbers.format(limits.imageBytes / (1024 * 1024));
+  const videoSize = numbers.format(limits.videoBytes / (1024 * 1024));
   const [photos, setPhotos] = useState(initial.items);
   const [cursor, setCursor] = useState(initial.nextCursor);
   const [queue, setQueue] = useState<UploadItem[]>([]);
@@ -61,6 +64,7 @@ export function PhotoGallery({
   const [deleting, setDeleting] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
   const nextId = useRef(0);
   const requests = useRef(new Map<number, XMLHttpRequest>());
   const mounted = useRef(true);
@@ -96,7 +100,7 @@ export function PhotoGallery({
       update({ status: "uploading" });
       request.open("POST", "/api/photos");
       request.setRequestHeader("X-Requested-With", "birthday-party");
-      request.timeout = 120000;
+      request.timeout = 600000;
       request.upload.onprogress = (event) => {
         if (event.lengthComputable)
           update({ progress: Math.round((event.loaded / event.total) * 100) });
@@ -145,6 +149,11 @@ export function PhotoGallery({
     if (selected === null && dialog.current?.open) dialog.current.close();
   }, [selected]);
 
+  useEffect(() => {
+    const playback = video.current;
+    return () => playback?.pause();
+  }, [selected]);
+
   function choose(files: FileList | null) {
     if (!files) return;
     const available = Math.max(
@@ -156,13 +165,17 @@ export function PhotoGallery({
     setQueue((items) => [
       ...items.filter((item) => item.status !== "done"),
       ...chosen.map((file): UploadItem => {
-        const problem = uploadProblem(file);
+        const problem = uploadProblem(file, limits);
         return {
           id: ++nextId.current,
           file,
           status: problem ? "error" : "queued",
           progress: 0,
-          error: problem ? t(`errors.${problem}`) : undefined,
+          error: problem
+            ? t(`errors.${problem}`, {
+                size: problem === "upload_video_size" ? videoSize : imageSize,
+              })
+            : undefined,
         };
       }),
     ]);
@@ -231,13 +244,14 @@ export function PhotoGallery({
         className="visually-hidden"
         type="file"
         multiple
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
         aria-label={t("photos.add")}
         onChange={(event) => choose(event.target.files)}
         tabIndex={-1}
       />
       <p className="photo-privacy">
-        <Images size={15} aria-hidden="true" /> {t("photos.privacy")}
+        <Images size={15} aria-hidden="true" />{" "}
+        {t("photos.privacy", { imageSize, videoSize })}
       </p>
       {queue.length > 0 && (
         <section
@@ -274,7 +288,11 @@ export function PhotoGallery({
                     />
                     <span className="fine-print">
                       {item.progress === 100
-                        ? t("photos.processing")
+                        ? t(
+                            item.file.type.startsWith("video/")
+                              ? "photos.processingVideo"
+                              : "photos.processing",
+                          )
                         : new Intl.NumberFormat(locale, {
                             style: "percent",
                           }).format(item.progress / 100)}
@@ -290,7 +308,7 @@ export function PhotoGallery({
                   </span>
                 )}
               </div>
-              {item.status === "error" && !uploadProblem(item.file) && (
+              {item.status === "error" && !uploadProblem(item.file, limits) && (
                 <button
                   className="icon-button"
                   aria-label={t("photos.retry", { name: item.file.name })}
@@ -343,7 +361,7 @@ export function PhotoGallery({
       <ErrorNotice message={selected === null ? error : null} />
       {photos.length === 0 ? (
         <EmptyState
-          icon={<Camera size={36} strokeWidth={1.4} />}
+          icon={<Images size={36} strokeWidth={1.4} />}
           title={t("photos.emptyTitle")}
         >
           <p>{t("photos.emptyDescription")}</p>
@@ -376,20 +394,31 @@ export function PhotoGallery({
                 className="photo-tile"
                 key={photo.id}
                 onClick={() => setSelected(photo.id)}
-                aria-label={t("photos.open", {
-                  name: photo.author.name,
-                  date: formatDate(photo.createdAt, timezone, true, locale),
-                })}
+                aria-label={t(
+                  photo.kind === "video" ? "photos.openVideo" : "photos.open",
+                  {
+                    name: photo.author.name,
+                    date: formatDate(photo.createdAt, timezone, true, locale),
+                  },
+                )}
               >
                 <img
                   src={photo.thumbnailUrl}
-                  alt={t("photos.alt", { name: photo.author.name })}
+                  alt={t(
+                    photo.kind === "video" ? "photos.videoAlt" : "photos.alt",
+                    { name: photo.author.name },
+                  )}
                   width={photo.width}
                   height={photo.height}
                   loading="lazy"
                   decoding="async"
                 />
-                <span>{photo.author.name}</span>
+                {photo.kind === "video" && (
+                  <span className="video-marker" aria-hidden="true">
+                    <Play size={20} fill="currentColor" />
+                  </span>
+                )}
+                <span className="photo-author">{photo.author.name}</span>
               </button>
             ))}
           </div>
@@ -414,10 +443,15 @@ export function PhotoGallery({
           if (event.target === dialog.current) setSelected(null);
         }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowRight" && currentIndex < photos.length - 1)
+          if (event.target instanceof HTMLVideoElement) return;
+          if (event.key === "ArrowRight" && currentIndex < photos.length - 1) {
+            event.preventDefault();
             setSelected(photos[currentIndex + 1].id);
-          if (event.key === "ArrowLeft" && currentIndex > 0)
+          }
+          if (event.key === "ArrowLeft" && currentIndex > 0) {
+            event.preventDefault();
             setSelected(photos[currentIndex - 1].id);
+          }
         }}
       >
         {current && (
@@ -438,13 +472,29 @@ export function PhotoGallery({
                 <X />
               </button>
             </div>
-            <img
-              className="lightbox-image"
-              src={current.url}
-              alt={t("photos.alt", { name: current.author.name })}
-              width={current.width}
-              height={current.height}
-            />
+            {current.kind === "video" ? (
+              <video
+                key={current.id}
+                ref={video}
+                className="lightbox-image"
+                src={current.url}
+                poster={current.thumbnailUrl}
+                width={current.width}
+                height={current.height}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={t("photos.videoAlt", { name: current.author.name })}
+              />
+            ) : (
+              <img
+                className="lightbox-image"
+                src={current.url}
+                alt={t("photos.alt", { name: current.author.name })}
+                width={current.width}
+                height={current.height}
+              />
+            )}
             <div className="lightbox-footer">
               <div className="button-row">
                 <button
@@ -472,7 +522,11 @@ export function PhotoGallery({
                 <a
                   className="icon-button"
                   href={current.url}
-                  download
+                  download={`media-${current.id}.${
+                    current.mimeType === "image/jpeg"
+                      ? "jpg"
+                      : current.mimeType.split("/")[1]
+                  }`}
                   aria-label={t("photos.download")}
                 >
                   <Download size={19} />

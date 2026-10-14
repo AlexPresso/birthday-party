@@ -1,11 +1,11 @@
 # Les 30 ans
 
-Application privée pour un anniversaire : photos, programme avec surprises
+Application privée pour un anniversaire : photos et vidéos, programme avec surprises
 programmées, livre d'or et paramètres. L'interface utilise le thème
 prune sombre choisi dans [le brief](docs/design.md).
 
 Next.js et TypeScript affichent l'application. Un service Go gère les invitations,
-les sessions, les permissions, SQLite et les photos sur disque. Le navigateur
+les sessions, les permissions, SQLite et les médias sur disque. Le navigateur
 utilise uniquement l'origine du frontend ; Next transmet `/api/*` au serveur Go.
 Le [contrat HTTP](docs/api.md) décrit les échanges.
 
@@ -26,7 +26,10 @@ conservées telles quelles, avec leurs ressources utiles et les crédits d'origi
 
 ## Démarrer en local
 
-Prérequis : Node.js 24+, npm et Go 1.26+. Aucun service de base de données externe
+Prérequis : Node.js 24+, npm, Go 1.26+, `ffmpeg` et `ffprobe` dans le `PATH`
+pour les vidéos. [FFmpeg](https://ffmpeg.org/download.html) doit inclure les
+encodeurs H.264 (`libx264`) et AAC. Docker les fournit automatiquement.
+Aucun service de base de données externe
 n'est nécessaire. Les commandes ci-dessous fonctionnent dans PowerShell à la
 racine du projet.
 
@@ -113,6 +116,28 @@ En local, `npm run dev` charge également le `.env` racine ; relancer la command
 après une modification. `frontend/.env.example` sert uniquement à lancer Next.js
 indépendamment, sans le script racine.
 
+## Limites des fichiers
+
+Dans le `.env` à la racine, ces variables définissent le poids maximal par fichier :
+
+```dotenv
+MAX_IMAGE_SIZE_MB=15
+MAX_VIDEO_SIZE_MB=100
+```
+
+Les valeurs sont des entiers de 1 à 1024, en Mio (1 Mio = 1 048 576 octets).
+Une variable absente ou vide utilise respectivement 15 et 100. Une valeur
+invalide empêche le démarrage avec un message d’erreur explicite.
+
+Après modification, lancer `docker compose up -d`. Le serveur, les limites
+affichées et le proxy prennent les nouvelles valeurs sans reconstruire les images.
+Recharger la page Médias pour actualiser les indications et la sélection des fichiers.
+Avec `npm run dev`, relancer la commande après modification du `.env`.
+
+La durée maximale des vidéos reste de 5 minutes ; les limites de résolution
+restent de 40 mégapixels pour les images et de 4K pour les vidéos. Le poids réglé
+concerne le fichier envoyé : une vidéo convertie peut avoir un poids différent.
+
 ## Langue de l’interface
 
 L’application suit les préférences de langue du téléphone ou du navigateur,
@@ -189,12 +214,20 @@ L'application n'envoie aucun e-mail ni message WhatsApp.
 - Avant activation, une personne à qui le lien est transféré peut prendre cet
   accès. Le partager uniquement avec son destinataire. Une session déjà ouverte
   dépend aussi de la confidentialité du navigateur utilisé.
-- Tous les invités actifs voient les photos, les messages et les événements
+- Tous les invités actifs voient les photos, les vidéos, les messages et les événements
   disponibles. Un auteur peut supprimer ses propres contributions ;
   l'organisateur peut modérer toutes les contributions.
-- Les fichiers photo sont protégés par la même connexion que l'application.
-  Les formats acceptés sont JPEG, PNG et WebP, jusqu'à 15 Mio et 40 mégapixels.
-  L'album accepte au plus 5 000 photos et 10 Gio de fichiers originaux.
+- Dans le livre d’or, cocher **Publier anonymement** masque le nom aux invités
+  et à l’organisateur. L’auteur peut toujours supprimer son message. Son identité
+  reste enregistrée dans la base privée pour gérer ce droit.
+- Les photos et vidéos sont protégées par la même connexion que l'application.
+  Les formats acceptés sont JPEG, PNG et WebP, jusqu'à 40 mégapixels.
+  Les vidéos acceptées sont MP4, MOV et WebM, jusqu’à 5 minutes et 4K.
+  Les poids maximaux viennent du `.env` : 15 Mio par image et 100 Mio par vidéo
+  par défaut.
+  Elles sont converties en MP4 H.264/AAC, jusqu’à 1280×720 et 30 images/seconde,
+  puis leur fichier d’origine est supprimé. La galerie accepte au plus 5 000
+  fichiers et 10 Gio ; les nouveaux envois comptent aussi leur vignette.
 - Go masque le titre privé et la description des surprises avant leur ouverture.
   Un aperçu public peut être défini. Le fuseau initial est **Europe/Zurich**,
   modifiable par l'organisateur ; les instants sont enregistrés en UTC.
@@ -223,12 +256,17 @@ utilisent un port et un dossier de données temporaires propres aux tests ; ils
 ne doivent pas utiliser les données de la fête. Voir aussi les
 instructions [frontend](frontend/AGENTS.md) et [backend](backend/AGENTS.md).
 
-Vérifications du 14 octobre 2026 : analyse et tests Go, lint, types, 13 tests
-frontend, 16 parcours Chrome, formatage et build production réussis. Les parcours
-couvrent invitations, photos privées, livre d'or, révocation, déverrouillage et
+Vérifications du 14 octobre 2026 : analyse et tests Go, lint, types, 18 tests
+frontend, 19 parcours Chrome, formatage et build production réussis. Les parcours
+couvrent invitations, photos et vidéos privées, livre d'or anonyme, révocation, déverrouillage et
 administration, ainsi que les cinq langues et le repli vers l’anglais ; les vues
 mobile et ordinateur ont été inspectées. Le détecteur
 de courses Go nécessite cgo et n'a pas pu être exécuté sur cette machine.
+Les tests vidéo utilisent FFmpeg sur Windows et dans Alpine 3.22, y compris
+la limite de cinq minutes et la lecture par plages d’octets.
+Les limites de poids personnalisées sont vérifiées côté navigateur et serveur.
+Un envoi de 106 Mio à travers le proxy de production a confirmé leur prise en
+compte avec les mêmes images Docker, sans reconstruction.
 
 L'audit des dépendances de production npm et `govulncheck` ne signalent aucune
 vulnérabilité connue. L'audit npm complet signale une vulnérabilité de `braces`
@@ -239,7 +277,7 @@ jour de `eslint-config-next` et relancer l'audit.
 ## Exécuter avec Docker
 
 La configuration Compose fournit les deux applications et un volume persistant
-`party-data` pour SQLite et les photos. Elle reste accessible uniquement depuis
+`party-data` pour SQLite, les photos et les vidéos. Elle reste accessible uniquement depuis
 la machine hôte sur le port 3000 ; le serveur Go n'a aucun port public.
 Le démarrage Compose, l'ouverture de la page d'invitation dans Chrome et l'accès
 à l'API via le frontend ont été vérifiés le 14 octobre 2026.
@@ -270,14 +308,16 @@ conteneurs. Conserver le backend sur le réseau privé et le volume de données 
 un stockage persistant. Les invitations générées utilisent `PUBLIC_URL` :
 `localhost` ne permet pas aux invités de se connecter depuis leur téléphone.
 
-Le proxy doit accepter des requêtes photo d'au moins 16 Mio et ne pas mettre en
+Le reverse proxy doit accepter le plus grand des deux poids configurés,
+avec au moins 64 Kio pour le formulaire, et un délai de 10 minutes pour
+l’envoi et la préparation des vidéos. Il ne doit pas mettre en
 cache les pages privées, les API ni les médias authentifiés. La destination du
 proxy Next est fixée pendant la compilation via `API_INTERNAL_URL` ; reconstruire
 le frontend si cette adresse interne change.
 
 Avant une sauvegarde simple, arrêter les deux services, copier l'intégralité de
 `backend/data/` en local ou du volume `party-data` avec Docker, puis redémarrer.
-Sauvegarder ensemble la base SQLite, ses éventuels fichiers WAL et les photos.
+Sauvegarder ensemble la base SQLite, ses éventuels fichiers WAL, les photos et les vidéos.
 Conserver les copies dans un espace privé et tester leur restauration. Éviter
 `docker compose down -v` tant que les souvenirs doivent être conservés : cette
 option supprime le volume.

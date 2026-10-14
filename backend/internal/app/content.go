@@ -36,10 +36,12 @@ type eventInput struct {
 }
 
 type Entry struct {
-	ID        int64  `json:"id"`
-	Author    Author `json:"author"`
-	Body      string `json:"body"`
-	CreatedAt string `json:"createdAt"`
+	ID        int64   `json:"id"`
+	Author    *Author `json:"author"`
+	Anonymous bool    `json:"anonymous"`
+	CanDelete bool    `json:"canDelete"`
+	Body      string  `json:"body"`
+	CreatedAt string  `json:"createdAt"`
 }
 
 func (a *App) getParty(w http.ResponseWriter, r *http.Request, _ Guest) {
@@ -234,12 +236,12 @@ func (a *App) deleteEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 	}
 }
 
-func (a *App) listEntries(w http.ResponseWriter, r *http.Request, _ Guest) {
+func (a *App) listEntries(w http.ResponseWriter, r *http.Request, guest Guest) {
 	before, limit, ok := page(w, r)
 	if !ok {
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT e.id,g.id,g.name,e.body,e.created_at FROM entries e JOIN guests g ON e.guest_id=g.id WHERE (?=0 OR e.id<?) ORDER BY e.id DESC LIMIT ?`, before, before, limit+1)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT e.id,g.id,g.name,e.anonymous,e.body,e.created_at FROM entries e JOIN guests g ON e.guest_id=g.id WHERE (?=0 OR e.id<?) ORDER BY e.id DESC LIMIT ?`, before, before, limit+1)
 	if err != nil {
 		internal(w, err)
 		return
@@ -248,9 +250,14 @@ func (a *App) listEntries(w http.ResponseWriter, r *http.Request, _ Guest) {
 	items := []Entry{}
 	for rows.Next() {
 		var entry Entry
-		if err := rows.Scan(&entry.ID, &entry.Author.ID, &entry.Author.Name, &entry.Body, &entry.CreatedAt); err != nil {
+		var author Author
+		if err := rows.Scan(&entry.ID, &author.ID, &author.Name, &entry.Anonymous, &entry.Body, &entry.CreatedAt); err != nil {
 			internal(w, err)
 			return
+		}
+		entry.CanDelete = guest.Role == "admin" || guest.ID == author.ID
+		if !entry.Anonymous {
+			entry.Author = &author
 		}
 		items = append(items, entry)
 	}
@@ -268,7 +275,8 @@ func (a *App) listEntries(w http.ResponseWriter, r *http.Request, _ Guest) {
 
 func (a *App) createEntry(w http.ResponseWriter, r *http.Request, guest Guest) {
 	var input struct {
-		Body string `json:"body"`
+		Body      string `json:"body"`
+		Anonymous bool   `json:"anonymous"`
 	}
 	if !decode(w, r, &input) {
 		return
@@ -278,8 +286,11 @@ func (a *App) createEntry(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 400, "invalid_message")
 		return
 	}
-	entry := Entry{Author: Author{ID: guest.ID, Name: guest.Name}, Body: input.Body, CreatedAt: stamp(a.now())}
-	result, err := a.db.ExecContext(r.Context(), "INSERT INTO entries(guest_id,body,created_at) VALUES(?,?,?)", guest.ID, entry.Body, entry.CreatedAt)
+	entry := Entry{Anonymous: input.Anonymous, CanDelete: true, Body: input.Body, CreatedAt: stamp(a.now())}
+	if !entry.Anonymous {
+		entry.Author = &Author{ID: guest.ID, Name: guest.Name}
+	}
+	result, err := a.db.ExecContext(r.Context(), "INSERT INTO entries(guest_id,anonymous,body,created_at) VALUES(?,?,?,?)", guest.ID, entry.Anonymous, entry.Body, entry.CreatedAt)
 	if err != nil {
 		internal(w, err)
 		return

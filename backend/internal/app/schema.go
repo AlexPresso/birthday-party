@@ -10,10 +10,10 @@ func migrate(db *sql.DB) error {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 1 {
+	if version > 2 {
 		return fmt.Errorf("database version %d is newer than this application", version)
 	}
-	if version == 1 {
+	if version == 2 {
 		return nil
 	}
 	tx, err := db.Begin()
@@ -21,10 +21,15 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(schema); err != nil {
+	if version < 1 {
+		if _, err := tx.Exec(schema); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec("ALTER TABLE entries ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0 CHECK(anonymous IN (0,1))"); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version=1"); err != nil {
+	if _, err := tx.Exec("PRAGMA user_version=2"); err != nil {
 		return err
 	}
 	return tx.Commit()

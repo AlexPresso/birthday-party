@@ -7,10 +7,10 @@ new decision; do not revisit the rejected directions without a reason.
 
 - A friendly app for a 30th birthday party.
 - A Next.js frontend with a Go backend.
-- Four tabs, in order: `photos`, `programme`, `livre d'or`, `paramètres` in French,
+- Four tabs, in order: `Médias`, `Programme`, `Livre d'or`, `Paramètres` in French,
   with translated labels and unchanged routes in the other supported languages.
 - Events and other content that become available later.
-- A guestbook with messages attributed to individual guests.
+- A guestbook with named messages and an optional anonymous posting checkbox.
 - Invite-only access through personal activation links and pre-created profiles.
 - Simple, readable code and a responsive, performant experience.
 - Interface language follows the phone/browser's preferred supported language:
@@ -41,7 +41,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Keep the four confirmed tabs in the same order, including translated labels.
   Use a fixed bottom navigation
   on phones and a comfortable equivalent on larger screens.
-- Photos is the first destination after authentication. Programme includes timed
+- Media is the first destination after authentication. Programme includes timed
   surprises; there is no separate home or surprises tab.
 - Give the next useful action a clear place on each screen.
 - Use the same readable sans-serif family for headings and body content.
@@ -51,24 +51,29 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Let photos and useful event information lead. Add personal details where they
   support the celebration without crowding controls or text.
 
-## Photo sharing
+## Photo and video sharing
 
 - Make upload easy to find and operate with touch, keyboard, and screen readers.
 - Explain supported files and limits when those are defined by the product.
-- Show selected photos, upload progress, success, and useful per-file errors.
+- Show selected files, upload progress, success, and useful per-file errors.
 - Preserve successful uploads when another file fails, and offer a clear retry.
 - Give an empty gallery a welcoming explanation and an upload action.
 - Use appropriately sized thumbnails, reserve image space, and load offscreen
   media on demand. Keep original-size files out of routine gallery rendering.
 - Leave room for meaningful captions or accessible descriptions when available.
+- Support JPEG/PNG/WebP photos and MP4/MOV/WebM videos up to 5 minutes and 4K
+  input. Display the configured upload sizes from the API (15/100 MiB defaults).
+  Display video thumbnails with a play marker.
+  Open a native player with controls; play only when the guest chooses to.
 
 ## Events and timed reveals
 
 - Distinguish upcoming, available, and completed experiences with text as well as color.
 - An upcoming reveal can offer a hint when the host wants one; do not expose
   content that is intended to remain hidden.
-- Show a readable opening date and time with the applicable timezone. A countdown
-  may supplement this information; it should not be the only explanation.
+- Show a readable opening date and time converted to the party's timezone,
+  without timezone suffixes or a timezone footer. A countdown may supplement
+  this information; it should not be the only explanation.
 - Handle loading, unavailable content, and failed refreshes with understandable
   messages and a useful next action.
 - Keep feedback modest. Prefer CSS for small transitions and honor reduced motion;
@@ -83,6 +88,9 @@ Do not invent party details, guest contributions, dates, or activity counts.
   to the host. Keep identity attached to a stable guest ID across new invitations.
 - The guestbook has a welcoming empty state and a clear message composer. Display
   actual guest names, readable messages and posting dates. Handle submission errors.
+- Place an unchecked anonymous posting checkbox beside the message composer.
+  When selected, explain that the name will not appear. Anonymous messages show
+  a neutral avatar and translated anonymous label, including to the host.
 - Settings shows the guest identity, the dark theme, event information and logout.
   Host-only controls manage guests, invitations, event details and the programme.
 - Keep administrative controls within settings so guest navigation stays simple.
@@ -116,5 +124,5 @@ keyboard navigation, visible focus, contrast, touch targets, and reduced motion.
 
 Event date, venue and actual content remain unset until the host supplies them.
 The initial event timezone is configurable, defaulting to `Europe/Zurich`.
-Active guests can view and contribute photos/messages; authors and hosts can
+Active guests can view and contribute photos, videos and messages; authors and hosts can
 remove their contributions, and the host can moderate all contributions.

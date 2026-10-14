@@ -35,7 +35,7 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - Make unlock boundary behavior explicit and test immediately before, at, and after the boundary.
   Pass a clock or time value into time-sensitive logic when useful for deterministic tests.
 
-## Photo uploads
+## Media uploads
 
 - Validate authorization, file size, and allowed file types on the server. Inspect file contents;
   do not trust extensions or client-provided MIME types. Set limits before reading request bodies.
@@ -44,6 +44,17 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - Generate safe storage identifiers; never use user-provided filenames as filesystem paths.
   Keep originals private and make access to stored media follow the same resource permissions.
 - Handle failed or cancelled uploads so incomplete files do not appear as successful contributions.
+- Upload sizes come from MAX_IMAGE_SIZE_MB/MAX_VIDEO_SIZE_MB (15/100 MiB by
+  default, integers 1–1024). Expose effective byte limits in the gallery API;
+  inspect contents to choose the limit and bound the request by their maximum.
+- Video inputs are MP4/MOV/WebM up to the configured size, 5 minutes and 4K. FFmpeg and
+  ffprobe are runtime dependencies (included in Compose). Restrict demuxers and
+  protocols, bound dimensions, threads, execution time and temporary output.
+  Convert to H.264/AAC MP4 with a private JPEG thumbnail; keep range requests
+  authenticated. Existing /api/photos URLs also serve videos.
+- Anonymous guestbook posts retain their owner only in SQLite. Serialize author
+  as null for all viewers, including administrators, and compute canDelete from
+  the authenticated viewer. Migrations preserve existing named messages.
 
 ## Implementation and commands
 

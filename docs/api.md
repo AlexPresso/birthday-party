@@ -41,20 +41,36 @@ The host may leave the party name empty when updating the date, location or
 timezone. Saving an empty `title` restores the frontend fallback; a custom title
 may contain up to 120 characters and remains in the host's original language.
 
-## Photos
+## Media
 
 `Author = { id, name }`
-`Photo = { id, author: Author, width, height, createdAt, url, thumbnailUrl }`
+`Photo = { id, author: Author, kind: "image" | "video", mimeType, width, height, createdAt, url, thumbnailUrl }`
 
-- `GET /api/photos?before=<id>&limit=24` -> `{ items: Photo[], nextCursor: string | null }`.
+The route and type names retain `photos` for compatibility; the collection
+contains both photos and videos. `mimeType` is `image/jpeg`, `image/png`,
+`image/webp` or `video/mp4`.
+
+- `GET /api/photos?before=<id>&limit=24` -> `{ items: Photo[], nextCursor: string | null, limits: { imageBytes, videoBytes } }`.
 - `POST /api/photos` multipart field `file` -> `Photo` (201). One file per request.
-- `GET /api/photos/{id}/image` -> original image; `?size=thumb` -> thumbnail.
+- `GET /api/photos/{id}/image` -> original image or normalized MP4 video;
+  `?size=thumb` -> JPEG thumbnail. Video requests support authenticated byte ranges.
 - `DELETE /api/photos/{id}` -> 204, only author or admin.
 
-JPEG, PNG and WebP, maximum 15 MiB each and 40 megapixels decoded. Media stays
-authenticated. The UI uploads a bounded queue with per-file progress and retry.
-Thumbnails are at most 720 pixels per side. The initial album is capped at 5000
-photos and 10 GiB of originals. Processing accepts two concurrent uploads.
+Images accept JPEG, PNG and WebP, up to 40 megapixels decoded.
+Videos accept MP4, MOV and WebM, up to 5 minutes and 4K input.
+`limits` contains the effective per-file input sizes in bytes, from
+`MAX_IMAGE_SIZE_MB` (default 15 MiB) and `MAX_VIDEO_SIZE_MB` (default 100 MiB).
+Both accept whole MiB from 1 to 1024. The browser uses these values for selection
+validation and displayed limits. Go validates file content and enforces its
+corresponding limit independently of client headers.
+The server inspects file contents, converts videos to H.264/AAC MP4 at up to
+1280×720 and 30 fps, and generates JPEG thumbnails. Uploaded video originals
+are discarded after conversion. Media and thumbnails stay authenticated.
+The UI uploads a bounded queue with per-file progress and retry. Thumbnails
+are at most 720 pixels per side. The gallery is capped at 5000 files and
+10 GiB; new upload accounting includes the playback/original file and thumbnail.
+Processing accepts two concurrent uploads. FFmpeg runs with limited threads,
+protocols, formats and processing time; failed or cancelled uploads are removed.
 
 ## Programme
 
@@ -73,11 +89,18 @@ An event unlocks when server time is at or after `unlockAt`. Null means availabl
 
 ## Guestbook
 
-`Entry = { id, author: Author, body, createdAt }`
+`Entry = { id, author: Author | null, anonymous: boolean, canDelete: boolean, body, createdAt }`
 
 - `GET /api/guestbook?before=<id>&limit=24` -> `{ items: Entry[], nextCursor: string | null }`.
-- `POST /api/guestbook { body }` -> `Entry` (201); 1–2000 characters after trimming.
+- `POST /api/guestbook { body, anonymous?: boolean }` -> `Entry` (201); 1–2000 characters after trimming.
 - `DELETE /api/guestbook/{id}` -> 204, only author or admin.
+
+Omitting `anonymous` defaults to `false`. Anonymous entries return `author: null`
+to every viewer, including the original author and administrators. Their owner ID
+remains private in the database so the author can still delete the entry.
+`canDelete` reflects the current viewer's permission: only the author or an
+administrator can delete an entry. The frontend uses this flag without needing
+the private identity. Existing entries keep their names after migration.
 
 ## Host controls
 

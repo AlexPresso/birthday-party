@@ -31,24 +31,34 @@ const en = {
   invalid_guest_name: "The name must contain between 1 and 80 characters.",
   guest_limit_reached: "You’ve reached the limit of 500 guests.",
   self_revoke_forbidden: "You cannot remove your own access.",
-  upload_busy: "Two photos are already being processed. Try again in a moment.",
-  photo_required: "Choose a photo to upload.",
-  single_photo_required: "Upload one photo at a time.",
-  photo_too_large: "This photo is larger than 15 MB. Choose a smaller file.",
-  photo_upload_failed: "The photo didn’t upload. Try again.",
-  unsupported_photo_type: "Choose a JPEG, PNG or WebP photo.",
+  upload_busy: "Two files are already being processed. Try again in a moment.",
+  photo_required: "Choose a photo or video to upload.",
+  single_photo_required: "Upload one file at a time.",
+  photo_too_large: "This photo is too large. Choose a smaller file.",
+  photo_upload_failed: "The file didn’t upload. Try again.",
+  unsupported_photo_type:
+    "Choose a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video.",
   photo_dimensions_too_large:
     "This photo exceeds 40 megapixels. Choose a smaller image.",
   unreadable_photo: "This photo could not be read. Choose another image.",
-  album_full: "The album is full (5000 photos or 10 GB). Contact the host.",
+  album_full: "The gallery is full (5000 files or 10 GB). Contact the host.",
   access_revoked: "You no longer have access to the party. Contact the host.",
-  photo_not_found: "This photo could not be found.",
-  photo_unavailable: "This photo is no longer available.",
-  photo_delete_forbidden: "You can only delete your own photos.",
+  photo_not_found: "This file could not be found.",
+  photo_unavailable: "This file is no longer available.",
+  photo_delete_forbidden: "You can only delete your own photos and videos.",
   upload_type:
-    "Choose a JPEG, PNG or WebP photo. Convert HEIC files to JPEG first.",
-  upload_size: "This photo is larger than 15 MB. Choose a smaller file.",
-  upload_empty: "This file is empty. Choose another photo.",
+    "Choose a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video. Convert HEIC files to JPEG first.",
+  upload_size: "This photo is larger than {size} MB. Choose a smaller file.",
+  upload_empty: "This file is empty. Choose another file.",
+  video_too_large: "This video is too large. Choose a smaller file.",
+  video_too_long: "Videos can be up to 5 minutes long. Choose a shorter video.",
+  video_dimensions_too_large:
+    "This video exceeds 4K resolution. Choose a smaller video.",
+  unreadable_video: "This video could not be read. Choose another video.",
+  video_processing_failed:
+    "This video could not be prepared. Try another file.",
+  upload_video_size:
+    "This video is larger than {size} MB. Choose a smaller file.",
 };
 
 export type ErrorCode = keyof typeof en;
@@ -91,25 +101,40 @@ export const errorMessages = {
     guest_limit_reached: "Tu as atteint la limite de 500 invités.",
     self_revoke_forbidden: "Tu ne peux pas retirer ton propre accès.",
     upload_busy:
-      "Deux photos sont déjà en cours de traitement. Réessaie dans un instant.",
-    photo_required: "Choisis une photo à envoyer.",
-    single_photo_required: "Envoie une seule photo à la fois.",
-    photo_too_large: "La photo dépasse 15 Mo. Choisis un fichier plus petit.",
-    photo_upload_failed: "La photo n’a pas été envoyée. Réessaie.",
-    unsupported_photo_type: "Choisis une photo JPEG, PNG ou WebP.",
+      "Deux fichiers sont déjà en cours de traitement. Réessaie dans un instant.",
+    photo_required: "Choisis une photo ou une vidéo à envoyer.",
+    single_photo_required: "Envoie un fichier à la fois.",
+    photo_too_large:
+      "Cette photo est trop lourde. Choisis un fichier plus petit.",
+    photo_upload_failed: "Le fichier n’a pas été envoyé. Réessaie.",
+    unsupported_photo_type:
+      "Choisis une photo JPEG, PNG ou WebP, ou une vidéo MP4, MOV ou WebM.",
     photo_dimensions_too_large:
       "La photo dépasse 40 mégapixels. Choisis une image plus petite.",
     unreadable_photo: "Cette photo est illisible. Choisis une autre image.",
     album_full:
-      "L’album est plein (5000 photos ou 10 Go). Contacte l’organisateur.",
+      "La galerie est pleine (5 000 fichiers ou 10 Go). Contacte l’organisateur.",
     access_revoked: "Tu n’as plus accès à la fête. Contacte l’organisateur.",
-    photo_not_found: "Cette photo est introuvable.",
-    photo_unavailable: "Cette photo n’est plus disponible.",
-    photo_delete_forbidden: "Tu peux seulement supprimer tes propres photos.",
+    photo_not_found: "Ce fichier est introuvable.",
+    photo_unavailable: "Ce fichier n’est plus disponible.",
+    photo_delete_forbidden:
+      "Tu peux seulement supprimer tes propres photos et vidéos.",
     upload_type:
-      "Choisis une photo JPEG, PNG ou WebP. Convertis d’abord les fichiers HEIC en JPEG.",
-    upload_size: "La photo dépasse 15 Mo. Choisis un fichier plus petit.",
-    upload_empty: "Ce fichier est vide. Choisis une autre photo.",
+      "Choisis une photo JPEG, PNG ou WebP, ou une vidéo MP4, MOV ou WebM. Convertis d’abord les fichiers HEIC en JPEG.",
+    upload_size: "La photo dépasse {size} Mo. Choisis un fichier plus petit.",
+    upload_empty: "Ce fichier est vide. Choisis un autre fichier.",
+    video_too_large:
+      "Cette vidéo est trop lourde. Choisis un fichier plus petit.",
+    video_too_long:
+      "Les vidéos sont limitées à 5 minutes. Choisis une vidéo plus courte.",
+    video_dimensions_too_large:
+      "Cette vidéo dépasse la résolution 4K. Choisis une vidéo de plus petite taille.",
+    unreadable_video:
+      "Cette vidéo ne peut pas être lue. Choisis une autre vidéo.",
+    video_processing_failed:
+      "Cette vidéo n’a pas pu être préparée. Essaie avec un autre fichier.",
+    upload_video_size:
+      "Cette vidéo dépasse {size} Mo. Choisis un fichier plus petit.",
   },
   de: {
     request_forbidden: "Diese Aktion ist nicht erlaubt.",
@@ -149,29 +174,42 @@ export const errorMessages = {
     guest_limit_reached: "Du hast das Limit von 500 Gästen erreicht.",
     self_revoke_forbidden: "Du kannst deinen eigenen Zugang nicht entfernen.",
     upload_busy:
-      "Es werden bereits zwei Fotos verarbeitet. Versuch es gleich noch einmal.",
-    photo_required: "Wähle ein Foto zum Hochladen.",
-    single_photo_required: "Lade jeweils nur ein Foto hoch.",
-    photo_too_large:
-      "Dieses Foto ist größer als 15 MB. Wähle eine kleinere Datei.",
+      "Zwei Dateien werden bereits verarbeitet. Versuche es gleich noch einmal.",
+    photo_required: "Wähle ein Foto oder Video zum Hochladen.",
+    single_photo_required: "Lade eine Datei nach der anderen hoch.",
+    photo_too_large: "Dieses Foto ist zu groß. Wähle eine kleinere Datei.",
     photo_upload_failed:
-      "Das Foto konnte nicht hochgeladen werden. Versuch es noch einmal.",
-    unsupported_photo_type: "Wähle ein Foto im Format JPEG, PNG oder WebP.",
+      "Die Datei wurde nicht hochgeladen. Versuche es erneut.",
+    unsupported_photo_type:
+      "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM.",
     photo_dimensions_too_large:
       "Dieses Foto hat mehr als 40 Megapixel. Wähle ein kleineres Bild.",
     unreadable_photo:
       "Dieses Foto konnte nicht gelesen werden. Wähle ein anderes Bild.",
     album_full:
-      "Das Album ist voll (5000 Fotos oder 10 GB). Melde dich beim Gastgeber.",
+      "Die Galerie ist voll (5000 Dateien oder 10 GB). Wende dich an den Gastgeber.",
     access_revoked:
       "Du hast keinen Zugang mehr zur Feier. Melde dich beim Gastgeber.",
-    photo_not_found: "Dieses Foto wurde nicht gefunden.",
-    photo_unavailable: "Dieses Foto ist nicht mehr verfügbar.",
-    photo_delete_forbidden: "Du kannst nur deine eigenen Fotos löschen.",
+    photo_not_found: "Diese Datei wurde nicht gefunden.",
+    photo_unavailable: "Diese Datei ist nicht mehr verfügbar.",
+    photo_delete_forbidden:
+      "Du kannst nur deine eigenen Fotos und Videos löschen.",
     upload_type:
-      "Wähle ein Foto im Format JPEG, PNG oder WebP. Wandle HEIC-Dateien zuerst in JPEG um.",
-    upload_size: "Dieses Foto ist größer als 15 MB. Wähle eine kleinere Datei.",
-    upload_empty: "Diese Datei ist leer. Wähle ein anderes Foto.",
+      "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM. Wandle HEIC-Dateien zuerst in JPEG um.",
+    upload_size:
+      "Dieses Foto ist größer als {size} MB. Wähle eine kleinere Datei.",
+    upload_empty: "Diese Datei ist leer. Wähle eine andere Datei.",
+    video_too_large: "Dieses Video ist zu groß. Wähle eine kleinere Datei.",
+    video_too_long:
+      "Videos dürfen bis zu 5 Minuten lang sein. Wähle ein kürzeres Video.",
+    video_dimensions_too_large:
+      "Dieses Video hat eine höhere Auflösung als 4K. Wähle ein kleineres Video.",
+    unreadable_video:
+      "Dieses Video konnte nicht gelesen werden. Wähle ein anderes Video.",
+    video_processing_failed:
+      "Dieses Video konnte nicht vorbereitet werden. Versuche es mit einer anderen Datei.",
+    upload_video_size:
+      "Dieses Video ist größer als {size} MB. Wähle eine kleinere Datei.",
   },
   it: {
     request_forbidden: "Questa azione non è consentita.",
@@ -207,24 +245,38 @@ export const errorMessages = {
     invalid_guest_name: "Il nome deve contenere da 1 a 80 caratteri.",
     guest_limit_reached: "Hai raggiunto il limite di 500 invitati.",
     self_revoke_forbidden: "Non puoi rimuovere il tuo accesso.",
-    upload_busy: "Due foto sono già in elaborazione. Riprova tra poco.",
-    photo_required: "Scegli una foto da caricare.",
-    single_photo_required: "Carica una sola foto alla volta.",
-    photo_too_large: "Questa foto supera i 15 MB. Scegli un file più piccolo.",
-    photo_upload_failed: "La foto non è stata caricata. Riprova.",
-    unsupported_photo_type: "Scegli una foto JPEG, PNG o WebP.",
+    upload_busy: "Due file sono già in elaborazione. Riprova tra poco.",
+    photo_required: "Scegli una foto o un video da caricare.",
+    single_photo_required: "Carica un file alla volta.",
+    photo_too_large: "Questa foto è troppo grande. Scegli un file più piccolo.",
+    photo_upload_failed: "Il file non è stato caricato. Riprova.",
+    unsupported_photo_type:
+      "Scegli una foto JPEG, PNG o WebP, oppure un video MP4, MOV o WebM.",
     photo_dimensions_too_large:
       "Questa foto supera i 40 megapixel. Scegli un’immagine più piccola.",
     unreadable_photo: "Questa foto non è leggibile. Scegli un’altra immagine.",
-    album_full: "L’album è pieno (5000 foto o 10 GB). Contatta chi organizza.",
+    album_full:
+      "La galleria è piena (5000 file o 10 GB). Contatta chi organizza.",
     access_revoked: "Non hai più accesso alla festa. Contatta chi organizza.",
-    photo_not_found: "Questa foto non è stata trovata.",
-    photo_unavailable: "Questa foto non è più disponibile.",
-    photo_delete_forbidden: "Puoi eliminare solo le tue foto.",
+    photo_not_found: "Questo file non è stato trovato.",
+    photo_unavailable: "Questo file non è più disponibile.",
+    photo_delete_forbidden: "Puoi eliminare solo le tue foto e i tuoi video.",
     upload_type:
-      "Scegli una foto JPEG, PNG o WebP. Converti prima i file HEIC in JPEG.",
-    upload_size: "Questa foto supera i 15 MB. Scegli un file più piccolo.",
-    upload_empty: "Questo file è vuoto. Scegli un’altra foto.",
+      "Scegli una foto JPEG, PNG o WebP, oppure un video MP4, MOV o WebM. Converti prima i file HEIC in JPEG.",
+    upload_size: "Questa foto supera i {size} MB. Scegli un file più piccolo.",
+    upload_empty: "Questo file è vuoto. Scegli un altro file.",
+    video_too_large:
+      "Questo video è troppo grande. Scegli un file più piccolo.",
+    video_too_long:
+      "I video possono durare fino a 5 minuti. Scegli un video più breve.",
+    video_dimensions_too_large:
+      "Questo video supera la risoluzione 4K. Scegli un video più piccolo.",
+    unreadable_video:
+      "Non è stato possibile leggere questo video. Scegli un altro video.",
+    video_processing_failed:
+      "Non è stato possibile preparare questo video. Prova un altro file.",
+    upload_video_size:
+      "Questo video supera i {size} MB. Scegli un file più piccolo.",
   },
   es: {
     request_forbidden: "Esta acción no está permitida.",
@@ -262,26 +314,39 @@ export const errorMessages = {
     guest_limit_reached: "Has llegado al límite de 500 invitados.",
     self_revoke_forbidden: "No puedes quitarte tu propio acceso.",
     upload_busy:
-      "Ya se están procesando dos fotos. Inténtalo de nuevo en un momento.",
-    photo_required: "Elige una foto para subir.",
-    single_photo_required: "Sube una sola foto cada vez.",
+      "Ya se están procesando dos archivos. Vuelve a intentarlo en un momento.",
+    photo_required: "Elige una foto o un vídeo para subir.",
+    single_photo_required: "Sube un archivo a la vez.",
     photo_too_large:
-      "Esta foto supera los 15 MB. Elige un archivo más pequeño.",
-    photo_upload_failed: "No se ha podido subir la foto. Inténtalo de nuevo.",
-    unsupported_photo_type: "Elige una foto JPEG, PNG o WebP.",
+      "Esta foto es demasiado grande. Elige un archivo más pequeño.",
+    photo_upload_failed: "El archivo no se ha subido. Vuelve a intentarlo.",
+    unsupported_photo_type:
+      "Elige una foto JPEG, PNG o WebP, o un vídeo MP4, MOV o WebM.",
     photo_dimensions_too_large:
       "Esta foto supera los 40 megapíxeles. Elige una imagen más pequeña.",
     unreadable_photo: "No se ha podido leer esta foto. Elige otra imagen.",
     album_full:
-      "El álbum está lleno (5000 fotos o 10 GB). Contacta con quien organiza.",
+      "La galería está llena (5000 archivos o 10 GB). Contacta con quien organiza.",
     access_revoked:
       "Ya no tienes acceso a la fiesta. Contacta con quien organiza.",
-    photo_not_found: "No se ha encontrado esta foto.",
-    photo_unavailable: "Esta foto ya no está disponible.",
-    photo_delete_forbidden: "Solo puedes borrar tus propias fotos.",
+    photo_not_found: "No se ha encontrado este archivo.",
+    photo_unavailable: "Este archivo ya no está disponible.",
+    photo_delete_forbidden: "Solo puedes eliminar tus propias fotos y vídeos.",
     upload_type:
-      "Elige una foto JPEG, PNG o WebP. Convierte primero los archivos HEIC a JPEG.",
-    upload_size: "Esta foto supera los 15 MB. Elige un archivo más pequeño.",
-    upload_empty: "Este archivo está vacío. Elige otra foto.",
+      "Elige una foto JPEG, PNG o WebP, o un vídeo MP4, MOV o WebM. Convierte primero los archivos HEIC a JPEG.",
+    upload_size:
+      "Esta foto supera los {size} MB. Elige un archivo más pequeño.",
+    upload_empty: "Este archivo está vacío. Elige otro archivo.",
+    video_too_large:
+      "Este vídeo es demasiado grande. Elige un archivo más pequeño.",
+    video_too_long:
+      "Los vídeos pueden durar hasta 5 minutos. Elige un vídeo más corto.",
+    video_dimensions_too_large:
+      "Este vídeo supera la resolución 4K. Elige un vídeo más pequeño.",
+    unreadable_video: "No se ha podido leer este vídeo. Elige otro vídeo.",
+    video_processing_failed:
+      "No se ha podido preparar este vídeo. Prueba con otro archivo.",
+    upload_video_size:
+      "Este vídeo supera los {size} MB. Elige un archivo más pequeño.",
   },
 } satisfies Record<"fr" | "en" | "de" | "it" | "es", Record<ErrorCode, string>>;

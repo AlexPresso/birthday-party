@@ -25,9 +25,12 @@ import (
 )
 
 const (
-	cookieName    = "birthday_session"
-	invitationTTL = 7 * 24 * time.Hour
-	sessionTTL    = 90 * 24 * time.Hour
+	cookieName                     = "birthday_session"
+	invitationTTL                  = 7 * 24 * time.Hour
+	sessionTTL                     = 90 * 24 * time.Hour
+	defaultMaxImageBytes     int64 = 15 << 20
+	defaultMaxVideoBytes     int64 = 100 << 20
+	maxConfiguredUploadBytes int64 = 1024 << 20
 )
 
 type Config struct {
@@ -36,6 +39,8 @@ type Config struct {
 	DataDir              string
 	CookieSecure         bool
 	PrintAdminInvitation bool
+	MaxImageBytes        int64
+	MaxVideoBytes        int64
 }
 
 func ConfigFromEnv() (Config, error) {
@@ -60,7 +65,30 @@ func ConfigFromEnv() (Config, error) {
 			return c, errors.New("PRINT_ADMIN_INVITATION must be true or false")
 		}
 	}
+	if c.MaxImageBytes, err = uploadLimitFromEnv("MAX_IMAGE_SIZE_MB", defaultMaxImageBytes); err != nil {
+		return c, err
+	}
+	if c.MaxVideoBytes, err = uploadLimitFromEnv("MAX_VIDEO_SIZE_MB", defaultMaxVideoBytes); err != nil {
+		return c, err
+	}
 	return c, nil
+}
+
+func uploadLimitFromEnv(name string, fallback int64) (int64, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback, nil
+	}
+	for _, digit := range value {
+		if digit < '0' || digit > '9' {
+			return 0, fmt.Errorf("%s must be an integer between 1 and 1024", name)
+		}
+	}
+	size, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || size < 1 || size > 1024 {
+		return 0, fmt.Errorf("%s must be an integer between 1 and 1024", name)
+	}
+	return size << 20, nil
 }
 
 func env(key, fallback string) string {
@@ -93,6 +121,15 @@ type App struct {
 }
 
 func Open(config Config) (*App, error) {
+	if config.MaxImageBytes == 0 {
+		config.MaxImageBytes = defaultMaxImageBytes
+	}
+	if config.MaxVideoBytes == 0 {
+		config.MaxVideoBytes = defaultMaxVideoBytes
+	}
+	if config.MaxImageBytes < 1<<20 || config.MaxImageBytes > maxConfiguredUploadBytes || config.MaxVideoBytes < 1<<20 || config.MaxVideoBytes > maxConfiguredUploadBytes {
+		return nil, errors.New("upload limits must be between 1 MiB and 1024 MiB")
+	}
 	if err := os.MkdirAll(filepath.Join(config.DataDir, "photos"), 0700); err != nil {
 		return nil, err
 	}

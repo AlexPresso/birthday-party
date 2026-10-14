@@ -1,6 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
-import { BookOpen, PenLine, Send, Trash2, Heart } from "lucide-react";
+import {
+  BookOpen,
+  PenLine,
+  Send,
+  Trash2,
+  Heart,
+  UserRound,
+} from "lucide-react";
 import { api, errorMessage, remove } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import {
@@ -28,6 +35,7 @@ export function Guestbook({
   const [entries, setEntries] = useState(initial.items);
   const [cursor, setCursor] = useState(initial.nextCursor);
   const [body, setBody] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
@@ -44,10 +52,11 @@ export function Guestbook({
     try {
       const entry = await api("/guestbook", entrySchema, {
         method: "POST",
-        body: { body: body.trim() },
+        body: { body: body.trim(), anonymous },
       });
       setEntries((items) => [entry, ...items]);
       setBody("");
+      setAnonymous(false);
       setNotice(t("guestbook.published"));
     } catch (err) {
       setError(errorMessage(err, t));
@@ -130,9 +139,20 @@ export function Guestbook({
                 {numbers.format(body.length)} / {numbers.format(2000)}
               </span>
               <span className="fine-print">
-                {t("guestbook.signed", { name: guest.name })}
+                {anonymous
+                  ? t("guestbook.signedAnonymously")
+                  : t("guestbook.signed", { name: guest.name })}
               </span>
             </div>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={anonymous}
+                onChange={(event) => setAnonymous(event.target.checked)}
+                disabled={sending}
+              />
+              <span>{t("guestbook.postAnonymously")}</span>
+            </label>
             <button
               className="button primary wide"
               disabled={sending || !body.trim()}
@@ -168,23 +188,31 @@ export function Guestbook({
             entries.map((entry) => (
               <article key={entry.id} className="guestbook-entry panel">
                 <header>
-                  <span className="avatar">
-                    {entry.author.name.charAt(0).toLocaleUpperCase(locale)}
+                  <span className="avatar" aria-hidden="true">
+                    {entry.author ? (
+                      entry.author.name.charAt(0).toLocaleUpperCase(locale)
+                    ) : (
+                      <UserRound size={20} />
+                    )}
                   </span>
                   <div>
-                    <strong>{entry.author.name}</strong>
+                    <strong>
+                      {entry.author?.name ?? t("guestbook.anonymous")}
+                    </strong>
                     <p className="fine-print">
                       {formatDate(entry.createdAt, timezone, true, locale)}
                     </p>
                   </div>
-                  {(guest.id === entry.author.id || guest.role === "admin") && (
+                  {entry.canDelete && (
                     <button
                       className="icon-button danger"
                       onClick={() => deleteEntry(entry.id)}
                       disabled={removing === entry.id}
-                      aria-label={t("guestbook.delete", {
-                        name: entry.author.name,
-                      })}
+                      aria-label={
+                        entry.author
+                          ? t("guestbook.delete", { name: entry.author.name })
+                          : t("guestbook.deleteAnonymous")
+                      }
                     >
                       <Trash2 size={16} />
                     </button>

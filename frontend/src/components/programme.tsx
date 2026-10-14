@@ -199,12 +199,6 @@ export function Programme({
           ))}
         </ol>
       )}
-      <p className="programme-note">
-        <LockKeyhole size={16} aria-hidden="true" />
-        <span className="fine-print">
-          {t("programme.timezone", { name: party.timezone })}
-        </span>
-      </p>
     </>
   );
 }

@@ -388,7 +388,7 @@ func TestPhotoProtectionValidationOwnershipAndPersistence(t *testing.T) {
 	data := pngBytes(t)
 	status(t, upload(t, a, nil, data), 401)
 	status(t, upload(t, a, one, []byte("<svg onload='alert(1)'></svg>")), 415)
-	status(t, upload(t, a, one, bytes.Repeat([]byte{0}, maxPhotoBytes+1)), 413)
+	status(t, upload(t, a, one, bytes.Repeat([]byte{0}, int(defaultMaxImageBytes)+1)), 413)
 	oversized := append([]byte(nil), data...)
 	binary.BigEndian.PutUint32(oversized[16:20], 10000)
 	binary.BigEndian.PutUint32(oversized[20:24], 10000)

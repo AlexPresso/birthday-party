@@ -535,7 +535,7 @@ svg {
 .photo-tile:hover img {
   transform: scale(1.035);
 }
-.photo-tile > span {
+.photo-author {
   position: absolute;
   left: 0;
   right: 0;
@@ -548,6 +548,22 @@ svg {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+}
+.video-marker {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #151218cc;
+  color: #fff;
+  border: 1px solid #ffffff59;
+}
+.video-marker svg {
+  margin-left: 2px;
 }
 .load-more {
   display: flex;
@@ -766,16 +782,6 @@ progress::-moz-progress-bar {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.programme-note {
-  display: flex;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 13px;
-  margin-top: 34px;
-}
-.programme-note svg {
-  margin-top: 4px;
-}
 .guestbook-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -815,6 +821,29 @@ progress::-moz-progress-bar {
   gap: 10px;
   justify-content: space-between;
   margin: 8px 0 18px;
+}
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.checkbox-field input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+.checkbox-field:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .guestbook-compose form > .fine-print {
   text-align: center;
@@ -1424,7 +1453,7 @@ progress::-moz-progress-bar {
   .photo-tile {
     border-radius: 7px;
   }
-  .photo-tile > span {
+  .photo-author {
     padding: 17px 7px 6px;
     font-size: 9px;
   }
@@ -1484,13 +1513,6 @@ progress::-moz-progress-bar {
   }
   .party-details p {
     font-size: 12px;
-  }
-  .programme-note {
-    font-size: 12px;
-    gap: 10px;
-  }
-  .programme-note .fine-print {
-    font-size: 10px;
   }
   .guestbook-compose {
     padding: 22px 19px;

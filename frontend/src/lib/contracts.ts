@@ -23,18 +23,28 @@ const mediaUrl = z
 export const photoSchema = z.object({
   id,
   author: authorSchema,
+  kind: z.enum(["image", "video"]),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "video/mp4"]),
   width: z.number().positive(),
   height: z.number().positive(),
   createdAt: instant,
   url: mediaUrl,
   thumbnailUrl: mediaUrl,
 });
-export const entrySchema = z.object({
+const entryFields = {
   id,
-  author: authorSchema,
+  canDelete: z.boolean(),
   body: z.string(),
   createdAt: instant,
-});
+};
+export const entrySchema = z.discriminatedUnion("anonymous", [
+  z.object({
+    ...entryFields,
+    anonymous: z.literal(false),
+    author: authorSchema,
+  }),
+  z.object({ ...entryFields, anonymous: z.literal(true), author: z.null() }),
+]);
 export const eventSchema = z.object({
   id,
   title: z.string(),
@@ -47,6 +57,18 @@ export const eventSchema = z.object({
 export const photosSchema = z.object({
   items: z.array(photoSchema),
   nextCursor: z.string().nullable(),
+  limits: z.object({
+    imageBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(1024 ** 3),
+    videoBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(1024 ** 3),
+  }),
 });
 export const entriesSchema = z.object({
   items: z.array(entrySchema),
@@ -69,6 +91,7 @@ export type Photo = z.infer<typeof photoSchema>;
 export type Entry = z.infer<typeof entrySchema>;
 export type PartyEvent = z.infer<typeof eventSchema>;
 export type PhotoPage = z.infer<typeof photosSchema>;
+export type UploadLimits = PhotoPage["limits"];
 export type EntryPage = z.infer<typeof entriesSchema>;
 
 export function formatDate(
@@ -81,19 +104,21 @@ export function formatDate(
     timeZone: timezone,
     day: "numeric",
     month: "long",
-    ...(time
-      ? ({ hour: "2-digit", minute: "2-digit", timeZoneName: "short" } as const)
-      : {}),
+    ...(time ? ({ hour: "2-digit", minute: "2-digit" } as const) : {}),
   }).format(new Date(value));
 }
 
-export function uploadProblem(file: {
-  type: string;
-  size: number;
-}): "upload_type" | "upload_size" | "upload_empty" | null {
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+export function uploadProblem(
+  file: { type: string; size: number },
+  limits: UploadLimits,
+): "upload_type" | "upload_size" | "upload_video_size" | "upload_empty" | null {
+  const video = ["video/mp4", "video/quicktime", "video/webm"].includes(
+    file.type,
+  );
+  if (!video && !["image/jpeg", "image/png", "image/webp"].includes(file.type))
     return "upload_type";
-  if (file.size > 15 * 1024 * 1024) return "upload_size";
+  if (file.size > (video ? limits.videoBytes : limits.imageBytes))
+    return video ? "upload_video_size" : "upload_size";
   if (file.size === 0) return "upload_empty";
   return null;
 }

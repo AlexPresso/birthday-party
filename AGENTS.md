@@ -2,7 +2,7 @@
 
 ## Product
 
-A friendly app for a 30th birthday celebration. Guests will share photos and
+A friendly app for a 30th birthday celebration. Guests will share photos, videos and
 discover events or surprises that become available later. Prioritize easy mobile
 use, a personal visual identity, simple code, and responsive interactions.
 
@@ -61,8 +61,8 @@ use, a personal visual identity, simple code, and responsive interactions.
   the chosen permissions on the backend for both reads and writes.
 - The backend decides when an event or surprise is available. Do not send locked
   content or its media to an unauthorized client and merely hide it in the UI.
-- Store scheduled instants in UTC. Establish the event's intended time zone
-  before implementing scheduling, and label displayed times unambiguously.
+- Store scheduled instants in UTC and display them in the party's timezone.
+  Omit timezone suffixes and repeated timezone notices from displayed dates.
 - Validate untrusted input at boundaries. Keep secrets and private guest data
   out of source control, logs, and sample fixtures.
   The explicitly requested exception is the administrator invitation printed once
@@ -83,19 +83,27 @@ use, a personal visual identity, simple code, and responsive interactions.
 
 ## Selected implementation
 
-- The approved design is dark plum with the tabs `photos`, `programme`,
-  `livre d'or`, `paramètres` in French. Translate labels while preserving their
+- The approved design is dark plum with the tabs `Médias`, `Programme`,
+  `Livre d'or`, `Paramètres` in French. Capitalize translated labels while preserving their
   order and routes; see `docs/design.md` and its reference image.
 - Guest profiles are prepared by the host. Individual, single-use invitation
   links activate a persistent session. A replacement link keeps the same identity.
-- SQLite stores records; a private local data directory stores photos and
+- SQLite stores records; a private local data directory stores photos, videos and
   thumbnails. Back up both together. This initial setup targets one Go process
   and persistent local storage, not ephemeral or horizontally scaled hosting.
 - The frontend proxies same-origin `/api/*` to Go. The public API contract is in
   `docs/api.md`; keep frontend validators and backend responses aligned.
+- The media gallery retains `/photos` and `/api/photos` for existing links.
+  Videos use FFmpeg to produce private MP4 playback files and JPEG thumbnails;
+  Compose includes FFmpeg. Keep processing and file sizes bounded.
+- Guestbook posts can be anonymous. Keep their owner ID private in SQLite for
+  deletion permissions; never send their identity to guests or administrators.
 - Shared runtime configuration belongs in the repository-root `.env`.
   `docker compose up` must apply it directly; do not load frontend env files in
   Compose or require a rebuild for birthday age and invitation copy changes.
+- MAX_IMAGE_SIZE_MB and MAX_VIDEO_SIZE_MB configure upload sizes (15/100 MiB
+  defaults). The API exposes effective limits to the gallery; the standalone
+  frontend applies its proxy cap at startup. Compose changes need no rebuild.
 - Invitation copy resolves a locale-specific variable (such as
   `INVITATION_TITLE_FR`) before its global variable and then its localized default.
   An explicitly empty value hides the text. Keep this distinction at every layer.

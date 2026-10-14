@@ -87,7 +87,8 @@ Translate all interface copy, including metadata, accessibility labels, errors,
 confirmations, loading states and empty states. API failures contain a stable
 `code` plus an English fallback `error`; translate the code at the presentation
 boundary. Format dates and counts with `Intl` for the selected locale, keeping
-the party's explicit timezone. Host date inputs use the browser's timezone.
+the party's explicit timezone. Omit timezone suffixes and the programme timezone
+footer. Host date inputs use the browser's timezone and retain their input hints.
 
 Keep names, guestbook messages, party titles, event details and public teasers
 exactly as supplied by their authors. A locked event with no public teaser has an
@@ -109,15 +110,28 @@ them, and removed after deliberate acceptance.
 Authenticated media deliberately uses native images: the Go service already
 creates thumbnails, and Next image optimization would not forward guest cookies.
 Uploads accept at most 20 selected files and run two requests concurrently;
-each image must satisfy the backend's JPEG/PNG/WebP and 15 MiB limits. The Next
-proxy permits 20 MiB request bodies to leave room for multipart overhead.
+each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos
+accept MP4/MOV/WebM up to 5 minutes and 4K input; Go converts them to
+MP4 and generates JPEG thumbnails. Render thumbnails in the gallery and use a
+native video player with controls, playsInline and no autoplay when opened.
+The gallery API includes limits.imageBytes/videoBytes from the root environment
+(MAX_IMAGE_SIZE_MB/MAX_VIDEO_SIZE_MB, defaults 15/100 MiB, range 1–1024).
+Use those values for browser validation and translated size labels.
+The Next proxy permits the larger configured limit plus 64 KiB and a 10-minute
+timeout. next.config.ts and the standalone startup.mjs share the runtime parser;
+Compose changes must apply on recreation without rebuilding the image.
 
-The chosen theme is dark plum. Keep these four tabs and their order: `photos`,
-`programme`, `livre d'or`, `paramètres` in French. Translate labels into the
+The chosen theme is dark plum. Keep these four tabs and their order: `Médias`,
+`Programme`, `Livre d'or`, `Paramètres` in French. Capitalize labels in the
 selected language while keeping routes unchanged. Host controls live inside
 settings. Empty states must never invent guest contributions or events.
 Scheduled timestamps are submitted as UTC; host date inputs identify their
 browser timezone, and guest dates use the party's explicit timezone.
+
+The anonymous guestbook checkbox starts unchecked. Anonymous entries have a
+null author for every viewer; display the translated anonymous label and use
+the backend's canDelete flag to offer deletion without needing an author ID.
+Preserve the draft and checkbox state after submission errors.
 
 For UI changes, inspect the rendered result with realistic content at phone and
 desktop sizes. Check upload flows, focus, overflow, and relevant state changes.

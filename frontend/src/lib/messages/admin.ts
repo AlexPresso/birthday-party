@@ -19,7 +19,7 @@ const en = {
   "admin.saveParty": "Save party details",
   "admin.partySaved": "Party details saved.",
   "admin.revokeConfirmation":
-    "Remove access for {name}? They’ll be signed out on every device. Their photos and messages will stay.",
+    "Remove access for {name}? They’ll be signed out on every device. Their photos, videos and messages will stay.",
   "admin.copyUnavailable":
     "The link couldn’t be copied. Select it below and copy it yourself.",
   "admin.guestName": "Guest’s first name",
@@ -74,7 +74,8 @@ const en = {
     "Sign out of this device? You’ll need a new link from the host to get back in.",
   "settings.host": "Host",
   "settings.guest": "Guest",
-  "settings.attribution": "Your photos and messages appear under this name.",
+  "settings.attribution":
+    "Your photos, videos and signed messages appear under this name.",
   "settings.signingOut": "Signing out…",
   "settings.signOut": "Sign out",
   "settings.details": "About the app",
@@ -82,10 +83,10 @@ const en = {
   "settings.dark": "Dark",
   "settings.private": "Guests only",
   "settings.privacyHint":
-    "Only guests can see photos and messages. You can delete the ones you’ve shared.",
+    "Only guests can see photos, videos and messages. You can delete the ones you’ve shared.",
   "settings.accessHelp": "Trouble getting in?",
   "settings.accessHelpHint":
-    "Ask the host for a new link. You’ll keep your profile, photos and messages.",
+    "Ask the host for a new link. You’ll keep your profile, photos, videos and messages.",
 };
 
 type AdminMessages = Record<keyof typeof en, string>;
@@ -112,7 +113,7 @@ const fr: AdminMessages = {
   "admin.saveParty": "Enregistrer la fête",
   "admin.partySaved": "Les infos de la fête sont enregistrées.",
   "admin.revokeConfirmation":
-    "Retirer l’accès de {name} ? Cette personne sera déconnectée de tous ses appareils. Ses photos et messages seront conservés.",
+    "Retirer l’accès de {name} ? Cette personne sera déconnectée de tous ses appareils. Ses photos, vidéos et messages seront conservés.",
   "admin.copyUnavailable":
     "Le lien n’a pas pu être copié. Sélectionne-le ci-dessous pour le copier toi-même.",
   "admin.guestName": "Prénom de l’invité",
@@ -169,7 +170,7 @@ const fr: AdminMessages = {
   "settings.host": "Organisateur",
   "settings.guest": "Invité",
   "settings.attribution":
-    "Tes photos et tes messages s’affichent avec ce prénom.",
+    "Tes photos, tes vidéos et tes messages signés s’affichent avec ce prénom.",
   "settings.signingOut": "Déconnexion…",
   "settings.signOut": "Se déconnecter",
   "settings.details": "À propos de l’appli",
@@ -177,10 +178,10 @@ const fr: AdminMessages = {
   "settings.dark": "Sombre",
   "settings.private": "Réservé aux invités",
   "settings.privacyHint":
-    "Seuls les invités voient les photos et les messages. Tu peux supprimer ce que tu as partagé.",
+    "Seuls les invités voient les photos, les vidéos et les messages. Tu peux supprimer ce que tu as partagé.",
   "settings.accessHelp": "Un souci avec ton accès ?",
   "settings.accessHelpHint":
-    "Demande un nouveau lien à l’organisateur. Tu garderas ton profil, tes photos et tes messages.",
+    "Demande un nouveau lien à l’organisateur. Tu garderas ton profil, tes photos, tes vidéos et tes messages.",
 };
 
 const de: AdminMessages = {
@@ -206,7 +207,7 @@ const de: AdminMessages = {
   "admin.saveParty": "Feier speichern",
   "admin.partySaved": "Die Angaben sind gespeichert.",
   "admin.revokeConfirmation":
-    "Zugang für {name} entfernen? Die Person wird auf allen Geräten abgemeldet. Ihre Fotos und Nachrichten bleiben erhalten.",
+    "Zugang für {name} entfernen? Die Person wird auf allen Geräten abgemeldet. Ihre Fotos, Videos und Nachrichten bleiben erhalten.",
   "admin.copyUnavailable":
     "Der Link konnte nicht kopiert werden. Markiere ihn unten und kopiere ihn selbst.",
   "admin.guestName": "Vorname des Gastes",
@@ -263,7 +264,7 @@ const de: AdminMessages = {
   "settings.host": "Gastgeber",
   "settings.guest": "Gast",
   "settings.attribution":
-    "Deine Fotos und Nachrichten erscheinen unter diesem Namen.",
+    "Deine Fotos, Videos und Nachrichten mit Namen erscheinen unter diesem Namen.",
   "settings.signingOut": "Wird abgemeldet…",
   "settings.signOut": "Abmelden",
   "settings.details": "Über die App",
@@ -271,10 +272,10 @@ const de: AdminMessages = {
   "settings.dark": "Dunkel",
   "settings.private": "Nur für Gäste",
   "settings.privacyHint":
-    "Nur Gäste sehen die Fotos und Nachrichten. Was du selbst geteilt hast, kannst du löschen.",
+    "Nur Gäste sehen die Fotos, Videos und Nachrichten. Was du selbst geteilt hast, kannst du löschen.",
   "settings.accessHelp": "Probleme mit dem Zugang?",
   "settings.accessHelpHint":
-    "Bitte den Gastgeber um einen neuen Link. Dein Profil, deine Fotos und Nachrichten bleiben erhalten.",
+    "Bitte den Gastgeber um einen neuen Link. Dein Profil, deine Fotos, Videos und Nachrichten bleiben erhalten.",
 };
 
 const it: AdminMessages = {
@@ -299,7 +300,7 @@ const it: AdminMessages = {
   "admin.saveParty": "Salva la festa",
   "admin.partySaved": "I dettagli sono stati salvati.",
   "admin.revokeConfirmation":
-    "Revocare l’accesso a {name}? La persona verrà disconnessa da tutti i dispositivi. Le sue foto e i suoi messaggi resteranno.",
+    "Rimuovere l’accesso di {name}? La persona verrà disconnessa da tutti i dispositivi. Le sue foto, i suoi video e i suoi messaggi resteranno.",
   "admin.copyUnavailable":
     "Non è stato possibile copiare il link. Selezionalo qui sotto e copialo tu.",
   "admin.guestName": "Nome dell’invitato",
@@ -356,7 +357,7 @@ const it: AdminMessages = {
   "settings.host": "Organizzatore",
   "settings.guest": "Invitato",
   "settings.attribution":
-    "Le tue foto e i tuoi messaggi compaiono con questo nome.",
+    "Le tue foto, i tuoi video e i messaggi firmati appaiono con questo nome.",
   "settings.signingOut": "Disconnessione…",
   "settings.signOut": "Esci",
   "settings.details": "Informazioni sull’app",
@@ -364,10 +365,10 @@ const it: AdminMessages = {
   "settings.dark": "Scuro",
   "settings.private": "Solo per gli invitati",
   "settings.privacyHint":
-    "Solo gli invitati vedono foto e messaggi. Puoi eliminare quelli che hai condiviso tu.",
+    "Solo gli invitati possono vedere foto, video e messaggi. Puoi eliminare ciò che hai condiviso.",
   "settings.accessHelp": "Problemi con l’accesso?",
   "settings.accessHelpHint":
-    "Chiedi un nuovo link all’organizzatore. Ritroverai il tuo profilo, le tue foto e i tuoi messaggi.",
+    "Chiedi un nuovo link a chi organizza. Conserverai il tuo profilo, le foto, i video e i messaggi.",
 };
 
 const es: AdminMessages = {
@@ -394,7 +395,7 @@ const es: AdminMessages = {
   "admin.saveParty": "Guardar la fiesta",
   "admin.partySaved": "Los detalles están guardados.",
   "admin.revokeConfirmation":
-    "¿Retirar el acceso a {name}? Se cerrará su sesión en todos sus dispositivos. Sus fotos y mensajes se conservarán.",
+    "¿Retirar el acceso de {name}? Se cerrará su sesión en todos los dispositivos. Sus fotos, vídeos y mensajes se conservarán.",
   "admin.copyUnavailable":
     "No se ha podido copiar el enlace. Selecciónalo abajo y cópialo tú.",
   "admin.guestName": "Nombre del invitado",
@@ -449,7 +450,8 @@ const es: AdminMessages = {
     "¿Cerrar sesión en este dispositivo? Necesitarás un nuevo enlace del organizador para volver.",
   "settings.host": "Organizador",
   "settings.guest": "Invitado",
-  "settings.attribution": "Tus fotos y mensajes aparecen con este nombre.",
+  "settings.attribution":
+    "Tus fotos, vídeos y mensajes firmados aparecen con este nombre.",
   "settings.signingOut": "Cerrando sesión…",
   "settings.signOut": "Cerrar sesión",
   "settings.details": "Sobre la app",
@@ -457,10 +459,10 @@ const es: AdminMessages = {
   "settings.dark": "Oscuro",
   "settings.private": "Solo para invitados",
   "settings.privacyHint":
-    "Solo los invitados ven las fotos y los mensajes. Puedes borrar los que hayas compartido tú.",
+    "Solo los invitados ven las fotos, los vídeos y los mensajes. Puedes eliminar lo que has compartido.",
   "settings.accessHelp": "¿Problemas para entrar?",
   "settings.accessHelpHint":
-    "Pide al organizador un nuevo enlace. Conservarás tu perfil, tus fotos y tus mensajes.",
+    "Pide un nuevo enlace al organizador. Conservarás tu perfil, tus fotos, tus vídeos y tus mensajes.",
 };
 
 export const adminMessages = { en, fr, de, it, es };

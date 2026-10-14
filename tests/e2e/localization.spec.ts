@@ -26,14 +26,15 @@ const languages = [
     welcome: "Bienvenue !",
     invalidInvitation:
       "Ce lien est invalide ou a expiré. Demande un nouveau lien à l’organisateur.",
-    tabs: ["photos", "programme", "livre d'or", "paramètres"],
-    photoInput: "Ajouter des photos",
+    tabs: ["Médias", "Programme", "Livre d'or", "Paramètres"],
+    mediaInput: "Ajouter des médias",
     uploadError:
-      "Choisis une photo JPEG, PNG ou WebP. Convertis d’abord les fichiers HEIC en JPEG.",
+      "Choisis une photo JPEG, PNG ou WebP, ou une vidéo MP4, MOV ou WebM. Convertis d’abord les fichiers HEIC en JPEG.",
     surprise: "Surprise",
     emptyProgramme: "Pas encore d'événements",
     refresh: "Actualiser le programme",
     message: "Ton message",
+    anonymous: "Publier anonymement",
     publish: "Publier le message",
     settings: "Paramètres",
     signOut: "Se déconnecter",
@@ -47,14 +48,15 @@ const languages = [
     welcome: "Welcome!",
     invalidInvitation:
       "This link is invalid or has expired. Ask the host for a new invitation.",
-    tabs: ["photos", "schedule", "guestbook", "settings"],
-    photoInput: "Add photos",
+    tabs: ["Media", "Schedule", "Guestbook", "Settings"],
+    mediaInput: "Add media",
     uploadError:
-      "Choose a JPEG, PNG or WebP photo. Convert HEIC files to JPEG first.",
+      "Choose a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video. Convert HEIC files to JPEG first.",
     surprise: "Surprise",
     emptyProgramme: "No events yet",
     refresh: "Refresh schedule",
     message: "Your message",
+    anonymous: "Post anonymously",
     publish: "Post message",
     settings: "Settings",
     signOut: "Sign out",
@@ -68,14 +70,15 @@ const languages = [
     welcome: "Willkommen!",
     invalidInvitation:
       "Dieser Link ist ungültig oder abgelaufen. Bitte den Gastgeber um eine neue Einladung.",
-    tabs: ["Fotos", "Programm", "Gästebuch", "Einstellungen"],
-    photoInput: "Fotos hinzufügen",
+    tabs: ["Medien", "Programm", "Gästebuch", "Einstellungen"],
+    mediaInput: "Medien hinzufügen",
     uploadError:
-      "Wähle ein Foto im Format JPEG, PNG oder WebP. Wandle HEIC-Dateien zuerst in JPEG um.",
+      "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM. Wandle HEIC-Dateien zuerst in JPEG um.",
     surprise: "Überraschung",
     emptyProgramme: "Noch keine Programmpunkte",
     refresh: "Programm aktualisieren",
     message: "Deine Nachricht",
+    anonymous: "Anonym veröffentlichen",
     publish: "Nachricht veröffentlichen",
     settings: "Einstellungen",
     signOut: "Abmelden",
@@ -89,14 +92,15 @@ const languages = [
     welcome: "Benvenuto!",
     invalidInvitation:
       "Questo link non è valido o è scaduto. Chiedi un nuovo invito a chi organizza.",
-    tabs: ["foto", "programma", "dediche", "impostazioni"],
-    photoInput: "Aggiungi foto",
+    tabs: ["Media", "Programma", "Dediche", "Impostazioni"],
+    mediaInput: "Aggiungi foto e video",
     uploadError:
-      "Scegli una foto JPEG, PNG o WebP. Converti prima i file HEIC in JPEG.",
+      "Scegli una foto JPEG, PNG o WebP, oppure un video MP4, MOV o WebM. Converti prima i file HEIC in JPEG.",
     surprise: "Sorpresa",
     emptyProgramme: "Non ci sono ancora eventi",
     refresh: "Aggiorna il programma",
     message: "Il tuo messaggio",
+    anonymous: "Pubblica in forma anonima",
     publish: "Pubblica il messaggio",
     settings: "Impostazioni",
     signOut: "Esci",
@@ -110,14 +114,15 @@ const languages = [
     welcome: "¡Te damos la bienvenida!",
     invalidInvitation:
       "Este enlace no es válido o ha caducado. Pide una nueva invitación a quien organiza.",
-    tabs: ["fotos", "programa", "dedicatorias", "ajustes"],
-    photoInput: "Añadir fotos",
+    tabs: ["Multimedia", "Programa", "Dedicatorias", "Ajustes"],
+    mediaInput: "Añadir fotos y vídeos",
     uploadError:
-      "Elige una foto JPEG, PNG o WebP. Convierte primero los archivos HEIC a JPEG.",
+      "Elige una foto JPEG, PNG o WebP, o un vídeo MP4, MOV o WebM. Convierte primero los archivos HEIC a JPEG.",
     surprise: "Sorpresa",
     emptyProgramme: "Todavía no hay eventos",
     refresh: "Actualizar el programa",
     message: "Tu mensaje",
+    anonymous: "Publicar de forma anónima",
     publish: "Publicar mensaje",
     settings: "Ajustes",
     signOut: "Cerrar sesión",
@@ -261,9 +266,9 @@ for (const language of languages) {
       await expect(navigation.getByRole("link")).toHaveText([...language.tabs]);
       await expect(page.locator("html")).toHaveAttribute("lang", language.lang);
       await page
-        .getByLabel(language.photoInput, { exact: true })
+        .getByLabel(language.mediaInput, { exact: true })
         .setInputFiles({
-          name: "not-a-photo.txt",
+          name: "not-media.txt",
           mimeType: "text/plain",
           buffer: Buffer.from("Upload validation fixture"),
         });
@@ -278,7 +283,7 @@ for (const language of languages) {
             response.request().method() === "POST",
         );
         await page
-          .getByLabel(language.photoInput, { exact: true })
+          .getByLabel(language.mediaInput, { exact: true })
           .setInputFiles({
             name: "broken.png",
             mimeType: "image/png",
@@ -288,9 +293,12 @@ for (const language of languages) {
         expect(failure.status()).toBe(415);
         expect((await failure.json()).code).toBe("unsupported_photo_type");
         await expect(
-          page.getByText("Wähle ein Foto im Format JPEG, PNG oder WebP.", {
-            exact: true,
-          }),
+          page.getByText(
+            "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM.",
+            {
+              exact: true,
+            },
+          ),
         ).toBeVisible();
       }
 
@@ -339,6 +347,12 @@ for (const language of languages) {
         .getByRole("link", { name: language.tabs[2], exact: true })
         .click();
       const message = `Un souvenir écrit en français, gardé tel quel (${language.lang}).`;
+      const anonymous = page.getByRole("checkbox", {
+        name: language.anonymous,
+        exact: true,
+      });
+      await expect(anonymous).toBeVisible();
+      await expect(anonymous).not.toBeChecked();
       await page.getByLabel(language.message, { exact: true }).fill(message);
       await page
         .getByRole("button", { name: language.publish, exact: true })
@@ -438,7 +452,7 @@ test("translates host forms and confirmation dialogs in German", async ({
       .click();
     const confirmation = await dialog;
     expect(confirmation.message()).toBe(
-      "Zugang für Invité François entfernen? Die Person wird auf allen Geräten abgemeldet. Ihre Fotos und Nachrichten bleiben erhalten.",
+      "Zugang für Invité François entfernen? Die Person wird auf allen Geräten abgemeldet. Ihre Fotos, Videos und Nachrichten bleiben erhalten.",
     );
     await confirmation.dismiss();
     await click;
