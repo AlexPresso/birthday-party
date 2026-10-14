@@ -14,6 +14,33 @@ use, a personal visual identity, simple code, and responsive interactions.
 - Keep shared rules here and stack-specific rules in the relevant directory.
   Update guidance when implementation decisions make it outdated.
 
+## Code language
+
+- Write code identifiers, comments, docstrings, test descriptions, and internal
+  diagnostics in English. Developer logs and CLI help/output must also be English.
+- Apply the same rule to configuration comments and code examples in documentation.
+- Translate interface text and accessibility labels into the phone/browser's
+  preferred supported language: French, English, German, Italian or Spanish.
+  Match regional language tags to their base language and fall back to English.
+  Select the locale from `Accept-Language` during server rendering; do not add a
+  language cookie or switcher. Preserve public URLs and API field names.
+- Preserve host- and guest-authored content in its original language. Do not send
+  names, messages, event details or other private content to translation services.
+
+## Project writing skills
+
+- Use the repository's [UX Writing](.agents/skills/ux-writing/SKILL.md) skill
+  when creating or editing interface labels, descriptions, errors or empty states.
+- Use the repository's [Humanizer](.agents/skills/humanizer/SKILL.md) skill to
+  review descriptions and remove artificial phrasing without changing meaning.
+- Read these local copies even if a skill with the same name is installed globally.
+- Write conversational copy with clear actions and useful information. Use
+  consistent `tu` in French and a similarly informal tone in other languages.
+  Avoid generic slogans, sentimental clichés and forced slang. Preserve product
+  facts, accessibility, and the meaning and order of the four navigation labels.
+- Keep each skill's supporting files and license in the repository so contributors
+  can use them without a separate global installation.
+
 ## Architecture and simplicity
 
 - Use Next.js with TypeScript for the frontend and Go for the backend.
@@ -38,6 +65,9 @@ use, a personal visual identity, simple code, and responsive interactions.
   before implementing scheduling, and label displayed times unambiguously.
 - Validate untrusted input at boundaries. Keep secrets and private guest data
   out of source control, logs, and sample fixtures.
+  The explicitly requested exception is the administrator invitation printed once
+  at backend startup when `PRINT_ADMIN_INVITATION` is enabled. Ordinary request
+  logs must still exclude invitation and session tokens.
 
 ## Quality and performance
 
@@ -51,12 +81,29 @@ use, a personal visual identity, simple code, and responsive interactions.
   verified and any checks that could not run; do not claim unmeasured performance.
 - Keep changes within the requested scope and preserve unrelated user work.
 
-## Bootstrap status
+## Selected implementation
 
-Only guidance files exist; application scaffolds and runnable checks have not
-been created. During application setup, replace this note and record the exact
-development, build, formatting, lint, type-check, and test commands in the scoped
-instruction files. Verify framework guidance against the selected versions.
-
-Guest access, database, photo storage and retention, hosting, and event time zone
-remain open decisions. Resolve each when it becomes relevant to implementation.
+- The approved design is dark plum with the tabs `photos`, `programme`,
+  `livre d'or`, `paramètres` in French. Translate labels while preserving their
+  order and routes; see `docs/design.md` and its reference image.
+- Guest profiles are prepared by the host. Individual, single-use invitation
+  links activate a persistent session. A replacement link keeps the same identity.
+- SQLite stores records; a private local data directory stores photos and
+  thumbnails. Back up both together. This initial setup targets one Go process
+  and persistent local storage, not ephemeral or horizontally scaled hosting.
+- The frontend proxies same-origin `/api/*` to Go. The public API contract is in
+  `docs/api.md`; keep frontend validators and backend responses aligned.
+- Shared runtime configuration belongs in the repository-root `.env`.
+  `docker compose up` must apply it directly; do not load frontend env files in
+  Compose or require a rebuild for birthday age and invitation copy changes.
+- Invitation copy resolves a locale-specific variable (such as
+  `INVITATION_TITLE_FR`) before its global variable and then its localized default.
+  An explicitly empty value hides the text. Keep this distinction at every layer.
+- The event timezone defaults to `Europe/Zurich` and is editable by the host.
+  Date, venue, actual guests and content are not seeded or invented.
+  Format dates in the viewer's language while preserving the party's timezone.
+- Compose enables `PRINT_ADMIN_INVITATION` by default. Startup reuses the oldest
+  active administrator, creating a technical `Admin` profile only if none exists.
+  Each start replaces its invitation without invalidating existing sessions.
+- Refer to `README.md` and scoped instruction files for commands. Keep lockfiles
+  committed and verify framework guidance against the installed versions.

@@ -41,12 +41,95 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
 
 ## Verification and setup
 
-There is no frontend scaffold, package manager, or runnable check yet. During
-setup, record the actual development, production build, lint, type-check, and
-test commands here, along with any required local services or environment values
-(names and examples only; never secrets).
+The frontend uses Next.js 16.4 App Router, React 19.3, strict TypeScript, npm,
+plain CSS, Lucide icons, and Zod response validation. Node 24 LTS is recommended.
+Keep the lockfile committed and use `npm ci` for a reproducible install.
+
+Run these commands from `frontend/`:
+
+- `npm run dev`: Next development server at `http://127.0.0.1:3000`.
+- `npm run build`: production compilation and framework type checks.
+- `npm start`: production server after a successful build.
+- `npm run typecheck`: generate Next route types, then TypeScript without emit.
+- `npm run lint`: ESLint with the matching Next configuration.
+- `npm run format`: format tracked source and guidance with Prettier.
+- `npm run format:check`: verify formatting without changing files.
+- `npm test`: Node tests for API boundary validation and upload constraints.
+
+Start the Go service too. `API_INTERNAL_URL` defaults to
+`http://127.0.0.1:8080`; `.env.example` documents it. Browser requests always use
+the same-origin `/api` proxy. Production rewrites are resolved during the build:
+set the intended internal API URL for both build and runtime. Root scripts manage
+the full stack and browser tests; see `../README.md`.
+
+Use the repository-root `.env` for shared configuration. Docker Compose reads
+it automatically and forwards the declared variables to each service; it does
+not load `frontend/.env` or `frontend/.env.local`. Run `docker compose up` after
+changing values; Compose recreates affected containers without rebuilding the
+image. Container API, port, host and production-mode settings remain explicit
+in Compose. The root development script also loads the root `.env`; local
+frontend env files are only needed when launching Next.js independently.
+For invitation copy, missing environment variables use defaults; explicitly
+empty values hide their text. Preserve that distinction in Compose and Next.js.
+Locale-specific `INVITATION_TITLE_FR/EN/DE/IT/ES` and
+`INVITATION_DESCRIPTION_FR/EN/DE/IT/ES` take precedence over their unsuffixed
+variables, which take precedence over localized defaults. Read them at runtime.
+
+## Languages
+
+Detect the locale from the request's `Accept-Language` header during server
+rendering. Support French, English, German, Italian and Spanish; match regional
+tags to their base language and fall back to English. Set the document language
+and pass only the selected catalog to client components. Do not add a language
+cookie or switcher, or render French first and replace it after hydration.
+
+Translate all interface copy, including metadata, accessibility labels, errors,
+confirmations, loading states and empty states. API failures contain a stable
+`code` plus an English fallback `error`; translate the code at the presentation
+boundary. Format dates and counts with `Intl` for the selected locale, keeping
+the party's explicit timezone. Host date inputs use the browser's timezone.
+
+Keep names, guestbook messages, party titles, event details and public teasers
+exactly as supplied by their authors. A locked event with no public teaser has an
+empty title; show the localized surprise placeholder without revealing private
+content. Do not automatically translate authored content or send it to a service.
+The party name is optional: an empty value uses the configured invitation title
+or localized birthday fallback. Allow hosts to save other party details without
+entering a custom name.
+
+## Sessions and interface behavior
+
+The shared layout validates the backend session and forwards cookies on private
+server fetches with `cache: "no-store"`. The backend owns the HttpOnly cookie.
+Use a full navigation after logout or session expiry to discard the private
+client router cache. Never put invitation tokens in queries, logs, or storage.
+Invitation fragments are read only in the browser, previewed without consuming
+them, and removed after deliberate acceptance.
+
+Authenticated media deliberately uses native images: the Go service already
+creates thumbnails, and Next image optimization would not forward guest cookies.
+Uploads accept at most 20 selected files and run two requests concurrently;
+each image must satisfy the backend's JPEG/PNG/WebP and 15 MiB limits. The Next
+proxy permits 20 MiB request bodies to leave room for multipart overhead.
+
+The chosen theme is dark plum. Keep these four tabs and their order: `photos`,
+`programme`, `livre d'or`, `paramètres` in French. Translate labels into the
+selected language while keeping routes unchanged. Host controls live inside
+settings. Empty states must never invent guest contributions or events.
+Scheduled timestamps are submitted as UTC; host date inputs identify their
+browser timezone, and guest dates use the party's explicit timezone.
 
 For UI changes, inspect the rendered result with realistic content at phone and
 desktop sizes. Check upload flows, focus, overflow, and relevant state changes.
 Use screenshots to review visual claims. A successful build alone does not
 verify usability or design quality; report unavailable checks honestly.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
