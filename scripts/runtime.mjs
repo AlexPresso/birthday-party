@@ -39,6 +39,12 @@ export function findGo() {
 
 export function localEnvironment() {
   const port = process.env.PORT || "3000";
+  const database = new URL("postgresql://127.0.0.1");
+  database.port = process.env.POSTGRES_PORT || "5432";
+  database.username = process.env.POSTGRES_USER || "birthday";
+  database.password = process.env.POSTGRES_PASSWORD || "birthday-local-only";
+  database.pathname = `/${process.env.POSTGRES_DB || "birthday"}`;
+  database.searchParams.set("sslmode", "disable");
   return {
     ...process.env,
     PORT: port,
@@ -46,6 +52,7 @@ export function localEnvironment() {
     API_INTERNAL_URL: process.env.API_INTERNAL_URL || "http://127.0.0.1:8080",
     PUBLIC_URL: process.env.PUBLIC_URL || `http://localhost:${port}`,
     DATA_DIR: path.resolve(backend, process.env.DATA_DIR || "data"),
+    DATABASE_URL: process.env.DATABASE_URL || database.toString(),
     // These scripts explicitly target local HTTP development.
     COOKIE_SECURE: process.env.COOKIE_SECURE || "false",
   };

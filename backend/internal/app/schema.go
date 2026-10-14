@@ -1,72 +1,100 @@
 package app
 
 import (
+	"context"
+	"crypto/sha256"
 	"database/sql"
+	"embed"
 	"fmt"
+	"io/fs"
+	"strconv"
+	"strings"
 )
 
-func migrate(db *sql.DB) error {
-	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+// Both startup operations use the same transaction-scoped lock within each schema.
+const startupLock = `SELECT pg_advisory_xact_lock(hashtextextended(current_database() || ':' || current_schema() || ':birthday-startup', 0))`
+
+func migrate(ctx context.Context, db *sql.DB) error {
+	return applyMigrations(ctx, db, migrations)
+}
+
+func applyMigrations(ctx context.Context, db *sql.DB, files fs.FS) error {
+	entries, err := fs.ReadDir(files, "migrations")
+	if err != nil {
 		return err
 	}
-	if version > 2 {
-		return fmt.Errorf("database version %d is newer than this application", version)
-	}
-	if version == 2 {
-		return nil
-	}
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if version < 1 {
-		if _, err := tx.Exec(schema); err != nil {
+	if _, err := tx.ExecContext(ctx, startupLock); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL,
+		applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		return err
+	}
+	type appliedMigration struct{ name, checksum string }
+	applied := make(map[int]appliedMigration)
+	rows, err := tx.QueryContext(ctx, "SELECT version,name,checksum FROM schema_migrations ORDER BY version")
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var version int
+		var record appliedMigration
+		if err := rows.Scan(&version, &record.name, &record.checksum); err != nil {
+			rows.Close()
+			return err
+		}
+		applied[version] = record
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for index, entry := range entries {
+		name := entry.Name()
+		prefix, _, found := strings.Cut(name, "_")
+		version, err := strconv.Atoi(prefix)
+		if err != nil || !found || len(prefix) != 4 || entry.IsDir() || !strings.HasSuffix(name, ".sql") || version != index+1 {
+			return fmt.Errorf("invalid or nonsequential migration filename %q", name)
+		}
+		body, err := fs.ReadFile(files, "migrations/"+name)
+		if err != nil {
+			return err
+		}
+		// Git checkouts can use CRLF; the SQL and its checksum are platform independent.
+		statement := strings.ReplaceAll(string(body), "\r\n", "\n")
+		checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(statement)))
+		if record, exists := applied[version]; exists {
+			if record.name != name || record.checksum != checksum {
+				return fmt.Errorf("applied migration %04d has changed; restore it and add a new migration", version)
+			}
+			delete(applied, version)
+			continue
+		}
+		for recordedVersion := range applied {
+			if recordedVersion > version {
+				return fmt.Errorf("migration history is missing version %04d", version)
+			}
+		}
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("apply migration %s: %w", name, err)
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,name,checksum) VALUES($1,$2,$3)", version, name, checksum); err != nil {
 			return err
 		}
 	}
-	if _, err := tx.Exec("ALTER TABLE entries ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0 CHECK(anonymous IN (0,1))"); err != nil {
-		return err
-	}
-	if _, err := tx.Exec("PRAGMA user_version=2"); err != nil {
-		return err
+	if len(applied) != 0 {
+		return fmt.Errorf("database contains migrations unknown to this application")
 	}
 	return tx.Commit()
 }
-
-const schema = `
-CREATE TABLE IF NOT EXISTS guests (
- id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('guest','admin')),
- active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))
-);
-CREATE TABLE IF NOT EXISTS invitations (
- token_hash TEXT PRIMARY KEY, guest_id INTEGER NOT NULL REFERENCES guests(id),
- expires_at INTEGER NOT NULL, used_at INTEGER
-);
-CREATE INDEX IF NOT EXISTS invitations_guest ON invitations(guest_id);
-CREATE TABLE IF NOT EXISTS sessions (
- token_hash TEXT PRIMARY KEY, guest_id INTEGER NOT NULL REFERENCES guests(id),
- created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS sessions_guest ON sessions(guest_id);
-CREATE TABLE IF NOT EXISTS party (
- id INTEGER PRIMARY KEY CHECK(id=1), title TEXT NOT NULL, timezone TEXT NOT NULL,
- date TEXT, location TEXT NOT NULL
-);
-INSERT OR IGNORE INTO party(id,title,timezone,date,location) VALUES(1,'','Europe/Zurich',NULL,'');
-CREATE TABLE IF NOT EXISTS events (
- id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT NOT NULL,
- teaser TEXT NOT NULL, starts_at TEXT, unlock_at TEXT
-);
-CREATE TABLE IF NOT EXISTS entries (
- id INTEGER PRIMARY KEY AUTOINCREMENT, guest_id INTEGER NOT NULL REFERENCES guests(id),
- body TEXT NOT NULL, created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS photos (
- id INTEGER PRIMARY KEY AUTOINCREMENT, guest_id INTEGER NOT NULL REFERENCES guests(id),
- width INTEGER NOT NULL, height INTEGER NOT NULL, created_at TEXT NOT NULL,
- filename TEXT NOT NULL, thumbnail TEXT NOT NULL, mime TEXT NOT NULL,
- byte_size INTEGER NOT NULL
-);
-`

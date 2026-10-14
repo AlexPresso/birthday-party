@@ -31,6 +31,34 @@ export const photoSchema = z.object({
   url: mediaUrl,
   thumbnailUrl: mediaUrl,
 });
+const uploadFields = {
+  id,
+  clientUploadId: z.uuid(),
+  filename: z.string().min(1),
+  kind: z.enum(["image", "video"]),
+  createdAt: instant,
+};
+export const uploadSchema = z.discriminatedUnion("status", [
+  z.object({
+    ...uploadFields,
+    status: z.enum(["queued", "processing"]),
+    errorCode: z.null(),
+    photo: z.null(),
+  }),
+  z.object({
+    ...uploadFields,
+    status: z.literal("ready"),
+    errorCode: z.null(),
+    photo: photoSchema,
+  }),
+  z.object({
+    ...uploadFields,
+    status: z.literal("failed"),
+    errorCode: z.string().regex(/^[a-z_]+$/),
+    photo: z.null(),
+  }),
+]);
+export const uploadsSchema = z.object({ items: z.array(uploadSchema).max(150) });
 const entryFields = {
   id,
   canDelete: z.boolean(),
@@ -88,6 +116,7 @@ export const previewSchema = z.object({
 export type Guest = z.infer<typeof guestSchema>;
 export type Party = z.infer<typeof partySchema>;
 export type Photo = z.infer<typeof photoSchema>;
+export type UploadJob = z.infer<typeof uploadSchema>;
 export type Entry = z.infer<typeof entrySchema>;
 export type PartyEvent = z.infer<typeof eventSchema>;
 export type PhotoPage = z.infer<typeof photosSchema>;

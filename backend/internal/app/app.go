@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -21,7 +22,6 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	_ "modernc.org/sqlite"
 )
 
 const (
@@ -37,6 +37,7 @@ type Config struct {
 	ListenAddr           string
 	PublicURL            string
 	DataDir              string
+	DatabaseURL          string
 	CookieSecure         bool
 	PrintAdminInvitation bool
 	MaxImageBytes        int64
@@ -44,7 +45,10 @@ type Config struct {
 }
 
 func ConfigFromEnv() (Config, error) {
-	c := Config{ListenAddr: env("LISTEN_ADDR", "127.0.0.1:8080"), PublicURL: strings.TrimRight(env("PUBLIC_URL", "http://localhost:3000"), "/"), DataDir: env("DATA_DIR", "./data")}
+	c := Config{ListenAddr: env("LISTEN_ADDR", "127.0.0.1:8080"), PublicURL: strings.TrimRight(env("PUBLIC_URL", "http://localhost:3000"), "/"), DataDir: env("DATA_DIR", "./data"), DatabaseURL: os.Getenv("DATABASE_URL")}
+	if c.DatabaseURL == "" {
+		return c, errors.New("DATABASE_URL is required")
+	}
 	u, err := url.Parse(c.PublicURL)
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
 		return c, errors.New("PUBLIC_URL must be an HTTP(S) origin without a path")
@@ -114,7 +118,13 @@ type App struct {
 	db         *sql.DB
 	config     Config
 	now        func() time.Time
-	uploads    chan struct{}
+	receivers  chan struct{}
+	workerMu sync.Mutex
+	workerCancel context.CancelFunc
+	workerConn *sql.Conn
+	workers sync.WaitGroup
+	closeOnce sync.Once
+	closeErr error
 	authMu     sync.Mutex
 	authWindow time.Time
 	authCount  int
@@ -136,23 +146,34 @@ func Open(config Config) (*App, error) {
 	if err := os.MkdirAll(filepath.Join(config.DataDir, "tmp"), 0700); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", filepath.Join(config.DataDir, "birthday.sqlite"))
+	if err := os.MkdirAll(filepath.Join(config.DataDir, "uploads"), 0700); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	db, err := openDatabase(ctx, config.DatabaseURL, config.DataDir)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	if _, err = db.Exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("configure database: %w", err)
-	}
-	if err = migrate(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("initialize database: %w", err)
-	}
-	return &App{db: db, config: config, now: time.Now, uploads: make(chan struct{}, 2)}, nil
+	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4)}, nil
 }
 
-func (a *App) Close() error { return a.db.Close() }
+func (a *App) Close() error {
+	a.closeOnce.Do(func() {
+		a.workerMu.Lock()
+		if a.workerCancel != nil { a.workerCancel() }
+		a.workerMu.Unlock()
+		a.workers.Wait()
+		if a.workerConn != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, _ = a.workerConn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtext(current_schema()), 73002)")
+			cancel()
+			_ = a.workerConn.Close()
+		}
+		a.closeErr = a.db.Close()
+	})
+	return a.closeErr
+}
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -179,6 +200,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/guestbook/{id}", a.auth(false, a.deleteEntry))
 	mux.HandleFunc("GET /api/photos", a.auth(false, a.listPhotos))
 	mux.HandleFunc("POST /api/photos", a.auth(false, a.uploadPhoto))
+	mux.HandleFunc("GET /api/uploads", a.auth(false, a.listUploads))
+	mux.HandleFunc("GET /api/uploads/{id}", a.auth(false, a.getUpload))
 	mux.HandleFunc("GET /api/photos/{id}/image", a.auth(false, a.servePhoto))
 	mux.HandleFunc("DELETE /api/photos/{id}", a.auth(false, a.deletePhoto))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +226,7 @@ func (a *App) auth(admin bool, next func(http.ResponseWriter, *http.Request, Gue
 			return
 		}
 		var guest Guest
-		err = a.db.QueryRowContext(r.Context(), `SELECT g.id,g.name,g.role,g.active FROM sessions s JOIN guests g ON g.id=s.guest_id WHERE s.token_hash=? AND s.expires_at>? AND g.active=1`, hashToken(cookie.Value), a.now().Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
+		err = a.db.QueryRowContext(r.Context(), `SELECT g.id,g.name,g.role,g.active FROM sessions s JOIN guests g ON g.id=s.guest_id WHERE s.token_hash=$1 AND s.expires_at>$2 AND g.active=1`, hashToken(cookie.Value), a.now().Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
 		if errors.Is(err, sql.ErrNoRows) {
 			fail(w, 401, "session_expired")
 			return

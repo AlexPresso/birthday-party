@@ -3,7 +3,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Every run owns a fresh database and media directory, never the host's real data.
+// scripts/e2e.mjs supplies a disposable PostgreSQL database for each run.
+// This private media directory never contains the host's real data.
 const dataDir =
   process.env.BIRTHDAY_E2E_DATA_DIR ??
   mkdtempSync(join(tmpdir(), "birthday-party-e2e-"));

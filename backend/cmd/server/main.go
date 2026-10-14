@@ -62,6 +62,9 @@ func run() error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	defer listener.Close()
+	if err := application.StartWorkers(ctx); err != nil {
+		return fmt.Errorf("start media workers: %w", err)
+	}
 	var invitationURL string
 	if config.PrintAdminInvitation {
 		invitationContext, cancel := context.WithTimeout(ctx, 10*time.Second)
