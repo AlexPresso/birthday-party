@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 	_ "time/tzdata"
-
 )
 
 const (
@@ -115,19 +114,20 @@ type Author struct {
 }
 
 type App struct {
-	db         *sql.DB
-	config     Config
-	now        func() time.Time
-	receivers  chan struct{}
-	workerMu sync.Mutex
+	db           *sql.DB
+	config       Config
+	now          func() time.Time
+	receivers    chan struct{}
+	workerMu     sync.Mutex
 	workerCancel context.CancelFunc
-	workerConn *sql.Conn
-	workers sync.WaitGroup
-	closeOnce sync.Once
-	closeErr error
-	authMu     sync.Mutex
-	authWindow time.Time
-	authCount  int
+	workerConn   *sql.Conn
+	workerErrors chan error
+	workers      sync.WaitGroup
+	closeOnce    sync.Once
+	closeErr     error
+	authMu       sync.Mutex
+	authWindow   time.Time
+	authCount    int
 }
 
 func Open(config Config) (*App, error) {
@@ -155,13 +155,15 @@ func Open(config Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4)}, nil
+	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), workerErrors: make(chan error, 1)}, nil
 }
 
 func (a *App) Close() error {
 	a.closeOnce.Do(func() {
 		a.workerMu.Lock()
-		if a.workerCancel != nil { a.workerCancel() }
+		if a.workerCancel != nil {
+			a.workerCancel()
+		}
 		a.workerMu.Unlock()
 		a.workers.Wait()
 		if a.workerConn != nil {

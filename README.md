@@ -5,7 +5,7 @@ programmées, livre d'or et paramètres. L'interface utilise le thème
 prune sombre choisi dans [le brief](docs/design.md).
 
 Next.js et TypeScript affichent l'application. Un service Go gère les invitations,
-les sessions, les permissions, SQLite et les médias sur disque. Le navigateur
+les sessions, les permissions, PostgreSQL et les médias sur disque. Le navigateur
 utilise uniquement l'origine du frontend ; Next transmet `/api/*` au serveur Go.
 Le [contrat HTTP](docs/api.md) décrit les échanges.
 
@@ -29,20 +29,21 @@ conservées telles quelles, avec leurs ressources utiles et les crédits d'origi
 Prérequis : Node.js 24+, npm, Go 1.26+, `ffmpeg` et `ffprobe` dans le `PATH`
 pour les vidéos. [FFmpeg](https://ffmpeg.org/download.html) doit inclure les
 encodeurs H.264 (`libx264`) et AAC. Docker les fournit automatiquement.
-Aucun service de base de données externe
-n'est nécessaire. Les commandes ci-dessous fonctionnent dans PowerShell à la
-racine du projet.
+PostgreSQL 18 est fourni par Docker Compose. Les commandes ci-dessous fonctionnent
+dans PowerShell à la racine du projet.
 
 ```powershell
 npm ci
 npm --prefix frontend ci
+docker compose -p birthday-party-dev -f compose.yaml -f compose.dev.yaml up -d --wait postgres
 npm run dev
 ```
 
 Ouvrir **http://localhost:3000**. Le serveur Go écoute sur `127.0.0.1:8080`.
 `Ctrl+C` arrête les deux processus. Next recharge les modifications du frontend ;
-relancer la commande après une modification Go. Les données locales sont dans
-`backend/data/`, exclu de Git. Aucun invité ni contenu de fête n'est créé au démarrage.
+relancer la commande après une modification Go. Les médias locaux sont dans
+`backend/data/`, exclu de Git ; les données sont dans PostgreSQL. Aucun invité ni
+contenu de fête n'est créé au démarrage.
 Avec `PRINT_ADMIN_INVITATION=true`, un profil technique `Admin` est créé seulement
 s'il n'existe aucun administrateur actif.
 
@@ -56,6 +57,12 @@ $env:GO_BIN = 'C:/path/to/go/bin/go.exe'
 Les scripts chargent un éventuel `.env` à la racine ; les variables déjà définies
 dans le terminal sont prioritaires. `.env.example` donne les options sans secret.
 Avec un `DATA_DIR` relatif, le chemin est résolu à partir de `backend/`.
+Les scripts construisent l'adresse PostgreSQL locale depuis `POSTGRES_DB`,
+`POSTGRES_USER`, `POSTGRES_PASSWORD` et `POSTGRES_PORT` (5432 par défaut).
+Une variable `DATABASE_URL` explicite permet d'utiliser une autre base.
+L'extension `compose.dev.yaml` expose PostgreSQL uniquement sur `127.0.0.1`.
+Le projet Compose `birthday-party-dev` possède sa propre base : les médias locaux
+et ceux du déploiement Docker restent associés à leurs enregistrements respectifs.
 
 ## Personnaliser l’anniversaire
 
@@ -228,6 +235,11 @@ L'application n'envoie aucun e-mail ni message WhatsApp.
   Elles sont converties en MP4 H.264/AAC, jusqu’à 1280×720 et 30 images/seconde,
   puis leur fichier d’origine est supprimé. La galerie accepte au plus 5 000
   fichiers et 10 Gio ; les nouveaux envois comptent aussi leur vignette.
+- Les fichiers reçus sont placés dans une file persistante, puis préparés deux
+  par deux. L'invité peut changer d'onglet pendant l'envoi et retrouver les fichiers
+  déjà reçus après un rechargement. Les fichiers encore sur le téléphone exigent
+  de garder la page ouverte jusqu'à la fin de leur transfert.
+  La file accepte 100 fichiers actifs par invité, 1 000 au total et 10 Gio d'entrées.
 - Go masque le titre privé et la description des surprises avant leur ouverture.
   Un aperçu public peut être défini. Le fuseau initial est **Europe/Zurich**,
   modifiable par l'organisateur ; les instants sont enregistrés en UTC.
@@ -252,9 +264,20 @@ npm --prefix frontend run format:check
 
 Arrêter `npm run dev` avant les tests navigateur ou une compilation de production :
 ces commandes partagent le répertoire de compilation Next. Les tests navigateur
-utilisent un port et un dossier de données temporaires propres aux tests ; ils
-ne doivent pas utiliser les données de la fête. Voir aussi les
+utilisent un port, un dossier de médias et un conteneur PostgreSQL temporaires
+propres aux tests. Docker doit tourner pour `npm run check` et `npm run test:e2e` ;
+la base de test est supprimée après la commande, sans toucher aux données de la fête.
+Voir aussi les
 instructions [frontend](frontend/AGENTS.md) et [backend](backend/AGENTS.md).
+
+Vérifications du 15 octobre 2026, après passage à PostgreSQL et ajout de la file
+persistante : analyse et tests Go avec PostgreSQL et FFmpeg, lint, types,
+19 tests frontend, 22 parcours Chrome et les deux images Docker réussis.
+Les tests couvrent aussi les migrations, l'import SQLite, la reprise après
+redémarrage, les envois simultanés, les doublons et la navigation pendant l'envoi.
+L'import réel a été comparé table par table à la sauvegarde SQLite avant le
+redémarrage de l'application ; la page servie par Docker a été vérifiée dans
+les cinq langues et avec le repli vers l'anglais.
 
 Vérifications du 14 octobre 2026 : analyse et tests Go, lint, types, 18 tests
 frontend, 19 parcours Chrome, formatage et build production réussis. Les parcours
@@ -276,9 +299,11 @@ jour de `eslint-config-next` et relancer l'audit.
 
 ## Exécuter avec Docker
 
-La configuration Compose fournit les deux applications et un volume persistant
-`party-data` pour SQLite, les photos et les vidéos. Elle reste accessible uniquement depuis
-la machine hôte sur le port 3000 ; le serveur Go n'a aucun port public.
+La configuration Compose fournit les deux applications et PostgreSQL 18.
+Le volume `postgres-data` conserve les enregistrements et la file d'attente ;
+`party-data` conserve les photos, vidéos, vignettes et fichiers en attente.
+L'application reste accessible uniquement depuis la machine hôte sur le port 3000 ;
+Go et PostgreSQL n'ont aucun port public.
 Le démarrage Compose, l'ouverture de la page d'invitation dans Chrome et l'accès
 à l'API via le frontend ont été vérifiés le 14 octobre 2026.
 
@@ -310,14 +335,18 @@ un stockage persistant. Les invitations générées utilisent `PUBLIC_URL` :
 
 Le reverse proxy doit accepter le plus grand des deux poids configurés,
 avec au moins 64 Kio pour le formulaire, et un délai de 10 minutes pour
-l’envoi et la préparation des vidéos. Il ne doit pas mettre en
+l’envoi des fichiers. La préparation des vidéos continue en arrière-plan après
+la réponse 202. Le proxy ne doit pas mettre en
 cache les pages privées, les API ni les médias authentifiés. La destination du
 proxy Next est fixée pendant la compilation via `API_INTERNAL_URL` ; reconstruire
 le frontend si cette adresse interne change.
 
-Avant une sauvegarde simple, arrêter les deux services, copier l'intégralité de
-`backend/data/` en local ou du volume `party-data` avec Docker, puis redémarrer.
-Sauvegarder ensemble la base SQLite, ses éventuels fichiers WAL, les photos et les vidéos.
-Conserver les copies dans un espace privé et tester leur restauration. Éviter
-`docker compose down -v` tant que les souvenirs doivent être conservés : cette
-option supprime le volume.
+Les migrations SQL et la procédure de sauvegarde sont décrites dans
+[docs/database.md](docs/database.md). Sauvegarder ensemble PostgreSQL et les médias,
+avec le backend arrêté pour conserver leur cohérence.
+
+Au premier démarrage de cette version, une ancienne base `birthday.sqlite` dans
+`party-data` est importée automatiquement vers une base PostgreSQL vide.
+Les invités, sessions, messages et références des médias sont conservés ; le fichier
+SQLite reste intact. Une base PostgreSQL déjà remplie sans trace d'import provoque
+un arrêt explicite pour éviter de mélanger deux jeux de données.

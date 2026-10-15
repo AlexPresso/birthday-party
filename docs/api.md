@@ -51,7 +51,11 @@ contains both photos and videos. `mimeType` is `image/jpeg`, `image/png`,
 `image/webp` or `video/mp4`.
 
 - `GET /api/photos?before=<id>&limit=24` -> `{ items: Photo[], nextCursor: string | null, limits: { imageBytes, videoBytes } }`.
-- `POST /api/photos` multipart field `file` -> `Photo` (201). One file per request.
+- `POST /api/photos` multipart field `file` -> `UploadJob` (202). One file per request.
+  Optional `X-Upload-ID` UUID makes retries idempotent for the authenticated owner.
+- `GET /api/uploads` -> `{ items: UploadJob[] }`: the owner's active jobs plus
+  their 50 most recent terminal jobs. Other guests and administrators cannot read them.
+- `GET /api/uploads/{id}` -> `UploadJob`, only for its owner; otherwise 404.
 - `GET /api/photos/{id}/image` -> original image or normalized MP4 video;
   `?size=thumb` -> JPEG thumbnail. Video requests support authenticated byte ranges.
 - `DELETE /api/photos/{id}` -> 204, only author or admin.
@@ -69,8 +73,22 @@ are discarded after conversion. Media and thumbnails stay authenticated.
 The UI uploads a bounded queue with per-file progress and retry. Thumbnails
 are at most 720 pixels per side. The gallery is capped at 5000 files and
 10 GiB; new upload accounting includes the playback/original file and thumbnail.
-Processing accepts two concurrent uploads. FFmpeg runs with limited threads,
-protocols, formats and processing time; failed or cancelled uploads are removed.
+`UploadJob = { id, clientUploadId, status: "queued" | "processing" | "ready" | "failed", filename, kind: "image" | "video", createdAt, errorCode: string | null, photo: Photo | null }`
+
+202 confirms the raw input and queue record have been saved. Preparation continues
+after navigation, disconnection or reload. `ready` publishes the media in the
+gallery; `photo` can later be null if that media was deleted. Failed jobs expose
+a translated error code; retry by sending the file again with a fresh upload ID.
+Reusing an existing upload ID returns the same job instead of adding another file.
+
+Two background workers prepare queued files; up to four request bodies are read
+at a time independently. The durable queue allows 100 active jobs per guest,
+1000 globally and 10 GiB of pending input. Capacity failures return 409
+`upload_queue_full`; two busy processors alone do not reject an upload.
+Terminal job history expires after 24 hours, while ready media remains in the gallery.
+FFmpeg runs with limited threads, protocols, formats and processing time.
+Interrupted jobs resume on server startup; failed inputs and temporary outputs
+are removed, and revoked guests' jobs cannot publish media.
 
 ## Programme
 

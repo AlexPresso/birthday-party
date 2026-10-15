@@ -6,8 +6,35 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
+
+func TestConcurrentStartupKeepsOneAdministrator(t *testing.T) {
+	a := testApp(t)
+	var tasks sync.WaitGroup
+	errors := make(chan error, 4)
+	for range 4 {
+		tasks.Go(func() {
+			_, err := a.StartupAdminInvitation(t.Context())
+			errors <- err
+		})
+	}
+	tasks.Wait()
+	close(errors)
+	for err := range errors {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var guests, invitations int
+	if err := a.db.QueryRow("SELECT (SELECT COUNT(*) FROM guests),(SELECT COUNT(*) FROM invitations)").Scan(&guests, &invitations); err != nil {
+		t.Fatal(err)
+	}
+	if guests != 1 || invitations != 1 {
+		t.Fatalf("concurrent startup created duplicate records: guests=%d invitations=%d", guests, invitations)
+	}
+}
 
 func TestStartupAdminInvitationCreatesAdministrator(t *testing.T) {
 	a := testApp(t)
@@ -119,7 +146,7 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			a := testApp(t)
 			for _, guest := range test.guests {
-				if _, err := a.db.Exec("INSERT INTO guests(id,name,role,active) VALUES(?,?,?,?)", guest.ID, guest.Name, guest.Role, guest.Active); err != nil {
+				if _, err := a.db.Exec("INSERT INTO guests(name,role,active) VALUES($1,$2,$3)", guest.Name, guest.Role, flag(guest.Active)); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -128,7 +155,7 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 				t.Fatal(err)
 			}
 			var id int64
-			if err := a.db.QueryRow("SELECT guest_id FROM invitations WHERE token_hash=?", hashToken(tokenFromURL(t, link))).Scan(&id); err != nil {
+			if err := a.db.QueryRow("SELECT guest_id FROM invitations WHERE token_hash=$1", hashToken(tokenFromURL(t, link))).Scan(&id); err != nil {
 				t.Fatal(err)
 			}
 			if id != test.wantID {
@@ -136,7 +163,7 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 			}
 			for _, original := range test.guests {
 				var stored Guest
-				if err := a.db.QueryRow("SELECT id,name,role,active FROM guests WHERE id=?", original.ID).Scan(&stored.ID, &stored.Name, &stored.Role, &stored.Active); err != nil {
+				if err := a.db.QueryRow("SELECT id,name,role,active FROM guests WHERE id=$1", original.ID).Scan(&stored.ID, &stored.Name, &stored.Role, &stored.Active); err != nil {
 					t.Fatal(err)
 				}
 				if stored != original {
@@ -148,6 +175,7 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 }
 
 func TestPrintAdminInvitationConfiguration(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://unused/unused")
 	t.Setenv("PUBLIC_URL", "http://localhost:3000")
 	t.Setenv("COOKIE_SECURE", "false")
 	for _, test := range []struct {

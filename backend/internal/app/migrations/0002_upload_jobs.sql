@@ -7,6 +7,7 @@ CREATE TABLE upload_jobs (
  kind TEXT NOT NULL CHECK(kind IN ('image','video')),
  input_format TEXT NOT NULL,
  storage_key TEXT NOT NULL UNIQUE,
+ attempt_id TEXT,
  byte_size BIGINT NOT NULL CHECK(byte_size >= 0),
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL,

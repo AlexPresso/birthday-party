@@ -31,7 +31,10 @@ const en = {
   invalid_guest_name: "The name must contain between 1 and 80 characters.",
   guest_limit_reached: "You’ve reached the limit of 500 guests.",
   self_revoke_forbidden: "You cannot remove your own access.",
-  upload_busy: "Two files are already being processed. Try again in a moment.",
+  upload_queue_full:
+    "The upload queue is full. Wait for a few files to finish, then try again.",
+  upload_not_found: "This upload could not be found.",
+  invalid_upload_id: "The upload could not be started. Choose the file again.",
   photo_required: "Choose a photo or video to upload.",
   single_photo_required: "Upload one file at a time.",
   photo_too_large: "This photo is too large. Choose a smaller file.",
@@ -100,8 +103,11 @@ export const errorMessages = {
     invalid_guest_name: "Le prénom doit contenir entre 1 et 80 caractères.",
     guest_limit_reached: "Tu as atteint la limite de 500 invités.",
     self_revoke_forbidden: "Tu ne peux pas retirer ton propre accès.",
-    upload_busy:
-      "Deux fichiers sont déjà en cours de traitement. Réessaie dans un instant.",
+    upload_queue_full:
+      "La file d’envoi est pleine. Attends que quelques fichiers soient prêts, puis réessaie.",
+    upload_not_found: "Cet envoi est introuvable.",
+    invalid_upload_id:
+      "L’envoi n’a pas pu démarrer. Choisis à nouveau le fichier.",
     photo_required: "Choisis une photo ou une vidéo à envoyer.",
     single_photo_required: "Envoie un fichier à la fois.",
     photo_too_large:
@@ -173,8 +179,11 @@ export const errorMessages = {
     invalid_guest_name: "Der Name muss zwischen 1 und 80 Zeichen enthalten.",
     guest_limit_reached: "Du hast das Limit von 500 Gästen erreicht.",
     self_revoke_forbidden: "Du kannst deinen eigenen Zugang nicht entfernen.",
-    upload_busy:
-      "Zwei Dateien werden bereits verarbeitet. Versuche es gleich noch einmal.",
+    upload_queue_full:
+      "Die Warteschlange ist voll. Warte, bis einige Dateien fertig sind, und versuche es erneut.",
+    upload_not_found: "Dieser Upload wurde nicht gefunden.",
+    invalid_upload_id:
+      "Der Upload konnte nicht starten. Wähle die Datei erneut aus.",
     photo_required: "Wähle ein Foto oder Video zum Hochladen.",
     single_photo_required: "Lade eine Datei nach der anderen hoch.",
     photo_too_large: "Dieses Foto ist zu groß. Wähle eine kleinere Datei.",
@@ -245,7 +254,11 @@ export const errorMessages = {
     invalid_guest_name: "Il nome deve contenere da 1 a 80 caratteri.",
     guest_limit_reached: "Hai raggiunto il limite di 500 invitati.",
     self_revoke_forbidden: "Non puoi rimuovere il tuo accesso.",
-    upload_busy: "Due file sono già in elaborazione. Riprova tra poco.",
+    upload_queue_full:
+      "La coda è piena. Aspetta che alcuni file siano pronti, poi riprova.",
+    upload_not_found: "Questo caricamento non è stato trovato.",
+    invalid_upload_id:
+      "Il caricamento non è partito. Seleziona di nuovo il file.",
     photo_required: "Scegli una foto o un video da caricare.",
     single_photo_required: "Carica un file alla volta.",
     photo_too_large: "Questa foto è troppo grande. Scegli un file più piccolo.",
@@ -313,8 +326,11 @@ export const errorMessages = {
     invalid_guest_name: "El nombre debe tener entre 1 y 80 caracteres.",
     guest_limit_reached: "Has llegado al límite de 500 invitados.",
     self_revoke_forbidden: "No puedes quitarte tu propio acceso.",
-    upload_busy:
-      "Ya se están procesando dos archivos. Vuelve a intentarlo en un momento.",
+    upload_queue_full:
+      "La cola está llena. Espera a que algunos archivos estén listos y vuelve a intentarlo.",
+    upload_not_found: "No se ha encontrado esta subida.",
+    invalid_upload_id:
+      "No se ha podido iniciar la subida. Elige el archivo de nuevo.",
     photo_required: "Elige una foto o un vídeo para subir.",
     single_photo_required: "Sube un archivo a la vez.",
     photo_too_large:

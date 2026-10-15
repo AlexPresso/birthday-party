@@ -89,6 +89,8 @@ confirmations, loading states and empty states. API failures contain a stable
 boundary. Format dates and counts with `Intl` for the selected locale, keeping
 the party's explicit timezone. Omit timezone suffixes and the programme timezone
 footer. Host date inputs use the browser's timezone and retain their input hints.
+Populate the saved party date after hydration without requiring focus. Preserve
+the original UTC instant until the host edits or clears the date field.
 
 Keep names, guestbook messages, party titles, event details and public teasers
 exactly as supplied by their authors. A locked event with no public teaser has an
@@ -109,8 +111,13 @@ them, and removed after deliberate acceptance.
 
 Authenticated media deliberately uses native images: the Go service already
 creates thumbnails, and Next image optimization would not forward guest cookies.
-Uploads accept at most 20 selected files and run two requests concurrently;
-each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos
+Uploads accept at most 20 selected files and run two requests concurrently.
+The authenticated layout owns transfers so tab navigation does not cancel them.
+POST /api/photos returns a persistent job with 202. Poll the owner's /api/uploads
+queue, distinguish transfer from waiting/preparation, and refresh the gallery
+when a job becomes ready. Reload restores accepted jobs; unsent browser files
+still require the page to remain open. Reuse X-Upload-ID for ambiguous retries.
+Each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos
 accept MP4/MOV/WebM up to 5 minutes and 4K input; Go converts them to
 MP4 and generates JPEG thumbnails. Render thumbnails in the gallery and use a
 native video player with controls, playsInline and no autoplay when opened.

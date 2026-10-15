@@ -10,9 +10,7 @@ const en = {
   "admin.location": "Location",
   "admin.unspecified": "To be confirmed",
   "admin.partyDate": "Party date",
-  "admin.currentDate": "Currently: {date}.",
-  "admin.dateHint":
-    "Enter the time in your device’s time zone. Select the field to edit it.",
+  "admin.dateHint": "Enter the time in your device’s time zone.",
   "admin.partyTimezone": "Party time zone",
   "admin.timezoneHint": "Guests see all times in this time zone.",
   "admin.saving": "Saving…",
@@ -78,15 +76,6 @@ const en = {
     "Your photos, videos and signed messages appear under this name.",
   "settings.signingOut": "Signing out…",
   "settings.signOut": "Sign out",
-  "settings.details": "About the app",
-  "settings.theme": "Plum theme",
-  "settings.dark": "Dark",
-  "settings.private": "Guests only",
-  "settings.privacyHint":
-    "Only guests can see photos, videos and messages. You can delete the ones you’ve shared.",
-  "settings.accessHelp": "Trouble getting in?",
-  "settings.accessHelpHint":
-    "Ask the host for a new link. You’ll keep your profile, photos, videos and messages.",
 };
 
 type AdminMessages = Record<keyof typeof en, string>;
@@ -104,9 +93,7 @@ const fr: AdminMessages = {
   "admin.location": "Lieu",
   "admin.unspecified": "À préciser",
   "admin.partyDate": "Date de la fête",
-  "admin.currentDate": "Actuellement : {date}.",
-  "admin.dateHint":
-    "Indique l’heure dans le fuseau de ton appareil. Sélectionne le champ pour la modifier.",
+  "admin.dateHint": "Indique l’heure dans le fuseau de ton appareil.",
   "admin.partyTimezone": "Fuseau horaire de la fête",
   "admin.timezoneHint": "Les invités verront tous les horaires dans ce fuseau.",
   "admin.saving": "Enregistrement…",
@@ -173,15 +160,6 @@ const fr: AdminMessages = {
     "Tes photos, tes vidéos et tes messages signés s’affichent avec ce prénom.",
   "settings.signingOut": "Déconnexion…",
   "settings.signOut": "Se déconnecter",
-  "settings.details": "À propos de l’appli",
-  "settings.theme": "Thème prune",
-  "settings.dark": "Sombre",
-  "settings.private": "Réservé aux invités",
-  "settings.privacyHint":
-    "Seuls les invités voient les photos, les vidéos et les messages. Tu peux supprimer ce que tu as partagé.",
-  "settings.accessHelp": "Un souci avec ton accès ?",
-  "settings.accessHelpHint":
-    "Demande un nouveau lien à l’organisateur. Tu garderas ton profil, tes photos, tes vidéos et tes messages.",
 };
 
 const de: AdminMessages = {
@@ -198,9 +176,7 @@ const de: AdminMessages = {
   "admin.location": "Ort",
   "admin.unspecified": "Noch offen",
   "admin.partyDate": "Datum der Feier",
-  "admin.currentDate": "Aktuell: {date}.",
-  "admin.dateHint":
-    "Gib die Uhrzeit in der Zeitzone deines Geräts ein. Wähle das Feld aus, um sie zu ändern.",
+  "admin.dateHint": "Gib die Uhrzeit in der Zeitzone deines Geräts ein.",
   "admin.partyTimezone": "Zeitzone der Feier",
   "admin.timezoneHint": "In dieser Zeitzone sehen die Gäste alle Uhrzeiten.",
   "admin.saving": "Wird gespeichert…",
@@ -267,15 +243,6 @@ const de: AdminMessages = {
     "Deine Fotos, Videos und Nachrichten mit Namen erscheinen unter diesem Namen.",
   "settings.signingOut": "Wird abgemeldet…",
   "settings.signOut": "Abmelden",
-  "settings.details": "Über die App",
-  "settings.theme": "Pflaumenfarbenes Design",
-  "settings.dark": "Dunkel",
-  "settings.private": "Nur für Gäste",
-  "settings.privacyHint":
-    "Nur Gäste sehen die Fotos, Videos und Nachrichten. Was du selbst geteilt hast, kannst du löschen.",
-  "settings.accessHelp": "Probleme mit dem Zugang?",
-  "settings.accessHelpHint":
-    "Bitte den Gastgeber um einen neuen Link. Dein Profil, deine Fotos, Videos und Nachrichten bleiben erhalten.",
 };
 
 const it: AdminMessages = {
@@ -291,9 +258,7 @@ const it: AdminMessages = {
   "admin.location": "Luogo",
   "admin.unspecified": "Da definire",
   "admin.partyDate": "Data della festa",
-  "admin.currentDate": "Attualmente: {date}.",
-  "admin.dateHint":
-    "Inserisci l’ora nel fuso orario del tuo dispositivo. Seleziona il campo per modificarla.",
+  "admin.dateHint": "Inserisci l’ora nel fuso orario del tuo dispositivo.",
   "admin.partyTimezone": "Fuso orario della festa",
   "admin.timezoneHint": "Gli invitati vedono tutti gli orari in questo fuso.",
   "admin.saving": "Salvataggio…",
@@ -360,15 +325,6 @@ const it: AdminMessages = {
     "Le tue foto, i tuoi video e i messaggi firmati appaiono con questo nome.",
   "settings.signingOut": "Disconnessione…",
   "settings.signOut": "Esci",
-  "settings.details": "Informazioni sull’app",
-  "settings.theme": "Tema prugna",
-  "settings.dark": "Scuro",
-  "settings.private": "Solo per gli invitati",
-  "settings.privacyHint":
-    "Solo gli invitati possono vedere foto, video e messaggi. Puoi eliminare ciò che hai condiviso.",
-  "settings.accessHelp": "Problemi con l’accesso?",
-  "settings.accessHelpHint":
-    "Chiedi un nuovo link a chi organizza. Conserverai il tuo profilo, le foto, i video e i messaggi.",
 };
 
 const es: AdminMessages = {
@@ -385,9 +341,7 @@ const es: AdminMessages = {
   "admin.location": "Lugar",
   "admin.unspecified": "Por confirmar",
   "admin.partyDate": "Fecha de la fiesta",
-  "admin.currentDate": "Actualmente: {date}.",
-  "admin.dateHint":
-    "Introduce la hora en la zona horaria de tu dispositivo. Selecciona el campo para cambiarla.",
+  "admin.dateHint": "Introduce la hora en la zona horaria de tu dispositivo.",
   "admin.partyTimezone": "Zona horaria de la fiesta",
   "admin.timezoneHint":
     "Los invitados ven todos los horarios en esta zona horaria.",
@@ -454,15 +408,6 @@ const es: AdminMessages = {
     "Tus fotos, vídeos y mensajes firmados aparecen con este nombre.",
   "settings.signingOut": "Cerrando sesión…",
   "settings.signOut": "Cerrar sesión",
-  "settings.details": "Sobre la app",
-  "settings.theme": "Tema ciruela",
-  "settings.dark": "Oscuro",
-  "settings.private": "Solo para invitados",
-  "settings.privacyHint":
-    "Solo los invitados ven las fotos, los vídeos y los mensajes. Puedes eliminar lo que has compartido.",
-  "settings.accessHelp": "¿Problemas para entrar?",
-  "settings.accessHelpHint":
-    "Pide un nuevo enlace al organizador. Conservarás tu perfil, tus fotos, tus vídeos y tus mensajes.",
 };
 
 export const adminMessages = { en, fr, de, it, es };

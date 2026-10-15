@@ -28,6 +28,9 @@ func run() error {
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
+	if command != "serve" && command != "invite-admin" && command != "migrate" {
+		return errors.New("usage: server serve | server migrate | server invite-admin --name NAME")
+	}
 	config, err := app.ConfigFromEnv()
 	if err != nil {
 		return err
@@ -37,6 +40,10 @@ func run() error {
 		return err
 	}
 	defer application.Close()
+	if command == "migrate" {
+		fmt.Println("Database migrations and legacy import completed.")
+		return nil
+	}
 	if command == "invite-admin" {
 		flags := flag.NewFlagSet(command, flag.ContinueOnError)
 		name := flags.String("name", "", "Name of the host")
@@ -51,9 +58,6 @@ func run() error {
 		}
 		fmt.Println(url)
 		return nil
-	}
-	if command != "serve" {
-		return errors.New("usage: server serve | server invite-admin --name NAME")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -87,6 +91,11 @@ func run() error {
 			return nil
 		}
 		return err
+	case err := <-application.WorkerErrors():
+		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdown)
+		return fmt.Errorf("media workers stopped: %w", err)
 	case <-ctx.Done():
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

@@ -88,15 +88,23 @@ use, a personal visual identity, simple code, and responsive interactions.
   order and routes; see `docs/design.md` and its reference image.
 - Guest profiles are prepared by the host. Individual, single-use invitation
   links activate a persistent session. A replacement link keeps the same identity.
-- SQLite stores records; a private local data directory stores photos, videos and
-  thumbnails. Back up both together. This initial setup targets one Go process
-  and persistent local storage, not ephemeral or horizontally scaled hosting.
+- PostgreSQL stores records and media jobs; a private local data directory stores
+  photos, videos, thumbnails and pending inputs. Back up both together. This setup
+  targets one Go process and persistent local storage.
+- All schema changes use new numbered SQL files under
+  `backend/internal/app/migrations/`. Startup applies them transactionally and
+  verifies recorded checksums; never edit an applied migration.
+- Existing `DATA_DIR/birthday.sqlite` is imported once into an empty PostgreSQL
+  database, preserving identities, sessions and media filenames. Keep the source
+  intact; SQLite is used only for this legacy import.
 - The frontend proxies same-origin `/api/*` to Go. The public API contract is in
   `docs/api.md`; keep frontend validators and backend responses aligned.
 - The media gallery retains `/photos` and `/api/photos` for existing links.
   Videos use FFmpeg to produce private MP4 playback files and JPEG thumbnails;
   Compose includes FFmpeg. Keep processing and file sizes bounded.
-- Guestbook posts can be anonymous. Keep their owner ID private in SQLite for
+  Accepted uploads enter a persistent queue; two background workers prepare them.
+  Preserve progress across navigation and restore accepted jobs after reload.
+- Guestbook posts can be anonymous. Keep their owner ID private in PostgreSQL for
   deletion permissions; never send their identity to guests or administrators.
 - Shared runtime configuration belongs in the repository-root `.env`.
   `docker compose up` must apply it directly; do not load frontend env files in

@@ -265,13 +265,15 @@ for (const language of languages) {
       const navigation = page.getByRole("navigation");
       await expect(navigation.getByRole("link")).toHaveText([...language.tabs]);
       await expect(page.locator("html")).toHaveAttribute("lang", language.lang);
-      await page
-        .getByLabel(language.mediaInput, { exact: true })
-        .setInputFiles({
-          name: "not-media.txt",
-          mimeType: "text/plain",
-          buffer: Buffer.from("Upload validation fixture"),
-        });
+      const fileChooser = page.waitForEvent("filechooser");
+      await page.locator("button.upload-button").click();
+      await (
+        await fileChooser
+      ).setFiles({
+        name: "not-media.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("Upload validation fixture"),
+      });
       await expect(
         page.getByText(language.uploadError, { exact: true }),
       ).toBeVisible();

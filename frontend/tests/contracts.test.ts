@@ -7,12 +7,63 @@ import {
   eventsSchema,
   sessionSchema,
   entrySchema,
+  uploadSchema,
+  uploadsSchema,
 } from "../src/lib/contracts.ts";
 
 const defaultLimits = {
   imageBytes: 15 * 1024 * 1024,
   videoBytes: 100 * 1024 * 1024,
 };
+
+test("upload responses distinguish accepted work, completed media and failed preparation", () => {
+  const job = {
+    id: 1,
+    clientUploadId: "b4174b65-4c1c-45a8-96ee-ac2c42e87090",
+    filename: "party.mp4",
+    kind: "video",
+    createdAt: "2026-10-15T16:00:00Z",
+    status: "queued",
+    errorCode: null,
+    photo: null,
+  };
+  assert.equal(uploadSchema.safeParse(job).success, true);
+  assert.equal(
+    uploadSchema.safeParse({ ...job, status: "processing" }).success,
+    true,
+  );
+  assert.equal(
+    uploadSchema.safeParse({
+      ...job,
+      status: "failed",
+      errorCode: "unreadable_video",
+    }).success,
+    true,
+  );
+  // A completed upload can outlive its deleted media record.
+  assert.equal(
+    uploadSchema.safeParse({ ...job, status: "ready" }).success,
+    true,
+  );
+  for (const invalid of [
+    { ...job, status: "failed" },
+    { ...job, status: "ready", errorCode: "unreadable_video" },
+    { ...job, status: "done" },
+    { ...job, clientUploadId: null },
+    { ...job, clientUploadId: "arbitrary-key" },
+    { ...job, errorCode: "unreadable_video" },
+    { ...job, photo: { url: "https://outside.example/private.mp4" } },
+  ])
+    assert.equal(uploadSchema.safeParse(invalid).success, false);
+  assert.equal(
+    uploadsSchema.safeParse({ items: Array(150).fill(job) }).success,
+    true,
+  );
+  assert.equal(
+    uploadsSchema.safeParse({ items: Array(151).fill(job) }).success,
+    false,
+  );
+});
 
 test("media responses cannot point a private gallery at an external host", () => {
   const valid = {

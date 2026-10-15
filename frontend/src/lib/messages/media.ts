@@ -16,7 +16,15 @@ const en = {
   "photos.removeFromQueue": "Remove {name} from the list",
   "photos.addedCountOne": "{count} file added.",
   "photos.addedCountOther": "{count} files added.",
-  "photos.keepOpen": "Keep this page open until your uploads finish.",
+  "photos.keepOpen":
+    "You can switch tabs. Keep the app open while your files are sent.",
+  "photos.receiving": "Finishing the transfer…",
+  "photos.serverQueued": "Received, waiting to be prepared",
+  "photos.safeToLeave":
+    "Your files have arrived. You can close the app while they're prepared.",
+  "photos.reselect": "Choose this file again to resend it.",
+  "photos.background": "Your uploads are continuing. View media",
+  "photos.needsAttention": "Some files need your attention. View media",
   "photos.selectionLimit":
     "Choose up to 20 files at a time. Wait for uploads to finish or remove failed files before adding more.",
   "photos.interrupted":
@@ -99,7 +107,16 @@ const fr: MediaMessages = {
   "photos.removeFromQueue": "Retirer {name} de la liste",
   "photos.addedCountOne": "{count} fichier ajouté.",
   "photos.addedCountOther": "{count} fichiers ajoutés.",
-  "photos.keepOpen": "Garde cette page ouverte jusqu'à la fin des envois.",
+  "photos.keepOpen":
+    "Tu peux changer d’onglet. Garde l’application ouverte pendant l’envoi des fichiers.",
+  "photos.receiving": "Fin de l’envoi…",
+  "photos.serverQueued": "Reçu, en attente de préparation",
+  "photos.safeToLeave":
+    "Tes fichiers sont reçus. Tu peux fermer l’application pendant leur préparation.",
+  "photos.reselect": "Choisis à nouveau ce fichier pour le renvoyer.",
+  "photos.background": "Tes envois continuent. Voir les médias",
+  "photos.needsAttention":
+    "Certains fichiers n’ont pas pu être ajoutés. Voir les médias",
   "photos.selectionLimit":
     "Choisis jusqu’à 20 fichiers à la fois. Attends la fin des envois ou retire les fichiers en échec avant d’en ajouter.",
   "photos.interrupted":
@@ -183,7 +200,16 @@ const de: MediaMessages = {
   "photos.addedCountOne": "{count} Datei hinzugefügt.",
   "photos.addedCountOther": "{count} Dateien hinzugefügt.",
   "photos.keepOpen":
-    "Lass diese Seite geöffnet, bis alle Dateien hochgeladen sind.",
+    "Du kannst den Tab wechseln. Lass die App geöffnet, während deine Dateien gesendet werden.",
+  "photos.receiving": "Übertragung wird abgeschlossen…",
+  "photos.serverQueued": "Empfangen, wartet auf die Verarbeitung",
+  "photos.safeToLeave":
+    "Deine Dateien sind angekommen. Du kannst die App während der Verarbeitung schließen.",
+  "photos.reselect":
+    "Wähle diese Datei erneut aus, um sie noch einmal zu senden.",
+  "photos.background": "Deine Uploads laufen weiter. Medien ansehen",
+  "photos.needsAttention":
+    "Einige Dateien konnten nicht hinzugefügt werden. Medien ansehen",
   "photos.selectionLimit":
     "Wähle höchstens 20 Dateien auf einmal. Warte, bis die Uploads fertig sind, oder entferne fehlgeschlagene Uploads, bevor du weitere Dateien hinzufügst.",
   "photos.interrupted":
@@ -267,7 +293,15 @@ const it: MediaMessages = {
   "photos.addedCountOne": "{count} file aggiunto.",
   "photos.addedCountOther": "{count} file aggiunti.",
   "photos.keepOpen":
-    "Lascia questa pagina aperta fino alla fine dei caricamenti.",
+    "Puoi cambiare scheda. Lascia l’app aperta mentre i file vengono inviati.",
+  "photos.receiving": "Invio quasi completato…",
+  "photos.serverQueued": "Ricevuto, in attesa di elaborazione",
+  "photos.safeToLeave":
+    "I tuoi file sono arrivati. Puoi chiudere l’app durante l’elaborazione.",
+  "photos.reselect": "Seleziona di nuovo questo file per inviarlo.",
+  "photos.background": "I caricamenti continuano. Vai a foto e video",
+  "photos.needsAttention":
+    "Alcuni file non sono stati aggiunti. Vai a foto e video",
   "photos.selectionLimit":
     "Scegli al massimo 20 file alla volta. Aspetta che i caricamenti finiscano o rimuovi i file con errori prima di aggiungerne altri.",
   "photos.interrupted":
@@ -350,7 +384,16 @@ const es: MediaMessages = {
   "photos.removeFromQueue": "Quitar {name} de la lista",
   "photos.addedCountOne": "{count} archivo añadido.",
   "photos.addedCountOther": "{count} archivos añadidos.",
-  "photos.keepOpen": "Deja esta página abierta hasta que terminen las subidas.",
+  "photos.keepOpen":
+    "Puedes cambiar de pestaña. Deja la aplicación abierta mientras se envían los archivos.",
+  "photos.receiving": "Terminando el envío…",
+  "photos.serverQueued": "Recibido, pendiente de preparación",
+  "photos.safeToLeave":
+    "Tus archivos han llegado. Puedes cerrar la aplicación mientras se preparan.",
+  "photos.reselect": "Elige este archivo de nuevo para volver a enviarlo.",
+  "photos.background": "Tus archivos se siguen enviando. Ver fotos y vídeos",
+  "photos.needsAttention":
+    "Algunos archivos no se han añadido. Ver fotos y vídeos",
   "photos.selectionLimit":
     "Selecciona un máximo de 20 archivos a la vez. Espera a que terminen las subidas o quita los archivos que han fallado antes de añadir más.",
   "photos.interrupted":

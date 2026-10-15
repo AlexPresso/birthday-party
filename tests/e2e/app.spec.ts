@@ -36,6 +36,27 @@ async function enter(page: Page, url: string) {
   await expect(page).toHaveURL(/\/photos$/);
 }
 
+async function completedMedia(client: APIRequestContext, id: number) {
+  let job;
+  await expect
+    .poll(
+      async () => {
+        const response = await client.get(`/api/uploads/${id}`);
+        expect(response.status()).toBe(200);
+        job = await response.json();
+        expect(
+          job.status,
+          job.errorCode ?? "Media preparation failed",
+        ).not.toBe("failed");
+        return job.status;
+      },
+      { timeout: 60_000 },
+    )
+    .toBe("ready");
+  expect(job.photo).toBeTruthy();
+  return job.photo;
+}
+
 test.beforeAll(async () => {
   const output = execFileSync(
     process.execPath,
@@ -77,6 +98,7 @@ test("private APIs and pages require an invitation; cross-origin changes are rej
   for (const path of [
     "/api/session",
     "/api/photos",
+    "/api/uploads",
     "/api/programme",
     "/api/guestbook",
     "/api/party",
@@ -278,6 +300,196 @@ test("configured media limits appear in the gallery and block oversized files be
   expect(uploads).toEqual([]);
 });
 
+test("media transfers survive tab changes and accepted jobs return after reload", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const invitation = await invite("Queue Navigation Test");
+  await enter(page, invitation.invitationUrl);
+  const image = await page.screenshot({ caret: "initial" });
+  let releaseTransfer!: () => void;
+  const transferHeld = new Promise<void>((resolve) => {
+    releaseTransfer = resolve;
+  });
+  let transferStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    transferStarted = resolve;
+  });
+  // Hold the request before reception to exercise navigation with a live File and XHR.
+  await page.route("**/api/photos", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    transferStarted();
+    await transferHeld;
+    await route.fulfill({ response: await route.fetch() });
+  });
+  let showPending = true;
+  // Keep the browser at the accepted stage while the real worker finishes.
+  await page.route("**/api/uploads", async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        items: data.items.map((job: Record<string, unknown>) =>
+          showPending
+            ? { ...job, status: "processing", photo: null, errorCode: null }
+            : job,
+        ),
+      },
+    });
+  });
+  const accepted = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/photos") &&
+      response.request().method() === "POST",
+  );
+  await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
+    name: "queue-navigation.png",
+    mimeType: "image/png",
+    buffer: image,
+  });
+  await started;
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Programme", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Programme", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Tes envois continuent. Voir les médias" }),
+  ).toBeVisible();
+  releaseTransfer();
+  const response = await accepted;
+  expect(response.status()).toBe(202);
+  const acceptedJob = await response.json();
+  expect(acceptedJob.clientUploadId).toBeTruthy();
+  await page
+    .getByRole("link", {
+      name: "Tes envois continuent. Voir les médias",
+      exact: true,
+    })
+    .click();
+  const row = page
+    .locator(".upload-item")
+    .filter({ hasText: "queue-navigation.png" });
+  await expect(row).toContainText("Enregistrement…");
+  await expect(row).not.toContainText("Ajouté");
+  await expect(
+    page.getByText(
+      "Tes fichiers sont reçus. Tu peux fermer l’application pendant leur préparation.",
+    ),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/upload-queue-mobile.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  await page.reload();
+  await expect(row).toContainText("Enregistrement…");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: "test-results/upload-queue-desktop.png",
+    fullPage: true,
+    caret: "initial",
+  });
+  await completedMedia(page.request, acceptedJob.id);
+  showPending = false;
+  await expect(row).toContainText("Ajouté", { timeout: 15_000 });
+  await expect(
+    page.getByRole("button", {
+      name: /^Ouvrir la photo de Queue Navigation Test/,
+    }),
+  ).toHaveCount(1);
+  const ownJobs = await (await page.request.get("/api/uploads")).json();
+  expect(ownJobs.items).toHaveLength(1);
+  expect(ownJobs.items[0].id).toBe(acceptedJob.id);
+});
+
+test("retrying a lost upload response reuses its receipt without duplicating media", async ({
+  page,
+}) => {
+  const invitation = await invite("Queue Retry Test");
+  await enter(page, invitation.invitationUrl);
+  const image = await page.screenshot({ caret: "initial" });
+  const keys: string[] = [];
+  let firstJobId = 0;
+  await page.route("**/api/photos", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    keys.push(route.request().headers()["x-upload-id"]);
+    const response = await route.fetch();
+    expect(response.status()).toBe(202);
+    if (keys.length === 1) {
+      firstJobId = (await response.json()).id;
+      await route.abort("failed");
+    } else await route.fulfill({ response });
+  });
+  await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
+    name: "lost-response.png",
+    mimeType: "image/png",
+    buffer: image,
+  });
+  await expect(
+    page.getByText(
+      "L'envoi s'est interrompu. Vérifie ta connexion et réessaie.",
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Réessayer l'envoi de lost-response.png" })
+    .click();
+  await expect(
+    page.locator(".upload-item").filter({ hasText: "lost-response.png" }),
+  ).toContainText("Ajouté", { timeout: 15_000 });
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toBe(keys[0]);
+  const jobs = await (await page.request.get("/api/uploads")).json();
+  expect(jobs.items).toHaveLength(1);
+  expect(jobs.items[0].id).toBe(firstJobId);
+  const photos = await (await page.request.get("/api/photos")).json();
+  expect(
+    photos.items.filter(
+      (photo: { author: { id: number } }) =>
+        photo.author.id === invitation.guest.id,
+    ),
+  ).toHaveLength(1);
+});
+
+test("failed preparation uses a new receipt on retry and asks for the file after reload", async ({
+  page,
+}) => {
+  const invitation = await invite("Queue Failed Video Test");
+  await enter(page, invitation.invitationUrl);
+  const keys: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/photos") && request.method() === "POST")
+      keys.push(request.headers()["x-upload-id"]);
+  });
+  await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
+    name: "incomplete-video.mp4",
+    mimeType: "video/mp4",
+    buffer: readFileSync("tests/fixtures/party-video.mp4").subarray(0, 32),
+  });
+  const retry = page.getByRole("button", {
+    name: "Réessayer l'envoi de incomplete-video.mp4",
+  });
+  await expect(retry).toBeVisible();
+  await expect(page.locator(".upload-item")).not.toContainText("Ajouté");
+  await retry.click();
+  await expect.poll(() => keys.length).toBe(2);
+  expect(keys[1]).not.toBe(keys[0]);
+  await expect(retry).toBeVisible();
+  const jobs = await (await page.request.get("/api/uploads")).json();
+  expect(jobs.items).toHaveLength(2);
+  expect(
+    jobs.items.every((job: { status: string }) => job.status === "failed"),
+  ).toBe(true);
+  await page.reload();
+  await expect(
+    page.getByText("Choisis à nouveau ce fichier pour le renvoyer."),
+  ).toHaveCount(2);
+  await expect(retry).toHaveCount(0);
+});
+
 test("a guest can upload, play, download and delete a video without loading originals in the gallery", async ({
   page,
 }) => {
@@ -298,8 +510,8 @@ test("a guest can upload, play, download and delete a video without loading orig
     .getByLabel("Ajouter des médias", { exact: true })
     .setInputFiles("tests/fixtures/party-video.mp4");
   const response = await uploaded;
-  expect(response.status()).toBe(201);
-  const media = await response.json();
+  expect(response.status()).toBe(202);
+  const media = await completedMedia(page.request, (await response.json()).id);
   expect(media).toMatchObject({
     kind: "video",
     mimeType: "video/mp4",
@@ -522,8 +734,8 @@ test("scheduled secrets stay on the server and revocation protects media", async
       file: { name: "test.png", mimeType: "image/png", buffer: image },
     },
   });
-  expect(upload.status()).toBe(201);
-  const photo = await upload.json();
+  expect(upload.status()).toBe(202);
+  const photo = await completedMedia(page.request, (await upload.json()).id);
   expect((await page.request.get(photo.url)).status()).toBe(200);
   const revoked = await admin.delete(
     `/api/admin/guests/${invitation.guest.id}`,

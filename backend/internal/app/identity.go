@@ -21,10 +21,10 @@ func (a *App) issueInvitation(ctx context.Context, tx *sql.Tx, id int64) (invita
 		return invitation{}, err
 	}
 	expires := a.now().Add(invitationTTL)
-	if _, err = tx.ExecContext(ctx, "DELETE FROM invitations WHERE guest_id=?", id); err != nil {
+	if _, err = tx.ExecContext(ctx, "DELETE FROM invitations WHERE guest_id=$1", id); err != nil {
 		return invitation{}, err
 	}
-	_, err = tx.ExecContext(ctx, "INSERT INTO invitations(token_hash,guest_id,expires_at) VALUES(?,?,?)", hashToken(token), id, expires.Unix())
+	_, err = tx.ExecContext(ctx, "INSERT INTO invitations(token_hash,guest_id,expires_at) VALUES($1,$2,$3)", hashToken(token), id, expires.Unix())
 	return invitation{InvitationURL: a.config.PublicURL + "/invitation#token=" + token, ExpiresAt: stamp(expires)}, err
 }
 
@@ -35,14 +35,13 @@ func (a *App) StartupAdminInvitation(ctx context.Context) (string, error) {
 		return "", err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "LOCK TABLE guests IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+		return "", err
+	}
 	var id int64
 	err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE role='admin' AND active=1 ORDER BY id LIMIT 1").Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		var result sql.Result
-		result, err = tx.ExecContext(ctx, "INSERT INTO guests(name,role) VALUES('Admin','admin')")
-		if err == nil {
-			id, err = result.LastInsertId()
-		}
+		err = tx.QueryRowContext(ctx, "INSERT INTO guests(name,role) VALUES('Admin','admin') RETURNING id").Scan(&id)
 	}
 	if err != nil {
 		return "", err
@@ -68,14 +67,13 @@ func (a *App) InviteAdmin(ctx context.Context, name string) (string, error) {
 		return "", err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "LOCK TABLE guests IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+		return "", err
+	}
 	var id int64
-	err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE name=? AND role='admin' AND active=1 ORDER BY id LIMIT 1", name).Scan(&id)
+	err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE name=$1 AND role='admin' AND active=1 ORDER BY id LIMIT 1", name).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		var result sql.Result
-		result, err = tx.ExecContext(ctx, "INSERT INTO guests(name,role) VALUES(?,'admin')", name)
-		if err == nil {
-			id, err = result.LastInsertId()
-		}
+		err = tx.QueryRowContext(ctx, "INSERT INTO guests(name,role) VALUES($1,'admin') RETURNING id", name).Scan(&id)
 	}
 	if err != nil {
 		return "", err
@@ -125,7 +123,7 @@ func (a *App) previewInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 	var name string
 	var expires int64
-	err := a.db.QueryRowContext(r.Context(), `SELECT g.name,i.expires_at FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=? AND i.used_at IS NULL AND i.expires_at>? AND g.active=1`, hashToken(input.Token), a.now().Unix()).Scan(&name, &expires)
+	err := a.db.QueryRowContext(r.Context(), `SELECT g.name,i.expires_at FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=$1 AND i.used_at IS NULL AND i.expires_at>$2 AND g.active=1`, hashToken(input.Token), a.now().Unix()).Scan(&name, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(w, 401, "invitation_unavailable")
 		return
@@ -160,7 +158,8 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 	var guest Guest
 	now := a.now()
-	err = tx.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=? AND i.used_at IS NULL AND i.expires_at>? AND g.active=1`, hashToken(input.Token), now.Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
+	// Lock the guest before the invitation, matching renewal and revocation.
+	err = tx.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=$1 AND i.used_at IS NULL AND i.expires_at>$2 AND g.active=1 FOR UPDATE OF g`, hashToken(input.Token), now.Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(w, 401, "invitation_unavailable")
 		return
@@ -169,7 +168,7 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 		internal(w, err)
 		return
 	}
-	result, err := tx.ExecContext(ctx, "UPDATE invitations SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at>?", now.Unix(), hashToken(input.Token), now.Unix())
+	result, err := tx.ExecContext(ctx, "UPDATE invitations SET used_at=$1 WHERE token_hash=$2 AND used_at IS NULL AND expires_at>$3", now.Unix(), hashToken(input.Token), now.Unix())
 	if err != nil {
 		internal(w, err)
 		return
@@ -190,17 +189,17 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 	expires := now.Add(sessionTTL)
 	// Keep at most five browser sessions per guest, and discard expired rows.
-	_, err = tx.ExecContext(ctx, "DELETE FROM sessions WHERE expires_at<=?", now.Unix())
+	_, err = tx.ExecContext(ctx, "DELETE FROM sessions WHERE expires_at<=$1", now.Unix())
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	_, err = tx.ExecContext(ctx, "DELETE FROM sessions WHERE guest_id=? AND token_hash NOT IN (SELECT token_hash FROM sessions WHERE guest_id=? ORDER BY created_at DESC,rowid DESC LIMIT 4)", guest.ID, guest.ID)
+	_, err = tx.ExecContext(ctx, "DELETE FROM sessions WHERE guest_id=$1 AND token_hash NOT IN (SELECT token_hash FROM sessions WHERE guest_id=$2 ORDER BY created_at DESC,token_hash DESC LIMIT 4)", guest.ID, guest.ID)
 	if err != nil {
 		internal(w, err)
 		return
 	}
-	_, err = tx.ExecContext(ctx, "INSERT INTO sessions(token_hash,guest_id,created_at,expires_at) VALUES(?,?,?,?)", hashToken(token), guest.ID, now.Unix(), expires.Unix())
+	_, err = tx.ExecContext(ctx, "INSERT INTO sessions(token_hash,guest_id,created_at,expires_at) VALUES($1,$2,$3,$4)", hashToken(token), guest.ID, now.Unix(), expires.Unix())
 	if err != nil {
 		internal(w, err)
 		return
@@ -215,7 +214,7 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request, _ Guest) {
 	cookie, _ := r.Cookie(cookieName)
-	if _, err := a.db.ExecContext(r.Context(), "DELETE FROM sessions WHERE token_hash=?", hashToken(cookie.Value)); err != nil {
+	if _, err := a.db.ExecContext(r.Context(), "DELETE FROM sessions WHERE token_hash=$1", hashToken(cookie.Value)); err != nil {
 		internal(w, err)
 		return
 	}
@@ -265,6 +264,10 @@ func (a *App) createGuest(w http.ResponseWriter, r *http.Request, _ Guest) {
 		return
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "LOCK TABLE guests IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+		internal(w, err)
+		return
+	}
 	var count int
 	if err = tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests").Scan(&count); err != nil {
 		internal(w, err)
@@ -274,12 +277,8 @@ func (a *App) createGuest(w http.ResponseWriter, r *http.Request, _ Guest) {
 		fail(w, 409, "guest_limit_reached")
 		return
 	}
-	result, err := tx.ExecContext(ctx, "INSERT INTO guests(name,role) VALUES(?,'guest')", input.Name)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	id, err := result.LastInsertId()
+	var id int64
+	err = tx.QueryRowContext(ctx, "INSERT INTO guests(name,role) VALUES($1,'guest') RETURNING id", input.Name).Scan(&id)
 	if err != nil {
 		internal(w, err)
 		return
@@ -307,7 +306,7 @@ func (a *App) renewInvitation(w http.ResponseWriter, r *http.Request, _ Guest) {
 		return
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(r.Context(), "UPDATE guests SET active=1 WHERE id=?", id)
+	result, err := tx.ExecContext(r.Context(), "UPDATE guests SET active=1 WHERE id=$1", id)
 	if !affected(w, result, err) {
 		return
 	}
@@ -338,15 +337,15 @@ func (a *App) revokeGuest(w http.ResponseWriter, r *http.Request, guest Guest) {
 		return
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(r.Context(), "UPDATE guests SET active=0 WHERE id=?", id)
+	result, err := tx.ExecContext(r.Context(), "UPDATE guests SET active=0 WHERE id=$1", id)
 	if !affected(w, result, err) {
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), "DELETE FROM sessions WHERE guest_id=?", id); err != nil {
+	if _, err = tx.ExecContext(r.Context(), "DELETE FROM sessions WHERE guest_id=$1", id); err != nil {
 		internal(w, err)
 		return
 	}
-	if _, err = tx.ExecContext(r.Context(), "DELETE FROM invitations WHERE guest_id=?", id); err != nil {
+	if _, err = tx.ExecContext(r.Context(), "DELETE FROM invitations WHERE guest_id=$1", id); err != nil {
 		internal(w, err)
 		return
 	}

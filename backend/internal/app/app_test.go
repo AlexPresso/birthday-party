@@ -26,7 +26,7 @@ import (
 
 func testApp(t *testing.T) *App {
 	t.Helper()
-	a, err := Open(Config{PublicURL: "http://localhost:3000", DataDir: t.TempDir()})
+	a, err := Open(Config{PublicURL: "http://localhost:3000", DataDir: t.TempDir(), DatabaseURL: testDatabaseURL(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +366,7 @@ func upload(t *testing.T, a *App, cookie *http.Cookie, data []byte) *httptest.Re
 	}
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, r)
-	return w
+	return completeTestUpload(t, a, cookie, w)
 }
 
 func pngBytes(t *testing.T) []byte {
@@ -525,7 +525,7 @@ func TestRenewalInvalidatesPendingLinkAndSessionsAreBounded(t *testing.T) {
 		previous = token
 	}
 	var sessions int
-	if err := a.db.QueryRow("SELECT COUNT(*) FROM sessions WHERE guest_id=?", hostGuest.ID).Scan(&sessions); err != nil {
+	if err := a.db.QueryRow("SELECT COUNT(*) FROM sessions WHERE guest_id=$1", hostGuest.ID).Scan(&sessions); err != nil {
 		t.Fatal(err)
 	}
 	if sessions != 5 {
@@ -534,6 +534,7 @@ func TestRenewalInvalidatesPendingLinkAndSessionsAreBounded(t *testing.T) {
 }
 
 func TestHTTPSCookieAndConfiguration(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://unused/unused")
 	a := testApp(t)
 	a.config.CookieSecure = true
 	host, _ := admin(t, a)

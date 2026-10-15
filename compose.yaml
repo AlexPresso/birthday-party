@@ -8,7 +8,11 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test:
+        [
+          "CMD-SHELL",
+          'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"',
+        ]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -19,7 +23,10 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-birthday}:${POSTGRES_PASSWORD:-birthday-local-only}@postgres:5432/${POSTGRES_DB:-birthday}?sslmode=disable
+      DATABASE_URL: postgresql://postgres:5432/?sslmode=disable
+      PGDATABASE: ${POSTGRES_DB:-birthday}
+      PGUSER: ${POSTGRES_USER:-birthday}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-birthday-local-only}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       PRINT_ADMIN_INVITATION: ${PRINT_ADMIN_INVITATION:-true}
@@ -33,7 +40,8 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/health"]
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/health"]
       interval: 10s
       timeout: 3s
       retries: 5

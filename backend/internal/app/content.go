@@ -90,7 +90,7 @@ func (a *App) updateParty(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 400, "invalid_date")
 		return
 	}
-	if _, err := a.db.ExecContext(r.Context(), "UPDATE party SET title=?,timezone=?,date=?,location=? WHERE id=1", input.Title, input.Timezone, input.Date, input.Location); err != nil {
+	if _, err := a.db.ExecContext(r.Context(), "UPDATE party SET title=$1,timezone=$2,date=$3,location=$4 WHERE id=1", input.Title, input.Timezone, input.Date, input.Location); err != nil {
 		internal(w, err)
 		return
 	}
@@ -183,6 +183,10 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 		return
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(r.Context(), "LOCK TABLE events IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+		internal(w, err)
+		return
+	}
 	var count int
 	if err = tx.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM events").Scan(&count); err != nil {
 		internal(w, err)
@@ -192,12 +196,8 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 		fail(w, 409, "event_limit_reached")
 		return
 	}
-	result, err := tx.ExecContext(r.Context(), "INSERT INTO events(title,description,teaser,starts_at,unlock_at) VALUES(?,?,?,?,?)", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	id, err := result.LastInsertId()
+	var id int64
+	err = tx.QueryRowContext(r.Context(), "INSERT INTO events(title,description,teaser,starts_at,unlock_at) VALUES($1,$2,$3,$4,$5) RETURNING id", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt).Scan(&id)
 	if err != nil {
 		internal(w, err)
 		return
@@ -218,7 +218,7 @@ func (a *App) updateEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 	if !ok {
 		return
 	}
-	result, err := a.db.ExecContext(r.Context(), "UPDATE events SET title=?,description=?,teaser=?,starts_at=?,unlock_at=? WHERE id=?", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt, id)
+	result, err := a.db.ExecContext(r.Context(), "UPDATE events SET title=$1,description=$2,teaser=$3,starts_at=$4,unlock_at=$5 WHERE id=$6", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt, id)
 	if !affected(w, result, err) {
 		return
 	}
@@ -230,7 +230,7 @@ func (a *App) deleteEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 	if !ok {
 		return
 	}
-	result, err := a.db.ExecContext(r.Context(), "DELETE FROM events WHERE id=?", id)
+	result, err := a.db.ExecContext(r.Context(), "DELETE FROM events WHERE id=$1", id)
 	if affected(w, result, err) {
 		w.WriteHeader(204)
 	}
@@ -241,7 +241,7 @@ func (a *App) listEntries(w http.ResponseWriter, r *http.Request, guest Guest) {
 	if !ok {
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT e.id,g.id,g.name,e.anonymous,e.body,e.created_at FROM entries e JOIN guests g ON e.guest_id=g.id WHERE (?=0 OR e.id<?) ORDER BY e.id DESC LIMIT ?`, before, before, limit+1)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT e.id,g.id,g.name,e.anonymous,e.body,e.created_at FROM entries e JOIN guests g ON e.guest_id=g.id WHERE ($1::bigint=0 OR e.id<$2) ORDER BY e.id DESC LIMIT $3`, before, before, limit+1)
 	if err != nil {
 		internal(w, err)
 		return
@@ -290,12 +290,7 @@ func (a *App) createEntry(w http.ResponseWriter, r *http.Request, guest Guest) {
 	if !entry.Anonymous {
 		entry.Author = &Author{ID: guest.ID, Name: guest.Name}
 	}
-	result, err := a.db.ExecContext(r.Context(), "INSERT INTO entries(guest_id,anonymous,body,created_at) VALUES(?,?,?,?)", guest.ID, entry.Anonymous, entry.Body, entry.CreatedAt)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	entry.ID, err = result.LastInsertId()
+	err := a.db.QueryRowContext(r.Context(), "INSERT INTO entries(guest_id,anonymous,body,created_at) VALUES($1,$2,$3,$4) RETURNING id", guest.ID, flag(entry.Anonymous), entry.Body, entry.CreatedAt).Scan(&entry.ID)
 	if err != nil {
 		internal(w, err)
 		return
@@ -309,7 +304,7 @@ func (a *App) deleteEntry(w http.ResponseWriter, r *http.Request, guest Guest) {
 		return
 	}
 	var author int64
-	err := a.db.QueryRowContext(r.Context(), "SELECT guest_id FROM entries WHERE id=?", id).Scan(&author)
+	err := a.db.QueryRowContext(r.Context(), "SELECT guest_id FROM entries WHERE id=$1", id).Scan(&author)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(w, 404, "message_not_found")
 		return
@@ -322,7 +317,7 @@ func (a *App) deleteEntry(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 403, "message_delete_forbidden")
 		return
 	}
-	result, err := a.db.ExecContext(r.Context(), "DELETE FROM entries WHERE id=?", id)
+	result, err := a.db.ExecContext(r.Context(), "DELETE FROM entries WHERE id=$1", id)
 	if affected(w, result, err) {
 		w.WriteHeader(204)
 	}

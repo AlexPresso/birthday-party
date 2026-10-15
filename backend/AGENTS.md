@@ -52,7 +52,12 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   protocols, bound dimensions, threads, execution time and temporary output.
   Convert to H.264/AAC MP4 with a private JPEG thumbnail; keep range requests
   authenticated. Existing /api/photos URLs also serve videos.
-- Anonymous guestbook posts retain their owner only in SQLite. Serialize author
+- Accept uploads into a private spool and PostgreSQL job queue before processing.
+  Return 202 once durable, process two jobs in the background, and recover
+  interrupted jobs on restart. Only the owner may read their queue/status.
+  Recheck access before publishing, bound the queue and spool, and keep processing
+  independent of the request. Invitation CLI commands must not start workers.
+- Anonymous guestbook posts retain their owner only in PostgreSQL. Serialize author
   as null for all viewers, including administrators, and compute canDelete from
   the authenticated viewer. Migrations preserve existing named messages.
 
@@ -60,8 +65,15 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 
 - Module: `birthday-party/backend`, Go 1.26+. One standard-library HTTP service
   under `cmd/server`; concrete app/database/handlers under `internal/app`.
-- SQLite uses `modernc.org/sqlite` without cgo and a single connection. Schema
-  migrations are transactional and versioned with `PRAGMA user_version`.
+- PostgreSQL uses `pgx` through `database/sql`, with `$n` placeholders and
+  `RETURNING` for generated IDs. Use row/advisory locks for concurrent invariants.
+  `DATABASE_URL` is required; Compose supplies private connection settings.
+- Schema changes belong in new sequential `internal/app/migrations/NNNN_name.sql`
+  files. Embedded migrations run under a transaction and advisory lock at startup;
+  applied names/checksums are verified. Never change an applied SQL file.
+- `modernc.org/sqlite` is retained only for the one-time read-only import of an
+  existing `DATA_DIR/birthday.sqlite`. Import into an empty destination, preserve
+  IDs and sessions, reset sequences and record completion in the same transaction.
 - `imaging` handles phone EXIF orientation and thumbnail resizing; `x/image/webp`
   registers WebP decoding. Do not replace content inspection with MIME/extension checks.
 - Go owns the route contract in [docs/api.md](../docs/api.md). Cookie path must
@@ -87,5 +99,8 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 ## Verification
 
 - Run commands from `backend/`; export env vars explicitly (Go does not load `.env`).
+- Integration tests require `TEST_DATABASE_URL` and create isolated schemas.
+  Root `npm run check` starts and removes a dedicated PostgreSQL test container.
+  Root `npm run test:e2e` uses another disposable database and private media folder.
 - Prioritize meaningful tests of resource authorization, unlock boundaries, invalid/oversized uploads,
   and failure handling. Use table-driven tests where they improve clarity, without coverage quotas.

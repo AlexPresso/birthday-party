@@ -14,6 +14,7 @@ import (
 )
 
 func TestUploadLimitsFromEnvironment(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://unused/unused")
 	t.Setenv("PUBLIC_URL", "http://localhost:3000")
 	t.Setenv("COOKIE_SECURE", "false")
 	t.Setenv("PRINT_ADMIN_INVITATION", "false")
@@ -71,7 +72,7 @@ func TestOpenValidatesUploadLimitsAndGalleryExposesThem(t *testing.T) {
 		{"custom", 32 << 20, 1 << 20},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			a, err := Open(Config{PublicURL: "http://localhost:3000", DataDir: t.TempDir(), MaxImageBytes: test.imageBytes, MaxVideoBytes: test.videoBytes})
+			a, err := Open(Config{PublicURL: "http://localhost:3000", DataDir: t.TempDir(), DatabaseURL: testDatabaseURL(t), MaxImageBytes: test.imageBytes, MaxVideoBytes: test.videoBytes})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +135,7 @@ func uploadStream(t *testing.T, a *App, cookie *http.Cookie, data io.Reader) *ht
 	r.AddCookie(cookie)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, r)
-	return w
+	return completeTestUpload(t, a, cookie, w)
 }
 
 func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
