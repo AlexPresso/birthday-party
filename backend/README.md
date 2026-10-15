@@ -4,6 +4,18 @@ Go owns identities, access checks, PostgreSQL persistence, media and scheduled r
 The browser calls the same-origin Next.js `/api/*` proxy. Keep Go's listening port
 private when deploying. The API contract is [docs/api.md](../docs/api.md).
 
+## Code organization
+
+`cmd/server` wires configuration, commands and the HTTP server. `internal/app`
+owns application behavior and persistence. Upload reception, queue storage,
+worker lifecycle, restart recovery and media publication have separate files
+within that package. Extract a package when it gains a clear responsibility and
+dependency boundary; keep simple CRUD direct.
+
+Go changes use the project-local [Go Style Guide](../.agents/skills/go-style-guide/SKILL.md).
+[AGENTS.md](AGENTS.md) defines the project's conventions and when to grow the
+architecture. The skill's upstream commit and license are included in the repository.
+
 ## Run
 
 From `backend/`, with Go 1.26 or newer and `DATABASE_URL` pointing to PostgreSQL:
@@ -86,7 +98,13 @@ HTTP request logs never include these tokens.
   Guests can read only their own jobs, including the 50 most recent terminal
   results. Terminal history expires after 24 hours; published media is retained.
   `X-Upload-ID` UUIDs prevent duplicate jobs on ambiguous network retries.
-  Failed jobs discard input; submitting the file again uses a new upload ID.
+  Confirmed invalid uploads fail and discard input; submitting the file again
+  uses a new upload ID. Infrastructure failures retain input and retry, including
+  missing video tools, cancellation and storage failures. Unknown video command
+  failures also retry conservatively rather than risk losing the original;
+  these jobs remain queued until processing succeeds or the cause is resolved.
+  Retrying jobs go behind older waiting jobs so one failure does not prevent
+  other guests' media from being processed.
 - Startup recovers interrupted processing. A dedicated PostgreSQL advisory lock
   permits one media-worker process per application schema; CLI invitation commands
   do not start workers. Files remain on one persistent local filesystem.
@@ -98,7 +116,9 @@ HTTP request logs never include these tokens.
   FFmpeg converts them to H.264/AAC MP4, at most 1280×720 and 30 fps, and creates
   a JPEG thumbnail. The input video is discarded after conversion. Video
   processing has a five-minute timeout, bounded threads and restricted input
-  formats/protocols. Each byte-range request checks the current session.
+  formats/protocols. Probe output and captured diagnostics are each capped at
+  64 KiB; raw tool diagnostics are never sent to guests or written to logs.
+  Each byte-range request checks the current session.
   Input limits apply before conversion. Converted output is bounded by the
   larger of 100 MiB and the configured video input limit; it may exceed the
   input limit for a small uploaded clip. Shortened conversions are rejected.

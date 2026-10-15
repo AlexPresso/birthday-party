@@ -37,6 +37,15 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   Preserve a guest's selection when retrying is possible.
 - Choose caching and refresh behavior explicitly for guest-specific data and
   scheduled reveals. Prevent shared caches from exposing protected content.
+- Keep default Link prefetching for the four tabs so Next can prepare shared
+  route information. Keep private page fetches uncached; full-page prefetch
+  or longer router cache lifetimes need an explicit freshness strategy. Show
+  pending feedback when a transition must wait, and measure production builds
+  because automatic prefetching is disabled in development.
+- Keep the initial loading boundary at `app/loading.tsx`. During tab changes,
+  retain the current page until fresh content is ready and show feedback in the
+  selected link. A loading boundary inside `(party)/` replaces every tab with a
+  spinner and can trigger React's fallback reveal delay even on a fast connection.
 - Handle empty, loading, error, locked, and available states where relevant.
 
 ## Verification and setup

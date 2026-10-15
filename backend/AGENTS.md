@@ -2,6 +2,25 @@
 
 Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 
+## Go skill and architectural growth
+
+- Read the repository's [Go Style Guide](../.agents/skills/go-style-guide/SKILL.md)
+  for Go implementation, reviews, refactors and architecture decisions, then load
+  only the references relevant to the task. Use this local copy even when another
+  version is installed globally; its source and license are preserved alongside it.
+- Project instructions take precedence over the skill's house preferences. Keep
+  `cmd/server` and `internal/`; do not migrate to `pkg/`. Existing typed errors and
+  application logging are appropriate here. Add config structs, sentinels and
+  interfaces when they clarify a real contract, rather than for checklist compliance.
+- Split functions and files around responsibilities when they become hard to follow.
+  The skill's file length guidance is a review prompt, not a mandatory line limit.
+- Extract a package under `internal/` when a cohesive responsibility benefits from
+  its own dependencies, invariants or focused tests. Keep dependencies directional;
+  avoid generic `utils` packages and speculative repository/service layers.
+- Introduce a separate service only for an actual deployment, isolation or measured
+  scaling need. File moves alone do not improve runtime performance. Benchmark
+  optimizations before claiming gains; avoid speculative field packing or caching.
+
 ## Structure and code
 
 - Begin with one Go service. Add packages around clear responsibilities when the code needs them.
@@ -57,6 +76,14 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   interrupted jobs on restart. Only the owner may read their queue/status.
   Recheck access before publishing, bound the queue and spool, and keep processing
   independent of the request. Invitation CLI commands must not start workers.
+- Distinguish invalid media from processing infrastructure failures. Retain the
+  original for retry on missing tools, cancellation, storage failures or unknown
+  command failures; only confirmed validation failures discard it. Preserve error
+  causes without exposing private filenames or tool diagnostics. Bound probe
+  output through composition so `io.Copy` cannot bypass the writer's size cap.
+- Give worker startup, maintenance and lock cleanup database calls deadlines.
+  Discard the dedicated lock connection if its advisory unlock cannot be confirmed;
+  never return a potentially locked connection to the pool.
 - Anonymous guestbook posts retain their owner only in PostgreSQL. Serialize author
   as null for all viewers, including administrators, and compute canDelete from
   the authenticated viewer. Migrations preserve existing named messages.

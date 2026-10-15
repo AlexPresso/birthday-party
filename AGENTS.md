@@ -27,8 +27,11 @@ use, a personal visual identity, simple code, and responsive interactions.
 - Preserve host- and guest-authored content in its original language. Do not send
   names, messages, event details or other private content to translation services.
 
-## Project writing skills
+## Project skills
 
+- Use the repository's [Go Style Guide](.agents/skills/go-style-guide/SKILL.md)
+  for Go implementation, reviews, refactors and architecture decisions. Apply the
+  project-specific scope and simplicity rules in [backend/AGENTS.md](backend/AGENTS.md).
 - Use the repository's [UX Writing](.agents/skills/ux-writing/SKILL.md) skill
   when creating or editing interface labels, descriptions, errors or empty states.
 - Use the repository's [Humanizer](.agents/skills/humanizer/SKILL.md) skill to

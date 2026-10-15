@@ -71,7 +71,7 @@ func TestVideoUploadNormalizesContainersAndProtectsPlayback(t *testing.T) {
 			if err := json.Unmarshal(response.Body.Bytes(), &media); err != nil {
 				t.Fatal(err)
 			}
-			if media.Kind != "video" || media.MimeType != "video/mp4" || media.Width != 160 || media.Height != 90 {
+			if media.Kind != "video" || media.MIMEType != "video/mp4" || media.Width != 160 || media.Height != 90 {
 				t.Fatalf("unexpected media metadata: %+v", media)
 			}
 			status(t, request(t, a, "GET", media.URL, nil, nil), 401)

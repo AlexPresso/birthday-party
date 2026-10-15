@@ -9,19 +9,25 @@ les sessions, les permissions, PostgreSQL et les médias sur disque. Le navigate
 utilise uniquement l'origine du frontend ; Next transmet `/api/*` au serveur Go.
 Le [contrat HTTP](docs/api.md) décrit les échanges.
 
-## Skills de rédaction du projet
+## Skills du projet
 
-Les skills sont inclus dans `.agents/skills/`, avec leurs références et licences MIT :
+Les skills sont inclus dans `.agents/skills/`, avec leurs références et licences :
 
+- [Go Style Guide](.agents/skills/go-style-guide/SKILL.md), issu de
+  [madflojo/go-style-agent-skill](https://github.com/madflojo/go-style-agent-skill)
+  (Apache-2.0), pour le code Go et l'évolution de l'architecture. Le commit source
+  est fixé dans [UPSTREAM.md](.agents/skills/go-style-guide/UPSTREAM.md) ; les choix
+  du projet sont précisés dans [backend/AGENTS.md](backend/AGENTS.md).
 - [UX Writing](.agents/skills/ux-writing/SKILL.md), issu de
   [content-designer/ux-writing-skill](https://github.com/content-designer/ux-writing-skill),
-  pour les textes de l'interface.
+  sous licence MIT, pour les textes de l'interface.
 - [Humanizer](.agents/skills/humanizer/SKILL.md), issu de
-  [blader/humanizer](https://github.com/blader/humanizer), pour la relecture du style.
+  [blader/humanizer](https://github.com/blader/humanizer), sous licence MIT, pour la
+  relecture du style.
 
 [AGENTS.md](AGENTS.md) précise leur usage et le ton de l'application.
 Ces copies sont propres au dépôt et peuvent être partagées avec le code ; aucune
-installation globale n'est nécessaire. Les instructions des deux `SKILL.md` sont
+installation globale n'est nécessaire. Les instructions des `SKILL.md` sont
 conservées telles quelles, avec leurs ressources utiles et les crédits d'origine.
 
 ## Démarrer en local
@@ -278,6 +284,12 @@ redémarrage, les envois simultanés, les doublons et la navigation pendant l'en
 L'import réel a été comparé table par table à la sauvegarde SQLite avant le
 redémarrage de l'application ; la page servie par Docker a été vérifiée dans
 les cinq langues et avec le repli vers l'anglais.
+
+Après réorganisation du code Go et correction des erreurs de traitement des médias,
+les tests backend passent aussi avec le détecteur de courses dans un conteneur Linux,
+PostgreSQL et FFmpeg : 146 tests et sous-tests réussis, aucun ignoré. Ils vérifient
+notamment les disques pleins, la conservation des originaux lors d'une panne,
+les délais des requêtes et la progression des autres envois pendant une reprise.
 
 Vérifications du 14 octobre 2026 : analyse et tests Go, lint, types, 18 tests
 frontend, 19 parcours Chrome, formatage et build production réussis. Les parcours
