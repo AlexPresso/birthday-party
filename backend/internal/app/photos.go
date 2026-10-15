@@ -76,6 +76,7 @@ func prepareImage(input *os.File, thumbnailPath string) (preparedMedia, error) {
 	}, nil
 }
 
+// Photo describes published media with URLs that require an active guest session.
 type Photo struct {
 	ID           int64  `json:"id"`
 	Author       Author `json:"author"`
@@ -85,12 +86,12 @@ type Photo struct {
 	URL          string `json:"url"`
 	ThumbnailURL string `json:"thumbnailUrl"`
 	Kind         string `json:"kind"`
-	MimeType     string `json:"mimeType"`
+	MIMEType     string `json:"mimeType"`
 }
 
 func (p *Photo) urls() {
 	p.Kind = "image"
-	if strings.HasPrefix(p.MimeType, "video/") {
+	if strings.HasPrefix(p.MIMEType, "video/") {
 		p.Kind = "video"
 	}
 	p.URL = "/api/photos/" + strconv.FormatInt(p.ID, 10) + "/image"
@@ -111,7 +112,7 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
 	items := []Photo{}
 	for rows.Next() {
 		var photo Photo
-		if err := rows.Scan(&photo.ID, &photo.Author.ID, &photo.Author.Name, &photo.Width, &photo.Height, &photo.CreatedAt, &photo.MimeType); err != nil {
+		if err := rows.Scan(&photo.ID, &photo.Author.ID, &photo.Author.Name, &photo.Width, &photo.Height, &photo.CreatedAt, &photo.MIMEType); err != nil {
 			internal(w, err)
 			return
 		}

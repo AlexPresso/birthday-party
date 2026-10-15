@@ -32,6 +32,8 @@ const (
 	maxConfiguredUploadBytes int64 = 1024 << 20
 )
 
+// Config controls the HTTP service, PostgreSQL connection and private media storage.
+// Zero upload limits use the defaults in Open; DatabaseURL must be supplied.
 type Config struct {
 	ListenAddr           string
 	PublicURL            string
@@ -43,6 +45,7 @@ type Config struct {
 	MaxVideoBytes        int64
 }
 
+// ConfigFromEnv reads and validates process environment variables without loading files.
 func ConfigFromEnv() (Config, error) {
 	c := Config{ListenAddr: env("LISTEN_ADDR", "127.0.0.1:8080"), PublicURL: strings.TrimRight(env("PUBLIC_URL", "http://localhost:3000"), "/"), DataDir: env("DATA_DIR", "./data"), DatabaseURL: os.Getenv("DATABASE_URL")}
 	if c.DatabaseURL == "" {
@@ -113,6 +116,8 @@ type Author struct {
 	Name string `json:"name"`
 }
 
+// App owns the database pool, media workers and authenticated HTTP handlers.
+// Construct it with Open and release its resources with Close.
 type App struct {
 	db           *sql.DB
 	config       Config
@@ -130,6 +135,8 @@ type App struct {
 	authCount    int
 }
 
+// Open prepares private storage, opens PostgreSQL and applies pending migrations.
+// It does not start media workers; serving processes must call StartWorkers.
 func Open(config Config) (*App, error) {
 	if config.MaxImageBytes == 0 {
 		config.MaxImageBytes = defaultMaxImageBytes
@@ -158,6 +165,8 @@ func Open(config Config) (*App, error) {
 	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), workerErrors: make(chan error, 1)}, nil
 }
 
+// Close cancels and waits for media workers, releases their lock and closes the database.
+// Repeated calls return the result of the first call.
 func (a *App) Close() error {
 	a.closeOnce.Do(func() {
 		a.workerMu.Lock()
@@ -166,17 +175,16 @@ func (a *App) Close() error {
 		}
 		a.workerMu.Unlock()
 		a.workers.Wait()
+		var releaseErr error
 		if a.workerConn != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, _ = a.workerConn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtext(current_schema()), 73002)")
-			cancel()
-			_ = a.workerConn.Close()
+			releaseErr = releaseWorkerConnection(a.workerConn)
 		}
-		a.closeErr = a.db.Close()
+		a.closeErr = errors.Join(releaseErr, a.db.Close())
 	})
 	return a.closeErr
 }
 
+// Handler returns the API router with authentication and mutation origin checks.
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
