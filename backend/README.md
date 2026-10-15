@@ -86,9 +86,39 @@ HTTP request logs never include these tokens.
   custom header (CLI/testing); cross-origin browser preflights are not allowed.
 - Invitation preview/accept are globally limited to 120 requests/minute. The
   limiter has constant memory and does not trust proxy address headers.
-- All active guests can see everyone's photos, videos and messages. Only their author or
-  a host can delete them. Every image request, including thumbnails, checks the
-  current session; private media responses are not cached.
+- Hosts can close guest access and display an ordered welcome sequence. While
+  closed, guests may accept invitations, check their session/current step and
+  log out; party, programme, guestbook and media browsing endpoints return 423.
+  The current step may allow the profile or upload actions described below.
+  Administrators retain access. PostgreSQL stores up to 12 steps and their current
+  position; revision-checked transactions prevent duplicate advances. Access is
+  open until the host explicitly starts waiting. Accepted uploads can finish
+  privately while access is closed. See the API contract for commands and limits.
+- Each welcome step can have an optional `profile_photo` action. Only while that
+  action is current may a waiting guest read their own profile and save, remove
+  or view their photo. Other guests' avatars and party content remain locked.
+  Saving rechecks the current action in the transaction. The host controls the
+  next step independently of whether a photo has been saved.
+- A `media_upload` welcome action accepts photos and videos into the main gallery
+  or a category chosen by the host. Waiting guests can send files and check their
+  own queue, without browsing media. Acceptance rechecks the current step revision
+  and captures its destination; accepted jobs finish there after the step changes.
+- Hosts can create up to 100 media categories with names of 1–80 characters.
+  Public categories are visible to guests with full app access. Private categories
+  are visible only to administrators, including when the uploader requests their
+  own file. Publishing a category later exposes its existing media without copying
+  files. The default gallery contains uncategorized media; category views are
+  separate filters within the same tab.
+- Once full access is open, active guests can see shared photos, videos and
+  messages. Only their author or a host can delete them, subject to category
+  visibility. Every file request, including thumbnails, checks the current session,
+  welcome access and category visibility; private media responses are not cached.
+- Guests can save or remove their own profile photo. JPEG, PNG and WebP inputs
+  use the configured image byte limit and 40-megapixel limit. A single bounded
+  processor applies orientation, center-crops and stores a metadata-free 256×256
+  JPEG (at most 128 KiB) in PostgreSQL; the original is discarded. Replacements
+  are atomic, and versioned image URLs require current session and welcome access.
+  Anonymous guestbook posts never expose a profile photo or other author details.
 - Image uploads allow JPEG, PNG and WebP, at most `MAX_IMAGE_SIZE_MB` MiB
   (15 by default) and 40 megapixels. Files stream into a private spool with
   server-generated storage names. A 202 response confirms a persistent job;
@@ -110,7 +140,7 @@ HTTP request logs never include these tokens.
   do not start workers. Files remain on one persistent local filesystem.
 - Thumbnails are JPEG, at most 720px on the longest side. Phone EXIF orientation is
   applied. Originals are retained unchanged, including embedded metadata, and
-  remain accessible only to authenticated guests.
+  remain accessible only to authenticated guests with access to their category.
 - Video uploads allow MP4, MOV and WebM up to `MAX_VIDEO_SIZE_MB` MiB
   (100 by default), 5 minutes and 4K input.
   FFmpeg converts them to H.264/AAC MP4, at most 1280×720 and 30 fps, and creates
@@ -118,7 +148,7 @@ HTTP request logs never include these tokens.
   processing has a five-minute timeout, bounded threads and restricted input
   formats/protocols. Probe output and captured diagnostics are each capped at
   64 KiB; raw tool diagnostics are never sent to guests or written to logs.
-  Each byte-range request checks the current session.
+  Each byte-range request checks the current session and category visibility.
   Input limits apply before conversion. Converted output is bounded by the
   larger of 100 MiB and the configured video input limit; it may exceed the
   input limit for a small uploaded clip. Shortened conversions are rejected.

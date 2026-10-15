@@ -105,34 +105,37 @@ func env(key, fallback string) string {
 }
 
 type Guest struct {
-	ID     int64  `json:"id"`
-	Name   string `json:"name"`
-	Role   string `json:"role"`
-	Active bool   `json:"active"`
+	ID        int64   `json:"id"`
+	Name      string  `json:"name"`
+	Role      string  `json:"role"`
+	Active    bool    `json:"active"`
+	AvatarURL *string `json:"avatarUrl"`
 }
 
 type Author struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID        int64   `json:"id"`
+	Name      string  `json:"name"`
+	AvatarURL *string `json:"avatarUrl"`
 }
 
 // App owns the database pool, media workers and authenticated HTTP handlers.
 // Construct it with Open and release its resources with Close.
 type App struct {
-	db           *sql.DB
-	config       Config
-	now          func() time.Time
-	receivers    chan struct{}
-	workerMu     sync.Mutex
-	workerCancel context.CancelFunc
-	workerConn   *sql.Conn
-	workerErrors chan error
-	workers      sync.WaitGroup
-	closeOnce    sync.Once
-	closeErr     error
-	authMu       sync.Mutex
-	authWindow   time.Time
-	authCount    int
+	db               *sql.DB
+	config           Config
+	now              func() time.Time
+	receivers        chan struct{}
+	avatarProcessors chan struct{}
+	workerMu         sync.Mutex
+	workerCancel     context.CancelFunc
+	workerConn       *sql.Conn
+	workerErrors     chan error
+	workers          sync.WaitGroup
+	closeOnce        sync.Once
+	closeErr         error
+	authMu           sync.Mutex
+	authWindow       time.Time
+	authCount        int
 }
 
 // Open prepares private storage, opens PostgreSQL and applies pending migrations.
@@ -162,7 +165,7 @@ func Open(config Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), workerErrors: make(chan error, 1)}, nil
+	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), avatarProcessors: make(chan struct{}, 1), workerErrors: make(chan error, 1)}, nil
 }
 
 // Close cancels and waits for media workers, releases their lock and closes the database.
@@ -194,26 +197,38 @@ func (a *App) Handler() http.Handler {
 		respond(w, 200, map[string]any{"guest": guest})
 	}))
 	mux.HandleFunc("POST /api/logout", a.auth(false, a.logout))
-	mux.HandleFunc("GET /api/party", a.auth(false, a.getParty))
+	mux.HandleFunc("GET /api/profile", a.authProfile(a.getProfile))
+	mux.HandleFunc("PUT /api/profile/avatar", a.authProfile(a.updateAvatar))
+	mux.HandleFunc("DELETE /api/profile/avatar", a.authProfile(a.deleteAvatar))
+	mux.HandleFunc("GET /api/guests/{id}/avatar", a.authProfile(a.serveAvatar))
+	mux.HandleFunc("GET /api/welcome", a.auth(false, a.getWelcome))
+	mux.HandleFunc("GET /api/welcome/upload-context", a.auth(false, a.getWelcomeUploadContext))
+	mux.HandleFunc("GET /api/admin/welcome", a.auth(true, a.getAdminWelcome))
+	mux.HandleFunc("PUT /api/admin/welcome", a.auth(true, a.updateWelcome))
+	mux.HandleFunc("POST /api/admin/welcome/transition", a.auth(true, a.transitionWelcome))
+	mux.HandleFunc("GET /api/party", a.authContent(a.getParty))
 	mux.HandleFunc("PATCH /api/admin/party", a.auth(true, a.updateParty))
 	mux.HandleFunc("GET /api/admin/guests", a.auth(true, a.listGuests))
 	mux.HandleFunc("POST /api/admin/guests", a.auth(true, a.createGuest))
 	mux.HandleFunc("POST /api/admin/guests/{id}/invitation", a.auth(true, a.renewInvitation))
 	mux.HandleFunc("DELETE /api/admin/guests/{id}", a.auth(true, a.revokeGuest))
-	mux.HandleFunc("GET /api/programme", a.auth(false, a.listProgramme))
+	mux.HandleFunc("GET /api/programme", a.authContent(a.listProgramme))
 	mux.HandleFunc("GET /api/admin/programme", a.auth(true, a.listAdminProgramme))
 	mux.HandleFunc("POST /api/admin/programme", a.auth(true, a.createEvent))
 	mux.HandleFunc("PUT /api/admin/programme/{id}", a.auth(true, a.updateEvent))
 	mux.HandleFunc("DELETE /api/admin/programme/{id}", a.auth(true, a.deleteEvent))
-	mux.HandleFunc("GET /api/guestbook", a.auth(false, a.listEntries))
-	mux.HandleFunc("POST /api/guestbook", a.auth(false, a.createEntry))
-	mux.HandleFunc("DELETE /api/guestbook/{id}", a.auth(false, a.deleteEntry))
-	mux.HandleFunc("GET /api/photos", a.auth(false, a.listPhotos))
-	mux.HandleFunc("POST /api/photos", a.auth(false, a.uploadPhoto))
-	mux.HandleFunc("GET /api/uploads", a.auth(false, a.listUploads))
-	mux.HandleFunc("GET /api/uploads/{id}", a.auth(false, a.getUpload))
-	mux.HandleFunc("GET /api/photos/{id}/image", a.auth(false, a.servePhoto))
-	mux.HandleFunc("DELETE /api/photos/{id}", a.auth(false, a.deletePhoto))
+	mux.HandleFunc("GET /api/guestbook", a.authContent(a.listEntries))
+	mux.HandleFunc("POST /api/guestbook", a.authContent(a.createEntry))
+	mux.HandleFunc("DELETE /api/guestbook/{id}", a.authContent(a.deleteEntry))
+	mux.HandleFunc("GET /api/photos", a.authContent(a.listPhotos))
+	mux.HandleFunc("GET /api/media-categories", a.authContent(a.listMediaCategories))
+	mux.HandleFunc("POST /api/admin/media-categories", a.auth(true, a.saveMediaCategory))
+	mux.HandleFunc("PUT /api/admin/media-categories/{id}", a.auth(true, a.saveMediaCategory))
+	mux.HandleFunc("POST /api/photos", a.authorize(false, uploadAccess, a.uploadPhoto))
+	mux.HandleFunc("GET /api/uploads", a.authorize(false, uploadAccess, a.listUploads))
+	mux.HandleFunc("GET /api/uploads/{id}", a.authorize(false, uploadAccess, a.getUpload))
+	mux.HandleFunc("GET /api/photos/{id}/image", a.authContent(a.servePhoto))
+	mux.HandleFunc("DELETE /api/photos/{id}", a.authContent(a.deletePhoto))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -228,7 +243,28 @@ func (a *App) Handler() http.Handler {
 	})
 }
 
+type accessScope uint8
+
+const (
+	sessionAccess accessScope = iota
+	partyAccess
+	profileAccess
+	uploadAccess
+)
+
 func (a *App) auth(admin bool, next func(http.ResponseWriter, *http.Request, Guest)) http.HandlerFunc {
+	return a.authorize(admin, sessionAccess, next)
+}
+
+func (a *App) authContent(next func(http.ResponseWriter, *http.Request, Guest)) http.HandlerFunc {
+	return a.authorize(false, partyAccess, next)
+}
+
+func (a *App) authProfile(next func(http.ResponseWriter, *http.Request, Guest)) http.HandlerFunc {
+	return a.authorize(false, profileAccess, next)
+}
+
+func (a *App) authorize(admin bool, scope accessScope, next func(http.ResponseWriter, *http.Request, Guest)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(cookieName)
 		if err != nil || !validToken(cookie.Value) {
@@ -236,7 +272,14 @@ func (a *App) auth(admin bool, next func(http.ResponseWriter, *http.Request, Gue
 			return
 		}
 		var guest Guest
-		err = a.db.QueryRowContext(r.Context(), `SELECT g.id,g.name,g.role,g.active FROM sessions s JOIN guests g ON g.id=s.guest_id WHERE s.token_hash=$1 AND s.expires_at>$2 AND g.active=1`, hashToken(cookie.Value), a.now().Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
+		var avatarVersion int64
+		var open bool
+		var welcomeAction *string
+		err = a.db.QueryRowContext(r.Context(), `SELECT g.id,g.name,g.role,g.active,w.is_open,
+ CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END,
+ CASE WHEN NOT w.is_open AND w.current_step>0 THEN w.steps->(w.current_step-1)->>'action' END
+ FROM sessions s JOIN guests g ON g.id=s.guest_id CROSS JOIN welcome w
+ WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active=1`, hashToken(cookie.Value), a.now().Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &open, &avatarVersion, &welcomeAction)
 		if errors.Is(err, sql.ErrNoRows) {
 			fail(w, 401, "session_expired")
 			return
@@ -249,6 +292,18 @@ func (a *App) auth(admin bool, next func(http.ResponseWriter, *http.Request, Gue
 			fail(w, 403, "admin_required")
 			return
 		}
+		if scope != sessionAccess && guest.Role != "admin" && !open {
+			selfProfile := scope == profileAccess && welcomeAction != nil && *welcomeAction == "profile_photo"
+			if target := r.PathValue("id"); target != "" && target != strconv.FormatInt(guest.ID, 10) {
+				selfProfile = false
+			}
+			welcomeUpload := scope == uploadAccess && welcomeAction != nil && *welcomeAction == "media_upload"
+			if !selfProfile && !welcomeUpload {
+				fail(w, http.StatusLocked, "welcome_required")
+				return
+			}
+		}
+		guest.AvatarURL = avatarURL(guest.ID, avatarVersion)
 		next(w, r, guest)
 	}
 }

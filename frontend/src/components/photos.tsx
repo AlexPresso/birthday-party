@@ -1,10 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
-  ImagePlus,
-  Upload,
-  Check,
-  RotateCw,
   X,
   Trash2,
   ChevronLeft,
@@ -13,7 +9,8 @@ import {
   Download,
   Play,
 } from "lucide-react";
-import { api, errorMessage, remove, responseError } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { api, errorMessage, remove } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import {
   photosSchema,
@@ -21,30 +18,41 @@ import {
   type Guest,
   type Photo,
   type PhotoPage,
+  type MediaCategory,
 } from "@/lib/contracts";
 import { PageHeading, EmptyState, ErrorNotice } from "./ui";
 import { useUploads } from "./upload-provider";
+import { UploadQueue } from "./upload-queue";
+import { MediaPicker } from "./media-picker";
+import "./media-categories.css";
 
 export function PhotoGallery({
   initial,
   guest,
   timezone,
+  categories,
+  categoryId,
 }: {
   initial: PhotoPage;
   guest: Guest;
   timezone: string;
+  categories: MediaCategory[];
+  categoryId: number | null;
 }) {
   const { locale, t } = useI18n();
   const numbers = new Intl.NumberFormat(locale);
   const plurals = new Intl.PluralRules(locale);
-  const limits = initial.limits;
-  const imageSize = numbers.format(limits.imageBytes / (1024 * 1024));
-  const videoSize = numbers.format(limits.videoBytes / (1024 * 1024));
+  const router = useRouter();
+  const [filterPending, startFilter] = useTransition();
+  const category = categories.find((item) => item.id === categoryId);
   const [storedPhotos, setPhotos] = useState(initial.items);
   const uploads = useUploads();
   const photos = [
     ...new Map(
-      [...storedPhotos, ...uploads.completed].map((photo) => [photo.id, photo]),
+      [
+        ...storedPhotos,
+        ...uploads.completed.filter((photo) => photo.categoryId === categoryId),
+      ].map((photo) => [photo.id, photo]),
     ).values(),
   ].sort((a, b) => b.id - a.id);
   const [cursor, setCursor] = useState(initial.nextCursor);
@@ -52,7 +60,6 @@ export function PhotoGallery({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
 
@@ -66,22 +73,14 @@ export function PhotoGallery({
     return () => playback?.pause();
   }, [selected]);
 
-  function choose(files: FileList | null) {
-    if (!files) return;
-    setError(
-      uploads.addFiles(Array.from(files), limits)
-        ? t("photos.selectionLimit")
-        : null,
-    );
-    if (input.current) input.current.value = "";
-  }
-
   async function loadMore() {
     setLoading(true);
     setError(null);
     try {
       const data = await api(
-        `/photos?limit=24&before=${encodeURIComponent(cursor!)}`,
+        "/photos?limit=24&before=" +
+          encodeURIComponent(cursor!) +
+          (categoryId === null ? "" : "&categoryId=" + categoryId),
         photosSchema,
       );
       setPhotos((items) => [
@@ -100,15 +99,6 @@ export function PhotoGallery({
 
   const currentIndex = photos.findIndex((photo) => photo.id === selected);
   const current = photos[currentIndex];
-  const transmitting = uploads.transfers.some(
-    (item) => item.status !== "error",
-  );
-  const active =
-    transmitting ||
-    uploads.jobs.some(
-      (job) => job.status === "queued" || job.status === "processing",
-    );
-  const completed = uploads.jobs.filter((job) => job.status === "ready").length;
   async function deletePhoto(photo: Photo) {
     if (!window.confirm(t("photos.deleteConfirm"))) return;
     setDeleting(true);
@@ -130,180 +120,71 @@ export function PhotoGallery({
       <PageHeading
         title={t("photos.title")}
         description={t("photos.description")}
-      >
-        <button
-          className="button primary upload-button"
-          onClick={() => input.current?.click()}
-        >
-          <ImagePlus size={20} />
-          {t("photos.add")}
-        </button>
-      </PageHeading>
-      <input
-        ref={input}
-        className="visually-hidden"
-        type="file"
-        multiple
-        accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-        aria-label={t("photos.add")}
-        onChange={(event) => choose(event.target.files)}
-        tabIndex={-1}
       />
-      <p className="photo-privacy">
-        <Images size={15} aria-hidden="true" />{" "}
-        {t("photos.privacy", { imageSize, videoSize })}
-      </p>
-      {(uploads.transfers.length > 0 || uploads.jobs.length > 0) && (
-        <section
-          className="upload-queue panel"
-          aria-label={t("photos.uploadQueue")}
-        >
-          <div className="section-row">
-            <h2>{t(active ? "photos.uploading" : "photos.uploads")}</h2>
-            {!active && (
-              <button className="text-button" onClick={uploads.clearFinished}>
-                {t("photos.close")}
-              </button>
-            )}
-          </div>
-          {uploads.transfers.map((item) => (
-            <div className="upload-item" key={item.clientUploadId}>
-              <div className={`upload-status ${item.status}`}>
-                <Upload size={20} aria-hidden="true" />
-              </div>
-              <div className="upload-details">
-                <span className="file-name">{item.file.name}</span>
-                {item.status === "uploading" ? (
-                  <>
-                    <progress
-                      aria-label={t("photos.fileProgress", {
-                        name: item.file.name,
-                      })}
-                      max={100}
-                      value={item.progress}
-                    />
-                    <span className="fine-print">
-                      {item.progress === 100
-                        ? t("photos.receiving")
-                        : new Intl.NumberFormat(locale, {
-                            style: "percent",
-                          }).format(item.progress / 100)}
-                    </span>
-                  </>
-                ) : (
-                  <span
-                    className={`fine-print ${item.status === "error" ? "error-text" : ""}`}
-                  >
-                    {item.error || t("photos.queued")}
-                  </span>
-                )}
-              </div>
-              {item.status === "error" && item.retryable && (
-                <button
-                  className="icon-button"
-                  aria-label={t("photos.retry", { name: item.file.name })}
-                  onClick={() => uploads.retryTransfer(item.clientUploadId)}
-                >
-                  <RotateCw size={18} />
-                </button>
-              )}
-              {item.status !== "uploading" && (
-                <button
-                  className="icon-button"
-                  aria-label={t("photos.removeFromQueue", {
-                    name: item.file.name,
-                  })}
-                  onClick={() => uploads.dismiss(item.clientUploadId)}
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </div>
-          ))}
-          {uploads.jobs.map((job) => (
-            <div className="upload-item" key={job.id}>
-              <div
-                className={`upload-status ${job.status === "ready" ? "done" : job.status === "failed" ? "error" : ""}`}
-              >
-                {job.status === "ready" ? (
-                  <Check size={20} aria-hidden="true" />
-                ) : (
-                  <Upload size={20} aria-hidden="true" />
-                )}
-              </div>
-              <div className="upload-details">
-                <span className="file-name">{job.filename}</span>
-                <span
-                  className={`fine-print ${job.status === "failed" ? "error-text" : ""}`}
-                >
-                  {job.status === "ready"
-                    ? t("photos.added")
-                    : job.status === "failed"
-                      ? responseError({ code: job.errorCode }, t)
-                      : job.status === "queued"
-                        ? t("photos.serverQueued")
-                        : t(
-                            job.kind === "video"
-                              ? "photos.processingVideo"
-                              : "photos.processing",
-                          )}
-                </span>
-                {job.status === "failed" && !uploads.canRetryJob(job) && (
-                  <span className="fine-print">{t("photos.reselect")}</span>
-                )}
-              </div>
-              {uploads.canRetryJob(job) && (
-                <button
-                  className="icon-button"
-                  aria-label={t("photos.retry", { name: job.filename })}
-                  onClick={() => uploads.retryJob(job)}
-                >
-                  <RotateCw size={18} />
-                </button>
-              )}
-              {(job.status === "ready" || job.status === "failed") && (
-                <button
-                  className="icon-button"
-                  aria-label={t("photos.removeFromQueue", {
-                    name: job.filename,
-                  })}
-                  onClick={() => uploads.dismiss(job.clientUploadId)}
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </div>
-          ))}
-          <span className="visually-hidden" role="status">
-            {t(
-              plurals.select(completed) === "one"
-                ? "photos.addedCountOne"
-                : "photos.addedCountOther",
-              { count: numbers.format(completed) },
-            )}
-          </span>
-          {active && (
-            <p className="fine-print">
-              {t(transmitting ? "photos.keepOpen" : "photos.safeToLeave")}
-            </p>
+      {categories.length > 0 && (
+        <div className="media-category-filter">
+          <label htmlFor="media-category-filter">
+            {t("categories.filter")}
+          </label>
+          <select
+            id="media-category-filter"
+            value={categoryId ?? ""}
+            disabled={filterPending}
+            onChange={(event) => {
+              const value = event.target.value;
+              startFilter(() =>
+                router.push(
+                  value
+                    ? "/photos?categoryId=" + encodeURIComponent(value)
+                    : "/photos",
+                  { scroll: false },
+                ),
+              );
+            }}
+          >
+            <option value="">{t("categories.main")}</option>
+            {categories.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.isPublic
+                  ? item.name
+                  : t("categories.privateOption", { name: item.name })}
+              </option>
+            ))}
+          </select>
+          {filterPending && (
+            <span className="fine-print" role="status">
+              {t("photos.loading")}
+            </span>
           )}
-        </section>
+        </div>
       )}
-      <ErrorNotice message={uploads.error} />
+      <MediaPicker
+        limits={initial.limits}
+        destination={{ categoryId, welcomeRevision: null }}
+      >
+        {category && (
+          <p className="fine-print">
+            {t("categories.destination", { name: category.name })}
+          </p>
+        )}
+        {category && !category.isPublic && (
+          <p className="fine-print">{t("categories.privateHint")}</p>
+        )}
+      </MediaPicker>
+      <UploadQueue />
       <ErrorNotice message={selected === null ? error : null} />
       {photos.length === 0 ? (
         <EmptyState
           icon={<Images size={36} strokeWidth={1.4} />}
           title={t("photos.emptyTitle")}
         >
-          <p>{t("photos.emptyDescription")}</p>
-          <button
-            className="button secondary"
-            onClick={() => input.current?.click()}
-          >
-            <ImagePlus size={18} />
-            {t("photos.choose")}
-          </button>
+          <p>
+            {t(
+              categoryId === null
+                ? "photos.emptyDescription"
+                : "categories.emptyGallery",
+            )}
+          </p>
         </EmptyState>
       ) : (
         <section aria-label={t("photos.all")}>

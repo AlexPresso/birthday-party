@@ -91,6 +91,29 @@ use, a personal visual identity, simple code, and responsive interactions.
   order and routes; see `docs/design.md` and its reference image.
 - Guest profiles are prepared by the host. Individual, single-use invitation
   links activate a persistent session. A replacement link keeps the same identity.
+- Guests can choose, replace or remove their own profile photo from settings.
+  Store normalized 256×256 JPEG avatars (at most 128 KiB) in PostgreSQL for atomic
+  replacement. Versioned avatar URLs require an active session and full app access,
+  except a guest's own avatar during a current `profile_photo` welcome action.
+  Keep anonymous guestbook entries free of all author details, including avatars.
+- The host can start a shared welcome sequence from settings. Guests remain at
+  `/attente` until the host opens full access; only the current step is returned.
+  Go gates party content, media and uploads while closed; administrators retain
+  access. Store steps and progress in PostgreSQL, with revision-checked commands.
+  Keep initial access open until the host explicitly starts the welcome.
+- Welcome steps have one optional typed action: `profile_photo` or `media_upload`.
+  The current photo action grants access to the guest's own profile editor and
+  avatar. The media action accepts queued uploads into its configured destination;
+  it does not grant gallery or file access. Recheck the current action at acceptance
+  and retain its revision and destination with each upload. The host advances
+  regardless of completion. Add action types explicitly with validation,
+  permissions and a matching component.
+- Media categories have an administrator-controlled public/private setting.
+  Public means visible to signed-in guests with full app access; private means
+  administrators only, including for files, thumbnails and video ranges. Owners
+  receive upload acknowledgements without private media URLs. Publishing a
+  category exposes its existing media without copying or moving files. The main
+  gallery contains uncategorized media; categories are filters within `/photos`.
 - PostgreSQL stores records and media jobs; a private local data directory stores
   photos, videos, thumbnails and pending inputs. Back up both together. This setup
   targets one Go process and persistent local storage.

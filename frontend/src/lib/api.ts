@@ -18,6 +18,11 @@ export function returnToInvitation() {
   window.location.replace("/invitation");
 }
 
+export function returnToWelcome() {
+  // Discard previously visited private routes when the host closes guest access.
+  window.location.replace("/attente");
+}
+
 function responseCode(body: unknown): string {
   return body &&
     typeof body === "object" &&
@@ -58,6 +63,8 @@ export async function api<T>(
   schema: z.ZodType<T>,
   options?: { method?: string; body?: unknown; signal?: AbortSignal },
 ) {
+  const body = options?.body;
+  const multipart = body instanceof FormData;
   const response = await fetchResponse(`/api${path}`, {
     method: options?.method || "GET",
     credentials: "same-origin",
@@ -65,15 +72,19 @@ export async function api<T>(
     signal: options?.signal,
     headers: {
       "X-Requested-With": "birthday-party",
-      ...(options?.body !== undefined
+      ...(options?.body !== undefined && !multipart
         ? { "Content-Type": "application/json" }
         : {}),
     },
-    body:
-      options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: multipart
+      ? body
+      : body !== undefined
+        ? JSON.stringify(body)
+        : undefined,
   });
   if (response.status === 401 && !path.startsWith("/invitations"))
     returnToInvitation();
+  if (response.status === 423) returnToWelcome();
   return readResponse(response, schema);
 }
 
@@ -84,6 +95,7 @@ export async function remove(path: string, method = "DELETE") {
     headers: { "X-Requested-With": "birthday-party" },
   });
   if (response.status === 401) returnToInvitation();
+  if (response.status === 423) returnToWelcome();
   if (!response.ok)
     throw new ApiError(
       responseCode(await response.json().catch(() => null)),

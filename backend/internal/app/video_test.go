@@ -150,7 +150,7 @@ func TestVideoValidationAndCleanup(t *testing.T) {
 func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
-	_, identity := admin(t, a)
+	host, identity := admin(t, a)
 	if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=$1", identity.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -168,6 +168,7 @@ func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 	}
 	r := httptest.NewRequest("POST", "/api/photos", &body)
 	r.Header.Set("Content-Type", writer.FormDataContentType())
+	r.AddCookie(host)
 	w := httptest.NewRecorder()
 	// Simulate revocation after the authentication middleware read this identity.
 	a.uploadPhoto(w, r, identity)

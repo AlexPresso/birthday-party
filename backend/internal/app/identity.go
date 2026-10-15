@@ -157,9 +157,10 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var guest Guest
+	var avatarVersion int64
 	now := a.now()
 	// Lock the guest before the invitation, matching renewal and revocation.
-	err = tx.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=$1 AND i.used_at IS NULL AND i.expires_at>$2 AND g.active=1 FOR UPDATE OF g`, hashToken(input.Token), now.Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
+	err = tx.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=$1 AND i.used_at IS NULL AND i.expires_at>$2 AND g.active=1 FOR UPDATE OF g`, hashToken(input.Token), now.Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &avatarVersion)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(w, 401, "invitation_unavailable")
 		return
@@ -209,6 +210,7 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: token, Path: "/", Expires: expires, MaxAge: int(sessionTTL.Seconds()), HttpOnly: true, Secure: a.config.CookieSecure, SameSite: http.SameSiteLaxMode})
+	guest.AvatarURL = avatarURL(guest.ID, avatarVersion)
 	respond(w, 200, map[string]any{"guest": guest})
 }
 
@@ -223,7 +225,7 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request, _ Guest) {
 }
 
 func (a *App) listGuests(w http.ResponseWriter, r *http.Request, _ Guest) {
-	rows, err := a.db.QueryContext(r.Context(), "SELECT id,name,role,active FROM guests ORDER BY active DESC,name,id LIMIT 500")
+	rows, err := a.db.QueryContext(r.Context(), "SELECT id,name,role,active,CASE WHEN avatar_jpeg IS NOT NULL THEN avatar_version ELSE 0 END FROM guests ORDER BY active DESC,name,id LIMIT 500")
 	if err != nil {
 		internal(w, err)
 		return
@@ -232,10 +234,12 @@ func (a *App) listGuests(w http.ResponseWriter, r *http.Request, _ Guest) {
 	items := []Guest{}
 	for rows.Next() {
 		var guest Guest
-		if err := rows.Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active); err != nil {
+		var avatarVersion int64
+		if err := rows.Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &avatarVersion); err != nil {
 			internal(w, err)
 			return
 		}
+		guest.AvatarURL = avatarURL(guest.ID, avatarVersion)
 		items = append(items, guest)
 	}
 	if err := rows.Err(); err != nil {

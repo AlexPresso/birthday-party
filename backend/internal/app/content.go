@@ -241,7 +241,7 @@ func (a *App) listEntries(w http.ResponseWriter, r *http.Request, guest Guest) {
 	if !ok {
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT e.id,g.id,g.name,e.anonymous,e.body,e.created_at FROM entries e JOIN guests g ON e.guest_id=g.id WHERE ($1::bigint=0 OR e.id<$2) ORDER BY e.id DESC LIMIT $3`, before, before, limit+1)
+	rows, err := a.db.QueryContext(r.Context(), `SELECT e.id,g.id,g.name,e.anonymous,e.body,e.created_at,CASE WHEN e.anonymous=0 AND g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END FROM entries e JOIN guests g ON e.guest_id=g.id WHERE ($1::bigint=0 OR e.id<$2) ORDER BY e.id DESC LIMIT $3`, before, before, limit+1)
 	if err != nil {
 		internal(w, err)
 		return
@@ -251,12 +251,14 @@ func (a *App) listEntries(w http.ResponseWriter, r *http.Request, guest Guest) {
 	for rows.Next() {
 		var entry Entry
 		var author Author
-		if err := rows.Scan(&entry.ID, &author.ID, &author.Name, &entry.Anonymous, &entry.Body, &entry.CreatedAt); err != nil {
+		var avatarVersion int64
+		if err := rows.Scan(&entry.ID, &author.ID, &author.Name, &entry.Anonymous, &entry.Body, &entry.CreatedAt, &avatarVersion); err != nil {
 			internal(w, err)
 			return
 		}
 		entry.CanDelete = guest.Role == "admin" || guest.ID == author.ID
 		if !entry.Anonymous {
+			author.AvatarURL = avatarURL(author.ID, avatarVersion)
 			entry.Author = &author
 		}
 		items = append(items, entry)
@@ -288,7 +290,7 @@ func (a *App) createEntry(w http.ResponseWriter, r *http.Request, guest Guest) {
 	}
 	entry := Entry{Anonymous: input.Anonymous, CanDelete: true, Body: input.Body, CreatedAt: stamp(a.now())}
 	if !entry.Anonymous {
-		entry.Author = &Author{ID: guest.ID, Name: guest.Name}
+		entry.Author = &Author{ID: guest.ID, Name: guest.Name, AvatarURL: guest.AvatarURL}
 	}
 	err := a.db.QueryRowContext(r.Context(), "INSERT INTO entries(guest_id,anonymous,body,created_at) VALUES($1,$2,$3,$4) RETURNING id", guest.ID, flag(entry.Anonymous), entry.Body, entry.CreatedAt).Scan(&entry.ID)
 	if err != nil {

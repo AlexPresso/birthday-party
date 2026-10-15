@@ -118,6 +118,44 @@ client router cache. Never put invitation tokens in queries, logs, or storage.
 Invitation fragments are read only in the browser, previewed without consuming
 them, and removed after deliberate acceptance.
 
+The host-controlled welcome uses `/attente`, outside the party layout. API status
+423 means guests must return there; handle it in server fetches, client API calls
+and upload requests. Never fetch or embed future welcome steps in guest pages.
+Guest browsers poll `/api/welcome` every three seconds while visible, pause while
+hidden, and check on return. Keep the displayed step during connection failures.
+Use a full navigation when access closes to discard cached private routes. After
+the host opens access, send guests to `/photos`. Administrators retain the four
+tabs and configure/advance the sequence in settings. Preserve drafts on conflicts.
+Each step has a nullable typed action. The current `profile_photo` action mounts
+the shared photo editor on `/attente` and fetches `/api/profile` only while active.
+Keep it across unchanged polls; unmount and abort requests when the step changes.
+Keep interactive controls outside the text's atomic live region. Saving a photo
+updates the widget without refreshing or advancing the welcome route.
+The host editor keeps stable draft keys while selecting or reordering steps.
+Use a dedicated mouse/touch drag handle and accessible move controls; normal
+scrolling and text selection must work outside the handle. Cancel interrupted
+drags without mutating the draft, announce successful moves and preserve focus.
+Keep the ordered list, selected text fields and action pane usable on narrow
+screens. Action-specific settings belong to focused forms with typed contracts;
+the current profile-photo action has no settings and keeps its existing API shape.
+The media-upload action has a typed category destination. Fetch its upload context
+only while that action is current, and key the widget by welcome revision. Reuse
+the bounded uploader, capture the destination/revision per transfer and retry,
+and abort unaccepted browser transfers when the step changes. Accepted jobs remain
+durable. A ready job may have no photo because the category is private or welcome
+access is still closed; show completion without fetching files in that case.
+Admin settings create categories and change their visibility. The media gallery
+filters uncategorized media or one accessible category; keep pagination, completed
+uploads and retries tied to that destination. Public means signed-in guests,
+private means administrators. Preserve category names as authored content.
+
+Profile settings accept JPEG/PNG/WebP photos using `/api/profile` image limits.
+Show a centered preview before saving, preserve the selection after failed saves,
+and release local object URLs. Refresh the server-rendered header after changes.
+Use the shared Avatar component with native authenticated images and initial
+fallbacks. Avatar URLs are versioned, same-origin API paths; anonymous guestbook
+posts keep their neutral icon and never receive an avatar URL.
+
 Authenticated media deliberately uses native images: the Go service already
 creates thumbnails, and Next image optimization would not forward guest cookies.
 Uploads accept at most 20 selected files and run two requests concurrently.

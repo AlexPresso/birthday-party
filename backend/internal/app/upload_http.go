@@ -53,17 +53,21 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 400, "invalid_upload_id")
 		return
 	}
-	if clientID != "" {
-		job, err := a.uploadByClientID(r.Context(), guest.ID, clientID)
-		if err == nil {
-			respond(w, 202, job)
-			return
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			internal(w, err)
-			return
-		}
-	} else {
+	destination, err := parseUploadDestination(r)
+	if err != nil {
+		failUpload(w, err)
+		return
+	}
+	existing, err := a.inspectUpload(r.Context(), guest.ID, clientID, &destination)
+	if err != nil {
+		failUpload(w, err)
+		return
+	}
+	if existing != nil {
+		respond(w, 202, existing)
+		return
+	}
+	if clientID == "" {
 		var err error
 		clientID, err = newUploadID()
 		if err != nil {
@@ -85,7 +89,7 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		return
 	}
 	defer os.Remove(upload.path)
-	job, err := a.enqueueUpload(r.Context(), guest.ID, clientID, upload)
+	job, err := a.enqueueUpload(r.Context(), guest.ID, clientID, upload, destination)
 	if err != nil {
 		failUpload(w, err)
 		return

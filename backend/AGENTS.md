@@ -42,6 +42,24 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 
 ## Access and scheduled reveals
 
+- Guest welcome state belongs in PostgreSQL. Protect every party, programme,
+  guestbook, media and upload route with the welcome access check, including
+  thumbnails and range requests. Session/logout/welcome status remain available.
+  Administrators bypass the welcome restriction. Return only the current step
+  to guests, and use revision-checked transactions for host edits/transitions.
+  Accepted media jobs may finish privately while welcome access is closed.
+  The current step's optional `profile_photo` action permits only the viewer's
+  own profile read, photo mutation and avatar GET/HEAD during welcome. Keep party
+  content and other guests' avatars locked. Recheck the current action under the
+  welcome row lock before saving; a completed photo never advances the sequence.
+  Validate supported action types explicitly and return only the current action.
+  The `media_upload` action permits upload reception and the owner's queue only.
+  Its typed `mediaUpload.categoryId` selects the main gallery (`null`) or a
+  category. Require the welcome revision and recheck it and the destination under
+  the welcome lock at acceptance; stale transfers must not become ordinary uploads.
+  Keep the accepted destination on the job and resulting photo across recovery.
+  Return no photo details in guest queue responses while welcome access is closed.
+
 - Go owns business rules, access control, and the authoritative unlock decision. Check access
   for each protected resource, including photo reads and writes.
 - Enforce reveal times in the API and media delivery. Do not send locked content or usable media
@@ -55,6 +73,14 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   Pass a clock or time value into time-sensitive logic when useful for deterministic tests.
 
 ## Media uploads
+
+- Profile photos use the configured image byte limit and 40-megapixel limit.
+  Normalize orientation and center-crop to a metadata-free 256×256 JPEG with
+  one bounded processor. Store at most 128 KiB per guest in PostgreSQL so
+  replacements/removals are atomic. Recheck session, identity and welcome state
+  before saving; only the signed-in guest can change their photo. Versioned
+  avatar reads remain authenticated and respect the welcome gate. Never include
+  an avatar URL in anonymous guestbook entries.
 
 - Validate authorization, file size, and allowed file types on the server. Inspect file contents;
   do not trust extensions or client-provided MIME types. Set limits before reading request bodies.
@@ -105,7 +131,12 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   registers WebP decoding. Do not replace content inspection with MIME/extension checks.
 - Go owns the route contract in [docs/api.md](../docs/api.md). Cookie path must
   remain `/` because Next.js Server Components forward it from page requests.
-- Guests see all contributions. Only author/admin can delete. Admin-only settings
+- Guests see uncategorized media and public categories after full access opens.
+  Private categories are administrator-only, even for the uploader. Check category
+  visibility on lists, direct files, thumbnails, HEAD/range requests and deletion;
+  redact private photo details from owner queue responses and idempotent retries.
+  Category visibility is checked when reading, so publishing needs no media copy.
+  Only author/admin can delete visible media. Admin-only settings
   manage guests, event content and party details. Re-invitation preserves identity.
 - Event timezone defaults explicitly to `Europe/Zurich` and is host-editable.
 - Use private `DATA_DIR` persistence, never a frontend public directory. Full

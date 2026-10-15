@@ -9,16 +9,253 @@ import {
   entrySchema,
   uploadSchema,
   uploadsSchema,
+  welcomeSchema,
+  adminWelcomeSchema,
+  profileSchema,
+  mediaCategorySchema,
+  mediaCategoriesSchema,
+  welcomeUploadContextSchema,
 } from "../src/lib/contracts.ts";
+
+test("welcome responses distinguish waiting, the current step and full access", () => {
+  const waiting = { open: false, revision: 1, step: null };
+  const step = {
+    position: 1,
+    title: "Meet outside",
+    body: "Bring your coat.",
+    action: null,
+  };
+  assert.equal(welcomeSchema.safeParse(waiting).success, true);
+  assert.equal(welcomeSchema.safeParse({ ...waiting, step }).success, true);
+  assert.equal(
+    welcomeSchema.safeParse({ ...waiting, open: true }).success,
+    true,
+  );
+  for (const invalid of [
+    { ...waiting, step, open: true },
+    { ...waiting, revision: -1 },
+    { ...waiting, step: { ...step, position: 0 } },
+    { ...waiting, step: { ...step, position: 13 } },
+    { ...waiting, step: { ...step, title: "" } },
+  ])
+    assert.equal(welcomeSchema.safeParse(invalid).success, false);
+
+  const admin = {
+    open: false,
+    revision: 2,
+    currentStep: 1,
+    steps: [{ title: step.title, body: step.body, action: null }],
+  };
+  assert.equal(adminWelcomeSchema.safeParse(admin).success, true);
+  assert.equal(
+    adminWelcomeSchema.safeParse({ ...admin, currentStep: 2 }).success,
+    false,
+  );
+  assert.equal(
+    adminWelcomeSchema.safeParse({ ...admin, open: true }).success,
+    false,
+  );
+  assert.equal(
+    adminWelcomeSchema.safeParse({
+      ...admin,
+      steps: Array(13).fill(admin.steps[0]),
+    }).success,
+    false,
+  );
+});
+
+test("welcome steps accept only supported optional actions", () => {
+  const step = { title: "Your photo", body: "", action: "profile_photo" };
+  const welcome = {
+    open: false,
+    revision: 3,
+    step: { ...step, position: 1 },
+  };
+  const admin = {
+    open: false,
+    revision: 3,
+    currentStep: 1,
+    steps: [step],
+  };
+  assert.equal(welcomeSchema.parse(welcome).step?.action, "profile_photo");
+  assert.equal(
+    adminWelcomeSchema.parse(admin).steps[0].action,
+    "profile_photo",
+  );
+  for (const action of [
+    undefined,
+    "",
+    "gallery",
+    true,
+    [],
+    { type: "profile_photo" },
+  ]) {
+    assert.equal(
+      welcomeSchema.safeParse({ ...welcome, step: { ...welcome.step, action } })
+        .success,
+      false,
+    );
+    assert.equal(
+      adminWelcomeSchema.safeParse({ ...admin, steps: [{ ...step, action }] })
+        .success,
+      false,
+    );
+  }
+});
 
 const defaultLimits = {
   imageBytes: 15 * 1024 * 1024,
   videoBytes: 100 * 1024 * 1024,
 };
 
+test("media upload actions require a typed destination and cannot configure another action", () => {
+  const state = { open: false, revision: 4, currentStep: 1 };
+  const base = { title: "Share a memory", body: "", action: "media_upload" };
+  for (const categoryId of [null, 42]) {
+    const step = { ...base, mediaUpload: { categoryId } };
+    assert.deepEqual(
+      adminWelcomeSchema.parse({ ...state, steps: [step] }).steps[0],
+      step,
+    );
+    assert.equal(
+      welcomeSchema.safeParse({
+        open: false,
+        revision: state.revision,
+        step: { ...step, position: 1 },
+      }).success,
+      true,
+    );
+  }
+  for (const mediaUpload of [
+    undefined,
+    null,
+    {},
+    true,
+    "main",
+    { categoryId: 0 },
+    { categoryId: -1 },
+    { categoryId: 1.5 },
+    { categoryId: "42" },
+    { categoryId: null, isPublic: true },
+  ]) {
+    assert.equal(
+      adminWelcomeSchema.safeParse({
+        ...state,
+        steps: [{ ...base, mediaUpload }],
+      }).success,
+      false,
+    );
+  }
+  for (const action of [null, "profile_photo"]) {
+    assert.equal(
+      adminWelcomeSchema.safeParse({
+        ...state,
+        steps: [{ ...base, action, mediaUpload: { categoryId: 42 } }],
+      }).success,
+      false,
+    );
+  }
+});
+
+test("categories require explicit visibility and bounded names and collections", () => {
+  const category = { id: 1, name: "For later", isPublic: false };
+  assert.deepEqual(mediaCategorySchema.parse(category), category);
+  assert.equal(
+    mediaCategorySchema.safeParse({ ...category, isPublic: true }).success,
+    true,
+  );
+  assert.equal(
+    mediaCategorySchema.safeParse({ ...category, name: "🎂".repeat(80) })
+      .success,
+    true,
+  );
+  for (const invalid of [
+    { ...category, isPublic: undefined },
+    { ...category, isPublic: "false" },
+    { ...category, id: 0 },
+    { ...category, name: "" },
+    { ...category, name: "🎂".repeat(81) },
+  ])
+    assert.equal(mediaCategorySchema.safeParse(invalid).success, false);
+  assert.equal(
+    mediaCategoriesSchema.safeParse({ items: Array(100).fill(category) })
+      .success,
+    true,
+  );
+  assert.equal(
+    mediaCategoriesSchema.safeParse({ items: Array(101).fill(category) })
+      .success,
+    false,
+  );
+});
+
+test("welcome upload context identifies the current destination and effective limits", () => {
+  const context = { revision: 6, category: null, limits: defaultLimits };
+  assert.deepEqual(welcomeUploadContextSchema.parse(context), context);
+  assert.equal(
+    welcomeUploadContextSchema.safeParse({
+      ...context,
+      category: { id: 2, name: "Surprise", isPublic: false },
+    }).success,
+    true,
+  );
+  for (const invalid of [
+    { ...context, revision: -1 },
+    { ...context, category: undefined },
+    { ...context, limits: undefined },
+    { ...context, limits: { ...defaultLimits, videoBytes: 0 } },
+  ])
+    assert.equal(welcomeUploadContextSchema.safeParse(invalid).success, false);
+});
+
+test("profile photos stay on the authenticated API and require effective image limits", () => {
+  const profile = {
+    guest: {
+      id: 1,
+      name: "Test guest",
+      role: "guest",
+      active: true,
+      avatarUrl: null,
+    },
+    limits: { imageBytes: defaultLimits.imageBytes },
+  };
+  assert.equal(profileSchema.safeParse(profile).success, true);
+  assert.equal(
+    profileSchema.safeParse({
+      ...profile,
+      guest: { ...profile.guest, avatarUrl: "/api/guests/1/avatar?v=2" },
+    }).success,
+    true,
+  );
+  for (const avatarUrl of [
+    undefined,
+    "/api/guests/1/avatar",
+    "/api/guests/1/avatar?v=0",
+    "https://example.com/avatar.jpg",
+    "//example.com/avatar.jpg",
+    "/api/guests/../avatar?v=1",
+  ]) {
+    assert.equal(
+      profileSchema.safeParse({
+        ...profile,
+        guest: { ...profile.guest, avatarUrl },
+      }).success,
+      false,
+    );
+  }
+  for (const imageBytes of [undefined, 0, -1, 1.5, 1024 ** 3 + 1]) {
+    assert.equal(
+      profileSchema.safeParse({ ...profile, limits: { imageBytes } }).success,
+      false,
+    );
+  }
+});
+
 test("upload responses distinguish accepted work, completed media and failed preparation", () => {
   const job = {
     id: 1,
+    categoryId: null,
+    welcomeRevision: null,
     clientUploadId: "b4174b65-4c1c-45a8-96ee-ac2c42e87090",
     filename: "party.mp4",
     kind: "video",
@@ -40,9 +277,19 @@ test("upload responses distinguish accepted work, completed media and failed pre
     }).success,
     true,
   );
-  // A completed upload can outlive its deleted media record.
+  // Ready jobs can omit media that is deleted, private or still welcome-gated.
   assert.equal(
     uploadSchema.safeParse({ ...job, status: "ready" }).success,
+    true,
+  );
+  assert.equal(
+    uploadSchema.safeParse({
+      ...job,
+      status: "ready",
+      categoryId: 12,
+      welcomeRevision: 4,
+      photo: null,
+    }).success,
     true,
   );
   for (const invalid of [
@@ -51,6 +298,10 @@ test("upload responses distinguish accepted work, completed media and failed pre
     { ...job, status: "done" },
     { ...job, clientUploadId: null },
     { ...job, clientUploadId: "arbitrary-key" },
+    { ...job, categoryId: undefined },
+    { ...job, categoryId: -1 },
+    { ...job, welcomeRevision: undefined },
+    { ...job, welcomeRevision: -1 },
     { ...job, errorCode: "unreadable_video" },
     { ...job, photo: { url: "https://outside.example/private.mp4" } },
   ])
@@ -68,7 +319,8 @@ test("upload responses distinguish accepted work, completed media and failed pre
 test("media responses cannot point a private gallery at an external host", () => {
   const valid = {
     id: 2,
-    author: { id: 1, name: "Test guest" },
+    categoryId: null,
+    author: { id: 1, name: "Test guest", avatarUrl: null },
     kind: "image",
     mimeType: "image/jpeg",
     width: 40,
@@ -78,6 +330,14 @@ test("media responses cannot point a private gallery at an external host", () =>
     thumbnailUrl: "/api/photos/2/image?size=thumb",
   };
   assert.equal(photoSchema.safeParse(valid).success, true);
+  assert.equal(
+    photoSchema.safeParse({ ...valid, categoryId: 12 }).success,
+    true,
+  );
+  assert.equal(
+    photoSchema.safeParse({ ...valid, categoryId: undefined }).success,
+    false,
+  );
   assert.equal(
     photoSchema.safeParse({
       ...valid,
@@ -203,8 +463,14 @@ test("anonymous entries cannot carry an author identity", () => {
   };
   assert.equal(entrySchema.safeParse(entry).success, true);
   assert.equal(
-    entrySchema.safeParse({ ...entry, author: { id: 2, name: "Private name" } })
-      .success,
+    entrySchema.safeParse({
+      ...entry,
+      author: {
+        id: 2,
+        name: "Private name",
+        avatarUrl: "/api/guests/2/avatar?v=1",
+      },
+    }).success,
     false,
   );
   assert.equal(
@@ -220,7 +486,13 @@ test("anonymous entries cannot carry an author identity", () => {
 test("API contract rejects ambiguous dates and unrecognized privileges", () => {
   assert.equal(
     sessionSchema.safeParse({
-      guest: { id: 1, name: "Test", role: "owner", active: true },
+      guest: {
+        id: 1,
+        name: "Test",
+        role: "owner",
+        active: true,
+        avatarUrl: null,
+      },
     }).success,
     false,
   );
