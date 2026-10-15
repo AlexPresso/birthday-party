@@ -17,6 +17,9 @@ import {
 import { commonMessages } from "../src/lib/messages/common.ts";
 import { adminMessages } from "../src/lib/messages/admin.ts";
 import { mediaMessages } from "../src/lib/messages/media.ts";
+import { welcomeMessages } from "../src/lib/messages/welcome.ts";
+import { profileMessages } from "../src/lib/messages/profile.ts";
+import { categoryMessages } from "../src/lib/messages/categories.ts";
 import { errorMessages } from "../src/lib/messages/errors.ts";
 
 test("locale negotiation follows language preferences and region variants", () => {
@@ -55,6 +58,9 @@ test("all catalogs contain the same nonempty keys and interpolation parameters",
     commonMessages,
     adminMessages,
     mediaMessages,
+    welcomeMessages,
+    profileMessages,
+    categoryMessages,
     errorMessages,
   ]) {
     const expected = family.en as Record<string, string>;

@@ -70,6 +70,71 @@ L'extension `compose.dev.yaml` expose PostgreSQL uniquement sur `127.0.0.1`.
 Le projet Compose `birthday-party-dev` possède sa propre base : les médias locaux
 et ceux du déploiement Docker restent associés à leurs enregistrements respectifs.
 
+## Photo de profil
+
+Dans **Paramètres**, chaque invité peut choisir une photo de profil, vérifier
+l’aperçu, puis l’enregistrer. Il peut ensuite la remplacer ou la supprimer.
+La photo apparaît dans l’en-tête et à côté de ses messages signés. Les messages
+anonymes gardent leur icône neutre.
+
+Les formats JPEG, PNG et WebP sont acceptés, avec la limite `MAX_IMAGE_SIZE_MB`
+déjà configurée. Le serveur recadre la photo au centre et conserve une petite
+version JPEG dans PostgreSQL ; l’original est supprimé. Ces photos restent
+privées et sont incluses dans la sauvegarde de la base.
+
+## Accueillir les invités par étapes
+
+Dans **Paramètres → Accueil des invités**, prépare les titres et les textes des
+étapes, puis enregistre-les. Tu peux ajouter jusqu’à 12 étapes et changer leur ordre.
+Les textes restent dans la langue où tu les as écrits.
+
+Sélectionne une étape dans la liste pour modifier son contenu. Déplace les étapes
+avec leur poignée ou les commandes de déplacement. Le volet **Action** sert à
+choisir l’action de l’étape et à consulter ses réglages ; l’action photo de profil
+n’a pas de paramètres pour le moment. Enregistre les étapes pour conserver tes
+modifications.
+
+Chaque étape peut aussi proposer une action. Choisis **Définir une photo de
+profil** pour que les invités puissent ajouter leur photo directement pendant
+l’accueil, avec un aperçu avant l’enregistrement. Retire l’action pour conserver
+une étape avec du texte seulement. La photo reste liée au profil après l’accueil.
+Tu décides quand passer à la suite, même si certains n’ont pas ajouté de photo.
+
+L’action **Envoyer des photos et vidéos** permet de recevoir des médias pendant
+l’accueil. Dans ses réglages, choisis **Médias principaux** ou une catégorie.
+Les fichiers entrent dans la file d’attente habituelle et restent associés à
+cette destination. Passer à l’étape suivante arrête les transferts que le serveur
+n’a pas encore acceptés ; les envois déjà acceptés continuent leur préparation.
+
+**Activer l’écran d’attente** place tous les invités sur un écran séparé, y compris
+ceux déjà connectés. Ton accès administrateur reste disponible. Clique sur
+**Afficher la première étape**, puis **Passer à l’étape suivante** pour avancer au
+même rythme pour tout le monde. Les nouveaux arrivants voient l’étape en cours.
+Les écrans vérifient automatiquement les changements toutes les trois secondes
+quand le navigateur est visible et connecté.
+
+Après la dernière étape, clique sur **Ouvrir l’application** pour donner accès aux
+quatre onglets. Ce bouton permet aussi de terminer l’accueil plus tôt. Les textes
+se modifient avant le premier affichage ou une fois l’application ouverte.
+Les étapes et l’avancement sont conservés après un redémarrage des conteneurs.
+
+L’application reste ouverte tant que tu n’as pas activé l’écran d’attente.
+Aucune nouvelle variable d’environnement n’est nécessaire.
+
+## Catégories de médias
+
+Dans **Paramètres → Catégories de médias**, crée une catégorie et choisis sa visibilité :
+
+- **Privée** : seuls les administrateurs peuvent consulter ses fichiers, même
+  lorsqu’un invité les a envoyés pendant l’accueil.
+- **Publique** : les invités connectés peuvent la consulter dans l’onglet Médias
+  une fois l’accès à l’application ouvert.
+
+Tu peux rendre une catégorie publique plus tard pour dévoiler tous ses médias.
+La galerie principale conserve les fichiers sans catégorie ; un filtre permet
+de consulter chaque catégorie accessible. Les catégories sont limitées à 100,
+avec un nom de 80 caractères maximum. Leur nom reste dans la langue où tu l’as écrit.
+
 ## Personnaliser l’anniversaire
 
 Copier `.env.example` vers `.env` à la racine si ce fichier n’existe pas encore,

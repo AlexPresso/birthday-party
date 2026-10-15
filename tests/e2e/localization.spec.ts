@@ -441,7 +441,10 @@ test("translates host forms and confirmation dialogs in German", async ({
         .filter({ hasText: "Gib eine gültige Zeitzone ein" }),
     ).toHaveText("Gib eine gültige Zeitzone ein, zum Beispiel Europe/Zurich.");
 
-    await page.locator("summary").filter({ hasText: "Gäste" }).click();
+    await page
+      .locator("summary")
+      .filter({ hasText: /^Gäste$/ })
+      .click();
     await expect(
       page.getByLabel("Vorname des Gastes", { exact: true }),
     ).toBeVisible();

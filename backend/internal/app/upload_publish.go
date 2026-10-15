@@ -72,7 +72,8 @@ func (a *App) prepareAndStoreUpload(ctx context.Context, job pendingUpload) erro
 		return err
 	}
 	var status, attempt string
-	if err = tx.QueryRowContext(ctx, "SELECT status,COALESCE(attempt_id,'') FROM upload_jobs WHERE id=$1 FOR UPDATE", job.id).Scan(&status, &attempt); err != nil {
+	var categoryID *int64
+	if err = tx.QueryRowContext(ctx, "SELECT status,COALESCE(attempt_id,''),category_id FROM upload_jobs WHERE id=$1 FOR UPDATE", job.id).Scan(&status, &attempt, &categoryID); err != nil {
 		return err
 	}
 	if status != "processing" || attempt != job.attempt {
@@ -94,7 +95,7 @@ func (a *App) prepareAndStoreUpload(ctx context.Context, job pendingUpload) erro
 		return &mediaValidationError{409, "album_full"}
 	}
 	var photoID int64
-	err = tx.QueryRowContext(ctx, `INSERT INTO photos(guest_id,filename,thumbnail,mime,width,height,byte_size,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, job.guestID, filename, thumbname, media.mimeType, media.width, media.height, info.Size()+thumbInfo.Size(), stamp(a.now())).Scan(&photoID)
+	err = tx.QueryRowContext(ctx, `INSERT INTO photos(guest_id,filename,thumbnail,mime,width,height,byte_size,created_at,category_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, job.guestID, filename, thumbname, media.mimeType, media.width, media.height, info.Size()+thumbInfo.Size(), stamp(a.now()), categoryID).Scan(&photoID)
 	if err != nil {
 		return err
 	}

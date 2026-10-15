@@ -3,6 +3,8 @@ import { getBirthdayConfig } from "@/lib/birthday-config";
 import { Navigation } from "@/components/navigation";
 import { getI18n } from "@/lib/server-i18n";
 import { UploadProvider, UploadNotice } from "@/components/upload-provider";
+import { GuestAccessMonitor } from "@/components/guest-access-monitor";
+import { Avatar } from "@/components/avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,7 @@ export default async function PartyLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [{ guest }, party, { age, title }, { locale, t }] = await Promise.all([
+  const [{ guest }, party, { age, title }, { t }] = await Promise.all([
     getSession(),
     getParty(),
     getBirthdayConfig(),
@@ -19,6 +21,7 @@ export default async function PartyLayout({
   ]);
   return (
     <div className="app-shell">
+      {guest.role === "guest" && <GuestAccessMonitor />}
       <a className="skip-link" href="#content">
         {t("shell.skip")}
       </a>
@@ -32,9 +35,7 @@ export default async function PartyLayout({
           </div>
         </div>
         <div className="guest-chip">
-          <span className="avatar">
-            {guest.name.charAt(0).toLocaleUpperCase(locale)}
-          </span>
+          <Avatar name={guest.name} avatarUrl={guest.avatarUrl} />
           <span>{guest.name}</span>
         </div>
       </header>

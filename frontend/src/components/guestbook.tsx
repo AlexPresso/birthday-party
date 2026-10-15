@@ -18,6 +18,7 @@ import {
   type Guest,
 } from "@/lib/contracts";
 import { PageHeading, ErrorNotice } from "./ui";
+import { Avatar } from "./avatar";
 
 export function Guestbook({
   initial,
@@ -188,13 +189,16 @@ export function Guestbook({
             entries.map((entry) => (
               <article key={entry.id} className="guestbook-entry panel">
                 <header>
-                  <span className="avatar" aria-hidden="true">
-                    {entry.author ? (
-                      entry.author.name.charAt(0).toLocaleUpperCase(locale)
-                    ) : (
+                  {entry.author ? (
+                    <Avatar
+                      name={entry.author.name}
+                      avatarUrl={entry.author.avatarUrl}
+                    />
+                  ) : (
+                    <span className="avatar" aria-hidden="true">
                       <UserRound size={20} />
-                    )}
-                  </span>
+                    </span>
+                  )}
                   <div>
                     <strong>
                       {entry.author?.name ?? t("guestbook.anonymous")}

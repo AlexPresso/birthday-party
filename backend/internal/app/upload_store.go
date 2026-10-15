@@ -20,14 +20,16 @@ const (
 
 // UploadJob is the owner's view of an accepted media upload and its eventual result.
 type UploadJob struct {
-	ID             int64   `json:"id"`
-	ClientUploadID string  `json:"clientUploadId"`
-	Status         string  `json:"status"`
-	Filename       string  `json:"filename"`
-	Kind           string  `json:"kind"`
-	CreatedAt      string  `json:"createdAt"`
-	ErrorCode      *string `json:"errorCode"`
-	Photo          *Photo  `json:"photo"`
+	ID              int64   `json:"id"`
+	ClientUploadID  string  `json:"clientUploadId"`
+	Status          string  `json:"status"`
+	Filename        string  `json:"filename"`
+	Kind            string  `json:"kind"`
+	CreatedAt       string  `json:"createdAt"`
+	ErrorCode       *string `json:"errorCode"`
+	Photo           *Photo  `json:"photo"`
+	CategoryID      *int64  `json:"categoryId"`
+	WelcomeRevision *int64  `json:"welcomeRevision"`
 }
 
 type pendingUpload struct {
@@ -37,18 +39,23 @@ type pendingUpload struct {
 
 var errUploadSuperseded = errors.New("upload processing attempt was superseded")
 
-const uploadSelect = `SELECT j.id,j.client_upload_id,j.status,j.filename,j.kind,j.created_at,j.error_code,
- p.id,g.id,g.name,p.width,p.height,p.created_at,p.mime
- FROM upload_jobs j LEFT JOIN photos p ON p.id=j.photo_id LEFT JOIN guests g ON g.id=p.guest_id`
+const uploadSelect = `SELECT j.id,j.client_upload_id,j.status,j.filename,j.kind,j.created_at,j.error_code,j.category_id,j.welcome_revision,
+ p.id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END
+ FROM upload_jobs j JOIN guests viewer ON viewer.id=j.guest_id CROSS JOIN welcome w
+ LEFT JOIN photos p ON p.id=j.photo_id AND (viewer.role='admin' OR
+ (w.is_open AND (p.category_id IS NULL OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public))))
+ LEFT JOIN guests g ON g.id=p.guest_id`
 
 func scanUpload(row interface{ Scan(...any) error }) (UploadJob, error) {
 	var job UploadJob
 	var id, authorID, width, height sql.NullInt64
 	var authorName, createdAt, mime sql.NullString
-	err := row.Scan(&job.ID, &job.ClientUploadID, &job.Status, &job.Filename, &job.Kind, &job.CreatedAt, &job.ErrorCode,
-		&id, &authorID, &authorName, &width, &height, &createdAt, &mime)
+	var avatarVersion int64
+	err := row.Scan(&job.ID, &job.ClientUploadID, &job.Status, &job.Filename, &job.Kind, &job.CreatedAt, &job.ErrorCode, &job.CategoryID, &job.WelcomeRevision,
+		&id, &authorID, &authorName, &width, &height, &createdAt, &mime, &avatarVersion)
 	if id.Valid {
-		job.Photo = &Photo{ID: id.Int64, Author: Author{ID: authorID.Int64, Name: authorName.String}, Width: int(width.Int64), Height: int(height.Int64), CreatedAt: createdAt.String, MIMEType: mime.String}
+		job.Photo = &Photo{ID: id.Int64, Author: Author{ID: authorID.Int64, Name: authorName.String, AvatarURL: avatarURL(authorID.Int64, avatarVersion)}, Width: int(width.Int64), Height: int(height.Int64), CreatedAt: createdAt.String, MIMEType: mime.String}
+		job.Photo.CategoryID = job.CategoryID
 		job.Photo.urls()
 	}
 	return job, err
@@ -91,7 +98,7 @@ func newUploadID() (string, error) {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", data[0:4], data[4:6], data[6:8], data[8:10], data[10:16]), nil
 }
 
-func (a *App) enqueueUpload(ctx context.Context, guestID int64, clientID string, upload receivedUpload) (UploadJob, error) {
+func (a *App) enqueueUpload(ctx context.Context, guestID int64, clientID string, upload receivedUpload, destination uploadDestination) (UploadJob, error) {
 	var job UploadJob
 	key, err := newToken()
 	if err != nil {
@@ -113,19 +120,15 @@ func (a *App) enqueueUpload(ctx context.Context, guestID int64, clientID string,
 	if _, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtext(current_schema()),73003)"); err != nil {
 		return job, err
 	}
+	if err = a.authorizeUpload(ctx, tx, guestID, &destination); err != nil {
+		return job, err
+	}
 	job, err = scanUpload(tx.QueryRowContext(ctx, uploadSelect+` WHERE j.guest_id=$1 AND j.client_upload_id=$2`, guestID, clientID))
 	if err == nil {
-		return job, nil
+		return job, sameUploadDestination(job, destination)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return job, err
-	}
-	var active int
-	if err = tx.QueryRowContext(ctx, "SELECT active FROM guests WHERE id=$1 FOR UPDATE", guestID).Scan(&active); err != nil {
-		return job, err
-	}
-	if active != 1 {
-		return job, &mediaValidationError{401, "access_revoked"}
 	}
 	var total, owned int
 	var queuedBytes int64
@@ -139,7 +142,8 @@ func (a *App) enqueueUpload(ctx context.Context, guestID int64, clientID string,
 		return job, err
 	}
 	job = UploadJob{ClientUploadID: clientID, Status: "queued", Filename: upload.filename, Kind: upload.kind, CreatedAt: stamp(a.now())}
-	err = tx.QueryRowContext(ctx, `INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at) VALUES($1,$2,'queued',$3,$4,$5,$6,$7,$8,$8) RETURNING id`, guestID, clientID, upload.filename, upload.kind, upload.format, key, upload.size, job.CreatedAt).Scan(&job.ID)
+	job.CategoryID, job.WelcomeRevision = destination.categoryID, destination.welcomeRevision
+	err = tx.QueryRowContext(ctx, `INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,category_id,welcome_revision) VALUES($1,$2,'queued',$3,$4,$5,$6,$7,$8,$8,$9,$10) RETURNING id`, guestID, clientID, upload.filename, upload.kind, upload.format, key, upload.size, job.CreatedAt, job.CategoryID, job.WelcomeRevision).Scan(&job.ID)
 	if err != nil {
 		return job, err
 	}

@@ -41,8 +41,38 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Keep the four confirmed tabs in the same order, including translated labels.
   Use a fixed bottom navigation
   on phones and a comfortable equivalent on larger screens.
-- Media is the first destination after authentication. Programme includes timed
+- Media is the first destination after authentication when full access is open.
+  During the host-led welcome, guests see a separate waiting screen without tabs.
+  Use a personalized welcome heading while waiting, then show the current
+  host-authored step in the existing plum theme. Do not add a separate greeting.
+  Update the screen automatically when the host advances; keep future steps private.
+  Allow logout and show a retry action when connection checks fail. Administrators
+  prepare the sequence and control waiting, each next step and full opening from
+  settings. Do not invent step content. Programme includes timed
   surprises; there is no separate home or surprises tab.
+- A welcome step can include one optional action. The first supported action is
+  setting a profile photo: reuse the preview, save, replace and remove controls
+  from settings inside the current step. Keep saved-photo feedback visible and
+  preserve selection during normal polling. Changing steps removes the widget.
+  The host chooses the action in the step editor and controls when to advance;
+  guests are not required to add a photo before the next step can appear.
+- The host's step editor separates the ordered step list, the selected step's
+  text and an action pane. Use compact selectable rows instead of expanding
+  every form at once. Keep each step's draft and action together when reordered.
+  Provide mouse/touch drag handles and keyboard-accessible move controls, with
+  clear drop feedback and a position announcement. Stack the areas on phones;
+  use columns only when the available content width supports them.
+  The action pane describes the selected action and displays its own settings
+  form when applicable. Profile photo currently has no parameters. Keep future
+  settings specific to a real action rather than exposing a generic JSON editor.
+- The media-upload action lets guests send photos and videos during its welcome
+  step, with the same queued progress and error feedback as the gallery. Its
+  settings choose the main gallery or a named category. Explain who can view the
+  destination; guests can submit to the assigned private category without seeing
+  its files. Keep the welcome screen focused on sending, not browsing media.
+  Administrators create categories and change public/private visibility in
+  settings. Public categories appear as filters in the Media tab; private ones
+  appear only to administrators. Use text labels for visibility, not color alone.
 - Give the next useful action a clear place on each screen.
 - Use the same readable sans-serif family for headings and body content.
 - Use a coherent color palette with strong text contrast and a clear action color.
@@ -96,6 +126,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
   When selected, explain that the name will not appear. Anonymous messages show
   a neutral avatar and translated anonymous label, including to the host.
 - Settings shows the guest identity and logout, without an About section.
+  Guests can choose a profile photo, check a circular center-cropped preview,
+  save it, replace it or remove it. Use initials when no photo is set. Show
+  the saved photo in the header, named guestbook posts and the host's guest list;
+  anonymous posts always keep their neutral icon.
   Host-only controls manage guests, invitations, event details and the programme.
 - Keep administrative controls within settings so guest navigation stays simple.
 
@@ -128,5 +162,6 @@ keyboard navigation, visible focus, contrast, touch targets, and reduced motion.
 
 Event date, venue and actual content remain unset until the host supplies them.
 The initial event timezone is configurable, defaulting to `Europe/Zurich`.
-Active guests can view and contribute photos, videos and messages; authors and hosts can
+Once the host opens full access, active guests can view and contribute photos,
+videos and messages; authors and hosts can
 remove their contributions, and the host can moderate all contributions.

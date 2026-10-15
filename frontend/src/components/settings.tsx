@@ -5,11 +5,26 @@ import { remove, errorMessage, returnToInvitation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import type { Guest } from "@/lib/contracts";
 import { ErrorNotice } from "./ui";
+import { Avatar } from "./avatar";
+import { ProfilePhotoEditor } from "./profile-photo-editor";
 
-export function SettingsPanel({ guest }: { guest: Guest }) {
-  const { locale, t } = useI18n();
+export function SettingsPanel({
+  guest,
+  imageBytes,
+}: {
+  guest: Guest;
+  imageBytes: number;
+}) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photo, setPhoto] = useState({
+    source: guest.avatarUrl,
+    url: guest.avatarUrl,
+  });
+  if (photo.source !== guest.avatarUrl) {
+    setPhoto({ source: guest.avatarUrl, url: guest.avatarUrl });
+  }
   async function logout() {
     if (!window.confirm(t("settings.logoutConfirmation"))) return;
     setBusy(true);
@@ -24,9 +39,7 @@ export function SettingsPanel({ guest }: { guest: Guest }) {
   }
   return (
     <section className="profile-card panel">
-      <div className="avatar large">
-        {guest.name.charAt(0).toLocaleUpperCase(locale)}
-      </div>
+      <Avatar name={guest.name} avatarUrl={photo.url} className="large" />
       <div>
         <h2>{guest.name}</h2>
         <span className="status-label">
@@ -34,6 +47,13 @@ export function SettingsPanel({ guest }: { guest: Guest }) {
         </span>
       </div>
       <p className="muted">{t("settings.attribution")}</p>
+      <ProfilePhotoEditor
+        avatarUrl={photo.url}
+        imageBytes={imageBytes}
+        onSaved={(updated) =>
+          setPhoto((current) => ({ ...current, url: updated.avatarUrl }))
+        }
+      />
       <button className="button secondary" disabled={busy} onClick={logout}>
         <LogOut size={17} />
         {busy ? t("settings.signingOut") : t("settings.signOut")}

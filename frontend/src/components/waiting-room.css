@@ -1,0 +1,115 @@
+.welcome-page {
+  min-height: 100dvh;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 32px 48px;
+}
+.welcome-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 110px;
+  border-bottom: 1px solid var(--border);
+}
+.welcome-header .brand {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.welcome-header .text-button {
+  flex-shrink: 0;
+}
+.welcome-content {
+  width: 100%;
+  max-width: 600px;
+  margin: clamp(48px, 10vh, 104px) auto 0;
+}
+.welcome-stage {
+  padding: 36px;
+}
+.welcome-cake {
+  display: block;
+  color: var(--accent);
+  margin-bottom: 28px;
+}
+.welcome-step-number {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+.welcome-stage h1 {
+  font-size: clamp(28px, 5vw, 36px);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.welcome-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 20px 0 0;
+  font-size: 16px;
+  line-height: 1.75;
+}
+.welcome-follow-up {
+  margin: 20px 0 0;
+  font-size: 14px;
+}
+.welcome-connection {
+  margin-top: 24px;
+}
+.welcome-profile,
+.welcome-media {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.welcome-media .upload-queue {
+  padding: 16px;
+  margin-bottom: 0;
+}
+.welcome-media .upload-item {
+  gap: 10px;
+}
+.welcome-media .photo-privacy {
+  line-height: 1.6;
+}
+.welcome-media .media-picker > .fine-print {
+  margin: 12px 0;
+}
+.welcome-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.welcome-profile-identity strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.welcome-profile .profile-photo-editor {
+  padding: 0;
+  border: 0;
+}
+.welcome-profile > p:last-child {
+  margin-bottom: 0;
+}
+@media (max-width: 600px) {
+  .welcome-page {
+    padding: 0 22px 32px;
+  }
+  .welcome-header {
+    min-height: 90px;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 18px 0;
+  }
+  .welcome-header .brand {
+    flex: 1 1 180px;
+  }
+  .welcome-content {
+    margin-top: 40px;
+  }
+  .welcome-stage {
+    padding: 28px 24px;
+  }
+}

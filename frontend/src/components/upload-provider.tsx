@@ -15,6 +15,7 @@ import {
   errorMessage,
   responseError,
   returnToInvitation,
+  returnToWelcome,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import {
@@ -26,7 +27,12 @@ import {
   type Photo,
 } from "@/lib/contracts";
 
-type Transfer = {
+export type UploadDestination = {
+  categoryId: number | null;
+  welcomeRevision: number | null;
+};
+
+type Transfer = UploadDestination & {
   clientUploadId: string;
   file: File;
   status: "queued" | "uploading" | "error";
@@ -40,7 +46,11 @@ type UploadContextValue = {
   jobs: UploadJob[];
   completed: Photo[];
   error: string | null;
-  addFiles: (files: File[], limits: UploadLimits) => boolean;
+  addFiles: (
+    files: File[],
+    limits: UploadLimits,
+    destination: UploadDestination,
+  ) => boolean;
   retryTransfer: (id: string) => void;
   retryJob: (job: UploadJob) => void;
   canRetryJob: (job: UploadJob) => boolean;
@@ -63,7 +73,13 @@ function newUploadId() {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export function UploadProvider({ children }: { children: ReactNode }) {
+export function UploadProvider({
+  children,
+  welcomeRevision = null,
+}: {
+  children: ReactNode;
+  welcomeRevision?: number | null;
+}) {
   const { locale, t } = useI18n();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
@@ -75,15 +91,18 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const files = useRef(new Map<string, File>());
   const mounted = useRef(true);
 
-  function rememberCompleted(items: UploadJob[]) {
+  function rememberCompleted(items: UploadJob[], replace = false) {
     const ready = items.flatMap((job) =>
       job.status === "ready" && job.photo ? [job.photo] : [],
     );
-    if (ready.length)
+    if (ready.length || replace)
       setCompleted((previous) =>
         [
           ...new Map(
-            [...previous, ...ready].map((photo) => [photo.id, photo]),
+            [...(replace ? [] : previous), ...ready].map((photo) => [
+              photo.id,
+              photo,
+            ]),
           ).values(),
         ]
           .sort((a, b) => b.id - a.id)
@@ -134,10 +153,20 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           );
       };
       update({ status: "uploading" });
-      request.open("POST", "/api/photos");
+      request.open(
+        "POST",
+        item.welcomeRevision === null && item.categoryId !== null
+          ? `/api/photos?categoryId=${item.categoryId}`
+          : "/api/photos",
+      );
       request.setRequestHeader("X-Requested-With", "birthday-party");
       // The same key recovers an accepted upload if its response was lost.
       request.setRequestHeader("X-Upload-ID", item.clientUploadId);
+      if (item.welcomeRevision !== null)
+        request.setRequestHeader(
+          "X-Welcome-Revision",
+          String(item.welcomeRevision),
+        );
       request.timeout = 600000;
       request.upload.onprogress = (event) => {
         if (event.lengthComputable)
@@ -150,6 +179,10 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           const body: unknown = JSON.parse(request.responseText);
           if (request.status === 401) {
             returnToInvitation();
+            return;
+          }
+          if (request.status === 423) {
+            returnToWelcome();
             return;
           }
           if (request.status < 200 || request.status >= 300) {
@@ -199,8 +232,14 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        setJobs(data.items);
-        rememberCompleted(data.items);
+        const items =
+          welcomeRevision === null
+            ? data.items
+            : data.items.filter(
+                (job) => job.welcomeRevision === welcomeRevision,
+              );
+        setJobs(items);
+        rememberCompleted(items, true);
         setError(null);
         for (const job of data.items)
           if (job.status === "ready") files.current.delete(job.clientUploadId);
@@ -229,9 +268,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [revision, t]);
+  }, [revision, t, welcomeRevision]);
 
-  function addFiles(selected: File[], limits: UploadLimits) {
+  function addFiles(
+    selected: File[],
+    limits: UploadLimits,
+    destination: UploadDestination,
+  ) {
     const active = jobs.filter(
       (job) => job.status === "queued" || job.status === "processing",
     ).length;
@@ -242,6 +285,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       const clientUploadId = newUploadId();
       if (!problem) files.current.set(clientUploadId, file);
       return {
+        ...destination,
         clientUploadId,
         file,
         status: problem ? "error" : "queued",
@@ -294,6 +338,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       {
         clientUploadId,
         file,
+        categoryId: job.categoryId,
+        welcomeRevision: job.welcomeRevision,
         status: "queued",
         progress: 0,
         retryable: true,

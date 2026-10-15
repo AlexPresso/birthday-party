@@ -3,7 +3,7 @@ const en = {
   "photos.description": "See everyone's photos and videos, and add your own.",
   "photos.add": "Add media",
   "photos.privacy":
-    "Guests only · Photos: JPEG, PNG, WebP, up to {imageSize} MB · Videos: MP4, MOV, WebM, up to {videoSize} MB and 5 minutes",
+    "Photos: JPEG, PNG, WebP, up to {imageSize} MB · Videos: MP4, MOV, WebM, up to {videoSize} MB and 5 minutes",
   "photos.uploadQueue": "Media uploads",
   "photos.uploading": "Uploading…",
   "photos.uploads": "Uploads",
@@ -16,8 +16,7 @@ const en = {
   "photos.removeFromQueue": "Remove {name} from the list",
   "photos.addedCountOne": "{count} file added.",
   "photos.addedCountOther": "{count} files added.",
-  "photos.keepOpen":
-    "You can switch tabs. Keep the app open while your files are sent.",
+  "photos.keepOpen": "Keep the app open while your files are sent.",
   "photos.receiving": "Finishing the transfer…",
   "photos.serverQueued": "Received, waiting to be prepared",
   "photos.safeToLeave":
@@ -94,7 +93,7 @@ const fr: MediaMessages = {
     "Retrouve les photos et les vidéos de la fête, et ajoute les tiennes.",
   "photos.add": "Ajouter des médias",
   "photos.privacy":
-    "Réservé aux invités · Photos : JPEG, PNG, WebP, {imageSize} Mo max. · Vidéos : MP4, MOV, WebM, {videoSize} Mo et 5 minutes max.",
+    "Photos : JPEG, PNG, WebP, {imageSize} Mo max. · Vidéos : MP4, MOV, WebM, {videoSize} Mo et 5 minutes max.",
   "photos.uploadQueue": "Envoi des médias",
   "photos.uploading": "Envoi en cours…",
   "photos.uploads": "Envois",
@@ -108,7 +107,7 @@ const fr: MediaMessages = {
   "photos.addedCountOne": "{count} fichier ajouté.",
   "photos.addedCountOther": "{count} fichiers ajoutés.",
   "photos.keepOpen":
-    "Tu peux changer d’onglet. Garde l’application ouverte pendant l’envoi des fichiers.",
+    "Garde l’application ouverte pendant l’envoi des fichiers.",
   "photos.receiving": "Fin de l’envoi…",
   "photos.serverQueued": "Reçu, en attente de préparation",
   "photos.safeToLeave":
@@ -186,7 +185,7 @@ const de: MediaMessages = {
     "Schau dir die Fotos und Videos der Feier an und teile deine eigenen.",
   "photos.add": "Medien hinzufügen",
   "photos.privacy":
-    "Nur für Gäste · Fotos: JPEG, PNG, WebP, bis {imageSize} MB · Videos: MP4, MOV, WebM, bis {videoSize} MB und 5 Minuten",
+    "Fotos: JPEG, PNG, WebP, bis {imageSize} MB · Videos: MP4, MOV, WebM, bis {videoSize} MB und 5 Minuten",
   "photos.uploadQueue": "Medien hochladen",
   "photos.uploading": "Wird hochgeladen…",
   "photos.uploads": "Uploads",
@@ -200,7 +199,7 @@ const de: MediaMessages = {
   "photos.addedCountOne": "{count} Datei hinzugefügt.",
   "photos.addedCountOther": "{count} Dateien hinzugefügt.",
   "photos.keepOpen":
-    "Du kannst den Tab wechseln. Lass die App geöffnet, während deine Dateien gesendet werden.",
+    "Lass die App geöffnet, während deine Dateien gesendet werden.",
   "photos.receiving": "Übertragung wird abgeschlossen…",
   "photos.serverQueued": "Empfangen, wartet auf die Verarbeitung",
   "photos.safeToLeave":
@@ -279,7 +278,7 @@ const it: MediaMessages = {
     "Guarda le foto e i video della festa e aggiungi i tuoi.",
   "photos.add": "Aggiungi foto e video",
   "photos.privacy":
-    "Solo per gli invitati · Foto: JPEG, PNG, WebP, fino a {imageSize} MB · Video: MP4, MOV, WebM, fino a {videoSize} MB e 5 minuti",
+    "Foto: JPEG, PNG, WebP, fino a {imageSize} MB · Video: MP4, MOV, WebM, fino a {videoSize} MB e 5 minuti",
   "photos.uploadQueue": "Caricamento di foto e video",
   "photos.uploading": "Caricamento…",
   "photos.uploads": "Caricamenti",
@@ -292,8 +291,7 @@ const it: MediaMessages = {
   "photos.removeFromQueue": "Rimuovi {name} dall'elenco",
   "photos.addedCountOne": "{count} file aggiunto.",
   "photos.addedCountOther": "{count} file aggiunti.",
-  "photos.keepOpen":
-    "Puoi cambiare scheda. Lascia l’app aperta mentre i file vengono inviati.",
+  "photos.keepOpen": "Lascia l’app aperta mentre i file vengono inviati.",
   "photos.receiving": "Invio quasi completato…",
   "photos.serverQueued": "Ricevuto, in attesa di elaborazione",
   "photos.safeToLeave":
@@ -371,7 +369,7 @@ const es: MediaMessages = {
     "Mira las fotos y los vídeos de la fiesta y añade los tuyos.",
   "photos.add": "Añadir fotos y vídeos",
   "photos.privacy":
-    "Solo para invitados · Fotos: JPEG, PNG, WebP, hasta {imageSize} MB · Vídeos: MP4, MOV, WebM, hasta {videoSize} MB y 5 minutos",
+    "Fotos: JPEG, PNG, WebP, hasta {imageSize} MB · Vídeos: MP4, MOV, WebM, hasta {videoSize} MB y 5 minutos",
   "photos.uploadQueue": "Subida de fotos y vídeos",
   "photos.uploading": "Subiendo…",
   "photos.uploads": "Subidas",
@@ -385,7 +383,7 @@ const es: MediaMessages = {
   "photos.addedCountOne": "{count} archivo añadido.",
   "photos.addedCountOther": "{count} archivos añadidos.",
   "photos.keepOpen":
-    "Puedes cambiar de pestaña. Deja la aplicación abierta mientras se envían los archivos.",
+    "Deja la aplicación abierta mientras se envían los archivos.",
   "photos.receiving": "Terminando el envío…",
   "photos.serverQueued": "Recibido, pendiente de preparación",
   "photos.safeToLeave":

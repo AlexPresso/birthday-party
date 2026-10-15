@@ -28,6 +28,7 @@ import {
   type PartyEvent,
 } from "@/lib/contracts";
 import { ErrorNotice } from "./ui";
+import { Avatar } from "./avatar";
 
 // Date inputs are explicitly in the organizer's browser timezone. Submitted
 // instants always use UTC; guests see them in the party's configured timezone.
@@ -376,9 +377,14 @@ function GuestManager({
       <ul className="guest-list">
         {guests.map((guest) => (
           <li key={guest.id}>
-            <span className="avatar">
-              {guest.name.charAt(0).toLocaleUpperCase(locale)}
-            </span>
+            <Avatar
+              name={guest.name}
+              avatarUrl={
+                guest.id === currentGuest.id
+                  ? currentGuest.avatarUrl
+                  : guest.avatarUrl
+              }
+            />
             <div className="guest-list-name">
               <strong>
                 {guest.name}

@@ -79,6 +79,7 @@ func prepareImage(input *os.File, thumbnailPath string) (preparedMedia, error) {
 // Photo describes published media with URLs that require an active guest session.
 type Photo struct {
 	ID           int64  `json:"id"`
+	CategoryID   *int64 `json:"categoryId"`
 	Author       Author `json:"author"`
 	Width        int    `json:"width"`
 	Height       int    `json:"height"`
@@ -98,12 +99,32 @@ func (p *Photo) urls() {
 	p.ThumbnailURL = p.URL + "?size=thumb"
 }
 
-func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
+func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, guest Guest) {
 	before, limit, ok := page(w, r)
 	if !ok {
 		return
 	}
-	rows, err := a.db.QueryContext(r.Context(), `SELECT p.id,g.id,g.name,p.width,p.height,p.created_at,p.mime FROM photos p JOIN guests g ON p.guest_id=g.id WHERE ($1::bigint=0 OR p.id<$1) ORDER BY p.id DESC LIMIT $2`, before, limit+1)
+	categoryID, err := requestedCategory(r)
+	if err != nil {
+		failUpload(w, err)
+		return
+	}
+	if categoryID != nil {
+		var id int64
+		err := a.db.QueryRowContext(r.Context(), "SELECT id FROM media_categories WHERE id=$1 AND (is_public OR $2)", *categoryID, guest.Role == "admin").Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			fail(w, 404, "media_category_not_found")
+			return
+		}
+		if err != nil {
+			internal(w, err)
+			return
+		}
+	}
+	rows, err := a.db.QueryContext(r.Context(), `SELECT p.id,p.category_id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END FROM photos p JOIN guests g ON p.guest_id=g.id
+ LEFT JOIN media_categories c ON c.id=p.category_id
+ WHERE ($1::bigint=0 OR p.id<$1) AND p.category_id IS NOT DISTINCT FROM $3::bigint
+ AND (p.category_id IS NULL OR c.is_public OR $4) ORDER BY p.id DESC LIMIT $2`, before, limit+1, categoryID, guest.Role == "admin")
 	if err != nil {
 		internal(w, err)
 		return
@@ -112,11 +133,13 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
 	items := []Photo{}
 	for rows.Next() {
 		var photo Photo
-		if err := rows.Scan(&photo.ID, &photo.Author.ID, &photo.Author.Name, &photo.Width, &photo.Height, &photo.CreatedAt, &photo.MIMEType); err != nil {
+		var avatarVersion int64
+		if err := rows.Scan(&photo.ID, &photo.CategoryID, &photo.Author.ID, &photo.Author.Name, &photo.Width, &photo.Height, &photo.CreatedAt, &photo.MIMEType, &avatarVersion); err != nil {
 			internal(w, err)
 			return
 		}
 		photo.urls()
+		photo.Author.AvatarURL = avatarURL(photo.Author.ID, avatarVersion)
 		items = append(items, photo)
 	}
 	if err := rows.Err(); err != nil {
@@ -134,13 +157,13 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, _ Guest) {
 	})
 }
 
-func (a *App) servePhoto(w http.ResponseWriter, r *http.Request, _ Guest) {
+func (a *App) servePhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	var filename, thumbname, mime string
-	err := a.db.QueryRowContext(r.Context(), "SELECT filename,thumbnail,mime FROM photos WHERE id=$1", id).Scan(&filename, &thumbname, &mime)
+	err := a.db.QueryRowContext(r.Context(), `SELECT p.filename,p.thumbnail,p.mime FROM photos p LEFT JOIN media_categories c ON c.id=p.category_id WHERE p.id=$1 AND (p.category_id IS NULL OR c.is_public OR $2)`, id, guest.Role == "admin").Scan(&filename, &thumbname, &mime)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(w, 404, "photo_not_found")
 		return
@@ -175,7 +198,7 @@ func (a *App) deletePhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 	}
 	var author int64
 	var filename, thumbname string
-	err := a.db.QueryRowContext(r.Context(), "SELECT guest_id,filename,thumbnail FROM photos WHERE id=$1", id).Scan(&author, &filename, &thumbname)
+	err := a.db.QueryRowContext(r.Context(), `SELECT p.guest_id,p.filename,p.thumbnail FROM photos p LEFT JOIN media_categories c ON c.id=p.category_id WHERE p.id=$1 AND (p.category_id IS NULL OR c.is_public OR $2)`, id, guest.Role == "admin").Scan(&author, &filename, &thumbname)
 	if errors.Is(err, sql.ErrNoRows) {
 		fail(w, 404, "photo_not_found")
 		return
@@ -188,8 +211,15 @@ func (a *App) deletePhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 		fail(w, 403, "photo_delete_forbidden")
 		return
 	}
-	result, err := a.db.ExecContext(r.Context(), "DELETE FROM photos WHERE id=$1", id)
-	if !affected(w, result, err) {
+	// Recheck visibility in the deletion itself if the host changed it since lookup.
+	err = a.db.QueryRowContext(r.Context(), `DELETE FROM photos p WHERE p.id=$1 AND
+ (p.category_id IS NULL OR $2 OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public)) RETURNING filename,thumbnail`, id, guest.Role == "admin").Scan(&filename, &thumbname)
+	if errors.Is(err, sql.ErrNoRows) {
+		fail(w, 404, "photo_not_found")
+		return
+	}
+	if err != nil {
+		internal(w, err)
 		return
 	}
 	for _, name := range []string{filename, thumbname} {

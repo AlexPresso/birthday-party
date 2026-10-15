@@ -1,0 +1,7 @@
+.media-picker input[hidden] {
+  display: none;
+}
+
+.media-picker .photo-privacy {
+  margin-top: 12px;
+}
