@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -41,6 +41,7 @@ function utcInput(value: string) {
   return value ? new Date(value).toISOString() : null;
 }
 const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const noSubscription = () => () => {};
 
 export function AdminPanel({
   guest,
@@ -109,6 +110,13 @@ function PartyEditor({
   const [location, setLocation] = useState(party.location);
   const [timezone, setTimezone] = useState(party.timezone);
   const [date, setDate] = useState<string | null>(null);
+  // The browser timezone is only available after hydration. Keep the original
+  // instant on save until the host edits the date, including its seconds.
+  const savedDate = useSyncExternalStore(
+    noSubscription,
+    () => localInput(party.date),
+    () => "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -169,20 +177,10 @@ function PartyEditor({
           <input
             id="party-date"
             type="datetime-local"
-            value={date ?? ""}
-            onFocus={() => {
-              if (date === null) setDate(localInput(party.date));
-            }}
+            value={date ?? savedDate}
             onChange={(event) => setDate(event.target.value)}
           />
-          <p className="fine-print">
-            {party.date && date === null
-              ? t("admin.currentDate", {
-                  date: formatDate(party.date, party.timezone, true, locale),
-                })
-              : ""}{" "}
-            {t("admin.dateHint")}
-          </p>
+          <p className="fine-print">{t("admin.dateHint")}</p>
         </div>
         <div>
           <label htmlFor="party-timezone">{t("admin.partyTimezone")}</label>

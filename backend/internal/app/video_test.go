@@ -48,7 +48,7 @@ func videoFixtureDuration(t *testing.T, format, duration string) []byte {
 
 func assertMediaFiles(t *testing.T, a *App, count int) {
 	t.Helper()
-	for directory, want := range map[string]int{"tmp": 0, "photos": count} {
+	for directory, want := range map[string]int{"tmp": 0, "uploads": 0, "photos": count} {
 		files, err := os.ReadDir(filepath.Join(a.config.DataDir, directory))
 		if err != nil || len(files) != want {
 			t.Fatalf("%s files=%d want=%d error=%v", directory, len(files), want, err)
@@ -98,7 +98,7 @@ func TestVideoUploadNormalizesContainersAndProtectsPlayback(t *testing.T) {
 			}
 			var filename, thumbnail string
 			var stored int64
-			if err := a.db.QueryRow("SELECT filename,thumbnail,byte_size FROM photos WHERE id=?", media.ID).Scan(&filename, &thumbnail, &stored); err != nil {
+			if err := a.db.QueryRow("SELECT filename,thumbnail,byte_size FROM photos WHERE id=$1", media.ID).Scan(&filename, &thumbnail, &stored); err != nil {
 				t.Fatal(err)
 			}
 			var actual int64
@@ -136,7 +136,7 @@ func TestVideoValidationAndCleanup(t *testing.T) {
 	}
 	imageResponse := upload(t, a, host, pngBytes(t))
 	status(t, imageResponse, 201)
-	if _, err := a.db.Exec("UPDATE photos SET byte_size=?", maxStoredPhotoBytes); err != nil {
+	if _, err := a.db.Exec("UPDATE photos SET byte_size=$1", maxStoredPhotoBytes); err != nil {
 		t.Fatal(err)
 	}
 	response := upload(t, a, host, data)
@@ -151,7 +151,7 @@ func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	_, identity := admin(t, a)
-	if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=?", identity.ID); err != nil {
+	if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=$1", identity.ID); err != nil {
 		t.Fatal(err)
 	}
 	var body bytes.Buffer

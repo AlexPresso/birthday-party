@@ -1,11 +1,9 @@
 package app
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,7 +32,7 @@ func TestAnonymousGuestbookRedactsIdentityForEveryViewer(t *testing.T) {
 	assertAnonymousEntry(t, created.Body.Bytes(), identity.Name)
 
 	var storedOwner int64
-	if err := a.db.QueryRow("SELECT guest_id FROM entries WHERE id=?", entry.ID).Scan(&storedOwner); err != nil {
+	if err := a.db.QueryRow("SELECT guest_id FROM entries WHERE id=$1", entry.ID).Scan(&storedOwner); err != nil {
 		t.Fatal(err)
 	}
 	if storedOwner != identity.ID {
@@ -149,50 +147,4 @@ func TestGuestbookKeepsNamedPostingAsDefault(t *testing.T) {
 	}
 	status(t, request(t, a, "POST", "/api/guestbook", map[string]any{"body": "Message", "anonymous": "true"}, owner), http.StatusBadRequest)
 	status(t, request(t, a, "POST", "/api/guestbook", map[string]any{"body": "Message", "anonymous": true, "guest_id": identity.ID}, other), http.StatusBadRequest)
-}
-
-func TestAnonymousGuestbookMigrationPreservesExistingEntries(t *testing.T) {
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "previous.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`
-		INSERT INTO guests(id,name,role) VALUES(7,'Existing guest','guest');
-		INSERT INTO entries(id,guest_id,body,created_at) VALUES(9,7,'Existing message','2026-10-14T12:00:00Z');
-		PRAGMA user_version=1;
-	`); err != nil {
-		t.Fatal(err)
-	}
-	for range 2 {
-		if err := migrate(db); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
-		t.Fatal(err)
-	}
-	if version != 2 {
-		t.Fatalf("schema version=%d want=2", version)
-	}
-	var owner int64
-	var body, createdAt string
-	var anonymous bool
-	if err := db.QueryRow("SELECT guest_id,body,created_at,anonymous FROM entries WHERE id=9").Scan(&owner, &body, &createdAt, &anonymous); err != nil {
-		t.Fatal(err)
-	}
-	if owner != 7 || body != "Existing message" || createdAt != "2026-10-14T12:00:00Z" || anonymous {
-		t.Fatal("migration changed an existing message or its attribution")
-	}
-	if _, err := db.Exec("UPDATE entries SET anonymous=2 WHERE id=9"); err == nil {
-		t.Fatal("anonymous column must reject invalid flags")
-	}
-	if _, err := db.Exec("UPDATE entries SET anonymous=NULL WHERE id=9"); err == nil {
-		t.Fatal("anonymous column must reject null flags")
-	}
 }

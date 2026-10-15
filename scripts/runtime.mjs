@@ -34,7 +34,9 @@ export function findGo() {
       if (existsSync(candidate)) return candidate;
     }
   }
-  throw new Error("Go was not found: install Go 1.26+ or set GO_BIN to its executable path.");
+  throw new Error(
+    "Go was not found: install Go 1.26+ or set GO_BIN to its executable path.",
+  );
 }
 
 export function localEnvironment() {
@@ -68,7 +70,10 @@ export function run(command, args, options = {}) {
     child.on("error", reject);
     child.on("exit", (code, signal) => {
       if (code === 0) resolve();
-      else reject(new Error(`${path.basename(command)} failed (${signal || code}).`));
+      else
+        reject(
+          new Error(`${path.basename(command)} failed (${signal || code}).`),
+        );
     });
   });
 }

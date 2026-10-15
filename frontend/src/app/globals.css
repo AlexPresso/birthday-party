@@ -311,15 +311,6 @@ svg {
   color: #dbb9ec;
   font-weight: 500;
   letter-spacing: -2px;
-  position: relative;
-}
-.brand-mark > span {
-  position: absolute;
-  font-size: 16px;
-  top: -8px;
-  right: -5px;
-  color: #e4c6f1;
-  line-height: 1.5;
 }
 .brand strong {
   font-size: 18px;
@@ -341,10 +332,6 @@ svg {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.guest-chip > svg {
-  color: var(--accent);
-  margin-left: 6px;
 }
 .avatar {
   width: 35px;
@@ -572,6 +559,15 @@ svg {
 .upload-queue {
   padding: 18px 20px;
   margin: 20px 0 24px;
+}
+.upload-notice {
+  padding: 12px 16px;
+  margin: 0 0 20px;
+  font-size: 14px;
+}
+.upload-notice a {
+  color: var(--text);
+  text-underline-offset: 3px;
 }
 .upload-queue h2 {
   font-size: 15px;
@@ -900,11 +896,6 @@ progress::-moz-progress-bar {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.settings-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 24px;
-}
 .profile-card {
   display: flex;
   align-items: center;
@@ -912,6 +903,7 @@ progress::-moz-progress-bar {
   gap: 16px;
   padding: 24px;
   align-content: start;
+  max-width: 480px;
 }
 .profile-card > div {
   min-width: 0;
@@ -928,31 +920,6 @@ progress::-moz-progress-bar {
 .profile-card > .button {
   margin-top: 4px;
   width: 100%;
-}
-.settings-details h2 {
-  font-size: 14px;
-  margin-bottom: 13px;
-}
-.settings-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 17px;
-  margin-bottom: 10px;
-}
-.settings-row > svg {
-  color: #c6a7d6;
-}
-.settings-row > div {
-  flex: 1;
-}
-.settings-row strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-.settings-row p {
-  font-size: 11px;
-  margin: 4px 0 0;
 }
 .admin-section {
   border-top: 1px solid var(--border);
@@ -1308,9 +1275,6 @@ progress::-moz-progress-bar {
     flex-wrap: wrap;
     gap: 20px;
   }
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
   .invite-form {
     flex-direction: column;
     align-items: stretch;
@@ -1338,11 +1302,6 @@ progress::-moz-progress-bar {
     border-radius: 12px;
     font-size: 25px;
   }
-  .brand-mark > span {
-    font-size: 13px;
-    top: -6px;
-    right: -4px;
-  }
   .brand strong {
     font-size: 15px;
   }
@@ -1350,8 +1309,7 @@ progress::-moz-progress-bar {
     max-width: 35%;
     gap: 7px;
   }
-  .guest-chip > span:nth-child(2),
-  .guest-chip > svg {
+  .guest-chip > span:nth-child(2) {
     display: none;
   }
   .guest-chip .avatar {
@@ -1544,15 +1502,8 @@ progress::-moz-progress-bar {
   .entry-body {
     font-size: 14px;
   }
-  .settings-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
-  }
   .profile-card {
     padding: 22px;
-  }
-  .settings-row {
-    padding: 17px 18px;
   }
   .admin-section {
     margin-top: 33px;

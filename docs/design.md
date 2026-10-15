@@ -56,6 +56,9 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Make upload easy to find and operate with touch, keyboard, and screen readers.
 - Explain supported files and limits when those are defined by the product.
 - Show selected files, upload progress, success, and useful per-file errors.
+- Distinguish sending a file from waiting for preparation and being ready in the
+  gallery. Guests can navigate between tabs while transfers continue. Accepted
+  jobs survive reloads and server restarts; never imply an unsent file is saved.
 - Preserve successful uploads when another file fails, and offer a clear retry.
 - Give an empty gallery a welcoming explanation and an upload action.
 - Use appropriately sized thumbnails, reserve image space, and load offscreen
@@ -82,6 +85,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
 ## Identity, guestbook and settings
 
 - The invitation badge pairs the configured age with a small cake icon with candles.
+- The app header shows the configured age and guest profile without decorative stars.
 - An invitation opens a personal welcome and an explicit `Entrer` action.
   Activation is a deliberate action; link previews must not consume invitations.
 - Explain invalid, expired and already used invitations, with a clear route back
@@ -91,7 +95,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Place an unchecked anonymous posting checkbox beside the message composer.
   When selected, explain that the name will not appear. Anonymous messages show
   a neutral avatar and translated anonymous label, including to the host.
-- Settings shows the guest identity, the dark theme, event information and logout.
+- Settings shows the guest identity and logout, without an About section.
   Host-only controls manage guests, invitations, event details and the programme.
 - Keep administrative controls within settings so guest navigation stays simple.
 

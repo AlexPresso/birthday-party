@@ -1,12 +1,12 @@
 # Birthday API
 
-Go owns identities, access checks, SQLite persistence, media and scheduled reveals.
+Go owns identities, access checks, PostgreSQL persistence, media and scheduled reveals.
 The browser calls the same-origin Next.js `/api/*` proxy. Keep Go's listening port
 private when deploying. The API contract is [docs/api.md](../docs/api.md).
 
 ## Run
 
-From `backend/`, with Go 1.26 or newer:
+From `backend/`, with Go 1.26 or newer and `DATABASE_URL` pointing to PostgreSQL:
 
 Video uploads also require `ffmpeg` and `ffprobe` on `PATH`, including the
 H.264 (`libx264`) and AAC encoders. The Docker image includes them. For local
@@ -27,15 +27,16 @@ From the repository root, the Node launcher also provides `npm run dev` and
 Environment variables are read from the process, not automatically from `.env`.
 See [.env.example](.env.example). Defaults are:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `LISTEN_ADDR` | `127.0.0.1:8080` | API listening address |
-| `PUBLIC_URL` | `http://localhost:3000` | Exact browser origin and invitation base URL |
-| `DATA_DIR` | `./data` | Private persistent SQLite database, originals, thumbnails |
-| `COOKIE_SECURE` | Determined by `PUBLIC_URL` | HTTPS requires `true`; local HTTP uses `false` |
-| `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup |
-| `MAX_IMAGE_SIZE_MB` | `15` | Maximum uploaded image size in MiB, integer 1–1024 |
-| `MAX_VIDEO_SIZE_MB` | `100` | Maximum uploaded video size in MiB, integer 1–1024 |
+| Variable                 | Default                     | Purpose                                                                         |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------------- |
+| `LISTEN_ADDR`            | `127.0.0.1:8080`            | API listening address                                                           |
+| `PUBLIC_URL`             | `http://localhost:3000`     | Exact browser origin and invitation base URL                                    |
+| `DATABASE_URL`           | Required                    | PostgreSQL connection URL; standard PG environment variables are also supported |
+| `DATA_DIR`               | `./data`                    | Private media, thumbnails and durable pending inputs                            |
+| `COOKIE_SECURE`          | Determined by `PUBLIC_URL`  | HTTPS requires `true`; local HTTP uses `false`                                  |
+| `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup                        |
+| `MAX_IMAGE_SIZE_MB`      | `15`                        | Maximum uploaded image size in MiB, integer 1–1024                              |
+| `MAX_VIDEO_SIZE_MB`      | `100`                       | Maximum uploaded video size in MiB, integer 1–1024                              |
 
 Missing or empty upload limits use their defaults. Invalid values stop startup.
 One MiB is 1,048,576 bytes. The gallery API returns the effective limits so the
@@ -77,9 +78,18 @@ HTTP request logs never include these tokens.
   a host can delete them. Every image request, including thumbnails, checks the
   current session; private media responses are not cached.
 - Image uploads allow JPEG, PNG and WebP, at most `MAX_IMAGE_SIZE_MB` MiB
-  (15 by default) and 40 megapixels. Two files can
-  be processed concurrently. Files stream into a private temporary directory;
-  invalid uploads are removed. Filenames are generated server-side.
+  (15 by default) and 40 megapixels. Files stream into a private spool with
+  server-generated storage names. A 202 response confirms a persistent job;
+  two background workers prepare media independently of browser requests.
+- The queue allows 100 active jobs per guest, 1000 overall and 10 GiB of pending
+  inputs. Four incoming files can stream concurrently; further receivers wait.
+  Guests can read only their own jobs, including the 50 most recent terminal
+  results. Terminal history expires after 24 hours; published media is retained.
+  `X-Upload-ID` UUIDs prevent duplicate jobs on ambiguous network retries.
+  Failed jobs discard input; submitting the file again uses a new upload ID.
+- Startup recovers interrupted processing. A dedicated PostgreSQL advisory lock
+  permits one media-worker process per application schema; CLI invitation commands
+  do not start workers. Files remain on one persistent local filesystem.
 - Thumbnails are JPEG, at most 720px on the longest side. Phone EXIF orientation is
   applied. Originals are retained unchanged, including embedded metadata, and
   remain accessible only to authenticated guests.
@@ -97,13 +107,17 @@ HTTP request logs never include these tokens.
   at 24 items by default, maximum 48. Hosts can manage up to 500 guest identities
   and 200 programme entries. These are initial explicit bounds, not performance
   claims.
-- SQLite migrations use `PRAGMA user_version`; the initial migration is atomic.
-  One connection serializes writes for this single-party app. WAL mode supports
-  local CLI access while the service runs. Back up the complete data directory
-  with the service stopped or use a consistent SQLite backup procedure.
-- Guestbook posts can be anonymous. Their owner remains in SQLite for deletion
+- PostgreSQL migrations are embedded SQL files in `internal/app/migrations`.
+  Startup validates names and checksums and applies pending files transactionally
+  under an advisory lock. Add the next `NNNN_description.sql` for every schema
+  change; never edit an applied migration. See [database changes](../docs/database.md).
+- Startup imports an existing `DATA_DIR/birthday.sqlite` into an empty PostgreSQL
+  database once, preserving identifiers, tokens, anonymity and media references.
+  The SQLite source is read-only and kept intact. An occupied destination without
+  an import marker stops startup rather than merging two datasets implicitly.
+- Guestbook posts can be anonymous. Their owner remains in PostgreSQL for deletion
   permissions, but no API response includes that identity, even for hosts.
-  The version 2 migration keeps existing entries named by default.
+  Legacy named entries retain their attribution when imported.
 - Dates are normalized to UTC. The party starts with `Europe/Zurich` as its
   explicit, editable IANA timezone and an empty title on new databases. Existing
   titles remain unchanged; the frontend supplies a localized title when needed.
@@ -129,6 +143,9 @@ go build -o .cache/ ./cmd/server
 ```
 
 Use `go test -race ./...` where cgo and a supported C compiler are installed.
+Set `TEST_DATABASE_URL` to a dedicated PostgreSQL test database; integration tests
+create and remove isolated schemas. Without it, database tests skip explicitly.
+Root `npm run check` provisions a disposable PostgreSQL container automatically.
 The pure-Go application builds and runs without cgo; the race detector itself
 requires it. Tests cover invitation reuse/expiry/concurrency, session revocation,
 CSRF, private reveal boundaries, upload validation, ownership and persistence.

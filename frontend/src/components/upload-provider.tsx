@@ -8,7 +8,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, errorMessage, responseError, returnToInvitation } from "@/lib/api";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  api,
+  errorMessage,
+  responseError,
+  returnToInvitation,
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import {
   uploadProblem,
@@ -16,6 +23,7 @@ import {
   uploadsSchema,
   type UploadJob,
   type UploadLimits,
+  type Photo,
 } from "@/lib/contracts";
 
 type Transfer = {
@@ -30,6 +38,7 @@ type Transfer = {
 type UploadContextValue = {
   transfers: Transfer[];
   jobs: UploadJob[];
+  completed: Photo[];
   error: string | null;
   addFiles: (files: File[], limits: UploadLimits) => boolean;
   retryTransfer: (id: string) => void;
@@ -37,20 +46,50 @@ type UploadContextValue = {
   canRetryJob: (job: UploadJob) => boolean;
   dismiss: (id: string) => void;
   clearFinished: () => void;
+  forgetPhoto: (id: number) => void;
 };
 
 const UploadContext = createContext<UploadContextValue | null>(null);
+
+function newUploadId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // Local HTTP deployments can use getRandomValues without a secure context.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, (value) =>
+    value.toString(16).padStart(2, "0"),
+  ).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export function UploadProvider({ children }: { children: ReactNode }) {
   const { locale, t } = useI18n();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
+  const [completed, setCompleted] = useState<Photo[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const requests = useRef(new Map<string, XMLHttpRequest>());
   const files = useRef(new Map<string, File>());
-  const dismissed = useRef(new Set<string>());
   const mounted = useRef(true);
+
+  function rememberCompleted(items: UploadJob[]) {
+    const ready = items.flatMap((job) =>
+      job.status === "ready" && job.photo ? [job.photo] : [],
+    );
+    if (ready.length)
+      setCompleted((previous) =>
+        [
+          ...new Map(
+            [...previous, ...ready].map((photo) => [photo.id, photo]),
+          ).values(),
+        ]
+          .sort((a, b) => b.id - a.id)
+          .slice(0, 150),
+      );
+  }
 
   useEffect(() => {
     mounted.current = true;
@@ -75,16 +114,24 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   // Layout ownership keeps file transfers alive when the guest changes tabs.
   useEffect(() => {
     const pending = transfers
-      .filter((item) => item.status === "queued" && !requests.current.has(item.clientUploadId))
+      .filter(
+        (item) =>
+          item.status === "queued" &&
+          !requests.current.has(item.clientUploadId),
+      )
       .slice(0, Math.max(0, 2 - requests.current.size));
     for (const item of pending) {
       const request = new XMLHttpRequest();
       requests.current.set(item.clientUploadId, request);
       const update = (changes: Partial<Transfer>) => {
         if (mounted.current)
-          setTransfers((items) => items.map((entry) =>
-            entry.clientUploadId === item.clientUploadId ? { ...entry, ...changes } : entry,
-          ));
+          setTransfers((items) =>
+            items.map((entry) =>
+              entry.clientUploadId === item.clientUploadId
+                ? { ...entry, ...changes }
+                : entry,
+            ),
+          );
       };
       update({ status: "uploading" });
       request.open("POST", "/api/photos");
@@ -110,8 +157,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             return;
           }
           const job = uploadSchema.parse(body);
-          setTransfers((items) => items.filter((entry) => entry.clientUploadId !== item.clientUploadId));
-          setJobs((items) => [job, ...items.filter((entry) => entry.id !== job.id)]);
+          rememberCompleted([job]);
+          setTransfers((items) =>
+            items.filter(
+              (entry) => entry.clientUploadId !== item.clientUploadId,
+            ),
+          );
+          setJobs((items) => [
+            job,
+            ...items.filter((entry) => entry.id !== job.id),
+          ]);
           if (job.status === "ready") files.current.delete(job.clientUploadId);
           setRevision((value) => value + 1);
         } catch (err) {
@@ -140,13 +195,20 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       if (running || document.hidden) return;
       running = true;
       try {
-        const data = await api("/uploads", uploadsSchema, { signal: controller.signal });
+        const data = await api("/uploads", uploadsSchema, {
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
-        setJobs(data.items.filter((job) => !dismissed.current.has(job.clientUploadId)));
+        setJobs(data.items);
+        rememberCompleted(data.items);
         setError(null);
         for (const job of data.items)
           if (job.status === "ready") files.current.delete(job.clientUploadId);
-        if (data.items.some((job) => job.status === "queued" || job.status === "processing"))
+        if (
+          data.items.some(
+            (job) => job.status === "queued" || job.status === "processing",
+          )
+        )
           timer = setTimeout(refresh, 3000);
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -158,7 +220,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       }
     }
     void refresh();
-    const visible = () => { if (!document.hidden) void refresh(); };
+    const visible = () => {
+      if (!document.hidden) void refresh();
+    };
     document.addEventListener("visibilitychange", visible);
     return () => {
       controller.abort();
@@ -168,58 +232,136 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   }, [revision, t]);
 
   function addFiles(selected: File[], limits: UploadLimits) {
-    const active = jobs.filter((job) => job.status === "queued" || job.status === "processing").length;
+    const active = jobs.filter(
+      (job) => job.status === "queued" || job.status === "processing",
+    ).length;
     const available = Math.max(0, 20 - transfers.length - active);
     const numbers = new Intl.NumberFormat(locale);
     const next = selected.slice(0, available).map((file): Transfer => {
       const problem = uploadProblem(file, limits);
-      const clientUploadId = crypto.randomUUID();
+      const clientUploadId = newUploadId();
       if (!problem) files.current.set(clientUploadId, file);
       return {
-        clientUploadId, file, status: problem ? "error" : "queued", progress: 0,
+        clientUploadId,
+        file,
+        status: problem ? "error" : "queued",
+        progress: 0,
         retryable: !problem,
-        error: problem ? t(`errors.${problem}`, {
-          size: numbers.format((problem === "upload_video_size" ? limits.videoBytes : limits.imageBytes) / (1024 * 1024)),
-        }) : undefined,
+        error: problem
+          ? t(`errors.${problem}`, {
+              size: numbers.format(
+                (problem === "upload_video_size"
+                  ? limits.videoBytes
+                  : limits.imageBytes) /
+                  (1024 * 1024),
+              ),
+            })
+          : undefined,
       };
     });
+    // Keep at most one selection's worth of originals for processing retries.
+    while (files.current.size > 20) {
+      files.current.delete(files.current.keys().next().value!);
+    }
     setTransfers((items) => [...items, ...next]);
     return selected.length > available;
   }
 
   function dismiss(id: string) {
-    dismissed.current.add(id);
+    if (requests.current.has(id)) return;
+    setHidden((items) => [...items, id].slice(-200));
     files.current.delete(id);
     setTransfers((items) => items.filter((item) => item.clientUploadId !== id));
     setJobs((items) => items.filter((job) => job.clientUploadId !== id));
   }
   function retryTransfer(id: string) {
-    setTransfers((items) => items.map((item) => item.clientUploadId === id
-      ? { ...item, status: "queued", progress: 0, error: undefined } : item));
+    setTransfers((items) =>
+      items.map((item) =>
+        item.clientUploadId === id
+          ? { ...item, status: "queued", progress: 0, error: undefined }
+          : item,
+      ),
+    );
   }
   function retryJob(job: UploadJob) {
     const file = files.current.get(job.clientUploadId);
     if (!file || job.status !== "failed") return;
-    const clientUploadId = crypto.randomUUID();
+    const clientUploadId = newUploadId();
     files.current.set(clientUploadId, file);
     dismiss(job.clientUploadId);
-    setTransfers((items) => [...items, {
-      clientUploadId, file, status: "queued", progress: 0, retryable: true,
-    }]);
+    setTransfers((items) => [
+      ...items,
+      {
+        clientUploadId,
+        file,
+        status: "queued",
+        progress: 0,
+        retryable: true,
+      },
+    ]);
   }
   function clearFinished() {
-    transfers.filter((item) => item.status === "error").forEach((item) => dismiss(item.clientUploadId));
-    jobs.filter((job) => job.status === "ready" || job.status === "failed").forEach((job) => dismiss(job.clientUploadId));
+    transfers
+      .filter((item) => item.status === "error")
+      .forEach((item) => dismiss(item.clientUploadId));
+    jobs
+      .filter((job) => job.status === "ready" || job.status === "failed")
+      .forEach((job) => dismiss(job.clientUploadId));
   }
 
-  return <UploadContext value={{ transfers, jobs, error, addFiles, retryTransfer, retryJob,
-    canRetryJob: (job) => job.status === "failed" && files.current.has(job.clientUploadId), dismiss, clearFinished }}>
-    {children}
-  </UploadContext>;
+  return (
+    <UploadContext
+      value={{
+        transfers,
+        error,
+        addFiles,
+        retryTransfer,
+        retryJob,
+        completed,
+        canRetryJob: (job) =>
+          job.status === "failed" && files.current.has(job.clientUploadId),
+        dismiss,
+        clearFinished,
+        jobs: jobs.filter((job) => !hidden.includes(job.clientUploadId)),
+        forgetPhoto: (id) => {
+          setCompleted((items) => items.filter((photo) => photo.id !== id));
+          setJobs((items) =>
+            items.map((job) =>
+              job.status === "ready" && job.photo?.id === id
+                ? { ...job, photo: null }
+                : job,
+            ),
+          );
+        },
+      }}
+    >
+      {children}
+    </UploadContext>
+  );
 }
 
 export function useUploads() {
   const context = useContext(UploadContext);
   if (!context) throw new Error("UploadProvider is required.");
   return context;
+}
+
+export function UploadNotice() {
+  const pathname = usePathname();
+  const { transfers, jobs } = useUploads();
+  const { t } = useI18n();
+  const active =
+    transfers.some((item) => item.status !== "error") ||
+    jobs.some((job) => job.status === "queued" || job.status === "processing");
+  const failed =
+    transfers.some((item) => item.status === "error") ||
+    jobs.some((job) => job.status === "failed");
+  if (pathname === "/photos" || (!active && !failed)) return null;
+  return (
+    <p className="upload-notice panel" role="status">
+      <Link href="/photos">
+        {t(active ? "photos.background" : "photos.needsAttention")}
+      </Link>
+    </p>
+  );
 }

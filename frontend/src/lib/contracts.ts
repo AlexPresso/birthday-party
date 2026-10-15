@@ -49,7 +49,7 @@ export const uploadSchema = z.discriminatedUnion("status", [
     ...uploadFields,
     status: z.literal("ready"),
     errorCode: z.null(),
-    photo: photoSchema,
+    photo: photoSchema.nullable(),
   }),
   z.object({
     ...uploadFields,
@@ -58,7 +58,9 @@ export const uploadSchema = z.discriminatedUnion("status", [
     photo: z.null(),
   }),
 ]);
-export const uploadsSchema = z.object({ items: z.array(uploadSchema).max(150) });
+export const uploadsSchema = z.object({
+  items: z.array(uploadSchema).max(150),
+});
 const entryFields = {
   id,
   canDelete: z.boolean(),

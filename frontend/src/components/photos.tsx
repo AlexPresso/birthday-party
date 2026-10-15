@@ -13,32 +13,17 @@ import {
   Download,
   Play,
 } from "lucide-react";
-import {
-  api,
-  errorMessage,
-  remove,
-  responseError,
-  returnToInvitation,
-} from "@/lib/api";
+import { api, errorMessage, remove, responseError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import {
-  photoSchema,
   photosSchema,
   formatDate,
-  uploadProblem,
   type Guest,
   type Photo,
   type PhotoPage,
 } from "@/lib/contracts";
 import { PageHeading, EmptyState, ErrorNotice } from "./ui";
-
-type UploadItem = {
-  id: number;
-  file: File;
-  status: "queued" | "uploading" | "done" | "error";
-  progress: number;
-  error?: string;
-};
+import { useUploads } from "./upload-provider";
 
 export function PhotoGallery({
   initial,
@@ -55,9 +40,14 @@ export function PhotoGallery({
   const limits = initial.limits;
   const imageSize = numbers.format(limits.imageBytes / (1024 * 1024));
   const videoSize = numbers.format(limits.videoBytes / (1024 * 1024));
-  const [photos, setPhotos] = useState(initial.items);
+  const [storedPhotos, setPhotos] = useState(initial.items);
+  const uploads = useUploads();
+  const photos = [
+    ...new Map(
+      [...storedPhotos, ...uploads.completed].map((photo) => [photo.id, photo]),
+    ).values(),
+  ].sort((a, b) => b.id - a.id);
   const [cursor, setCursor] = useState(initial.nextCursor);
-  const [queue, setQueue] = useState<UploadItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -65,84 +55,6 @@ export function PhotoGallery({
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const nextId = useRef(0);
-  const requests = useRef(new Map<number, XMLHttpRequest>());
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    const active = requests.current;
-    return () => {
-      mounted.current = false;
-      active.forEach((request) => request.abort());
-    };
-  }, []);
-
-  // At most two uploads run together. Each request keeps its file for a retry.
-  useEffect(() => {
-    const slots = Math.max(0, 2 - requests.current.size);
-    const pending = queue
-      .filter(
-        (item) => item.status === "queued" && !requests.current.has(item.id),
-      )
-      .slice(0, slots);
-    for (const item of pending) {
-      const request = new XMLHttpRequest();
-      requests.current.set(item.id, request);
-      const update = (changes: Partial<UploadItem>) => {
-        if (mounted.current)
-          setQueue((items) =>
-            items.map((entry) =>
-              entry.id === item.id ? { ...entry, ...changes } : entry,
-            ),
-          );
-      };
-      update({ status: "uploading" });
-      request.open("POST", "/api/photos");
-      request.setRequestHeader("X-Requested-With", "birthday-party");
-      request.timeout = 600000;
-      request.upload.onprogress = (event) => {
-        if (event.lengthComputable)
-          update({ progress: Math.round((event.loaded / event.total) * 100) });
-      };
-      request.onload = () => {
-        requests.current.delete(item.id);
-        if (!mounted.current) return;
-        try {
-          const body: unknown = JSON.parse(request.responseText);
-          if (request.status === 401) {
-            returnToInvitation();
-            return;
-          }
-          if (request.status < 200 || request.status >= 300) {
-            update({ status: "error", error: responseError(body, t) });
-            return;
-          }
-          const photo = photoSchema.parse(body);
-          setPhotos((items) => [
-            photo,
-            ...items.filter((existing) => existing.id !== photo.id),
-          ]);
-          update({ status: "done", progress: 100 });
-        } catch (err) {
-          update({ status: "error", error: errorMessage(err, t) });
-        }
-      };
-      const fail = () => {
-        requests.current.delete(item.id);
-        update({
-          status: "error",
-          error: t("photos.interrupted"),
-        });
-      };
-      request.onerror = fail;
-      request.ontimeout = fail;
-      request.onabort = fail;
-      const data = new FormData();
-      data.append("file", item.file);
-      request.send(data);
-    }
-  }, [queue, t]);
 
   useEffect(() => {
     if (selected !== null && !dialog.current?.open) dialog.current?.showModal();
@@ -156,29 +68,11 @@ export function PhotoGallery({
 
   function choose(files: FileList | null) {
     if (!files) return;
-    const available = Math.max(
-      0,
-      20 - queue.filter((item) => item.status !== "done").length,
+    setError(
+      uploads.addFiles(Array.from(files), limits)
+        ? t("photos.selectionLimit")
+        : null,
     );
-    const chosen = Array.from(files).slice(0, available);
-    setError(files.length > available ? t("photos.selectionLimit") : null);
-    setQueue((items) => [
-      ...items.filter((item) => item.status !== "done"),
-      ...chosen.map((file): UploadItem => {
-        const problem = uploadProblem(file, limits);
-        return {
-          id: ++nextId.current,
-          file,
-          status: problem ? "error" : "queued",
-          progress: 0,
-          error: problem
-            ? t(`errors.${problem}`, {
-                size: problem === "upload_video_size" ? videoSize : imageSize,
-              })
-            : undefined,
-        };
-      }),
-    ]);
     if (input.current) input.current.value = "";
   }
 
@@ -206,10 +100,15 @@ export function PhotoGallery({
 
   const currentIndex = photos.findIndex((photo) => photo.id === selected);
   const current = photos[currentIndex];
-  const active = queue.some(
-    (item) => item.status === "uploading" || item.status === "queued",
+  const transmitting = uploads.transfers.some(
+    (item) => item.status !== "error",
   );
-  const completed = queue.filter((item) => item.status === "done").length;
+  const active =
+    transmitting ||
+    uploads.jobs.some(
+      (job) => job.status === "queued" || job.status === "processing",
+    );
+  const completed = uploads.jobs.filter((job) => job.status === "ready").length;
   async function deletePhoto(photo: Photo) {
     if (!window.confirm(t("photos.deleteConfirm"))) return;
     setDeleting(true);
@@ -218,6 +117,7 @@ export function PhotoGallery({
       await remove(`/photos/${photo.id}`);
       setSelected(null);
       setPhotos((items) => items.filter((item) => item.id !== photo.id));
+      uploads.forgetPhoto(photo.id);
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
@@ -253,7 +153,7 @@ export function PhotoGallery({
         <Images size={15} aria-hidden="true" />{" "}
         {t("photos.privacy", { imageSize, videoSize })}
       </p>
-      {queue.length > 0 && (
+      {(uploads.transfers.length > 0 || uploads.jobs.length > 0) && (
         <section
           className="upload-queue panel"
           aria-label={t("photos.uploadQueue")}
@@ -261,19 +161,15 @@ export function PhotoGallery({
           <div className="section-row">
             <h2>{t(active ? "photos.uploading" : "photos.uploads")}</h2>
             {!active && (
-              <button className="text-button" onClick={() => setQueue([])}>
+              <button className="text-button" onClick={uploads.clearFinished}>
                 {t("photos.close")}
               </button>
             )}
           </div>
-          {queue.map((item) => (
-            <div className="upload-item" key={item.id}>
+          {uploads.transfers.map((item) => (
+            <div className="upload-item" key={item.clientUploadId}>
               <div className={`upload-status ${item.status}`}>
-                {item.status === "done" ? (
-                  <Check size={20} />
-                ) : (
-                  <Upload size={20} />
-                )}
+                <Upload size={20} aria-hidden="true" />
               </div>
               <div className="upload-details">
                 <span className="file-name">{item.file.name}</span>
@@ -288,11 +184,7 @@ export function PhotoGallery({
                     />
                     <span className="fine-print">
                       {item.progress === 100
-                        ? t(
-                            item.file.type.startsWith("video/")
-                              ? "photos.processingVideo"
-                              : "photos.processing",
-                          )
+                        ? t("photos.receiving")
                         : new Intl.NumberFormat(locale, {
                             style: "percent",
                           }).format(item.progress / 100)}
@@ -302,30 +194,15 @@ export function PhotoGallery({
                   <span
                     className={`fine-print ${item.status === "error" ? "error-text" : ""}`}
                   >
-                    {item.status === "done"
-                      ? t("photos.added")
-                      : item.error || t("photos.queued")}
+                    {item.error || t("photos.queued")}
                   </span>
                 )}
               </div>
-              {item.status === "error" && !uploadProblem(item.file, limits) && (
+              {item.status === "error" && item.retryable && (
                 <button
                   className="icon-button"
                   aria-label={t("photos.retry", { name: item.file.name })}
-                  onClick={() =>
-                    setQueue((items) =>
-                      items.map((entry) =>
-                        entry.id === item.id
-                          ? {
-                              ...entry,
-                              status: "queued",
-                              progress: 0,
-                              error: undefined,
-                            }
-                          : entry,
-                      ),
-                    )
-                  }
+                  onClick={() => uploads.retryTransfer(item.clientUploadId)}
                 >
                   <RotateCw size={18} />
                 </button>
@@ -336,11 +213,61 @@ export function PhotoGallery({
                   aria-label={t("photos.removeFromQueue", {
                     name: item.file.name,
                   })}
-                  onClick={() =>
-                    setQueue((items) =>
-                      items.filter((entry) => entry.id !== item.id),
-                    )
-                  }
+                  onClick={() => uploads.dismiss(item.clientUploadId)}
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          ))}
+          {uploads.jobs.map((job) => (
+            <div className="upload-item" key={job.id}>
+              <div
+                className={`upload-status ${job.status === "ready" ? "done" : job.status === "failed" ? "error" : ""}`}
+              >
+                {job.status === "ready" ? (
+                  <Check size={20} aria-hidden="true" />
+                ) : (
+                  <Upload size={20} aria-hidden="true" />
+                )}
+              </div>
+              <div className="upload-details">
+                <span className="file-name">{job.filename}</span>
+                <span
+                  className={`fine-print ${job.status === "failed" ? "error-text" : ""}`}
+                >
+                  {job.status === "ready"
+                    ? t("photos.added")
+                    : job.status === "failed"
+                      ? responseError({ code: job.errorCode }, t)
+                      : job.status === "queued"
+                        ? t("photos.serverQueued")
+                        : t(
+                            job.kind === "video"
+                              ? "photos.processingVideo"
+                              : "photos.processing",
+                          )}
+                </span>
+                {job.status === "failed" && !uploads.canRetryJob(job) && (
+                  <span className="fine-print">{t("photos.reselect")}</span>
+                )}
+              </div>
+              {uploads.canRetryJob(job) && (
+                <button
+                  className="icon-button"
+                  aria-label={t("photos.retry", { name: job.filename })}
+                  onClick={() => uploads.retryJob(job)}
+                >
+                  <RotateCw size={18} />
+                </button>
+              )}
+              {(job.status === "ready" || job.status === "failed") && (
+                <button
+                  className="icon-button"
+                  aria-label={t("photos.removeFromQueue", {
+                    name: job.filename,
+                  })}
+                  onClick={() => uploads.dismiss(job.clientUploadId)}
                 >
                   <X size={18} />
                 </button>
@@ -355,9 +282,14 @@ export function PhotoGallery({
               { count: numbers.format(completed) },
             )}
           </span>
-          {active && <p className="fine-print">{t("photos.keepOpen")}</p>}
+          {active && (
+            <p className="fine-print">
+              {t(transmitting ? "photos.keepOpen" : "photos.safeToLeave")}
+            </p>
+          )}
         </section>
       )}
+      <ErrorNotice message={uploads.error} />
       <ErrorNotice message={selected === null ? error : null} />
       {photos.length === 0 ? (
         <EmptyState
