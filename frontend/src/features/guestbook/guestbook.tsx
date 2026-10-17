@@ -62,11 +62,12 @@ export function Guestbook({
     }
   }
   async function loadMore() {
+    if (cursor === null) return;
     setLoading(true);
     setError(null);
     try {
       const page = await api(
-        `/guestbook?limit=24&before=${encodeURIComponent(cursor!)}`,
+        `/guestbook?limit=24&before=${encodeURIComponent(cursor)}`,
         entriesSchema,
       );
       setEntries((items) => [

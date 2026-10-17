@@ -100,19 +100,18 @@ export function UploadProvider({
     const ready = items.flatMap((job) =>
       job.status === "ready" && job.photo ? [job.photo] : [],
     );
-    if (ready.length || replace)
-      setCompleted((previous) =>
-        [
-          ...new Map(
-            [...(replace ? [] : previous), ...ready].map((photo) => [
-              photo.id,
-              photo,
-            ]),
-          ).values(),
-        ]
-          .sort((a, b) => b.id - a.id)
-          .slice(0, 150),
-      );
+    if (ready.length || replace) {
+      setCompleted((previous) => {
+        const candidates = [...(replace ? [] : previous), ...ready];
+        const photosById = new Map(
+          candidates.map((photo) => [photo.id, photo]),
+        );
+        const newestFirst = [...photosById.values()].sort(
+          (a, b) => b.id - a.id,
+        );
+        return newestFirst.slice(0, 150);
+      });
+    }
   }
 
   useEffect(() => {

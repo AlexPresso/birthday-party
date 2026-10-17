@@ -54,14 +54,13 @@ export function PhotoGallery({
     : t("categories.main");
   const [storedPhotos, setPhotos] = useState(initial.items);
   const uploads = useUploads();
-  const photos = [
-    ...new Map(
-      [
-        ...storedPhotos,
-        ...uploads.completed.filter((photo) => photo.categoryId === categoryId),
-      ].map((photo) => [photo.id, photo]),
-    ).values(),
-  ].sort((a, b) => b.id - a.id);
+  const completedInCategory = uploads.completed.filter(
+    (photo) => photo.categoryId === categoryId,
+  );
+  const photosById = new Map(
+    [...storedPhotos, ...completedInCategory].map((photo) => [photo.id, photo]),
+  );
+  const photos = [...photosById.values()].sort((a, b) => b.id - a.id);
   const [cursor, setCursor] = useState(initial.nextCursor);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

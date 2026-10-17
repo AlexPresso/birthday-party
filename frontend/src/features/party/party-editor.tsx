@@ -22,10 +22,10 @@ export function PartyEditor({
   const [title, setTitle] = useState(party.title);
   const [location, setLocation] = useState(party.location);
   const [timezone, setTimezone] = useState(party.timezone);
-  const [date, setDate] = useState<string | null>(null);
+  const [dateDraft, setDateDraft] = useState<string | null>(null);
   // The browser timezone is only available after hydration. Keep the original
   // instant on save until the host edits the date, including its seconds.
-  const savedDate = useSyncExternalStore(
+  const savedLocalDate = useSyncExternalStore(
     noSubscription,
     () => localInput(party.date),
     () => "",
@@ -46,7 +46,7 @@ export function PartyEditor({
           title: title.trim(),
           location: location.trim(),
           timezone: timezone.trim(),
-          date: date === null ? party.date : utcInput(date),
+          date: dateDraft === null ? party.date : utcInput(dateDraft),
         },
       });
       onSave(updated);
@@ -90,8 +90,8 @@ export function PartyEditor({
           <input
             id="party-date"
             type="datetime-local"
-            value={date ?? savedDate}
-            onChange={(event) => setDate(event.target.value)}
+            value={dateDraft ?? savedLocalDate}
+            onChange={(event) => setDateDraft(event.target.value)}
           />
           <p className="fine-print">{t("admin.dateHint")}</p>
         </div>
