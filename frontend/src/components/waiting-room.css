@@ -50,9 +50,54 @@
   font-size: 16px;
   line-height: 1.75;
 }
+.welcome-widgets {
+  display: grid;
+  gap: 24px;
+}
+.welcome-widgets > * {
+  min-width: 0;
+  margin: 0;
+}
+.welcome-widget-title {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.welcome-widgets h2.welcome-widget-title {
+  font-size: clamp(24px, 4vw, 30px);
+  line-height: 1.25;
+}
+.welcome-widgets > .welcome-profile,
+.welcome-widgets > .welcome-media {
+  margin-top: 0;
+}
+.welcome-widgets > .welcome-profile:first-child,
+.welcome-widgets > .welcome-media:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
 .welcome-follow-up {
   margin: 20px 0 0;
   font-size: 14px;
+}
+.welcome-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.welcome-navigation > .button {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+}
+.welcome-navigation > .welcome-finish {
+  flex-basis: 100%;
+}
+.welcome-stage #welcome-heading:focus,
+.welcome-step-number:focus {
+  outline-offset: 6px;
 }
 .welcome-connection {
   margin-top: 24px;

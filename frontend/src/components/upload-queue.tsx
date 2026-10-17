@@ -4,23 +4,29 @@ import { responseError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { useUploads } from "./upload-provider";
 import { ErrorNotice } from "./ui";
-export function UploadQueue() {
+export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
   const { locale, t } = useI18n();
   const numbers = new Intl.NumberFormat(locale);
   const plurals = new Intl.PluralRules(locale);
   const uploads = useUploads();
-  const transmitting = uploads.transfers.some(
-    (item) => item.status !== "error",
-  );
+  const transfers =
+    widgetIndex === undefined
+      ? uploads.transfers
+      : uploads.transfers.filter(
+          (item) => item.welcomeWidgetIndex === widgetIndex,
+        );
+  const jobs =
+    widgetIndex === undefined
+      ? uploads.jobs
+      : uploads.jobs.filter((job) => job.welcomeWidgetIndex === widgetIndex);
+  const transmitting = transfers.some((item) => item.status !== "error");
   const active =
     transmitting ||
-    uploads.jobs.some(
-      (job) => job.status === "queued" || job.status === "processing",
-    );
-  const completed = uploads.jobs.filter((job) => job.status === "ready").length;
+    jobs.some((job) => job.status === "queued" || job.status === "processing");
+  const completed = jobs.filter((job) => job.status === "ready").length;
   return (
     <>
-      {(uploads.transfers.length > 0 || uploads.jobs.length > 0) && (
+      {(transfers.length > 0 || jobs.length > 0) && (
         <section
           className="upload-queue panel"
           aria-label={t("photos.uploadQueue")}
@@ -28,12 +34,15 @@ export function UploadQueue() {
           <div className="section-row">
             <h2>{t(active ? "photos.uploading" : "photos.uploads")}</h2>
             {!active && (
-              <button className="text-button" onClick={uploads.clearFinished}>
+              <button
+                className="text-button"
+                onClick={() => uploads.clearFinished(widgetIndex)}
+              >
                 {t("photos.close")}
               </button>
             )}
           </div>
-          {uploads.transfers.map((item) => (
+          {transfers.map((item) => (
             <div className="upload-item" key={item.clientUploadId}>
               <div className={`upload-status ${item.status}`}>
                 <Upload size={20} aria-hidden="true" />
@@ -87,7 +96,7 @@ export function UploadQueue() {
               )}
             </div>
           ))}
-          {uploads.jobs.map((job) => (
+          {jobs.map((job) => (
             <div className="upload-item" key={job.id}>
               <div
                 className={`upload-status ${job.status === "ready" ? "done" : job.status === "failed" ? "error" : ""}`}
@@ -156,7 +165,7 @@ export function UploadQueue() {
           )}
         </section>
       )}
-      <ErrorNotice message={uploads.error} />
+      {widgetIndex === undefined && <ErrorNotice message={uploads.error} />}
     </>
   );
 }

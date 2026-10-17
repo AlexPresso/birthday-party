@@ -13,19 +13,19 @@ func TestWelcomeMediaSettingsAreTypedAndValidated(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)
 	for _, test := range []struct{ name, step, code string }{
-		{"missing settings", `{"action":"media_upload"}`, "invalid_welcome_action"},
-		{"null settings", `{"action":"media_upload","mediaUpload":null}`, "invalid_welcome_action"},
-		{"missing category", `{"action":"media_upload","mediaUpload":{}}`, "invalid_body"},
-		{"negative category", `{"action":"media_upload","mediaUpload":{"categoryId":-1}}`, "invalid_welcome_action"},
-		{"string category", `{"action":"media_upload","mediaUpload":{"categoryId":"1"}}`, "invalid_body"},
-		{"boolean category", `{"action":"media_upload","mediaUpload":{"categoryId":true}}`, "invalid_body"},
-		{"fractional category", `{"action":"media_upload","mediaUpload":{"categoryId":1.5}}`, "invalid_body"},
-		{"unknown setting", `{"action":"media_upload","mediaUpload":{"categoryId":null,"guestId":2}}`, "invalid_body"},
-		{"profile settings", `{"action":"profile_photo","mediaUpload":{"categoryId":null}}`, "invalid_welcome_action"},
-		{"plain settings", `{"action":null,"mediaUpload":{"categoryId":null}}`, "invalid_welcome_action"},
+		{"missing settings", `{"type":"media_upload"}`, "invalid_welcome_action"},
+		{"null settings", `{"type":"media_upload","mediaUpload":null}`, "invalid_welcome_action"},
+		{"missing category", `{"type":"media_upload","mediaUpload":{}}`, "invalid_body"},
+		{"negative category", `{"type":"media_upload","mediaUpload":{"categoryId":-1}}`, "invalid_welcome_action"},
+		{"string category", `{"type":"media_upload","mediaUpload":{"categoryId":"1"}}`, "invalid_body"},
+		{"boolean category", `{"type":"media_upload","mediaUpload":{"categoryId":true}}`, "invalid_body"},
+		{"fractional category", `{"type":"media_upload","mediaUpload":{"categoryId":1.5}}`, "invalid_body"},
+		{"unknown setting", `{"type":"media_upload","mediaUpload":{"categoryId":null,"guestId":2}}`, "invalid_body"},
+		{"profile settings", `{"type":"profile_photo","mediaUpload":{"categoryId":null}}`, "invalid_body"},
+		{"plain settings", `{"type":"text","mediaUpload":{"categoryId":null}}`, "invalid_body"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			body := `{"revision":0,"steps":[{"title":"Upload","body":"",` + strings.TrimPrefix(test.step, "{") + `]}`
+			body := `{"revision":0,"steps":[{"widgets":[` + test.step + `]}]}`
 			r := httptest.NewRequest("PUT", "/api/admin/welcome", strings.NewReader(body))
 			r.Header.Set("X-Requested-With", "birthday-party")
 			r.AddCookie(host)
@@ -33,9 +33,9 @@ func TestWelcomeMediaSettingsAreTypedAndValidated(t *testing.T) {
 		})
 	}
 	missing := int64(99999)
-	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{{Title: "Upload", Action: ptr("media_upload"), MediaUpload: &welcomeMediaUpload{CategoryID: &missing}}}}, host), 404, "media_category_not_found")
-	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{{Title: "Profile", Action: ptr("profile_photo")}, {Title: "Main gallery", Action: ptr("media_upload"), MediaUpload: &welcomeMediaUpload{}}}}, host))
-	if state.Steps[0].MediaUpload != nil || state.Steps[1].MediaUpload == nil || state.Steps[1].MediaUpload.CategoryID != nil {
+	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("Upload", "", welcomeWidget{Type: "media_upload", MediaUpload: &welcomeMediaUpload{CategoryID: &missing}})}}, host), 404, "media_category_not_found")
+	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("Profile", "", welcomeWidget{Type: "profile_photo"}), testWelcomeStep("Main gallery", "", welcomeWidget{Type: "media_upload", MediaUpload: &welcomeMediaUpload{}})}}, host))
+	if state.Steps[0].Widgets[1].MediaUpload != nil || state.Steps[1].Widgets[1].MediaUpload == nil || state.Steps[1].Widgets[1].MediaUpload.CategoryID != nil {
 		t.Fatal("optional typed settings did not round trip")
 	}
 }
@@ -47,22 +47,24 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 	other, _, _ := guest(t, a, host, "Other guest")
 	category := createTestCategory(t, a, host, "Hidden contributions", false)
 	steps := []welcomeStep{
-		{Title: "Introduction"},
-		{Title: "Send a memory", Action: ptr("media_upload"), MediaUpload: &welcomeMediaUpload{CategoryID: &category.ID}},
-		{Title: "A later gallery upload", Action: ptr("media_upload"), MediaUpload: &welcomeMediaUpload{}},
-		{Title: "Next instruction"},
+		testWelcomeStep("Introduction", ""),
+		testWelcomeStep("Send a memory", "", welcomeWidget{Type: "media_upload", MediaUpload: &welcomeMediaUpload{CategoryID: &category.ID}}),
+		testWelcomeStep("A later gallery upload", "", welcomeWidget{Type: "media_upload", MediaUpload: &welcomeMediaUpload{}}),
+		testWelcomeStep("Next instruction", ""),
 	}
 	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": steps}, host))
 	state = changeWelcome(t, a, host, state.Revision, "start")
 	for range 2 {
-		assertWelcomeError(t, request(t, a, "GET", "/api/welcome/upload-context", nil, visitor), 423, "welcome_required")
+		assertWelcomeError(t, request(t, a, "GET", "/api/welcome/upload-context?widgetIndex=1", nil, visitor), 423, "welcome_required")
 		view := request(t, a, "GET", "/api/welcome", nil, visitor)
-		if strings.Contains(view.Body.String(), "mediaUpload") || strings.Contains(view.Body.String(), steps[2].Title) {
+		if strings.Contains(view.Body.String(), "mediaUpload") || strings.Contains(view.Body.String(), steps[2].Widgets[0].Text) {
 			t.Fatal("future media action leaked")
 		}
 		state = changeWelcome(t, a, host, state.Revision, "next")
 	}
-	context := request(t, a, "GET", "/api/welcome/upload-context", nil, visitor)
+	progressRevision := selectGuestWelcomeStep(t, a, visitor, 2).ProgressRevision
+	selectGuestWelcomeStep(t, a, other, 2)
+	context := request(t, a, "GET", "/api/welcome/upload-context?widgetIndex=1", nil, visitor)
 	status(t, context, 200)
 	var uploadContext struct {
 		Revision int64            `json:"revision"`
@@ -72,7 +74,7 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 	if err := json.Unmarshal(context.Body.Bytes(), &uploadContext); err != nil {
 		t.Fatal(err)
 	}
-	if uploadContext.Revision != state.Revision || uploadContext.Category.ID != category.ID || uploadContext.Category.IsPublic || uploadContext.Limits["videoBytes"] != a.config.MaxVideoBytes {
+	if uploadContext.Revision != progressRevision || uploadContext.Category.ID != category.ID || uploadContext.Category.IsPublic || uploadContext.Limits["videoBytes"] != a.config.MaxVideoBytes {
 		t.Fatalf("wrong upload context: %s", context.Body.String())
 	}
 	for _, path := range []string{"/api/photos", "/api/party", "/api/programme", "/api/guestbook", "/api/profile", "/api/media-categories"} {
@@ -80,15 +82,15 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 	}
 	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, nil, "")), 400, "invalid_body")
 	wrongCategory := int64(99999)
-	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, &wrongCategory, &state.Revision, "")), 400, "invalid_media_category")
+	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, &wrongCategory, &progressRevision, "")), 400, "invalid_media_category")
 	clientID := "11111111-1111-4111-8111-111111111111"
-	accepted := performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &state.Revision, clientID))
+	accepted := performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &progressRevision, clientID))
 	status(t, accepted, 202)
 	job := parseJob(t, accepted)
-	if !sameOptionalID(job.CategoryID, &category.ID) || !sameOptionalID(job.WelcomeRevision, &state.Revision) {
+	if !sameOptionalID(job.CategoryID, &category.ID) || !sameOptionalID(job.WelcomeRevision, &progressRevision) {
 		t.Fatal("welcome destination was not forced into the job")
 	}
-	if retry := parseJob(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &state.Revision, clientID))); retry.ID != job.ID {
+	if retry := parseJob(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &progressRevision, clientID))); retry.ID != job.ID {
 		t.Fatal("same welcome retry created another job")
 	}
 	photo := finishCategoryUpload(t, a, accepted)
@@ -104,11 +106,15 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 		assertWelcomeError(t, request(t, a, "GET", path, nil, visitor), 423, "welcome_required")
 		status(t, request(t, a, "GET", path, nil, host), 200)
 	}
-	previousRevision := state.Revision
+	previousRevision := progressRevision
 	state = changeWelcome(t, a, host, state.Revision, "next")
+	if retry := parseJob(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &progressRevision, clientID))); retry.ID != job.ID {
+		t.Fatal("host unlock invalidated a current upload context")
+	}
+	progressRevision = moveGuestWelcome(t, a, visitor, "next").ProgressRevision
 	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &previousRevision, clientID)), 409, "welcome_conflict")
-	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &state.Revision, clientID)), 409, "welcome_conflict")
-	mainAccepted := performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &state.Revision, ""))
+	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &progressRevision, clientID)), 409, "welcome_conflict")
+	mainAccepted := performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &progressRevision, ""))
 	status(t, mainAccepted, 202)
 	// Restart before processing: destination and welcome revision are durable.
 	config, clock := a.config, a.now
@@ -128,6 +134,10 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 	}
 	state = changeWelcome(t, a, host, state.Revision, "open")
 	assertWelcomeError(t, performMediaUpload(a, mediaUploadRequest(t, visitor, nil, &previousRevision, clientID)), 409, "welcome_conflict")
+	if parseJob(t, request(t, a, "GET", jobPath, nil, visitor)).Photo != nil {
+		t.Fatal("host opening exposed media before guest completion")
+	}
+	moveGuestWelcome(t, a, visitor, "finish")
 	status(t, request(t, a, "GET", photo.URL, nil, visitor), 404)
 	status(t, request(t, a, "GET", main.URL, nil, visitor), 200)
 	if parseJob(t, request(t, a, "GET", jobPath, nil, visitor)).Photo != nil {
@@ -141,26 +151,32 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 }
 
 func TestWelcomeMediaUploadRejectsLateAcceptance(t *testing.T) {
-	for _, ending := range []string{"plain step", "another upload step", "open", "logout", "revoke"} {
+	for _, ending := range []string{"plain step", "another upload step", "unlock", "open", "finish", "logout", "revoke"} {
 		t.Run(ending, func(t *testing.T) {
 			a := testApp(t)
 			host, _ := admin(t, a)
 			visitor, identity, _ := guest(t, a, host, "Uploading guest")
-			next := welcomeStep{Title: "Next"}
+			next := testWelcomeStep("Next", "")
 			if ending == "another upload step" {
-				next.Action = ptr("media_upload")
-				next.MediaUpload = &welcomeMediaUpload{}
+				next.Widgets = append(next.Widgets, welcomeWidget{Type: "media_upload", MediaUpload: &welcomeMediaUpload{}})
 			}
-			state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{{Title: "Upload", Action: ptr("media_upload"), MediaUpload: &welcomeMediaUpload{}}, next}}, host))
+			state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("Upload", "", welcomeWidget{Type: "media_upload", MediaUpload: &welcomeMediaUpload{}}), next}}, host))
 			state = changeWelcome(t, a, host, state.Revision, "start")
 			state = changeWelcome(t, a, host, state.Revision, "next")
-			r := mediaUploadRequest(t, visitor, nil, &state.Revision, "")
+			progressRevision := selectGuestWelcomeStep(t, a, visitor, 1).ProgressRevision
+			r := mediaUploadRequest(t, visitor, nil, &progressRevision, "")
 			r.Body = io.NopCloser(&welcomeClosureReader{Reader: r.Body, onRead: func() {
 				switch ending {
 				case "plain step", "another upload step":
 					changeWelcome(t, a, host, state.Revision, "next")
-				case "open":
+					moveGuestWelcome(t, a, visitor, "next")
+				case "unlock":
+					changeWelcome(t, a, host, state.Revision, "next")
+				case "open", "finish":
 					changeWelcome(t, a, host, state.Revision, "open")
+					if ending == "finish" {
+						moveGuestWelcome(t, a, visitor, "finish")
+					}
 				case "logout":
 					status(t, request(t, a, "POST", "/api/logout", nil, visitor), 204)
 				case "revoke":
@@ -170,10 +186,14 @@ func TestWelcomeMediaUploadRejectsLateAcceptance(t *testing.T) {
 			response := performMediaUpload(a, r)
 			if ending == "logout" || ending == "revoke" {
 				status(t, response, 401)
+			} else if ending == "unlock" || ending == "open" {
+				status(t, response, 202)
 			} else {
 				assertWelcomeError(t, response, 409, "welcome_conflict")
 			}
-			assertNoAcceptedMedia(t, a)
+			if ending != "unlock" && ending != "open" {
+				assertNoAcceptedMedia(t, a)
+			}
 		})
 	}
 }
@@ -217,6 +237,9 @@ func TestMediaCategoryMigrationPreservesExistingMediaAndWelcome(t *testing.T) {
 	db := testDatabase(t)
 	files := migrationFiles(t)
 	delete(files, "migrations/0006_media_categories.sql")
+	delete(files, "migrations/0007_welcome_widgets.sql")
+	delete(files, "migrations/0008_guest_welcome_progress.sql")
+	delete(files, "migrations/0009_notifications.sql")
 	if err := applyMigrations(t.Context(), db, files); err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +257,11 @@ func TestMediaCategoryMigrationPreservesExistingMediaAndWelcome(t *testing.T) {
 	if err := db.QueryRow("SELECT row_to_json(welcome)::text FROM welcome").Scan(&before); err != nil {
 		t.Fatal(err)
 	}
-	if err := migrate(t.Context(), db); err != nil {
+	files = migrationFiles(t)
+	delete(files, "migrations/0007_welcome_widgets.sql")
+	delete(files, "migrations/0008_guest_welcome_progress.sql")
+	delete(files, "migrations/0009_notifications.sql")
+	if err := applyMigrations(t.Context(), db, files); err != nil {
 		t.Fatal(err)
 	}
 	var after string

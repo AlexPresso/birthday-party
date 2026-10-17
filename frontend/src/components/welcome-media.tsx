@@ -8,12 +8,17 @@ import {
   type WelcomeUploadContext,
 } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n-context";
-import { UploadProvider } from "./upload-provider";
 import { MediaPicker } from "./media-picker";
 import { UploadQueue } from "./upload-queue";
 import { ErrorNotice } from "./ui";
 
-export function WelcomeMedia({ revision }: { revision: number }) {
+export function WelcomeMedia({
+  revision,
+  widgetIndex,
+}: {
+  revision: number;
+  widgetIndex: number;
+}) {
   const { t } = useI18n();
   const [context, setContext] = useState<WelcomeUploadContext | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,12 +28,16 @@ export function WelcomeMedia({ revision }: { revision: number }) {
     let disposed = false;
     const controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 10000);
-    void api("/welcome/upload-context", welcomeUploadContextSchema, {
-      signal: controller.signal,
-    })
+    void api(
+      `/welcome/upload-context?widgetIndex=${widgetIndex}`,
+      welcomeUploadContextSchema,
+      {
+        signal: controller.signal,
+      },
+    )
       .then((next) => {
         if (disposed) return;
-        if (next.revision !== revision) {
+        if (next.revision !== revision || next.widgetIndex !== widgetIndex) {
           setError(t("errors.welcome_conflict"));
           return;
         }
@@ -48,34 +57,49 @@ export function WelcomeMedia({ revision }: { revision: number }) {
       controller.abort();
       clearTimeout(deadline);
     };
-  }, [attempt, revision, t]);
+  }, [attempt, revision, widgetIndex, t]);
+
+  const category = context?.category;
+  const categoryName = category
+    ? category.isPublic
+      ? category.name
+      : t("categories.privateOption", { name: category.name })
+    : t("categories.main");
 
   return (
-    <div className="welcome-media">
+    <div
+      className="welcome-media"
+      data-welcome-widget-index={widgetIndex}
+      role="group"
+      aria-label={
+        context
+          ? t("categories.destination", {
+              name: categoryName,
+            })
+          : t("widgets.mediaUpload")
+      }
+    >
       {context ? (
-        <UploadProvider welcomeRevision={revision}>
+        <>
           <MediaPicker
             limits={context.limits}
             destination={{
               categoryId: context.category?.id ?? null,
               welcomeRevision: revision,
+              welcomeWidgetIndex: widgetIndex,
             }}
           >
             <p className="fine-print">
               {t("categories.destination", {
-                name: context.category?.name ?? t("categories.main"),
+                name: categoryName,
               })}
             </p>
-            <p className="fine-print">
-              {t(
-                context.category && !context.category.isPublic
-                  ? "categories.privateHint"
-                  : "categories.publicHint",
-              )}
-            </p>
+            {(!category || category.isPublic) && (
+              <p className="fine-print">{t("categories.publicHint")}</p>
+            )}
           </MediaPicker>
-          <UploadQueue />
-        </UploadProvider>
+          <UploadQueue widgetIndex={widgetIndex} />
+        </>
       ) : error ? (
         <>
           <ErrorNotice message={error} />

@@ -123,11 +123,22 @@ The host-controlled welcome uses `/attente`, outside the party layout. API statu
 and upload requests. Never fetch or embed future welcome steps in guest pages.
 Guest browsers poll `/api/welcome` every three seconds while visible, pause while
 hidden, and check on return. Keep the displayed step during connection failures.
-Use a full navigation when access closes to discard cached private routes. After
-the host opens access, send guests to `/photos`. Administrators retain the four
-tabs and configure/advance the sequence in settings. Preserve drafts on conflicts.
-Each step has a nullable typed action. The current `profile_photo` action mounts
-the shared photo editor on `/attente` and fetches `/api/profile` only while active.
+Use a full navigation when effective guest access closes to discard cached private
+routes. Host commands unlock steps; each guest chooses next/previous and enters
+explicitly with finish. The public `open` field describes that guest's effective
+access, so redirect to `/photos` only when it becomes true. A global Required
+switch makes late arrivals follow the full sequence even after host opening.
+Administrators retain the four tabs and unlock steps in settings. Save the switch
+separately without losing step drafts. Preserve drafts on conflicts. Already
+unlocked steps stay immutable until the host restarts from an open application.
+Polls carry host `revision` and guest `progressRevision`; compare both and reject
+older responses after navigation. Key widgets by `progressRevision`, which host
+unlocks preserve, so uploads and profile selections remain active.
+Each step has an ordered list of typed widgets and no fixed title or body fields.
+Render title, text, profile-photo, media-upload and notification widgets in their
+saved order.
+The current `profile_photo` widget mounts the shared photo editor on `/attente`
+and fetches `/api/profile` only while active.
 Keep it across unchanged polls; unmount and abort requests when the step changes.
 Keep interactive controls outside the text's atomic live region. Saving a photo
 updates the widget without refreshing or advancing the welcome route.
@@ -135,12 +146,17 @@ The host editor keeps stable draft keys while selecting or reordering steps.
 Use a dedicated mouse/touch drag handle and accessible move controls; normal
 scrolling and text selection must work outside the handle. Cancel interrupted
 drags without mutating the draft, announce successful moves and preserve focus.
-Keep the ordered list, selected text fields and action pane usable on narrow
-screens. Action-specific settings belong to focused forms with typed contracts;
-the current profile-photo action has no settings and keeps its existing API shape.
-The media-upload action has a typed category destination. Fetch its upload context
-only while that action is current, and key the widget by welcome revision. Reuse
-the bounded uploader, capture the destination/revision per transfer and retry,
+Keep the ordered step list, widget canvas and widget palette usable on narrow
+screens. Allow dragging from the palette into the canvas and reordering widgets,
+with add and move buttons as keyboard alternatives. Widget-specific settings
+belong to focused forms with typed contracts. A step holds up to 12 widgets and
+at most one profile-photo widget and one notification widget, neither with
+settings. Text and media widgets can repeat. Strip local draft keys before saving.
+Each media-upload widget has a typed category destination. Fetch its upload
+context by widget index only while current, and key the step by progress revision.
+Share one bounded uploader and queue poller across the step's media widgets;
+filter displayed queues and dismissal by widget index. Capture the destination,
+progress revision and widget index per transfer and retry,
 and abort unaccepted browser transfers when the step changes. Accepted jobs remain
 durable. A ready job may have no photo because the category is private or welcome
 access is still closed; show completion without fetching files in that case.
@@ -148,6 +164,17 @@ Admin settings create categories and change their visibility. The media gallery
 filters uncategorized media or one accessible category; keep pagination, completed
 uploads and retries tied to that destination. Public means signed-in guests,
 private means administrators. Preserve category names as authored content.
+
+The `enable_notifications` widget and settings share the browser notification
+control. Ask permission only from an explicit click and retain that user gesture;
+never prompt on mount or block guest navigation when permission is declined.
+Show enabled only after permission, a browser push subscription and server
+registration all succeed. Handle unsupported browsers, insecure origins, denial,
+network failures and iOS Home Screen installation with translated guidance.
+Use `/sw.js` only for push display and same-origin notification clicks. It must
+not cache authenticated pages or API responses. Keep subscriptions tied to the
+current session; an existing browser subscription must not silently bind another
+guest identity. Allow retry after failed registration and disabling in settings.
 
 Profile settings accept JPEG/PNG/WebP photos using `/api/profile` image limits.
 Show a centered preview before saving, preserve the selection after failed saves,
@@ -168,6 +195,14 @@ Each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos
 accept MP4/MOV/WebM up to 5 minutes and 4K input; Go converts them to
 MP4 and generates JPEG thumbnails. Render thumbnails in the gallery and use a
 native video player with controls, playsInline and no autoplay when opened.
+The gallery can explicitly start a slideshow of its current category, including
+uncategorized media. Keep a snapshot of the loaded list and fetch subsequent
+metadata pages only as needed, retaining the category on every request. Show
+each loaded image for five seconds; play videos muted by default until they end.
+Loop after the last page. Provide pause, previous/next, close and optional native
+fullscreen controls. Pause playback while the document is hidden, abort pending
+requests on close and restore focus to the launch button. File or page failures
+pause the slideshow and offer a retry instead of silently skipping content.
 The gallery API includes limits.imageBytes/videoBytes from the root environment
 (MAX_IMAGE_SIZE_MB/MAX_VIDEO_SIZE_MB, defaults 15/100 MiB, range 1–1024).
 Use those values for browser validation and translated size labels.

@@ -15,15 +15,29 @@ import {
   mediaCategorySchema,
   mediaCategoriesSchema,
   welcomeUploadContextSchema,
+  notificationConfigSchema,
+  notificationStatusSchema,
+  notificationSavedSchema,
 } from "../src/lib/contracts.ts";
 
+const waitingWelcome = {
+  open: false,
+  revision: 1,
+  progressRevision: 10,
+  step: null,
+  canPrevious: false,
+  canNext: false,
+  canFinish: false,
+};
+
 test("welcome responses distinguish waiting, the current step and full access", () => {
-  const waiting = { open: false, revision: 1, step: null };
+  const waiting = waitingWelcome;
   const step = {
     position: 1,
-    title: "Meet outside",
-    body: "Bring your coat.",
-    action: null,
+    widgets: [
+      { type: "title", text: "Meet outside" },
+      { type: "text", text: "Bring your coat." },
+    ],
   };
   assert.equal(welcomeSchema.safeParse(waiting).success, true);
   assert.equal(welcomeSchema.safeParse({ ...waiting, step }).success, true);
@@ -34,9 +48,17 @@ test("welcome responses distinguish waiting, the current step and full access", 
   for (const invalid of [
     { ...waiting, step, open: true },
     { ...waiting, revision: -1 },
+    { ...waiting, progressRevision: -1 },
+    { ...waiting, progressRevision: undefined },
+    { ...waiting, canNext: undefined },
+    { ...waiting, canPrevious: true },
+    { ...waiting, step, canPrevious: true },
+    { ...waiting, open: true, canFinish: true },
+    { ...waiting, open: true, canNext: true },
     { ...waiting, step: { ...step, position: 0 } },
     { ...waiting, step: { ...step, position: 13 } },
-    { ...waiting, step: { ...step, title: "" } },
+    { ...waiting, step: { ...step, widgets: [] } },
+    { ...waiting, step: { ...step, title: "Legacy title" } },
   ])
     assert.equal(welcomeSchema.safeParse(invalid).success, false);
 
@@ -44,7 +66,8 @@ test("welcome responses distinguish waiting, the current step and full access", 
     open: false,
     revision: 2,
     currentStep: 1,
-    steps: [{ title: step.title, body: step.body, action: null }],
+    required: false,
+    steps: [{ widgets: step.widgets }],
   };
   assert.equal(adminWelcomeSchema.safeParse(admin).success, true);
   assert.equal(
@@ -53,7 +76,35 @@ test("welcome responses distinguish waiting, the current step and full access", 
   );
   assert.equal(
     adminWelcomeSchema.safeParse({ ...admin, open: true }).success,
+    true,
+  );
+  assert.equal(
+    adminWelcomeSchema.safeParse({ ...admin, required: undefined }).success,
     false,
+  );
+  assert.equal(
+    adminWelcomeSchema.safeParse({ ...admin, required: "true" }).success,
+    false,
+  );
+  assert.equal(
+    adminWelcomeSchema.safeParse({ ...admin, required: true }).success,
+    true,
+  );
+  assert.equal(
+    welcomeSchema.safeParse({ ...waiting, canNext: true }).success,
+    true,
+  );
+  assert.equal(
+    welcomeSchema.safeParse({ ...waiting, canFinish: true }).success,
+    true,
+  );
+  assert.equal(
+    welcomeSchema.safeParse({
+      ...waiting,
+      step: { ...step, position: 2 },
+      canPrevious: true,
+    }).success,
+    true,
   );
   assert.equal(
     adminWelcomeSchema.safeParse({
@@ -64,10 +115,19 @@ test("welcome responses distinguish waiting, the current step and full access", 
   );
 });
 
-test("welcome steps accept only supported optional actions", () => {
-  const step = { title: "Your photo", body: "", action: "profile_photo" };
+test("welcome steps preserve ordered typed widgets without fixed title or body fields", () => {
+  const step = {
+    widgets: [
+      { type: "text", text: "Start here." },
+      { type: "profile_photo" },
+      { type: "enable_notifications" },
+      { type: "title", text: "Then a photo" },
+      { type: "media_upload", mediaUpload: { categoryId: 4 } },
+      { type: "media_upload", mediaUpload: { categoryId: null } },
+    ],
+  };
   const welcome = {
-    open: false,
+    ...waitingWelcome,
     revision: 3,
     step: { ...step, position: 1 },
   };
@@ -75,32 +135,89 @@ test("welcome steps accept only supported optional actions", () => {
     open: false,
     revision: 3,
     currentStep: 1,
+    required: false,
     steps: [step],
   };
-  assert.equal(welcomeSchema.parse(welcome).step?.action, "profile_photo");
-  assert.equal(
-    adminWelcomeSchema.parse(admin).steps[0].action,
-    "profile_photo",
-  );
-  for (const action of [
+  assert.deepEqual(welcomeSchema.parse(welcome).step?.widgets, step.widgets);
+  assert.deepEqual(adminWelcomeSchema.parse(admin).steps[0], step);
+  for (const widgets of [
     undefined,
-    "",
-    "gallery",
-    true,
+    null,
     [],
-    { type: "profile_photo" },
+    true,
+    "title",
+    [{ type: "unknown" }],
+    [{ type: "title" }],
+    [{ type: "title", text: " " }],
+    [{ type: "text", text: "" }],
+    [{ type: "title", text: "🎂".repeat(121) }],
+    [{ type: "text", text: "🎂".repeat(1001) }],
+    [{ type: "profile_photo", text: "Unused" }],
+    [{ type: "profile_photo", mediaUpload: null }],
+    [{ type: "title", text: "A title", mediaUpload: null }],
+    [{ type: "profile_photo" }, { type: "profile_photo" }],
+    [{ type: "enable_notifications" }, { type: "enable_notifications" }],
+    [{ type: "enable_notifications", text: "Unused settings" }],
+    [{ type: "enable_notifications", mediaUpload: null }],
+    Array(13).fill({ type: "text", text: "Too many widgets" }),
   ]) {
     assert.equal(
-      welcomeSchema.safeParse({ ...welcome, step: { ...welcome.step, action } })
-        .success,
+      welcomeSchema.safeParse({
+        ...welcome,
+        step: { ...welcome.step, widgets },
+      }).success,
       false,
     );
     assert.equal(
-      adminWelcomeSchema.safeParse({ ...admin, steps: [{ ...step, action }] })
-        .success,
+      adminWelcomeSchema.safeParse({ ...admin, steps: [{ widgets }] }).success,
       false,
     );
   }
+  for (const widgets of [
+    [{ type: "profile_photo" }],
+    [{ type: "enable_notifications" }],
+    [{ type: "title", text: "🎂".repeat(120) }],
+    Array(12).fill({ type: "text", text: "🎂".repeat(1000) }),
+  ])
+    assert.equal(
+      adminWelcomeSchema.safeParse({ ...admin, steps: [{ widgets }] }).success,
+      true,
+    );
+});
+
+test("notification contracts require a public application key and persisted success", () => {
+  assert.equal(
+    notificationConfigSchema.safeParse({ publicKey: "B" + "A".repeat(86) })
+      .success,
+    true,
+  );
+  for (const publicKey of [
+    null,
+    "",
+    "secret",
+    "B" + "+".repeat(86),
+    "B" + "A".repeat(87),
+  ]) {
+    assert.equal(
+      notificationConfigSchema.safeParse({ publicKey }).success,
+      false,
+    );
+  }
+  assert.deepEqual(notificationStatusSchema.parse({ subscribed: false }), {
+    subscribed: false,
+  });
+  assert.equal(
+    notificationStatusSchema.safeParse({ permission: "granted" }).success,
+    false,
+  );
+  assert.equal(
+    notificationSavedSchema.safeParse({ subscribed: false }).success,
+    false,
+  );
+  assert.equal(
+    notificationSavedSchema.safeParse({ subscribed: true }).success,
+    true,
+  );
 });
 
 const defaultLimits = {
@@ -108,18 +225,18 @@ const defaultLimits = {
   videoBytes: 100 * 1024 * 1024,
 };
 
-test("media upload actions require a typed destination and cannot configure another action", () => {
-  const state = { open: false, revision: 4, currentStep: 1 };
-  const base = { title: "Share a memory", body: "", action: "media_upload" };
+test("media widgets require a typed destination and reject unrelated parameters", () => {
+  const state = { open: false, revision: 4, currentStep: 1, required: false };
+  const base = { type: "media_upload" };
   for (const categoryId of [null, 42]) {
-    const step = { ...base, mediaUpload: { categoryId } };
+    const step = { widgets: [{ ...base, mediaUpload: { categoryId } }] };
     assert.deepEqual(
       adminWelcomeSchema.parse({ ...state, steps: [step] }).steps[0],
       step,
     );
     assert.equal(
       welcomeSchema.safeParse({
-        open: false,
+        ...waitingWelcome,
         revision: state.revision,
         step: { ...step, position: 1 },
       }).success,
@@ -141,16 +258,16 @@ test("media upload actions require a typed destination and cannot configure anot
     assert.equal(
       adminWelcomeSchema.safeParse({
         ...state,
-        steps: [{ ...base, mediaUpload }],
+        steps: [{ widgets: [{ ...base, mediaUpload }] }],
       }).success,
       false,
     );
   }
-  for (const action of [null, "profile_photo"]) {
+  for (const type of [null, "profile_photo", "text"]) {
     assert.equal(
       adminWelcomeSchema.safeParse({
         ...state,
-        steps: [{ ...base, action, mediaUpload: { categoryId: 42 } }],
+        steps: [{ widgets: [{ type, mediaUpload: { categoryId: 42 } }] }],
       }).success,
       false,
     );
@@ -190,7 +307,12 @@ test("categories require explicit visibility and bounded names and collections",
 });
 
 test("welcome upload context identifies the current destination and effective limits", () => {
-  const context = { revision: 6, category: null, limits: defaultLimits };
+  const context = {
+    revision: 6,
+    widgetIndex: 0,
+    category: null,
+    limits: defaultLimits,
+  };
   assert.deepEqual(welcomeUploadContextSchema.parse(context), context);
   assert.equal(
     welcomeUploadContextSchema.safeParse({
@@ -201,6 +323,10 @@ test("welcome upload context identifies the current destination and effective li
   );
   for (const invalid of [
     { ...context, revision: -1 },
+    { ...context, widgetIndex: undefined },
+    { ...context, widgetIndex: -1 },
+    { ...context, widgetIndex: 12 },
+    { ...context, widgetIndex: "0" },
     { ...context, category: undefined },
     { ...context, limits: undefined },
     { ...context, limits: { ...defaultLimits, videoBytes: 0 } },
@@ -256,6 +382,7 @@ test("upload responses distinguish accepted work, completed media and failed pre
     id: 1,
     categoryId: null,
     welcomeRevision: null,
+    welcomeWidgetIndex: null,
     clientUploadId: "b4174b65-4c1c-45a8-96ee-ac2c42e87090",
     filename: "party.mp4",
     kind: "video",
@@ -288,6 +415,7 @@ test("upload responses distinguish accepted work, completed media and failed pre
       status: "ready",
       categoryId: 12,
       welcomeRevision: 4,
+      welcomeWidgetIndex: 11,
       photo: null,
     }).success,
     true,
@@ -302,6 +430,11 @@ test("upload responses distinguish accepted work, completed media and failed pre
     { ...job, categoryId: -1 },
     { ...job, welcomeRevision: undefined },
     { ...job, welcomeRevision: -1 },
+    { ...job, welcomeWidgetIndex: undefined },
+    { ...job, welcomeWidgetIndex: -1 },
+    { ...job, welcomeWidgetIndex: 12 },
+    { ...job, welcomeWidgetIndex: 0.5 },
+    { ...job, welcomeWidgetIndex: 0, welcomeRevision: null },
     { ...job, errorCode: "unreadable_video" },
     { ...job, photo: { url: "https://outside.example/private.mp4" } },
   ])

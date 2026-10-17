@@ -4,6 +4,9 @@ import type { mediaMessages } from "./messages/media";
 import type { welcomeMessages } from "./messages/welcome";
 import type { profileMessages } from "./messages/profile";
 import type { categoryMessages } from "./messages/categories";
+import type { widgetMessages } from "./messages/widgets";
+import type { slideshowMessages } from "./messages/slideshow";
+import type { notificationMessages } from "./messages/notifications";
 import type { ErrorCode } from "./messages/errors";
 
 export type MessageKey =
@@ -13,6 +16,9 @@ export type MessageKey =
   | keyof typeof welcomeMessages.en
   | keyof typeof profileMessages.en
   | keyof typeof categoryMessages.en
+  | keyof typeof widgetMessages.en
+  | keyof typeof slideshowMessages.en
+  | keyof typeof notificationMessages.en
   | `errors.${ErrorCode}`;
 export type Messages = Record<MessageKey, string>;
 export type Translator = (

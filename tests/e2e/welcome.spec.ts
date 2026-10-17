@@ -12,19 +12,45 @@ const mutationHeaders = {
   "X-Requested-With": "birthday-party",
   Origin: baseURL,
 };
-type WelcomeStep = {
-  title: string;
-  body: string;
-  action: "profile_photo" | null;
-};
+type Widget =
+  | { type: "title"; text: string }
+  | { type: "text"; text: string }
+  | { type: "profile_photo" }
+  | { type: "media_upload"; mediaUpload: { categoryId: number | null } };
+type WelcomeStep = { widgets: Widget[] };
+
+function step(
+  title: string,
+  body: string,
+  action: "profile_photo" | "media_upload" | null = null,
+  categoryId: number | null = null,
+): WelcomeStep {
+  const widgets: Widget[] = [
+    { type: "title", text: title },
+    { type: "text", text: body },
+  ];
+  if (action === "profile_photo") widgets.push({ type: action });
+  if (action === "media_upload")
+    widgets.push({ type: action, mediaUpload: { categoryId } });
+  return { widgets };
+}
+
+function titleOf(step: WelcomeStep) {
+  return step.widgets.find((widget) => widget.type === "title")!.text;
+}
+function bodyOf(step: WelcomeStep) {
+  return step.widgets.find((widget) => widget.type === "text")!.text;
+}
 type AdminWelcome = {
   open: boolean;
   revision: number;
   currentStep: number;
+  required: boolean;
   steps: WelcomeStep[];
 };
 let host: APIRequestContext;
 let previousSteps: WelcomeStep[] = [];
+let previouslyRequired = false;
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
 
@@ -58,9 +84,21 @@ async function saveSteps(steps: WelcomeStep[]) {
   return response.json() as Promise<AdminWelcome>;
 }
 
-async function restoreOpen(steps: WelcomeStep[]) {
+async function setRequired(required: boolean) {
+  const { revision } = await adminState();
+  const response = await host.patch("/api/admin/welcome/required", {
+    data: { revision, required },
+  });
+  expect(response.status()).toBe(200);
+  return response.json() as Promise<AdminWelcome>;
+}
+
+async function restoreOpen(steps: WelcomeStep[], required = false) {
   if (!(await adminState()).open) await transition("open");
+  await transition("start");
   await saveSteps(steps);
+  await setRequired(required);
+  await transition("open");
 }
 
 async function invite(name: string) {
@@ -82,11 +120,38 @@ async function enterWaiting(page: Page, invitationUrl: string) {
 
 async function expectStep(page: Page, step: WelcomeStep) {
   await expect(
-    page.getByRole("heading", { name: step.title, exact: true }),
+    page.getByRole("heading", { name: titleOf(step), exact: true }),
   ).toBeVisible();
-  await expect(page.getByText(step.body, { exact: true })).toBeVisible();
+  await expect(page.getByText(bodyOf(step), { exact: true })).toBeVisible();
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await expect(page).toHaveURL(/\/attente$/);
+}
+
+async function guestNext(page: Page) {
+  const response = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/welcome/progress" &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: /^(Commencer|Suivant)$/ }).click();
+  expect((await response).status()).toBe(200);
+}
+
+async function guestPrevious(page: Page) {
+  const response = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/welcome/progress" &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Précédent", exact: true }).click();
+  expect((await response).status()).toBe(200);
+}
+
+async function finishWelcome(page: Page) {
+  await page
+    .getByRole("button", { name: "Entrer dans l’application", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/photos$/);
 }
 
 test.beforeAll(async () => {
@@ -118,7 +183,9 @@ test.beforeAll(async () => {
     data: { token: invitationToken(match[0]) },
   });
   expect(accepted.status()).toBe(200);
-  previousSteps = (await adminState()).steps;
+  const previousState = await adminState();
+  previousSteps = previousState.steps;
+  previouslyRequired = previousState.required;
 });
 
 test.beforeEach(async () => {
@@ -127,28 +194,28 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   // The browser suite shares one disposable database across its specifications.
-  await restoreOpen(previousSteps);
+  await restoreOpen(previousSteps, previouslyRequired);
 });
 
 test.afterAll(async () => {
   await host?.dispose();
 });
 
-test("guests wait for the host, discover only the current step and enter when access opens", async ({
+test("guests navigate unlocked steps independently and keep their position across reloads", async ({
   page,
   browser,
 }) => {
   const steps = [
-    {
-      title: "Find your table and keep your invitation nearby",
-      body: "The table numbers are on the cards beside the entrance. Keep your invitation with you for the next activity.",
-      action: null,
-    },
-    {
-      title: "Open the envelope on your table",
-      body: "Read the note together, then leave the envelope beside the flowers.",
-      action: null,
-    },
+    step(
+      "Find your table and keep your invitation nearby",
+      "The table numbers are on the cards beside the entrance. Keep your invitation with you for the next activity.",
+      null,
+    ),
+    step(
+      "Open the envelope on your table",
+      "Read the note together, then leave the envelope beside the flowers.",
+      null,
+    ),
   ];
   await saveSteps(steps);
   await transition("start");
@@ -165,12 +232,16 @@ test("guests wait for the host, discover only the current step and enter when ac
   expect(await waitingResponse.json()).toEqual({
     open: false,
     revision: expect.any(Number),
+    progressRevision: expect.any(Number),
     step: null,
+    canPrevious: false,
+    canNext: false,
+    canFinish: false,
   });
   const initialHTML = await page.content();
   for (const step of steps) {
-    expect(initialHTML).not.toContain(step.title);
-    expect(initialHTML).not.toContain(step.body);
+    expect(initialHTML).not.toContain(titleOf(step));
+    expect(initialHTML).not.toContain(bodyOf(step));
   }
   await page.screenshot({
     path: "test-results/welcome-waiting-mobile.png",
@@ -193,17 +264,45 @@ test("guests wait for the host, discover only the current step and enter when ac
   );
 
   await transition("next");
+  await expect(
+    page.getByRole("button", { name: "Commencer", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("heading", {
+      name: `Bienvenue ${invitation.guest.name}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(
+    (await (await page.request.get("/api/welcome")).json()).step,
+  ).toBeNull();
+  await guestNext(page);
   await expectStep(page, steps[0]);
+  await expect(page.locator("#welcome-position")).toBeFocused();
   expect(await (await page.request.get("/api/welcome")).json()).toEqual({
     open: false,
     revision: expect.any(Number),
+    progressRevision: expect.any(Number),
     step: { position: 1, ...steps[0] },
+    canPrevious: false,
+    canNext: false,
+    canFinish: false,
   });
+  const lockedProgress = await (await page.request.get("/api/welcome")).json();
+  const rejectedNext = await page.request.post("/api/welcome/progress", {
+    headers: mutationHeaders,
+    data: { revision: lockedProgress.progressRevision, action: "next" },
+  });
+  expect(rejectedNext.status()).toBe(409);
+  expect(await rejectedNext.json()).toMatchObject({
+    code: "invalid_welcome_transition",
+  });
+  await expectStep(page, steps[0]);
   const stageResponse = await page.request.get("/attente");
   expect(stageResponse.status()).toBe(200);
   const stageHTML = await stageResponse.text();
-  expect(stageHTML).not.toContain(steps[1].title);
-  expect(stageHTML).not.toContain(steps[1].body);
+  expect(stageHTML).not.toContain(titleOf(steps[1]));
+  expect(stageHTML).not.toContain(bodyOf(steps[1]));
 
   await page.route("**/api/welcome", (route) => route.abort("failed"), {
     times: 1,
@@ -241,17 +340,41 @@ test("guests wait for the host, discover only the current step and enter when ac
     const lateInvitation = await invite("Alex Welcome Test");
     await enterWaiting(latePage, lateInvitation.invitationUrl);
     await expectStep(latePage, steps[0]);
+    const firstProgress = (
+      await (await page.request.get("/api/welcome")).json()
+    ).progressRevision;
     await transition("next");
+    await expect(
+      latePage.getByRole("button", { name: "Suivant", exact: true }),
+    ).toBeEnabled();
+    await expectStep(latePage, steps[0]);
+    await guestNext(latePage);
     await expectStep(latePage, steps[1]);
-    // The first context may be backgrounded; a returning guest reads the latest state.
+    // Unlocking a step and another guest moving must preserve this guest's position.
     await page.bringToFront();
-    await expectStep(page, steps[1]);
+    await expectStep(page, steps[0]);
+    expect(
+      (await (await page.request.get("/api/welcome")).json()).progressRevision,
+    ).toBe(firstProgress);
     await page.reload();
+    await expectStep(page, steps[0]);
+    await guestNext(page);
     await expectStep(page, steps[1]);
+    await guestPrevious(page);
+    await expectStep(page, steps[0]);
+    await page.reload();
+    await expectStep(page, steps[0]);
+    await guestNext(page);
+    await expectStep(page, steps[1]);
+    await latePage.bringToFront();
+    await latePage.reload();
+    await expectStep(latePage, steps[1]);
     expect((await adminState()).open).toBe(false);
 
     await transition("open");
-    await expect(page).toHaveURL(/\/photos$/);
+    await page.bringToFront();
+    await expectStep(page, steps[1]);
+    await finishWelcome(page);
     const navigation = page.getByRole("navigation");
     for (const name of ["Médias", "Programme", "Livre d'or", "Paramètres"]) {
       await expect(
@@ -259,13 +382,124 @@ test("guests wait for the host, discover only the current step and enter when ac
       ).toBeVisible();
     }
     await latePage.bringToFront();
-    await expect(latePage).toHaveURL(/\/photos$/);
+    await expectStep(latePage, steps[1]);
+    await finishWelcome(latePage);
   } finally {
     await lateContext.close();
   }
 });
 
-test("the host prepares, reorders and reveals welcome steps from settings", async ({
+test("required late arrivals complete every step before entering an already open app", async ({
+  page,
+}) => {
+  const steps = [
+    step(
+      "First welcome instruction",
+      "Read this instruction before continuing.",
+    ),
+    step("Second welcome instruction", "Read this next instruction as well."),
+    step(
+      "Last welcome instruction",
+      "You can enter after this last instruction.",
+    ),
+  ];
+  await saveSteps(steps);
+  await setRequired(true);
+  await transition("start");
+  for (let index = 0; index < steps.length; index++) await transition("next");
+  await transition("open");
+  const invitation = await invite("Required Late Arrival Test");
+  await enterWaiting(page, invitation.invitationUrl);
+  await expectStep(page, steps[0]);
+  expect((await page.request.get("/api/photos")).status()).toBe(423);
+  const first = await (await page.request.get("/api/welcome")).json();
+  expect(first).toMatchObject({
+    open: false,
+    canPrevious: false,
+    canNext: true,
+    canFinish: false,
+  });
+  expect(JSON.stringify(first)).not.toContain(titleOf(steps[1]));
+  expect(JSON.stringify(first)).not.toContain(titleOf(steps[2]));
+  const finishEarly = await page.request.post("/api/welcome/progress", {
+    headers: mutationHeaders,
+    data: { revision: first.progressRevision, action: "finish" },
+  });
+  expect(finishEarly.status()).toBe(409);
+  expect(await finishEarly.json()).toMatchObject({
+    code: "invalid_welcome_transition",
+  });
+  await guestNext(page);
+  await expectStep(page, steps[1]);
+  await guestPrevious(page);
+  await expectStep(page, steps[0]);
+  await page.reload();
+  await expectStep(page, steps[0]);
+  await guestNext(page);
+  await expectStep(page, steps[1]);
+  await guestNext(page);
+  await expectStep(page, steps[2]);
+  expect((await page.request.get("/api/photos")).status()).toBe(423);
+  await expect(
+    page.getByRole("button", {
+      name: "Entrer dans l’application",
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await page.setViewportSize({ width: 320, height: 740 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "artifacts/welcome-progress/required-last-step-mobile-320.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: "artifacts/welcome-progress/required-last-step-desktop.png",
+    fullPage: true,
+  });
+  await finishWelcome(page);
+  expect((await page.request.get("/api/photos")).status()).toBe(200);
+  await page.reload();
+  await expect(page).toHaveURL(/\/photos$/);
+  await page.goto("/attente");
+  await expect(page).toHaveURL(/\/photos$/);
+});
+
+test("optional late arrivals enter directly after the host opens the app", async ({
+  page,
+}) => {
+  const steps = [
+    step(
+      "Optional welcome instruction",
+      "This welcome has already taken place.",
+    ),
+    step(
+      "Optional final instruction",
+      "Late arrivals can join the party directly.",
+    ),
+  ];
+  await saveSteps(steps);
+  await transition("start");
+  await transition("next");
+  await transition("next");
+  await transition("open");
+  const invitation = await invite("Optional Late Arrival Test");
+  await page.goto(invitation.invitationUrl);
+  await page.getByRole("button", { name: "Entrer", exact: true }).click();
+  await expect(page).toHaveURL(/\/photos$/);
+  expect((await (await page.request.get("/api/welcome")).json()).open).toBe(
+    true,
+  );
+  expect((await page.request.get("/api/photos")).status()).toBe(200);
+  await page.goto("/attente");
+  await expect(page).toHaveURL(/\/photos$/);
+});
+
+test("the host prepares, reorders and unlocks welcome steps from settings", async ({
   page,
   context,
 }) => {
@@ -274,12 +508,9 @@ test("the host prepares, reorders and reveals welcome steps from settings", asyn
   await page.goto("/parametres");
   const summary = page.getByText("Accueil des invités", { exact: true });
   await expect(summary).toBeVisible();
-  const title = (position: number) =>
-    page.getByLabel(`Titre de l’étape ${position}`, { exact: true });
-  const body = (position: number) =>
-    page.getByLabel(`Texte de l’étape ${position}`, { exact: true });
+  const title = () => page.getByLabel("Titre du widget 1", { exact: true });
   const action = page.getByRole("button", {
-    name: "Définir une photo de profil",
+    name: "Ajouter le widget Photo de profil",
     exact: true,
   });
   const selectStep = (position: number) =>
@@ -299,24 +530,30 @@ test("the host prepares, reorders and reveals welcome steps from settings", asyn
   });
 
   await add.click();
-  await title(1).fill("Read the table card");
-  await body(1).fill("Find the name of your team on the table card.");
-  await expect(action).toHaveAttribute("aria-pressed", "false");
+  await addTextWidgets(
+    page,
+    "Read the table card",
+    "Find the name of your team on the table card.",
+  );
+  await expect(action).toBeEnabled();
   await add.click();
-  await title(2).fill("Collect your envelope at the entrance");
-  await body(2).fill("Take one envelope for your table and keep it closed.");
+  await addTextWidgets(
+    page,
+    "Collect your envelope at the entrance",
+    "Take one envelope for your table and keep it closed.",
+  );
   await action.click();
   await expect(start).toBeDisabled();
 
   await page
     .getByRole("button", { name: "Monter l’étape 2", exact: true })
     .click();
-  await expect(title(1)).toHaveValue("Collect your envelope at the entrance");
-  await expect(action).toHaveAttribute("aria-pressed", "true");
+  await expect(title()).toHaveValue("Collect your envelope at the entrance");
+  await expect(action).toBeDisabled();
   await selectStep(2);
-  await expect(title(2)).toHaveValue("Read the table card");
-  await expect(action).toHaveAttribute("aria-pressed", "false");
-  await title(2).fill("Find your team on the table card");
+  await expect(title()).toHaveValue("Read the table card");
+  await expect(action).toBeEnabled();
+  await title().fill("Find your team on the table card");
   const savedResponse = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/admin/welcome") &&
@@ -327,26 +564,37 @@ test("the host prepares, reorders and reveals welcome steps from settings", asyn
     .click();
   expect((await savedResponse).status()).toBe(200);
   expect((await adminState()).steps).toEqual([
-    {
-      title: "Collect your envelope at the entrance",
-      body: "Take one envelope for your table and keep it closed.",
-      action: "profile_photo",
-    },
-    {
-      title: "Find your team on the table card",
-      body: "Find the name of your team on the table card.",
-      action: null,
-    },
+    step(
+      "Collect your envelope at the entrance",
+      "Take one envelope for your table and keep it closed.",
+      "profile_photo",
+    ),
+    step(
+      "Find your team on the table card",
+      "Find the name of your team on the table card.",
+      null,
+    ),
   ]);
 
+  const required = page.getByLabel("Obligatoire", { exact: true });
+  await expect(required).not.toBeChecked();
+  const requiredSaved = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/admin/welcome/required" &&
+      response.request().method() === "PATCH",
+  );
+  await required.check();
+  expect((await requiredSaved).status()).toBe(200);
+  expect((await adminState()).required).toBe(true);
   await page.reload();
+  await expect(required).toBeChecked();
   await expect(summary).toBeVisible();
   await selectStep(1);
-  await expect(title(1)).toHaveValue("Collect your envelope at the entrance");
-  await expect(action).toHaveAttribute("aria-pressed", "true");
+  await expect(title()).toHaveValue("Collect your envelope at the entrance");
+  await expect(action).toBeDisabled();
   await selectStep(2);
-  await expect(title(2)).toHaveValue("Find your team on the table card");
-  await expect(action).toHaveAttribute("aria-pressed", "false");
+  await expect(title()).toHaveValue("Find your team on the table card");
+  await expect(action).toBeEnabled();
   await selectStep(1);
   await page.screenshot({
     path: "test-results/welcome-admin-mobile.png",
@@ -377,14 +625,32 @@ test("the host prepares, reorders and reveals welcome steps from settings", asyn
   await expect(page).toHaveURL(/\/parametres$/);
   await expect(page.getByRole("navigation")).toBeVisible();
   expect(await adminState()).toMatchObject({ open: false, currentStep: 0 });
-  await pressTransition("Afficher la première étape");
+  await pressTransition("Débloquer la première étape");
   expect(await adminState()).toMatchObject({ open: false, currentStep: 1 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .locator(".welcome-control")
+    .screenshot({ path: "artifacts/welcome-progress/host-unlock-mobile.png" });
+  await page
+    .locator(".welcome-required")
+    .screenshot({
+      path: "artifacts/welcome-progress/host-required-mobile.png",
+    });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page
+    .locator(".welcome-control")
+    .screenshot({ path: "artifacts/welcome-progress/host-unlock-desktop.png" });
+  await page
+    .locator(".welcome-required")
+    .screenshot({
+      path: "artifacts/welcome-progress/host-required-desktop.png",
+    });
   await expect(action).toBeDisabled();
-  await pressTransition("Passer à l’étape suivante");
+  await pressTransition("Débloquer l’étape suivante");
   expect(await adminState()).toMatchObject({ open: false, currentStep: 2 });
   await expect(
     page.getByRole("button", {
-      name: "Passer à l’étape suivante",
+      name: "Débloquer l’étape suivante",
       exact: true,
     }),
   ).toHaveCount(0);
@@ -427,22 +693,14 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
   context,
 }) => {
   const savedSteps: WelcomeStep[] = [
-    {
-      title: "Collect the table card",
-      body: "Take one card for your table.",
-      action: null,
-    },
-    {
-      title: "Read the team name",
-      body: "Read the name written on your card.",
-      action: null,
-    },
+    step("Collect the table card", "Take one card for your table.", null),
+    step("Read the team name", "Read the name written on your card.", null),
   ];
   await saveSteps(savedSteps);
   await transition("start");
   await context.addCookies((await host.storageState()).cookies);
   await page.goto("/parametres");
-  const title = page.getByLabel("Titre de l’étape 1", { exact: true });
+  const title = page.getByLabel("Titre du widget 1", { exact: true });
   const draftTitle = "Unpublished changes from this browser";
   await title.fill(draftTitle);
 
@@ -479,7 +737,7 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
   await expect(title).toHaveValue(draftTitle);
   await expect(title).toBeDisabled();
   const next = page.getByRole("button", {
-    name: "Passer à l’étape suivante",
+    name: "Débloquer l’étape suivante",
     exact: true,
   });
   await expect(next).toBeDisabled();
@@ -496,14 +754,14 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
   await expect(title).toHaveValue(draftTitle);
   page.once("dialog", (dialog) => void dialog.accept());
   await discard.click();
-  await expect(title).toHaveValue(savedSteps[0].title);
+  await expect(title).toHaveValue(titleOf(savedSteps[0]));
   await expect(discard).toHaveCount(0);
   await expect(next).toBeEnabled();
   expect((await adminState()).steps).toEqual(savedSteps);
 
   await next.click();
   await expect(
-    page.getByRole("heading", { name: "Étape 2 sur 2 affichée", exact: true }),
+    page.getByRole("heading", { name: "Étape 2 sur 2 débloquée", exact: true }),
   ).toBeVisible();
   page.once("dialog", (dialog) => void dialog.accept());
   await page
@@ -515,22 +773,57 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
   expect((await adminState()).open).toBe(true);
 });
 
+test("the host restarts an unlocked welcome without losing a conflicting draft", async ({
+  page,
+  context,
+}) => {
+  const savedSteps = [
+    step("Saved first step", "Saved instructions for the first step."),
+    step("Saved second step", "Saved instructions for the second step."),
+  ];
+  await saveSteps(savedSteps);
+  await transition("start");
+  await context.addCookies((await host.storageState()).cookies);
+  await page.goto("/parametres");
+  const title = page.getByLabel("Titre du widget 1", { exact: true });
+  const draftTitle = "Keep this unsaved title after restarting";
+  await title.fill(draftTitle);
+  await transition("next");
+  const rejectedSave = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/admin/welcome" &&
+      response.request().method() === "PUT",
+  );
+  await page
+    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
+    .click();
+  expect((await rejectedSave).status()).toBe(409);
+  await page
+    .getByRole("button", { name: "Actualiser l’état", exact: true })
+    .click();
+  await expect(title).toBeDisabled();
+  await expect(title).toHaveValue(draftTitle);
+  page.on("dialog", (dialog) => void dialog.accept());
+  await page
+    .getByRole("button", { name: "Ouvrir l’application", exact: true })
+    .click();
+  const restart = page.getByRole("button", {
+    name: "Relancer l’accueil",
+    exact: true,
+  });
+  await expect(restart).toBeEnabled();
+  await restart.click();
+  await expect(title).toBeEnabled();
+  await expect(title).toHaveValue(draftTitle);
+  expect(await adminState()).toMatchObject({ open: false, currentStep: 0 });
+  await saveEditor(page);
+  expect(titleOf((await adminState()).steps[0])).toBe(draftTitle);
+});
+
 const editorSteps: WelcomeStep[] = [
-  {
-    title: "Find your table",
-    body: "Read the table names beside the entrance.",
-    action: null,
-  },
-  {
-    title: "Choose your photo",
-    body: "Choose a photo for your profile.",
-    action: null,
-  },
-  {
-    title: "Collect your envelope",
-    body: "Take one envelope for your table.",
-    action: null,
-  },
+  step("Find your table", "Read the table names beside the entrance.", null),
+  step("Choose your photo", "Choose a photo for your profile.", null),
+  step("Collect your envelope", "Take one envelope for your table.", null),
 ];
 
 async function saveEditor(page: Page) {
@@ -544,6 +837,178 @@ async function saveEditor(page: Page) {
     .click();
   expect((await response).status()).toBe(200);
 }
+
+async function addTextWidgets(page: Page, title: string, body: string) {
+  await page
+    .getByRole("button", { name: "Ajouter le widget Titre", exact: true })
+    .click();
+  await page.getByLabel("Titre du widget 1", { exact: true }).fill(title);
+  await page
+    .getByRole("button", { name: "Ajouter le widget Texte", exact: true })
+    .click();
+  await page.getByLabel("Texte du widget 2", { exact: true }).fill(body);
+}
+
+test("the host drags widgets into a step, reorders them and retains their content after saving", async ({
+  page,
+  context,
+}) => {
+  await context.addCookies((await host.storageState()).cookies);
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto("/parametres");
+  const editor = page.locator(".welcome-admin");
+  await editor
+    .getByRole("button", { name: "Ajouter une étape", exact: true })
+    .click();
+  const canvas = editor.locator(".welcome-widget-list");
+  const widgets = canvas.locator("[data-widget-key]");
+  await expect(widgets).toHaveCount(0);
+  await expect(
+    editor.getByLabel(/Titre de l’étape|Texte de l’étape/),
+  ).toHaveCount(0);
+
+  async function paletteDrag(name: string, beforeFirst = false) {
+    await canvas.scrollIntoViewIfNeeded();
+    const handle = editor.getByRole("button", {
+      name: `Glisser le widget ${name} dans l’étape`,
+      exact: true,
+    });
+    const source = await handle.boundingBox();
+    const target = await canvas.boundingBox();
+    expect(source).toBeTruthy();
+    expect(target).toBeTruthy();
+    await page.mouse.move(
+      source!.x + source!.width / 2,
+      source!.y + source!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      target!.x + target!.width / 2,
+      target!.y + (beforeFirst ? 4 : target!.height / 2),
+      { steps: 15 },
+    );
+    await page.mouse.up();
+  }
+
+  await paletteDrag("Titre");
+  await expect(widgets).toHaveCount(1);
+  await page
+    .getByLabel("Titre du widget 1", { exact: true })
+    .fill("Find your table");
+  await paletteDrag("Texte", true);
+  await expect(widgets).toHaveCount(2);
+  await expect(widgets.first()).toHaveAttribute("data-widget-type", "text");
+  await page
+    .getByLabel("Texte du widget 1", { exact: true })
+    .fill("Read the card beside the entrance.");
+  await editor
+    .getByRole("button", {
+      name: "Ajouter le widget Photo de profil",
+      exact: true,
+    })
+    .press("Enter");
+  await expect(widgets).toHaveCount(3);
+  await expect(
+    editor.getByRole("button", {
+      name: "Ajouter le widget Photo de profil",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await editor
+    .getByRole("button", {
+      name: "Ajouter le widget Photos et vidéos",
+      exact: true,
+    })
+    .press("Enter");
+  await expect(widgets).toHaveCount(4);
+  await expect(
+    page.getByLabel("Destination des envois", { exact: true }),
+  ).toHaveValue("");
+  await editor
+    .getByRole("button", { name: "Monter le widget 2", exact: true })
+    .press("Enter");
+  await expect(widgets.first()).toHaveAttribute("data-widget-type", "title");
+  await expect(
+    page.getByLabel("Titre du widget 1", { exact: true }),
+  ).toHaveValue("Find your table");
+
+  // The drag handle moves an existing widget without changing its form data.
+  await canvas.evaluate((element) =>
+    element.scrollIntoView({ block: "center" }),
+  );
+  const source = await editor
+    .getByRole("button", { name: "Déplacer le widget 2", exact: true })
+    .boundingBox();
+  const target = await widgets.first().boundingBox();
+  expect(source).toBeTruthy();
+  expect(target).toBeTruthy();
+  await page.mouse.move(
+    source!.x + source!.width / 2,
+    source!.y + source!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(target!.x + target!.width / 2, target!.y + 4, {
+    steps: 12,
+  });
+  await page.mouse.up();
+  await expect(widgets.first()).toHaveAttribute("data-widget-type", "text");
+  await expect(
+    page.getByLabel("Texte du widget 1", { exact: true }),
+  ).toHaveValue("Read the card beside the entrance.");
+
+  const expected: WelcomeStep[] = [
+    {
+      widgets: [
+        { type: "text", text: "Read the card beside the entrance." },
+        { type: "title", text: "Find your table" },
+        { type: "profile_photo" },
+        { type: "media_upload", mediaUpload: { categoryId: null } },
+      ],
+    },
+  ];
+  await saveEditor(page);
+  expect((await adminState()).steps).toEqual(expected);
+  await page.reload();
+  await expect(widgets).toHaveCount(4);
+  await expect(
+    page.getByLabel("Titre du widget 2", { exact: true }),
+  ).toHaveValue("Find your table");
+  await expect(
+    page.getByLabel("Texte du widget 1", { exact: true }),
+  ).toHaveValue("Read the card beside the entrance.");
+  await editor
+    .getByRole("button", { name: "Ajouter le widget Titre", exact: true })
+    .press("Enter");
+  const invalidTitle = page.getByLabel("Titre du widget 5", { exact: true });
+  await editor
+    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
+    .click();
+  await expect(invalidTitle).toBeFocused();
+  expect((await adminState()).steps).toEqual(expected);
+  await editor
+    .getByRole("button", { name: "Supprimer le widget 5", exact: true })
+    .click();
+  await expect(widgets).toHaveCount(4);
+  await expect(editor.getByRole("alert")).toHaveCount(0);
+  await canvas.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await editor.screenshot({
+    path: "test-results/welcome-widgets-editor-desktop.png",
+  });
+  await page.setViewportSize({ width: 320, height: 740 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await canvas.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await editor.screenshot({
+    path: "test-results/welcome-widgets-editor-mobile-320.png",
+  });
+});
 
 test("dragging a selected welcome step preserves its draft and action settings through save and reload", async ({
   page,
@@ -562,18 +1027,16 @@ test("dragging a selected welcome step preserves its draft and action settings t
   const editedTitle = "Choose a photo that your friends recognize";
   const editedBody =
     "You can change your profile photo again after the welcome.";
-  await page
-    .getByLabel("Titre de l’étape 2", { exact: true })
-    .fill(editedTitle);
-  await page.getByLabel("Texte de l’étape 2", { exact: true }).fill(editedBody);
+  await page.getByLabel("Titre du widget 1", { exact: true }).fill(editedTitle);
+  await page.getByLabel("Texte du widget 2", { exact: true }).fill(editedBody);
   const action = editor.getByRole("button", {
-    name: "Définir une photo de profil",
+    name: "Ajouter le widget Photo de profil",
     exact: true,
   });
   await action.click();
   await expect(
-    editor.getByText("Aucun réglage pour cette action.", { exact: true }),
-  ).toBeVisible();
+    editor.locator('[data-widget-type="profile_photo"]'),
+  ).toHaveCount(1);
   const selectedKey = await rows.nth(1).getAttribute("data-step-key");
   await list.evaluate((element) => element.scrollIntoView({ block: "center" }));
   const source = await editor
@@ -593,53 +1056,53 @@ test("dragging a selected welcome step preserves its draft and action settings t
   await page.mouse.up();
   await expect(rows).toContainText([
     editedTitle,
-    editorSteps[0].title,
-    editorSteps[2].title,
+    titleOf(editorSteps[0]),
+    titleOf(editorSteps[2]),
   ]);
   await expect(rows.first()).toHaveAttribute("data-step-key", selectedKey!);
   await expect(
     editor.getByRole("button", { name: "Déplacer l’étape 1", exact: true }),
   ).toBeFocused();
   await expect(
-    page.getByLabel("Titre de l’étape 1", { exact: true }),
+    page.getByLabel("Titre du widget 1", { exact: true }),
   ).toHaveValue(editedTitle);
   await expect(
-    page.getByLabel("Texte de l’étape 1", { exact: true }),
+    page.getByLabel("Texte du widget 2", { exact: true }),
   ).toHaveValue(editedBody);
-  await expect(action).toHaveAttribute("aria-pressed", "true");
+  await expect(action).toBeDisabled();
 
   await editor
-    .getByRole("button", { name: "Retirer l’action", exact: true })
+    .getByRole("button", { name: "Supprimer le widget 3", exact: true })
     .click();
-  await expect(action).toHaveAttribute("aria-pressed", "false");
+  await expect(action).toBeEnabled();
   await editor
     .getByRole("button", { name: "Modifier l’étape 3", exact: true })
     .click();
-  await expect(action).toHaveAttribute("aria-pressed", "false");
+  await expect(action).toBeEnabled();
   await editor
     .getByRole("button", { name: "Modifier l’étape 1", exact: true })
     .click();
   await expect(
-    page.getByLabel("Texte de l’étape 1", { exact: true }),
+    page.getByLabel("Texte du widget 2", { exact: true }),
   ).toHaveValue(editedBody);
-  await expect(action).toHaveAttribute("aria-pressed", "false");
+  await expect(action).toBeEnabled();
   await action.click();
   await saveEditor(page);
   expect((await adminState()).steps).toEqual([
-    { title: editedTitle, body: editedBody, action: "profile_photo" },
+    step(editedTitle, editedBody, "profile_photo"),
     editorSteps[0],
     editorSteps[2],
   ]);
   await page.reload();
   await expect(rows).toContainText([
     editedTitle,
-    editorSteps[0].title,
-    editorSteps[2].title,
+    titleOf(editorSteps[0]),
+    titleOf(editorSteps[2]),
   ]);
   await expect(
-    page.getByLabel("Titre de l’étape 1", { exact: true }),
+    page.getByLabel("Titre du widget 1", { exact: true }),
   ).toHaveValue(editedTitle);
-  await expect(action).toHaveAttribute("aria-pressed", "true");
+  await expect(action).toBeDisabled();
   await editor.screenshot({ path: "test-results/welcome-editor-desktop.png" });
 
   let unexpectedSaves = 0;
@@ -663,14 +1126,17 @@ test("dragging a selected welcome step preserves its draft and action settings t
     .getByRole("button", { name: "Enregistrer les étapes", exact: true })
     .click();
   await expect(
-    page.getByLabel("Titre de l’étape 4", { exact: true }),
+    editor.getByRole("button", {
+      name: "Ajouter le widget Titre",
+      exact: true,
+    }),
   ).toBeFocused();
   expect(unexpectedSaves).toBe(0);
   await editor
     .getByRole("button", { name: "Supprimer l’étape 4", exact: true })
     .click();
   await expect(
-    page.getByLabel("Titre de l’étape 3", { exact: true }),
+    editor.getByRole("button", { name: "Modifier l’étape 3", exact: true }),
   ).toBeFocused();
   page.on("dialog", (dialog) => void dialog.accept());
   await editor
@@ -680,16 +1146,16 @@ test("dragging a selected welcome step preserves its draft and action settings t
     .getByRole("button", { name: "Supprimer l’étape 2", exact: true })
     .click();
   await expect(
-    page.getByLabel("Titre de l’étape 2", { exact: true }),
-  ).toHaveValue(editorSteps[2].title);
+    page.getByLabel("Titre du widget 1", { exact: true }),
+  ).toHaveValue(titleOf(editorSteps[2]));
   await expect(
-    page.getByLabel("Titre de l’étape 2", { exact: true }),
+    editor.getByRole("button", { name: "Modifier l’étape 2", exact: true }),
   ).toBeFocused();
   await editor
     .getByRole("button", { name: "Supprimer l’étape 2", exact: true })
     .click();
   await expect(
-    page.getByLabel("Titre de l’étape 1", { exact: true }),
+    editor.getByRole("button", { name: "Modifier l’étape 1", exact: true }),
   ).toBeFocused();
   await editor
     .getByRole("button", { name: "Supprimer l’étape 1", exact: true })
@@ -721,19 +1187,17 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
       .click();
     const draftBody =
       "Keep this envelope closed until the host tells you to open it.";
-    await page
-      .getByLabel("Texte de l’étape 3", { exact: true })
-      .fill(draftBody);
+    await page.getByLabel("Texte du widget 2", { exact: true }).fill(draftBody);
     await editor
       .getByRole("button", { name: "Monter l’étape 3", exact: true })
       .press("Enter");
     await expect(rows).toContainText([
-      editorSteps[0].title,
-      editorSteps[2].title,
-      editorSteps[1].title,
+      titleOf(editorSteps[0]),
+      titleOf(editorSteps[2]),
+      titleOf(editorSteps[1]),
     ]);
     await expect(
-      page.getByLabel("Texte de l’étape 2", { exact: true }),
+      page.getByLabel("Texte du widget 2", { exact: true }),
     ).toHaveValue(draftBody);
     await expect(
       editor.getByRole("button", { name: "Monter l’étape 2", exact: true }),
@@ -760,9 +1224,9 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
       .getByRole("button", { name: "Déplacer l’étape 2", exact: true })
       .tap();
     await expect(rows).toContainText([
-      editorSteps[0].title,
-      editorSteps[2].title,
-      editorSteps[1].title,
+      titleOf(editorSteps[0]),
+      titleOf(editorSteps[2]),
+      titleOf(editorSteps[1]),
     ]);
     const cdp = await context.newCDPSession(page);
     async function touchDrag(position: number, cancel = false) {
@@ -801,42 +1265,45 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
     }
     await touchDrag(2, true);
     await expect(rows).toContainText([
-      editorSteps[0].title,
-      editorSteps[2].title,
-      editorSteps[1].title,
+      titleOf(editorSteps[0]),
+      titleOf(editorSteps[2]),
+      titleOf(editorSteps[1]),
     ]);
     await touchDrag(3);
     await expect(rows).toContainText([
-      editorSteps[1].title,
-      editorSteps[0].title,
-      editorSteps[2].title,
+      titleOf(editorSteps[1]),
+      titleOf(editorSteps[0]),
+      titleOf(editorSteps[2]),
     ]);
     await editor
       .getByRole("button", { name: "Modifier l’étape 3", exact: true })
       .click();
     await expect(
-      page.getByLabel("Texte de l’étape 3", { exact: true }),
+      page.getByLabel("Texte du widget 2", { exact: true }),
     ).toHaveValue(draftBody);
     await editor
-      .getByRole("button", { name: "Définir une photo de profil", exact: true })
+      .getByRole("button", {
+        name: "Ajouter le widget Photo de profil",
+        exact: true,
+      })
       .click();
     await saveEditor(page);
     expect((await adminState()).steps).toEqual([
       editorSteps[1],
       editorSteps[0],
-      { ...editorSteps[2], body: draftBody, action: "profile_photo" },
+      step(titleOf(editorSteps[2]), draftBody, "profile_photo"),
     ]);
     await page.reload();
     await expect(rows).toContainText([
-      editorSteps[1].title,
-      editorSteps[0].title,
-      editorSteps[2].title,
+      titleOf(editorSteps[1]),
+      titleOf(editorSteps[0]),
+      titleOf(editorSteps[2]),
     ]);
     await editor
       .getByRole("button", { name: "Modifier l’étape 3", exact: true })
       .click();
     await expect(
-      page.getByLabel("Texte de l’étape 3", { exact: true }),
+      page.getByLabel("Texte du widget 2", { exact: true }),
     ).toHaveValue(draftBody);
     await page.setViewportSize({ width: 320, height: 740 });
     expect(
@@ -846,6 +1313,64 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
     ).toBe(true);
     await editor.screenshot({ path: "test-results/welcome-editor-mobile.png" });
 
+    const widgetList = editor.locator(".welcome-widget-list");
+    const widgetRows = widgetList.locator("[data-widget-key]");
+    async function touchWidgetDrag(cancel: boolean) {
+      await widgetList.evaluate((element) =>
+        element.scrollIntoView({ block: "start" }),
+      );
+      const source = await editor
+        .getByRole("button", { name: "Déplacer le widget 2", exact: true })
+        .boundingBox();
+      const target = await widgetRows.first().boundingBox();
+      expect(source).toBeTruthy();
+      expect(target).toBeTruthy();
+      const x = source!.x + source!.width / 2;
+      const startY = source!.y + source!.height / 2;
+      // Keep the drop away from page-edge scrolling and above the first row's midpoint.
+      const endY = target!.y + target!.height / 3;
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x, y: startY, id: 1 }],
+      });
+      for (let progress = 1; progress <= 12; progress++) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [
+            { x, y: startY + ((endY - startY) * progress) / 12, id: 1 },
+          ],
+        });
+      }
+      if (cancel) await page.keyboard.press("Escape");
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    }
+    await touchWidgetDrag(true);
+    await expect(widgetRows.first()).toHaveAttribute(
+      "data-widget-type",
+      "title",
+    );
+    await touchWidgetDrag(false);
+    await expect(widgetRows.first()).toHaveAttribute(
+      "data-widget-type",
+      "text",
+    );
+    await expect(
+      page.getByLabel("Texte du widget 1", { exact: true }),
+    ).toHaveValue(draftBody);
+    await editor
+      .getByRole("button", { name: "Descendre le widget 1", exact: true })
+      .press("Enter");
+    await expect(widgetRows.first()).toHaveAttribute(
+      "data-widget-type",
+      "title",
+    );
+    await expect(
+      page.getByLabel("Texte du widget 2", { exact: true }),
+    ).toHaveValue(draftBody);
+
     await transition("start");
     await transition("next");
     await page.reload();
@@ -854,12 +1379,12 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
     ).toBeDisabled();
     await expect(
       editor.getByRole("button", {
-        name: "Définir une photo de profil",
+        name: "Ajouter le widget Photo de profil",
         exact: true,
       }),
     ).toBeDisabled();
     await expect(
-      page.getByLabel("Titre de l’étape 1", { exact: true }),
+      page.getByLabel("Titre du widget 1", { exact: true }),
     ).toBeDisabled();
   } finally {
     await context.close();
@@ -870,14 +1395,15 @@ test("dragging through twelve welcome steps scrolls the list and preserves the m
   page,
   context,
 }) => {
-  const steps: WelcomeStep[] = Array.from({ length: 12 }, (_, index) => ({
-    title:
+  const steps: WelcomeStep[] = Array.from({ length: 12 }, (_, index) =>
+    step(
       index % 2 === 0
         ? `Welcome activity ${index + 1}: collect the card assigned to your table`
         : `Welcome activity ${index + 1}`,
-    body: `Instructions for welcome activity ${index + 1}.`,
-    action: index === 0 ? "profile_photo" : null,
-  }));
+      `Instructions for welcome activity ${index + 1}.`,
+      index === 0 ? "profile_photo" : null,
+    ),
+  );
   await saveSteps(steps);
   await context.addCookies((await host.storageState()).cookies);
   await page.setViewportSize({ width: 1440, height: 1100 });
@@ -923,37 +1449,37 @@ test("dragging through twelve welcome steps scrolls the list and preserves the m
   );
   await page.mouse.up();
   const ordered = [...steps.slice(1), steps[0]];
-  await expect(rows).toContainText(ordered.map((step) => step.title));
+  await expect(rows).toContainText(ordered.map((step) => titleOf(step)));
   await expect(
-    page.getByLabel("Titre de l’étape 12", { exact: true }),
-  ).toHaveValue(steps[0].title);
+    page.getByLabel("Titre du widget 1", { exact: true }),
+  ).toHaveValue(titleOf(steps[0]));
   await expect(
-    page.getByLabel("Texte de l’étape 12", { exact: true }),
-  ).toHaveValue(steps[0].body);
+    page.getByLabel("Texte du widget 2", { exact: true }),
+  ).toHaveValue(bodyOf(steps[0]));
   await expect(
     editor.getByRole("button", {
-      name: "Définir une photo de profil",
+      name: "Ajouter le widget Photo de profil",
       exact: true,
     }),
-  ).toHaveAttribute("aria-pressed", "true");
+  ).toBeDisabled();
   await saveEditor(page);
   expect((await adminState()).steps).toEqual(ordered);
   await page.reload();
-  await expect(rows).toContainText(ordered.map((step) => step.title));
+  await expect(rows).toContainText(ordered.map((step) => titleOf(step)));
   await page.setViewportSize({ width: 390, height: 844 });
   // Confirm hydration before sending low-level pointer events after a full reload.
   await editor
     .getByRole("button", { name: "Modifier l’étape 2", exact: true })
     .click();
   await expect(
-    page.getByLabel("Titre de l’étape 2", { exact: true }),
-  ).toHaveValue(ordered[1].title);
+    page.getByLabel("Titre du widget 1", { exact: true }),
+  ).toHaveValue(titleOf(ordered[1]));
   await editor
     .getByRole("button", { name: "Modifier l’étape 1", exact: true })
     .click();
   await expect(
-    page.getByLabel("Titre de l’étape 1", { exact: true }),
-  ).toHaveValue(ordered[0].title);
+    page.getByLabel("Titre du widget 1", { exact: true }),
+  ).toHaveValue(titleOf(ordered[0]));
   await list.evaluate((element) => {
     element.scrollTop = 0;
     window.scrollBy(
@@ -983,7 +1509,7 @@ test("dragging through twelve welcome steps scrolls the list and preserves the m
     .toBeGreaterThan(0);
   await page.keyboard.press("Escape");
   await page.mouse.up();
-  await expect(rows).toContainText(ordered.map((step) => step.title));
+  await expect(rows).toContainText(ordered.map((step) => titleOf(step)));
 });
 
 async function profileImage(page: Page) {
@@ -1015,21 +1541,21 @@ test("a welcome profile action becomes available only for its step and keeps the
   page,
 }) => {
   const steps: WelcomeStep[] = [
-    {
-      title: "Find your seat",
-      body: "Take a seat with your group before the next activity.",
-      action: null,
-    },
-    {
-      title: "Choose your profile photo",
-      body: "Add a photo so the other guests can recognize you.",
-      action: "profile_photo",
-    },
-    {
-      title: "Keep the table envelope closed",
-      body: "Wait for the organizer to explain the next activity.",
-      action: null,
-    },
+    step(
+      "Find your seat",
+      "Take a seat with your group before the next activity.",
+      null,
+    ),
+    step(
+      "Choose your profile photo",
+      "Add a photo so the other guests can recognize you.",
+      "profile_photo",
+    ),
+    step(
+      "Keep the table envelope closed",
+      "Wait for the organizer to explain the next activity.",
+      null,
+    ),
   ];
   await saveSteps(steps);
   await transition("start");
@@ -1044,17 +1570,20 @@ test("a welcome profile action becomes available only for its step and keeps the
   const widget = page.locator(".welcome-profile");
   await expect(widget).toHaveCount(0);
   await transition("next");
+  await guestNext(page);
   await expectStep(page, steps[0]);
   expect(profileRequests).toEqual([]);
   const plainState = await (await page.request.get("/api/welcome")).json();
   expect(plainState.step).toEqual({ position: 1, ...steps[0] });
   expect(JSON.stringify(plainState)).not.toContain("profile_photo");
   const initialHTML = await page.content();
-  expect(initialHTML).not.toContain(steps[1].title);
-  expect(initialHTML).not.toContain(steps[2].title);
+  expect(initialHTML).not.toContain(titleOf(steps[1]));
+  expect(initialHTML).not.toContain(titleOf(steps[2]));
   expect((await page.request.get("/api/profile")).status()).toBe(423);
 
   await transition("next");
+  await expectStep(page, steps[0]);
+  await guestNext(page);
   await expectStep(page, steps[1]);
   const input = widget.locator('input[type="file"]');
   await expect(
@@ -1126,6 +1655,9 @@ test("a welcome profile action becomes available only for its step and keeps the
   });
 
   await transition("next");
+  await expectStep(page, steps[1]);
+  await expect(widget.locator(".avatar img")).toHaveAttribute("src", avatarURL);
+  await guestNext(page);
   await expectStep(page, steps[2]);
   await expect(widget).toHaveCount(0);
   expect((await page.request.get("/api/profile")).status()).toBe(423);
@@ -1139,32 +1671,32 @@ test("a welcome profile action becomes available only for its step and keeps the
   expect((await page.request.get(avatarURL)).status()).toBe(423);
   expect((await host.get(avatarURL)).status()).toBe(200);
   await transition("open");
-  await expect(page).toHaveURL(/\/photos$/);
+  await finishWelcome(page);
   await expect(page.locator(".app-header .avatar img")).toHaveAttribute(
     "src",
     avatarURL,
   );
 });
 
-test("advancing a welcome action discards stale profile loads and prevents a pending photo from saving", async ({
+test("guest navigation discards stale profile loads and prevents a pending photo from saving", async ({
   page,
 }) => {
   const steps: WelcomeStep[] = [
-    {
-      title: "First profile photo prompt",
-      body: "Choose a photo for your profile.",
-      action: "profile_photo",
-    },
-    {
-      title: "Second profile photo prompt",
-      body: "You can still choose your photo during this step.",
-      action: "profile_photo",
-    },
-    {
-      title: "Listen to the next instructions",
-      body: "Leave your phone aside for the next activity.",
-      action: null,
-    },
+    step(
+      "First profile photo prompt",
+      "Choose a photo for your profile.",
+      "profile_photo",
+    ),
+    step(
+      "Second profile photo prompt",
+      "You can still choose your photo during this step.",
+      "profile_photo",
+    ),
+    step(
+      "Listen to the next instructions",
+      "Leave your phone aside for the next activity.",
+      null,
+    ),
   ];
   await saveSteps(steps);
   await transition("start");
@@ -1203,6 +1735,8 @@ test("advancing a welcome action discards stale profile loads and prevents a pen
     const previouslyCanceled = canceledLoads;
     holdLoads = false;
     await transition("next");
+    await expectStep(page, steps[0]);
+    await guestNext(page);
     await expectStep(page, steps[1]);
     const widget = page.locator(".welcome-profile");
     await expect(
@@ -1227,6 +1761,8 @@ test("advancing a welcome action discards stale profile loads and prevents a pen
       .click();
     await expect.poll(() => uploadHeld).toBe(true);
     await transition("next");
+    await expectStep(page, steps[1]);
+    await guestNext(page);
     await expectStep(page, steps[2]);
     await expect(widget).toHaveCount(0);
     releaseUpload();

@@ -20,16 +20,17 @@ const (
 
 // UploadJob is the owner's view of an accepted media upload and its eventual result.
 type UploadJob struct {
-	ID              int64   `json:"id"`
-	ClientUploadID  string  `json:"clientUploadId"`
-	Status          string  `json:"status"`
-	Filename        string  `json:"filename"`
-	Kind            string  `json:"kind"`
-	CreatedAt       string  `json:"createdAt"`
-	ErrorCode       *string `json:"errorCode"`
-	Photo           *Photo  `json:"photo"`
-	CategoryID      *int64  `json:"categoryId"`
-	WelcomeRevision *int64  `json:"welcomeRevision"`
+	ID                 int64   `json:"id"`
+	ClientUploadID     string  `json:"clientUploadId"`
+	Status             string  `json:"status"`
+	Filename           string  `json:"filename"`
+	Kind               string  `json:"kind"`
+	CreatedAt          string  `json:"createdAt"`
+	ErrorCode          *string `json:"errorCode"`
+	Photo              *Photo  `json:"photo"`
+	CategoryID         *int64  `json:"categoryId"`
+	WelcomeRevision    *int64  `json:"welcomeRevision"`
+	WelcomeWidgetIndex *int64  `json:"welcomeWidgetIndex"`
 }
 
 type pendingUpload struct {
@@ -39,19 +40,20 @@ type pendingUpload struct {
 
 var errUploadSuperseded = errors.New("upload processing attempt was superseded")
 
-const uploadSelect = `SELECT j.id,j.client_upload_id,j.status,j.filename,j.kind,j.created_at,j.error_code,j.category_id,j.welcome_revision,
- p.id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END
+const uploadSelect = `SELECT j.id,j.client_upload_id,j.status,j.filename,j.kind,j.created_at,j.error_code,j.category_id,j.welcome_revision,j.welcome_widget_index,
+ media.id,g.id,g.name,media.width,media.height,media.created_at,media.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END
  FROM upload_jobs j JOIN guests viewer ON viewer.id=j.guest_id CROSS JOIN welcome w
- LEFT JOIN photos p ON p.id=j.photo_id AND (viewer.role='admin' OR
- (w.is_open AND (p.category_id IS NULL OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public))))
- LEFT JOIN guests g ON g.id=p.guest_id`
+ LEFT JOIN guest_welcome_progress p ON p.guest_id=viewer.id
+ LEFT JOIN photos media ON media.id=j.photo_id AND (viewer.role='admin' OR
+ (` + welcomeAccessSQL + ` AND (media.category_id IS NULL OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=media.category_id AND c.is_public))))
+ LEFT JOIN guests g ON g.id=media.guest_id`
 
 func scanUpload(row interface{ Scan(...any) error }) (UploadJob, error) {
 	var job UploadJob
 	var id, authorID, width, height sql.NullInt64
 	var authorName, createdAt, mime sql.NullString
 	var avatarVersion int64
-	err := row.Scan(&job.ID, &job.ClientUploadID, &job.Status, &job.Filename, &job.Kind, &job.CreatedAt, &job.ErrorCode, &job.CategoryID, &job.WelcomeRevision,
+	err := row.Scan(&job.ID, &job.ClientUploadID, &job.Status, &job.Filename, &job.Kind, &job.CreatedAt, &job.ErrorCode, &job.CategoryID, &job.WelcomeRevision, &job.WelcomeWidgetIndex,
 		&id, &authorID, &authorName, &width, &height, &createdAt, &mime, &avatarVersion)
 	if id.Valid {
 		job.Photo = &Photo{ID: id.Int64, Author: Author{ID: authorID.Int64, Name: authorName.String, AvatarURL: avatarURL(authorID.Int64, avatarVersion)}, Width: int(width.Int64), Height: int(height.Int64), CreatedAt: createdAt.String, MIMEType: mime.String}
@@ -143,7 +145,8 @@ func (a *App) enqueueUpload(ctx context.Context, guestID int64, clientID string,
 	}
 	job = UploadJob{ClientUploadID: clientID, Status: "queued", Filename: upload.filename, Kind: upload.kind, CreatedAt: stamp(a.now())}
 	job.CategoryID, job.WelcomeRevision = destination.categoryID, destination.welcomeRevision
-	err = tx.QueryRowContext(ctx, `INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,category_id,welcome_revision) VALUES($1,$2,'queued',$3,$4,$5,$6,$7,$8,$8,$9,$10) RETURNING id`, guestID, clientID, upload.filename, upload.kind, upload.format, key, upload.size, job.CreatedAt, job.CategoryID, job.WelcomeRevision).Scan(&job.ID)
+	job.WelcomeWidgetIndex = destination.welcomeWidgetIndex
+	err = tx.QueryRowContext(ctx, `INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,category_id,welcome_revision,welcome_widget_index) VALUES($1,$2,'queued',$3,$4,$5,$6,$7,$8,$8,$9,$10,$11) RETURNING id`, guestID, clientID, upload.filename, upload.kind, upload.format, key, upload.size, job.CreatedAt, job.CategoryID, job.WelcomeRevision, job.WelcomeWidgetIndex).Scan(&job.ID)
 	if err != nil {
 		return job, err
 	}

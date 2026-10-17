@@ -7,9 +7,9 @@ import {
   useState,
   type PointerEvent,
 } from "react";
-import { GripVertical, Camera } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
-import type { StepDraft } from "./welcome-admin";
+import { stepLabel, type StepDraft } from "./welcome-admin";
 
 type Drag = {
   pointerId: number;
@@ -248,19 +248,11 @@ export function WelcomeStepList({
               <span className="welcome-list-number">{number(index + 1)}</span>
               <span className="welcome-list-copy">
                 <strong>
-                  {step.title.trim() || t("adminWelcome.untitled")}
+                  {stepLabel(step).trim() ||
+                    t("welcome.step", { number: number(index + 1) })}
                 </strong>
                 <span>
-                  {step.action === "profile_photo" && (
-                    <Camera size={12} aria-hidden="true" />
-                  )}
-                  {t(
-                    step.action === "profile_photo"
-                      ? "profile.photo"
-                      : step.action === "media_upload"
-                        ? "categories.mediaAction"
-                        : "adminWelcome.noAction",
-                  )}
+                  {t("widgets.count", { count: number(step.widgets.length) })}
                 </span>
               </span>
             </button>

@@ -9,62 +9,21 @@ import (
 	"testing"
 )
 
-func TestWelcomeActionsValidateAndPreserveOptionalInput(t *testing.T) {
-	a := testApp(t)
-	host, _ := admin(t, a)
-	for _, test := range []struct {
-		name   string
-		action any
-		code   string
-	}{
-		{"unknown", "gallery", "invalid_welcome_action"},
-		{"empty", "", "invalid_welcome_action"},
-		{"whitespace", " profile_photo ", "invalid_welcome_action"},
-		{"boolean", true, "invalid_body"},
-		{"number", 1, "invalid_body"},
-		{"object", map[string]string{"type": "profile_photo"}, "invalid_body"},
-		{"list", []string{"profile_photo"}, "invalid_body"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			response := request(t, a, "PUT", "/api/admin/welcome", map[string]any{
-				"revision": 0,
-				"steps":    []map[string]any{{"title": "A step", "body": "A message", "action": test.action}},
-			}, host)
-			assertWelcomeError(t, response, 400, test.code)
-			state := readWelcomeState(t, request(t, a, "GET", "/api/admin/welcome", nil, host))
-			if state.Revision != 0 || len(state.Steps) != 0 {
-				t.Fatal("invalid action changed the welcome sequence")
-			}
-		})
-	}
-	response := request(t, a, "PUT", "/api/admin/welcome", map[string]any{
-		"revision": 0,
-		"steps": []map[string]any{
-			{"title": "Old client", "body": "An authored instruction"},
-			{"title": "No action", "body": "Another instruction", "action": nil},
-			{"title": "Choose a photo", "body": "A personal instruction", "action": "profile_photo"},
-		},
-	}, host)
-	state := readWelcomeState(t, response)
-	if len(state.Steps) != 3 || state.Steps[0].Action != nil || state.Steps[1].Action != nil || state.Steps[2].Action == nil || *state.Steps[2].Action != "profile_photo" || strings.Count(response.Body.String(), `"action":null`) != 2 {
-		t.Fatalf("optional action contract changed: %s", response.Body.String())
-	}
-}
-
 func TestWelcomeProfileActionRevealsOnlyCurrentStepAndPersists(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Welcome action guest")
 	steps := []welcomeStep{
-		{Title: "First instruction", Body: "First text"},
-		{Title: "A personal photo", Body: "Photo instruction", Action: ptr("profile_photo")},
-		{Title: "Hidden final step", Body: "Private final details"},
+		testWelcomeStep("First instruction", "First text"),
+		testWelcomeStep("A personal photo", "Photo instruction", welcomeWidget{Type: "profile_photo"}),
+		testWelcomeStep("Hidden final step", "Private final details"),
 	}
 	saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": steps}, host))
 	waiting := changeWelcome(t, a, host, saved.Revision, "start")
 	for _, stage := range []int{0, 1, 2} {
 		if stage > 0 {
 			waiting = changeWelcome(t, a, host, waiting.Revision, "next")
+			selectGuestWelcomeStep(t, a, visitor, stage)
 		}
 		response := request(t, a, "GET", "/api/welcome", nil, visitor)
 		status(t, response, 200)
@@ -76,14 +35,14 @@ func TestWelcomeProfileActionRevealsOnlyCurrentStepAndPersists(t *testing.T) {
 			t.Fatalf("wrong welcome view: %s", response.Body.String())
 		}
 		if stage < 2 {
-			if strings.Contains(response.Body.String(), "profile_photo") || strings.Contains(response.Body.String(), steps[1].Title) || strings.Contains(response.Body.String(), steps[1].Body) {
+			if strings.Contains(response.Body.String(), "profile_photo") || strings.Contains(response.Body.String(), steps[1].Widgets[0].Text) || strings.Contains(response.Body.String(), steps[1].Widgets[1].Text) {
 				t.Fatal("future action or content leaked")
 			}
 			assertWelcomeError(t, request(t, a, "GET", "/api/profile", nil, visitor), 423, "welcome_required")
-		} else if view.Step.Action == nil || *view.Step.Action != "profile_photo" {
+		} else if view.Step.Widgets[2].Type != "profile_photo" {
 			t.Fatal("current profile action was not returned")
 		}
-		if strings.Contains(response.Body.String(), steps[2].Title) || strings.Contains(response.Body.String(), steps[2].Body) || strings.Contains(response.Body.String(), `"steps"`) {
+		if strings.Contains(response.Body.String(), steps[2].Widgets[0].Text) || strings.Contains(response.Body.String(), steps[2].Widgets[1].Text) || strings.Contains(response.Body.String(), `"steps"`) {
 			t.Fatal("future instructions leaked")
 		}
 	}
@@ -97,14 +56,17 @@ func TestWelcomeProfileActionRevealsOnlyCurrentStepAndPersists(t *testing.T) {
 	t.Cleanup(func() { reopened.Close() })
 	reopened.now = a.now
 	persisted := readWelcomeState(t, request(t, reopened, "GET", "/api/admin/welcome", nil, host))
-	if persisted.Revision != waiting.Revision || persisted.Open || persisted.CurrentStep != 2 || persisted.Steps[1].Action == nil || *persisted.Steps[1].Action != "profile_photo" {
+	if persisted.Revision != waiting.Revision || persisted.Open || persisted.CurrentStep != 2 || persisted.Steps[1].Widgets[2].Type != "profile_photo" {
 		t.Fatalf("restart lost welcome action or progress: %+v", persisted)
 	}
 	status(t, request(t, reopened, "GET", "/api/profile", nil, visitor), 200)
 	// The host can continue even when this guest has not chosen a photo.
 	next := changeWelcome(t, reopened, host, persisted.Revision, "next")
+	status(t, request(t, reopened, "GET", "/api/profile", nil, visitor), 200)
+	moveGuestWelcome(t, reopened, visitor, "next")
 	assertWelcomeError(t, request(t, reopened, "GET", "/api/profile", nil, visitor), 423, "welcome_required")
 	changeWelcome(t, reopened, host, next.Revision, "open")
+	moveGuestWelcome(t, reopened, visitor, "finish")
 	status(t, request(t, reopened, "GET", "/api/profile", nil, visitor), 200)
 }
 
@@ -121,7 +83,7 @@ func TestWelcomeProfileActionAllowsOnlyOwnProfile(t *testing.T) {
 	if err := json.Unmarshal(mediaResponse.Body.Bytes(), &photo); err != nil {
 		t.Fatal(err)
 	}
-	steps := []welcomeStep{{Title: "Choose a photo", Action: ptr("profile_photo")}, {Title: "Next instruction"}}
+	steps := []welcomeStep{testWelcomeStep("Choose a photo", "", welcomeWidget{Type: "profile_photo"}), testWelcomeStep("Next instruction", "")}
 	saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": steps}, host))
 	waiting := changeWelcome(t, a, host, saved.Revision, "start")
 	// A future profile action must not unlock its endpoints before it is shown.
@@ -129,6 +91,8 @@ func TestWelcomeProfileActionAllowsOnlyOwnProfile(t *testing.T) {
 	assertWelcomeError(t, request(t, a, "DELETE", "/api/profile/avatar", nil, visitor), 423, "welcome_required")
 	assertWelcomeError(t, request(t, a, "GET", *initial.AvatarURL, nil, visitor), 423, "welcome_required")
 	shown := changeWelcome(t, a, host, waiting.Revision, "next")
+	selectGuestWelcomeStep(t, a, visitor, 1)
+	selectGuestWelcomeStep(t, a, other, 1)
 	for _, method := range []string{"GET", "HEAD"} {
 		status(t, request(t, a, method, "/api/profile", nil, visitor), 200)
 		status(t, request(t, a, method, *initial.AvatarURL, nil, visitor), 200)
@@ -169,6 +133,7 @@ func TestWelcomeProfileActionAllowsOnlyOwnProfile(t *testing.T) {
 		t.Fatal("changing a profile photo advanced the shared welcome")
 	}
 	late, _, _ := guest(t, a, host, "Late profile step guest")
+	readGuestWelcome(t, a, late)
 	status(t, request(t, a, "GET", "/api/profile", nil, late), 200)
 	status(t, uploadAvatar(t, a, late, pngBytes(t)), 200)
 	status(t, request(t, a, "DELETE", "/api/admin/guests/"+strconv.FormatInt(identity.ID, 10), nil, host), 204)
@@ -177,25 +142,31 @@ func TestWelcomeProfileActionAllowsOnlyOwnProfile(t *testing.T) {
 	status(t, request(t, a, "DELETE", "/api/profile/avatar", nil, visitor), 401)
 	status(t, request(t, a, "HEAD", *initial.AvatarURL, nil, visitor), 401)
 	changeWelcome(t, a, host, shown.Revision, "next")
+	status(t, request(t, a, "GET", *otherProfile.AvatarURL, nil, other), 200)
+	moveGuestWelcome(t, a, other, "next")
 	assertWelcomeError(t, request(t, a, "GET", *otherProfile.AvatarURL, nil, other), 423, "welcome_required")
 }
 
 func TestWelcomeProfileActionAdvanceDuringReceptionRejectsLateSave(t *testing.T) {
-	for _, ending := range []string{"next", "revoke", "logout"} {
+	for _, ending := range []string{"unlock", "next", "revoke", "logout"} {
 		t.Run(ending, func(t *testing.T) {
 			a := testApp(t)
 			host, _ := admin(t, a)
 			visitor, identity, _ := guest(t, a, host, "Uploading welcome photo")
 			initial := profileGuest(t, uploadAvatar(t, a, visitor, pngBytes(t)))
-			steps := []welcomeStep{{Title: "Choose a photo", Action: ptr("profile_photo")}, {Title: "The next instruction"}}
+			steps := []welcomeStep{testWelcomeStep("Choose a photo", "", welcomeWidget{Type: "profile_photo"}), testWelcomeStep("The next instruction", "")}
 			saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": steps}, host))
 			waiting := changeWelcome(t, a, host, saved.Revision, "start")
 			shown := changeWelcome(t, a, host, waiting.Revision, "next")
+			selectGuestWelcomeStep(t, a, visitor, 1)
 			r := avatarRequest(t, visitor, pngBytes(t))
 			r.Body = io.NopCloser(&welcomeClosureReader{Reader: r.Body, onRead: func() {
 				switch ending {
-				case "next":
+				case "unlock", "next":
 					changeWelcome(t, a, host, shown.Revision, "next")
+					if ending == "next" {
+						moveGuestWelcome(t, a, visitor, "next")
+					}
 				case "revoke":
 					status(t, request(t, a, "DELETE", "/api/admin/guests/"+strconv.FormatInt(identity.ID, 10), nil, host), 204)
 				case "logout":
@@ -207,57 +178,15 @@ func TestWelcomeProfileActionAdvanceDuringReceptionRejectsLateSave(t *testing.T)
 			if ending == "next" {
 				assertWelcomeError(t, response, 423, "welcome_required")
 				assertWelcomeError(t, request(t, a, "DELETE", "/api/profile/avatar", nil, visitor), 423, "welcome_required")
+			} else if ending == "unlock" {
+				status(t, response, 200)
 			} else {
 				status(t, response, 401)
 			}
-			status(t, request(t, a, "GET", *initial.AvatarURL, nil, host), 200)
+			if ending != "unlock" {
+				status(t, request(t, a, "GET", *initial.AvatarURL, nil, host), 200)
+			}
 			assertAvatarTempEmpty(t, a)
-		})
-	}
-}
-
-func TestWelcomeActionsMigrationPreservesInstructionsAndProgress(t *testing.T) {
-	for _, populated := range []bool{false, true} {
-		t.Run(strconv.FormatBool(populated), func(t *testing.T) {
-			db := testDatabase(t)
-			files := migrationFiles(t)
-			delete(files, "migrations/0005_welcome_actions.sql")
-			delete(files, "migrations/0006_media_categories.sql")
-			if err := applyMigrations(t.Context(), db, files); err != nil {
-				t.Fatal(err)
-			}
-			if populated {
-				_, err := db.Exec(`UPDATE welcome SET is_open=false,revision=7,current_step=1,steps='[{"title":"First title","body":"Authored text"},{"title":"Second title","body":"Other text"}]'::jsonb WHERE id=1`)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			before, err := scanWelcome(db.QueryRow("SELECT is_open,revision,current_step,steps FROM welcome WHERE id=1"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := migrate(t.Context(), db); err != nil {
-				t.Fatal(err)
-			}
-			after, err := scanWelcome(db.QueryRow("SELECT is_open,revision,current_step,steps FROM welcome WHERE id=1"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if before.Open != after.Open || before.Revision != after.Revision || before.CurrentStep != after.CurrentStep || len(before.Steps) != len(after.Steps) {
-				t.Fatalf("migration changed welcome state: before=%+v after=%+v", before, after)
-			}
-			for index := range before.Steps {
-				if before.Steps[index] != after.Steps[index] {
-					t.Fatalf("migration changed instruction %d", index)
-				}
-			}
-			var missing bool
-			if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM welcome, jsonb_array_elements(steps) step WHERE NOT step ? 'action' OR step->'action' <> 'null'::jsonb)`).Scan(&missing); err != nil {
-				t.Fatal(err)
-			}
-			if missing {
-				t.Fatal("migration did not normalize explicit null actions")
-			}
 		})
 	}
 }

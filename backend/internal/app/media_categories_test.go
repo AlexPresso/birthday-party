@@ -46,6 +46,7 @@ func mediaUploadRequest(t *testing.T, cookie *http.Cookie, categoryID, revision 
 	}
 	if revision != nil {
 		r.Header.Set("X-Welcome-Revision", strconv.FormatInt(*revision, 10))
+		r.Header.Set("X-Welcome-Widget-Index", "1")
 	}
 	r.Header.Set("X-Upload-ID", clientID)
 	return r

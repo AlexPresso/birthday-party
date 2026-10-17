@@ -178,14 +178,17 @@ func (a *App) saveAvatar(ctx context.Context, guestID int64, sessionHash string,
 	if err != nil {
 		return guest, err
 	}
-	var open bool
-	var action *string
-	if err = tx.QueryRowContext(ctx, `SELECT is_open,
- CASE WHEN current_step>0 THEN steps->(current_step-1)->>'action' END
- FROM welcome WHERE id=1 FOR SHARE`).Scan(&open, &action); err != nil {
+	view, err := currentGuestWelcome(ctx, tx, guestID)
+	if err != nil {
 		return guest, err
 	}
-	if guest.Role != "admin" && !open && (action == nil || *action != "profile_photo") {
+	profileWidget := false
+	if view.Step != nil {
+		for _, widget := range view.Step.Widgets {
+			profileWidget = profileWidget || widget.Type == "profile_photo"
+		}
+	}
+	if guest.Role != "admin" && !view.Open && !profileWidget {
 		return guest, &mediaValidationError{http.StatusLocked, "welcome_required"}
 	}
 	var version int64

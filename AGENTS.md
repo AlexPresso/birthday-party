@@ -96,18 +96,36 @@ use, a personal visual identity, simple code, and responsive interactions.
   replacement. Versioned avatar URLs require an active session and full app access,
   except a guest's own avatar during a current `profile_photo` welcome action.
   Keep anonymous guestbook entries free of all author details, including avatars.
-- The host can start a shared welcome sequence from settings. Guests remain at
-  `/attente` until the host opens full access; only the current step is returned.
-  Go gates party content, media and uploads while closed; administrators retain
-  access. Store steps and progress in PostgreSQL, with revision-checked commands.
-  Keep initial access open until the host explicitly starts the welcome.
-- Welcome steps have one optional typed action: `profile_photo` or `media_upload`.
-  The current photo action grants access to the guest's own profile editor and
-  avatar. The media action accepts queued uploads into its configured destination;
-  it does not grant gallery or file access. Recheck the current action at acceptance
-  and retain its revision and destination with each upload. The host advances
-  regardless of completion. Add action types explicitly with validation,
-  permissions and a matching component.
+- The host starts a welcome sequence and unlocks its steps from settings. Each
+  guest chooses when to advance or return to a previous unlocked step; persist
+  their own position in PostgreSQL. Return only that guest's selected step.
+  The global `required` switch makes late arrivals follow every step before
+  entering, including after the host opens the app. Existing participants enter
+  explicitly when ready; host unlocks never move them or interrupt their widgets.
+  Go enforces each guest's effective access; administrators retain full access.
+  Host commands use the shared revision; guest navigation and widget uploads use
+  a separate stable progress revision. Keep initial access open until the host
+  starts the welcome. Restart the welcome before editing already unlocked steps.
+- Welcome steps contain an ordered list of 1 to 12 typed widgets, with no fixed
+  title or body: `title`, `text`, `profile_photo`, `media_upload` and
+  `enable_notifications`. Text and media widgets may repeat; allow at most one
+  profile widget and one notification widget per step. The current
+  profile widget grants access to the guest's own profile editor and avatar.
+  Each media widget accepts queued uploads into its configured destination,
+  without granting gallery or file access. Recheck its index and the current
+  progress revision at acceptance and retain both with the upload destination.
+  The host unlocks regardless of completion; guests navigate explicitly. Add
+  widget types explicitly with validation, permissions and a matching component.
+  Migrate existing steps without losing
+  authored content or accepted uploads.
+- The notification widget asks permission only after an explicit guest click.
+  Persist Web Push subscriptions with their guest, session and browser language;
+  permission alone does not mean delivery is enabled. Guests can manage their
+  current browser subscription in settings. Keep VAPID keys in PostgreSQL and
+  send bounded, generic welcome notifications through a durable outbox. Do not
+  include guest names, authored instructions, media or invitation/session tokens
+  in push payloads. Logout, expiry and revocation stop further delivery.
+  The service worker handles push and clicks without caching private content.
 - Media categories have an administrator-controlled public/private setting.
   Public means visible to signed-in guests with full app access; private means
   administrators only, including for files, thumbnails and video ranges. Owners

@@ -39,16 +39,17 @@ From the repository root, the Node launcher also provides `npm run dev` and
 Environment variables are read from the process, not automatically from `.env`.
 See [.env.example](.env.example). Defaults are:
 
-| Variable                 | Default                     | Purpose                                                                         |
-| ------------------------ | --------------------------- | ------------------------------------------------------------------------------- |
-| `LISTEN_ADDR`            | `127.0.0.1:8080`            | API listening address                                                           |
-| `PUBLIC_URL`             | `http://localhost:3000`     | Exact browser origin and invitation base URL                                    |
-| `DATABASE_URL`           | Required                    | PostgreSQL connection URL; standard PG environment variables are also supported |
-| `DATA_DIR`               | `./data`                    | Private media, thumbnails and durable pending inputs                            |
-| `COOKIE_SECURE`          | Determined by `PUBLIC_URL`  | HTTPS requires `true`; local HTTP uses `false`                                  |
-| `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup                        |
-| `MAX_IMAGE_SIZE_MB`      | `15`                        | Maximum uploaded image size in MiB, integer 1–1024                              |
-| `MAX_VIDEO_SIZE_MB`      | `100`                       | Maximum uploaded video size in MiB, integer 1–1024                              |
+| Variable                 | Default                     | Purpose                                                                                    |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `LISTEN_ADDR`            | `127.0.0.1:8080`            | API listening address                                                                      |
+| `PUBLIC_URL`             | `http://localhost:3000`     | Exact browser origin and invitation base URL                                               |
+| `VAPID_SUBJECT`          | HTTPS `PUBLIC_URL`          | Optional Web Push contact URI (`mailto:` or HTTPS); local HTTP uses a reserved placeholder |
+| `DATABASE_URL`           | Required                    | PostgreSQL connection URL; standard PG environment variables are also supported            |
+| `DATA_DIR`               | `./data`                    | Private media, thumbnails and durable pending inputs                                       |
+| `COOKIE_SECURE`          | Determined by `PUBLIC_URL`  | HTTPS requires `true`; local HTTP uses `false`                                             |
+| `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup                                   |
+| `MAX_IMAGE_SIZE_MB`      | `15`                        | Maximum uploaded image size in MiB, integer 1–1024                                         |
+| `MAX_VIDEO_SIZE_MB`      | `100`                       | Maximum uploaded video size in MiB, integer 1–1024                                         |
 
 Missing or empty upload limits use their defaults. Invalid values stop startup.
 One MiB is 1,048,576 bytes. The gallery API returns the effective limits so the
@@ -71,7 +72,7 @@ HTTP request logs never include these tokens.
 
 ## Behavior and limits
 
-- Invite-only access. No signup or external message delivery. Hosts manually send
+- Invite-only access. No signup or automatic invitation delivery. Hosts manually send
   the links generated in settings. Invitation tokens and session tokens contain
   32 cryptographically random bytes; only SHA-256 hashes are stored.
 - Invitations expire in 7 days and are consumed transactionally by a deliberate
@@ -86,23 +87,53 @@ HTTP request logs never include these tokens.
   custom header (CLI/testing); cross-origin browser preflights are not allowed.
 - Invitation preview/accept are globally limited to 120 requests/minute. The
   limiter has constant memory and does not trust proxy address headers.
-- Hosts can close guest access and display an ordered welcome sequence. While
-  closed, guests may accept invitations, check their session/current step and
+- Hosts can close guest access and unlock an ordered welcome sequence. Until
+  each guest has full access, they may accept invitations, check their session/current step and
   log out; party, programme, guestbook and media browsing endpoints return 423.
-  The current step may allow the profile or upload actions described below.
-  Administrators retain access. PostgreSQL stores up to 12 steps and their current
-  position; revision-checked transactions prevent duplicate advances. Access is
+  The current step may include the profile and upload widgets described below.
+  Administrators retain access. PostgreSQL stores up to 12 steps, the unlocked
+  boundary and each guest's selected position. Guests navigate forwards/backwards
+  explicitly; revision-checked transactions prevent duplicate advances. A global
+  required switch makes late arrivals follow every step even after host opening.
+  Existing participants enter explicitly when ready; required participants finish
+  the steps first. Host opening unlocks all remaining steps. Access is
   open until the host explicitly starts waiting. Accepted uploads can finish
   privately while access is closed. See the API contract for commands and limits.
-- Each welcome step can have an optional `profile_photo` action. Only while that
-  action is current may a waiting guest read their own profile and save, remove
-  or view their photo. Other guests' avatars and party content remain locked.
-  Saving rechecks the current action in the transaction. The host controls the
-  next step independently of whether a photo has been saved.
-- A `media_upload` welcome action accepts photos and videos into the main gallery
+- Each welcome step contains 1–12 ordered widgets: titles, texts, profile photo
+  and media uploads. Titles and texts are optional widget types, with limits of
+  120 and 1000 Unicode code points respectively. Multiple upload widgets can
+  choose separate destinations; at most one profile editor is allowed per step.
+  Migration 0007 preserves legacy content/order/progress and increments the
+  revision for converted steps. Previously accepted uploads still finish.
+- Only while a `profile_photo` widget is current may a waiting guest read their
+  own profile and save, remove or view their photo. Other guests' avatars and
+  party content remain locked.
+  Saving rechecks the guest's current widgets in the transaction. Host unlocks
+  preserve the guest's position and active profile editor.
+- A `media_upload` welcome widget accepts photos and videos into the main gallery
   or a category chosen by the host. Waiting guests can send files and check their
-  own queue, without browsing media. Acceptance rechecks the current step revision
-  and captures its destination; accepted jobs finish there after the step changes.
+  own queue, without browsing media. Acceptance rechecks the guest progress revision
+  and widget index and captures its destination; accepted jobs finish there after
+  the step changes. Retries cannot switch widgets, including ones sharing a destination.
+  Migration 0008 stores guest progress and assigns separate revision tokens, so
+  host unlocks do not invalidate transfers. Guest navigation or restarting the
+  welcome invalidates the previous context; already accepted jobs keep processing.
+- The `enable_notifications` widget has no settings and appears at most once per
+  step. It lets guests subscribe their browser to Web Push during that selected
+  step; full-access guests and administrators can also subscribe from settings.
+  Configuration, own status and removal require a session but no full-app access.
+  Permission is checked again before saving, and each guest has at most 10 devices.
+  Migration 0009 stores VAPID keys, session-bound subscriptions and a durable
+  outbox. Keys are generated once, so a restart does not invalidate subscriptions.
+  Host unlock/open commands queue a generic notification without waiting for an
+  external push service. A separate worker coalesces pending updates and retries
+  transient failures within a bounded window. Logout/revocation removes session
+  subscriptions; delivery also checks guest activity and session expiry.
+  Only event type and supported locale enter the payload. The service worker
+  translates generic text and opens `/attente`; it never receives private content.
+  Delivery allows public HTTPS destinations only, pins resolved addresses and
+  disables redirects/proxies to prevent subscriptions from accessing private hosts.
+  Notifications require HTTPS on phones; iOS/iPadOS require a Home Screen app.
 - Hosts can create up to 100 media categories with names of 1–80 characters.
   Public categories are visible to guests with full app access. Private categories
   are visible only to administrators, including when the uploader requests their

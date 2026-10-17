@@ -70,6 +70,19 @@ L'extension `compose.dev.yaml` expose PostgreSQL uniquement sur `127.0.0.1`.
 Le projet Compose `birthday-party-dev` possède sa propre base : les médias locaux
 et ceux du déploiement Docker restent associés à leurs enregistrements respectifs.
 
+## Diaporama
+
+Dans **Médias**, sélectionne une catégorie puis clique sur **Lancer le diaporama**.
+Seuls les médias de cette catégorie défilent, y compris ceux qui ne sont pas
+encore chargés dans la grille. **Médias principaux** affiche uniquement les médias
+sans catégorie.
+
+Les photos restent affichées cinq secondes et les vidéos sont lues jusqu’au bout,
+avec le son coupé au départ. Tu peux activer le son dans le lecteur, mettre en
+pause, passer au média précédent ou suivant, et utiliser le plein écran si ton
+navigateur le permet. Le diaporama reprend au début après le dernier média.
+Ferme-le avec la croix ou la touche Échap.
+
 ## Photo de profil
 
 Dans **Paramètres**, chaque invité peut choisir une photo de profil, vérifier
@@ -84,41 +97,81 @@ privées et sont incluses dans la sauvegarde de la base.
 
 ## Accueillir les invités par étapes
 
-Dans **Paramètres → Accueil des invités**, prépare les titres et les textes des
-étapes, puis enregistre-les. Tu peux ajouter jusqu’à 12 étapes et changer leur ordre.
-Les textes restent dans la langue où tu les as écrits.
+Dans **Paramètres → Accueil des invités**, crée jusqu’à 12 étapes. Chaque étape
+contient une liste de widgets, sans titre ni texte obligatoire en dehors de cette
+liste. Glisse un widget **Titre**, **Texte**, **Photo de profil**, **Photos et
+vidéos** ou **Activer les notifications** depuis le volet des widgets vers l’étape, puis déplace-le à l’endroit
+souhaité. Les boutons d’ajout et de déplacement permettent aussi de tout faire
+au clavier. Enregistre les étapes pour conserver tes modifications.
 
-Sélectionne une étape dans la liste pour modifier son contenu. Déplace les étapes
-avec leur poignée ou les commandes de déplacement. Le volet **Action** sert à
-choisir l’action de l’étape et à consulter ses réglages ; l’action photo de profil
-n’a pas de paramètres pour le moment. Enregistre les étapes pour conserver tes
-modifications.
+Une étape peut contenir jusqu’à 12 widgets. Tu peux ajouter plusieurs titres,
+textes ou zones d’envoi, une photo de profil et un widget de notifications. Les textes restent dans la langue
+où tu les as écrits. Les anciennes étapes sont converties automatiquement : leur
+titre, leur texte et leur action deviennent des widgets dans le même ordre.
 
-Chaque étape peut aussi proposer une action. Choisis **Définir une photo de
-profil** pour que les invités puissent ajouter leur photo directement pendant
-l’accueil, avec un aperçu avant l’enregistrement. Retire l’action pour conserver
-une étape avec du texte seulement. La photo reste liée au profil après l’accueil.
-Tu décides quand passer à la suite, même si certains n’ont pas ajouté de photo.
+Le widget **Photo de profil** permet aux invités d’ajouter leur photo pendant
+l’accueil, avec un aperçu avant l’enregistrement. La photo reste liée au profil
+après l’accueil. Tu décides quand débloquer la suite ; chaque invité choisit
+quand il est prêt à avancer.
 
-L’action **Envoyer des photos et vidéos** permet de recevoir des médias pendant
+Le widget d’envoi de photos et vidéos permet de recevoir des médias pendant
 l’accueil. Dans ses réglages, choisis **Médias principaux** ou une catégorie.
-Les fichiers entrent dans la file d’attente habituelle et restent associés à
-cette destination. Passer à l’étape suivante arrête les transferts que le serveur
-n’a pas encore acceptés ; les envois déjà acceptés continuent leur préparation.
+Chaque zone d’envoi garde sa propre destination et affiche ses propres envois.
+Les fichiers partagent la file d’attente habituelle, limitée à deux transferts
+simultanés. Débloquer une nouvelle étape laisse les envois en cours continuer.
+Quand l’invité change lui-même d’étape, les transferts que le serveur n’a pas
+encore acceptés s’arrêtent ; les envois déjà acceptés continuent leur préparation.
 
 **Activer l’écran d’attente** place tous les invités sur un écran séparé, y compris
 ceux déjà connectés. Ton accès administrateur reste disponible. Clique sur
-**Afficher la première étape**, puis **Passer à l’étape suivante** pour avancer au
-même rythme pour tout le monde. Les nouveaux arrivants voient l’étape en cours.
+**Débloquer la première étape**, puis **Débloquer l’étape suivante**. Chaque invité
+utilise **Commencer**, **Suivant** et **Précédent** à son rythme. Débloquer une étape
+ne déplace personne et ne ferme pas les widgets en cours d’utilisation.
 Les écrans vérifient automatiquement les changements toutes les trois secondes
 quand le navigateur est visible et connecté.
 
-Après la dernière étape, clique sur **Ouvrir l’application** pour donner accès aux
-quatre onglets. Ce bouton permet aussi de terminer l’accueil plus tôt. Les textes
-se modifient avant le premier affichage ou une fois l’application ouverte.
-Les étapes et l’avancement sont conservés après un redémarrage des conteneurs.
+Le switch **Obligatoire** impose toutes les étapes aux invités qui arrivent pour
+la première fois, même si l’application est déjà ouverte. Sans cette option, un
+nouvel arrivant rejoint la dernière étape débloquée pendant l’accueil, ou entre
+directement si l’application est ouverte. Le réglage s’enregistre immédiatement.
+
+**Ouvrir l’application** débloque les étapes restantes et permet aux invités de
+choisir **Entrer dans l’application**. Ceux qui suivent un parcours obligatoire
+doivent d’abord atteindre la dernière étape. Chacun garde sa position tant qu’il
+n’a pas choisi d’entrer.
+
+Les étapes se modifient avant le premier déblocage. Pour les modifier ensuite,
+ouvre l’application puis choisis **Relancer l’accueil** : les invités reprennent
+depuis le début. Les étapes et la progression individuelle sont conservées après
+un rechargement de page ou un redémarrage des conteneurs.
 
 L’application reste ouverte tant que tu n’as pas activé l’écran d’attente.
+
+## Notifications sur le téléphone
+
+Ajoute le widget **Activer les notifications** à une étape. L’invité choisit de
+les activer, puis accepte la demande du navigateur. Il reçoit une notification
+quand tu débloques une étape ou ouvres l’application. La notification ouvre sa
+position actuelle, sans le faire avancer. Il peut aussi gérer les notifications
+de cet appareil depuis **Paramètres**. Refuser n’empêche pas de poursuivre l’accueil.
+
+Sur téléphone, l’application doit être servie en **HTTPS**. Sur iPhone et iPad,
+ajoute-la à l’écran d’accueil puis ouvre-la depuis son icône avant d’activer les
+notifications. Le widget affiche les instructions adaptées. Le site sur
+`http://localhost` peut être utilisé pour les tests sur ordinateur.
+Voir les conditions de [Web Push sur iOS/iPadOS](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)
+et des [contextes sécurisés](https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe).
+
+Les clés de notification sont créées automatiquement et conservées dans
+PostgreSQL, avec les abonnements des appareils. Aucun compte auprès d’un service
+tiers n’est à créer. Le navigateur utilise son propre service de réception.
+Les notifications ne contiennent ni noms d’invités, ni consignes privées, ni médias.
+Se déconnecter supprime l’abonnement associé à cette session.
+
+`VAPID_SUBJECT` permet de préciser une adresse de contact, par exemple
+`mailto:you@example.com`. En HTTPS, sa valeur par défaut est `PUBLIC_URL`.
+Le serveur envoie les notifications en arrière-plan et limite les tentatives en
+cas de panne ; une notification n’est donc pas une garantie de réception immédiate.
 Aucune nouvelle variable d’environnement n’est nécessaire.
 
 ## Catégories de médias

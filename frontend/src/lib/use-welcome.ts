@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { welcomeSchema, type Welcome } from "./contracts";
+import { latestWelcome } from "./welcome-state";
 
 // One small request per visible browser every three seconds is enough for a
 // host-led welcome. Hidden tabs pause and refresh as soon as guests return.
@@ -29,9 +30,7 @@ export function useWelcome(initial: Welcome | null = null) {
           signal: controller.signal,
         });
         if (!disposed) {
-          setWelcome((previous) =>
-            previous?.revision === next.revision ? previous : next,
-          );
+          setWelcome((previous) => latestWelcome(previous, next));
           setFailed(false);
         }
       } catch {
@@ -58,5 +57,13 @@ export function useWelcome(initial: Welcome | null = null) {
     };
   }, []);
 
-  return { welcome, failed, refresh: () => retry.current() };
+  return {
+    welcome,
+    failed,
+    refresh: () => retry.current(),
+    accept: (next: Welcome) => {
+      setWelcome((previous) => latestWelcome(previous, next));
+      setFailed(false);
+    },
+  };
 }

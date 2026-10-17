@@ -13,16 +13,40 @@ const mutationHeaders = {
   Origin: baseURL,
 };
 type Category = { id: number; name: string; isPublic: boolean };
-type Step = {
-  title: string;
-  body: string;
-  action: "profile_photo" | "media_upload" | null;
-  mediaUpload?: { categoryId: number | null };
-};
+type Widget =
+  | { type: "title"; text: string }
+  | { type: "text"; text: string }
+  | { type: "profile_photo" }
+  | { type: "media_upload"; mediaUpload: { categoryId: number | null } };
+type Step = { widgets: Widget[] };
+
+function step(
+  title: string,
+  body: string,
+  action: "profile_photo" | "media_upload" | null = null,
+  categoryId: number | null = null,
+): Step {
+  const widgets: Widget[] = [
+    { type: "title", text: title },
+    { type: "text", text: body },
+  ];
+  if (action === "profile_photo") widgets.push({ type: action });
+  if (action === "media_upload")
+    widgets.push({ type: action, mediaUpload: { categoryId } });
+  return { widgets };
+}
+
+function titleOf(step: Step) {
+  return step.widgets.find((widget) => widget.type === "title")!.text;
+}
+function bodyOf(step: Step) {
+  return step.widgets.find((widget) => widget.type === "text")!.text;
+}
 type Welcome = {
   open: boolean;
   revision: number;
   currentStep: number;
+  required: boolean;
   steps: Step[];
 };
 type Photo = {
@@ -36,6 +60,7 @@ type Job = {
   id: number;
   categoryId: number | null;
   welcomeRevision: number | null;
+  welcomeWidgetIndex: number | null;
   filename: string;
   status: string;
   errorCode: string | null;
@@ -43,6 +68,7 @@ type Job = {
 };
 let host: APIRequestContext;
 let previousSteps: Step[];
+let previouslyRequired = false;
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
 
@@ -76,9 +102,19 @@ async function saveSteps(steps: Step[]) {
   return response.json() as Promise<Welcome>;
 }
 
-async function restoreOpen(steps: Step[]) {
+async function restoreOpen(steps: Step[], required = false) {
   if (!(await welcome()).open) await transition("open");
+  await transition("start");
   await saveSteps(steps);
+  const { revision } = await welcome();
+  expect(
+    (
+      await host.patch("/api/admin/welcome/required", {
+        data: { revision, required },
+      })
+    ).status(),
+  ).toBe(200);
+  await transition("open");
 }
 
 async function createCategory(name: string, isPublic: boolean) {
@@ -105,10 +141,32 @@ async function enterWaiting(page: Page, name: string) {
 
 async function expectStep(page: Page, step: Step) {
   await expect(
-    page.getByRole("heading", { name: step.title, exact: true }),
+    page.getByRole("heading", { name: titleOf(step), exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await expect(page).toHaveURL(/\/attente$/);
+}
+
+async function guestNext(page: Page) {
+  const response = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/welcome/progress" &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Suivant", exact: true }).click();
+  expect((await response).status()).toBe(200);
+}
+
+async function finishWelcome(page: Page) {
+  await page
+    .getByRole("button", { name: "Entrer dans l’application", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/photos$/);
+}
+
+async function progressRevision(page: Page) {
+  return (await (await page.request.get("/api/welcome")).json())
+    .progressRevision as number;
 }
 
 async function testImage(page: Page, name: string, color = "#91729d") {
@@ -130,10 +188,19 @@ async function testImage(page: Page, name: string, color = "#91729d") {
   return { name, mimeType: "image/png", buffer: Buffer.from(data, "base64") };
 }
 
-async function upload(page: Page, name: string, color?: string) {
+async function upload(
+  page: Page,
+  name: string,
+  color?: string,
+  widgetPosition?: number,
+) {
   const image = await testImage(page, name, color);
+  const controls =
+    widgetPosition === undefined
+      ? page
+      : page.locator(".welcome-media").nth(widgetPosition);
   await expect(
-    page.getByLabel("Ajouter des médias", { exact: true }),
+    controls.getByLabel("Ajouter des médias", { exact: true }),
   ).toBeHidden();
   const accepted = page.waitForResponse(
     (response) =>
@@ -142,7 +209,7 @@ async function upload(page: Page, name: string, color?: string) {
   );
   // Clicking the real control also waits for hydration after a full navigation.
   const chooser = page.waitForEvent("filechooser");
-  await page
+  await controls
     .getByRole("button", { name: "Ajouter des médias", exact: true })
     .and(page.locator("button"))
     .click();
@@ -221,7 +288,205 @@ test.beforeAll(async () => {
     data: { token: invitationToken(match[0]) },
   });
   expect(accepted.status()).toBe(200);
-  previousSteps = (await welcome()).steps;
+  const previousState = await welcome();
+  previousSteps = previousState.steps;
+  previouslyRequired = previousState.required;
+});
+
+test("several media widgets keep separate destinations and queues alongside a profile widget", async ({
+  page,
+}) => {
+  const category = await createCategory("Private table challenge", false);
+  const steps: Step[] = [
+    {
+      widgets: [
+        { type: "text", text: "First take a photo with your table." },
+        { type: "media_upload", mediaUpload: { categoryId: category.id } },
+        { type: "title", text: "Now share a photo with everyone" },
+        { type: "media_upload", mediaUpload: { categoryId: null } },
+        { type: "profile_photo" },
+        { type: "text", text: "You can also choose your profile photo here." },
+      ],
+    },
+    step(
+      "A future surprise",
+      "These instructions remain hidden until the host continues.",
+      "media_upload",
+      category.id,
+    ),
+  ];
+  await saveSteps(steps);
+  await transition("start");
+  await transition("next");
+  await enterWaiting(page, "Sam Several Widgets Test");
+  const activeRevision = await progressRevision(page);
+  const media = page.locator(".welcome-media");
+  const profile = page.locator(".welcome-profile");
+  await expect(media).toHaveCount(2);
+  await expect(profile).toBeVisible();
+  const current = await (await page.request.get("/api/welcome")).json();
+  expect(current.step).toEqual({ position: 1, ...steps[0] });
+  for (const key of ["title", "body", "action", "mediaUpload"])
+    expect(current.step).not.toHaveProperty(key);
+  const html = await page.content();
+  expect(html).not.toContain(titleOf(steps[1]));
+  expect(html).not.toContain(bodyOf(steps[1]));
+  const order = await page
+    .locator(".welcome-widgets > *")
+    .evaluateAll((elements) =>
+      elements
+        .map((element) =>
+          element.classList.contains("welcome-media")
+            ? "media"
+            : element.classList.contains("welcome-profile")
+              ? "profile"
+              : element.textContent?.trim(),
+        )
+        .filter(Boolean),
+    );
+  // Each authored text and interactive widget stays in the order chosen by the host.
+  const positions = [
+    order.indexOf("First take a photo with your table."),
+    order.indexOf("media"),
+    order.indexOf("Now share a photo with everyone"),
+    order.lastIndexOf("media"),
+    order.indexOf("profile"),
+    order.indexOf("You can also choose your profile photo here."),
+  ];
+  expect(positions.every((position) => position >= 0)).toBe(true);
+  expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  await profile
+    .locator('input[type="file"]')
+    .setInputFiles(await testImage(page, "profile-and-media.png"));
+  const preview = profile.getByRole("img", {
+    name: "Aperçu de ta photo de profil",
+    exact: true,
+  });
+  await expect(preview).toBeVisible();
+  const previewURL = await preview.getAttribute("src");
+
+  const privateJob = await (async () => {
+    let releaseUpload!: () => void;
+    let held = false;
+    const gate = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    await page.route("**/api/photos", async (route) => {
+      if (route.request().method() === "POST" && !held) {
+        held = true;
+        await gate;
+      }
+      await route.continue();
+    });
+    const pendingUpload = upload(
+      page,
+      "table-widget-private.png",
+      "#91729d",
+      0,
+    );
+    try {
+      await expect.poll(() => held).toBe(true);
+      await transition("next");
+      await expect(
+        page.getByRole("button", { name: "Suivant", exact: true }),
+      ).toBeEnabled();
+      await expect(media).toHaveCount(2);
+      await expect(preview).toHaveAttribute("src", previewURL!);
+      expect(await progressRevision(page)).toBe(activeRevision);
+      const current = await (await page.request.get("/api/welcome")).json();
+      expect(current.step).toEqual({ position: 1, ...steps[0] });
+      expect(JSON.stringify(current)).not.toContain(titleOf(steps[1]));
+      releaseUpload();
+      return await pendingUpload;
+    } finally {
+      releaseUpload();
+      await pendingUpload.catch(() => {});
+      await page.unroute("**/api/photos");
+    }
+  })();
+  const mainJob = await upload(page, "table-widget-main.png", "#688b96", 1);
+  expect(privateJob).toMatchObject({
+    categoryId: category.id,
+    welcomeRevision: activeRevision,
+    welcomeWidgetIndex: 1,
+  });
+  expect(mainJob).toMatchObject({
+    categoryId: null,
+    welcomeRevision: activeRevision,
+    welcomeWidgetIndex: 3,
+  });
+  expect((await ready(page.request, privateJob.id)).photo).toBeNull();
+  expect((await ready(page.request, mainJob.id)).photo).toBeNull();
+  await expect(media.nth(0).locator(".upload-queue")).toContainText(
+    privateJob.filename,
+  );
+  await expect(media.nth(0).locator(".upload-queue")).not.toContainText(
+    mainJob.filename,
+  );
+  await expect(media.nth(1).locator(".upload-queue")).toContainText(
+    mainJob.filename,
+  );
+  await expect(media.nth(1).locator(".upload-queue")).not.toContainText(
+    privateJob.filename,
+  );
+  await expect(preview).toHaveAttribute("src", previewURL!);
+  const saved = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/profile/avatar" &&
+      response.request().method() === "PUT",
+  );
+  await profile
+    .getByRole("button", { name: "Enregistrer la photo", exact: true })
+    .click();
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await expect(media.nth(0).locator(".upload-queue")).toContainText(
+    privateJob.filename,
+  );
+  await expect(media.nth(0).locator(".upload-queue")).not.toContainText(
+    mainJob.filename,
+  );
+  await expect(media.nth(1).locator(".upload-queue")).toContainText(
+    mainJob.filename,
+  );
+  await expect(media.nth(1).locator(".upload-queue")).not.toContainText(
+    privateJob.filename,
+  );
+  await expect(profile.locator(".avatar img")).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 740 });
+  await expectNoOverflow(page);
+  await page.screenshot({
+    path: "test-results/welcome-widgets-guest-mobile-320.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.screenshot({
+    path: "test-results/welcome-widgets-guest-desktop.png",
+    fullPage: true,
+  });
+  await media
+    .nth(0)
+    .getByRole("button", { name: "Fermer", exact: true })
+    .click();
+  await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
+  await expect(media.nth(1).locator(".upload-queue")).toContainText(
+    mainJob.filename,
+  );
+  await page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/welcome",
+  );
+  await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
+  await expect(media.nth(1).locator(".upload-queue")).toContainText(
+    mainJob.filename,
+  );
+  expect((await page.request.get("/api/photos")).status()).toBe(423);
+  await transition("open");
+  await finishWelcome(page);
+  const published = (await ready(page.request, mainJob.id)).photo!;
+  await expect(
+    page.locator(`img[src="${published.thumbnailUrl}"]`),
+  ).toBeVisible();
+  expect((await ready(page.request, privateJob.id)).photo).toBeNull();
 });
 
 test.beforeEach(async () => {
@@ -230,7 +495,7 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   // Every specification shares the disposable database supplied by the runner.
-  await restoreOpen(previousSteps);
+  await restoreOpen(previousSteps, previouslyRequired);
 });
 
 test.afterAll(async () => {
@@ -289,40 +554,54 @@ test("the host creates private and public categories and saves each welcome uplo
   ).toBeVisible();
 
   const steps: Step[] = [
-    {
-      title: "Share a photo from your table",
-      body: "Choose a photo with your group.",
-      action: "media_upload",
-      mediaUpload: { categoryId: privateCategory.id },
-    },
-    {
-      title: "Share a dance floor photo",
-      body: "Choose a photo from the dance floor.",
-      action: "media_upload",
-      mediaUpload: { categoryId: publicCategory.id },
-    },
-    {
-      title: "Add another memory",
-      body: "Choose a photo for the main gallery.",
-      action: "media_upload",
-      mediaUpload: { categoryId: null },
-    },
+    step(
+      "Share a photo from your table",
+      "Choose a photo with your group.",
+      "media_upload",
+      privateCategory.id,
+    ),
+    step(
+      "Share a dance floor photo",
+      "Choose a photo from the dance floor.",
+      "media_upload",
+      publicCategory.id,
+    ),
+    step(
+      "Add another memory",
+      "Choose a photo for the main gallery.",
+      "media_upload",
+      null,
+    ),
   ];
-  for (const [index, step] of steps.entries()) {
+  for (const step of steps) {
     await page
       .getByRole("button", { name: "Ajouter une étape", exact: true })
       .click();
-    await page.getByLabel(`Titre de l’étape ${index + 1}`).fill(step.title);
-    await page.getByLabel(`Texte de l’étape ${index + 1}`).fill(step.body);
+    await page
+      .getByRole("button", { name: "Ajouter le widget Titre", exact: true })
+      .click();
+    await page
+      .getByLabel("Titre du widget 1", { exact: true })
+      .fill(titleOf(step));
+    await page
+      .getByRole("button", { name: "Ajouter le widget Texte", exact: true })
+      .click();
+    await page
+      .getByLabel("Texte du widget 2", { exact: true })
+      .fill(bodyOf(step));
     await page
       .getByRole("button", {
-        name: "Envoyer des photos et vidéos",
+        name: "Ajouter le widget Photos et vidéos",
         exact: true,
       })
       .click();
     await page
       .getByLabel("Destination des envois", { exact: true })
-      .selectOption(step.mediaUpload!.categoryId?.toString() ?? "");
+      .selectOption(
+        step.widgets
+          .find((widget) => widget.type === "media_upload")!
+          .mediaUpload.categoryId?.toString() ?? "",
+      );
   }
   const saved = page.waitForResponse(
     (response) =>
@@ -344,7 +623,11 @@ test("the host creates private and public categories and saves each welcome uplo
       .click();
     await expect(
       page.getByLabel("Destination des envois", { exact: true }),
-    ).toHaveValue(step.mediaUpload!.categoryId?.toString() ?? "");
+    ).toHaveValue(
+      step.widgets
+        .find((widget) => widget.type === "media_upload")!
+        .mediaUpload.categoryId?.toString() ?? "",
+    );
   }
   await page
     .getByRole("button", { name: "Modifier l’étape 1", exact: true })
@@ -368,29 +651,21 @@ test("a private welcome upload survives reload and stays inaccessible until the 
 }) => {
   const category = await createCategory("Unopened table portraits", false);
   const steps: Step[] = [
-    {
-      title: "Find your table",
-      body: "Keep the envelope closed.",
-      action: null,
-    },
-    {
-      title: "Send your table portrait",
-      body: "Take a photo together and send it here.",
-      action: "media_upload",
-      mediaUpload: { categoryId: category.id },
-    },
-    {
-      title: "Open your envelope",
-      body: "Read the note together.",
-      action: null,
-    },
+    step("Find your table", "Keep the envelope closed.", null),
+    step(
+      "Send your table portrait",
+      "Take a photo together and send it here.",
+      "media_upload",
+      category.id,
+    ),
+    step("Open your envelope", "Read the note together.", null),
   ];
   await saveSteps(steps);
   await transition("start");
   await transition("next");
   const contextRequests: string[] = [];
   page.on("request", (request) => {
-    if (request.url().endsWith("/api/welcome/upload-context"))
+    if (new URL(request.url()).pathname === "/api/welcome/upload-context")
       contextRequests.push(request.url());
   });
   const guest = await enterWaiting(page, "Morgan Private Upload Test");
@@ -399,18 +674,24 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   expect(contextRequests).toEqual([]);
   const initialState = await (await page.request.get("/api/welcome")).json();
   expect(JSON.stringify(initialState)).not.toContain(category.name);
-  expect(initialState.step.action).toBeNull();
-  expect(initialState.step.mediaUpload ?? null).toBeNull();
+  expect(initialState.step.widgets).toEqual(steps[0].widgets);
+  expect(initialState.step).not.toHaveProperty("action");
 
-  const active = await transition("next");
+  await transition("next");
+  await expectStep(page, steps[0]);
+  await guestNext(page);
   await expectStep(page, steps[1]);
+  const activeRevision = await progressRevision(page);
   await expect(page.locator(".welcome-media")).toBeVisible();
-  const contextResponse = await page.request.get("/api/welcome/upload-context");
+  const contextResponse = await page.request.get(
+    "/api/welcome/upload-context?widgetIndex=2",
+  );
   expect(contextResponse.status()).toBe(200);
   expect((await contextResponse.json()).category).toEqual(category);
   const accepted = await upload(page, "table-portrait-private.png");
   expect(accepted.categoryId).toBe(category.id);
-  expect(accepted.welcomeRevision).toBe(active.revision);
+  expect(accepted.welcomeRevision).toBe(activeRevision);
+  expect(accepted.welcomeWidgetIndex).toBe(2);
   const completed = await ready(page.request, accepted.id);
   expect(completed.photo).toBeNull();
   await expect(page.locator(".upload-queue")).toContainText(
@@ -446,14 +727,18 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   }
 
   await transition("next");
+  await expectStep(page, steps[1]);
+  await guestNext(page);
   await expectStep(page, steps[2]);
   await expect(page.locator(".welcome-media")).toHaveCount(0);
-  expect((await page.request.get("/api/welcome/upload-context")).status()).toBe(
-    423,
-  );
+  expect(
+    (
+      await page.request.get("/api/welcome/upload-context?widgetIndex=2")
+    ).status(),
+  ).toBe(423);
   expect((await page.request.get("/api/uploads")).status()).toBe(423);
   await transition("open");
-  await expect(page).toHaveURL(/\/photos$/);
+  await finishWelcome(page);
   const categories = await (
     await page.request.get("/api/media-categories")
   ).json();
@@ -532,33 +817,39 @@ test("welcome uploads keep their public or main destination and the gallery filt
 }) => {
   const category = await createCategory("Shared dance photos", true);
   const steps: Step[] = [
-    {
-      title: "Share a dance photo",
-      body: "Send a photo for the dance collection.",
-      action: "media_upload",
-      mediaUpload: { categoryId: category.id },
-    },
-    {
-      title: "Share a memory in the main gallery",
-      body: "Send another photo for everyone.",
-      action: "media_upload",
-      mediaUpload: { categoryId: null },
-    },
+    step(
+      "Share a dance photo",
+      "Send a photo for the dance collection.",
+      "media_upload",
+      category.id,
+    ),
+    step(
+      "Share a memory in the main gallery",
+      "Send another photo for everyone.",
+      "media_upload",
+      null,
+    ),
   ];
   await saveSteps(steps);
   await transition("start");
-  const first = await transition("next");
+  await transition("next");
   await enterWaiting(page, "Alex Public Upload Test");
   await expectStep(page, steps[0]);
+  const firstRevision = await progressRevision(page);
   const namedJob = await upload(page, "dance-public.png", "#688b96");
   expect(namedJob.categoryId).toBe(category.id);
-  expect(namedJob.welcomeRevision).toBe(first.revision);
+  expect(namedJob.welcomeRevision).toBe(firstRevision);
+  expect(namedJob.welcomeWidgetIndex).toBe(2);
   expect((await ready(page.request, namedJob.id)).photo).toBeNull();
-  const second = await transition("next");
+  await transition("next");
+  await expectStep(page, steps[0]);
+  await guestNext(page);
   await expectStep(page, steps[1]);
+  const secondRevision = await progressRevision(page);
   const mainJob = await upload(page, "memory-main.png", "#8d784f");
   expect(mainJob.categoryId).toBeNull();
-  expect(mainJob.welcomeRevision).toBe(second.revision);
+  expect(mainJob.welcomeRevision).toBe(secondRevision);
+  expect(mainJob.welcomeWidgetIndex).toBe(2);
   expect((await ready(page.request, mainJob.id)).photo).toBeNull();
   await expectNoOverflow(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -567,7 +858,7 @@ test("welcome uploads keep their public or main destination and the gallery filt
     fullPage: true,
   });
   await transition("open");
-  await expect(page).toHaveURL(/\/photos$/);
+  await finishWelcome(page);
   const main = (await ready(page.request, mainJob.id)).photo!;
   const named = (await ready(page.request, namedJob.id)).photo!;
   expect(main).toBeTruthy();
@@ -589,6 +880,7 @@ test("welcome uploads keep their public or main destination and the gallery filt
   const galleryJob = await upload(page, "dance-gallery.png", "#6d8b69");
   expect(galleryJob.categoryId).toBe(category.id);
   expect(galleryJob.welcomeRevision).toBeNull();
+  expect(galleryJob.welcomeWidgetIndex).toBeNull();
   const galleryPhoto = (await ready(page.request, galleryJob.id)).photo!;
   await expect(
     page.locator(`img[src="${galleryPhoto.thumbnailUrl}"]`),

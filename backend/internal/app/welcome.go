@@ -12,10 +12,40 @@ import (
 )
 
 type welcomeStep struct {
-	Title       string              `json:"title"`
-	Body        string              `json:"body"`
-	Action      *string             `json:"action"`
+	Widgets []welcomeWidget `json:"widgets"`
+}
+
+type welcomeWidget struct {
+	Type        string              `json:"type"`
+	Text        string              `json:"text,omitempty"`
 	MediaUpload *welcomeMediaUpload `json:"mediaUpload,omitempty"`
+}
+
+func (w *welcomeWidget) UnmarshalJSON(data []byte) error {
+	type widget welcomeWidget
+	var input widget
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for name := range fields {
+		if name != "type" && name != "text" && name != "mediaUpload" {
+			return errors.New("unsupported welcome widget field")
+		}
+	}
+	if _, exists := fields["text"]; exists && input.Type != "title" && input.Type != "text" {
+		return errors.New("text is only supported on title and text widgets")
+	}
+	if _, exists := fields["mediaUpload"]; exists && input.Type != "media_upload" {
+		return errors.New("mediaUpload is only supported on media upload widgets")
+	}
+	*w = welcomeWidget(input)
+	return nil
 }
 
 type welcomeMediaUpload struct {
@@ -23,6 +53,15 @@ type welcomeMediaUpload struct {
 }
 
 func (m *welcomeMediaUpload) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for name := range fields {
+		if name != "categoryId" {
+			return errors.New("unsupported media upload setting")
+		}
+	}
 	var input struct {
 		CategoryID json.RawMessage `json:"categoryId"`
 	}
@@ -41,48 +80,28 @@ type welcomeState struct {
 	Open        bool          `json:"open"`
 	Revision    int64         `json:"revision"`
 	CurrentStep int           `json:"currentStep"`
+	Required    bool          `json:"required"`
+	Generation  int64         `json:"-"`
 	Steps       []welcomeStep `json:"steps"`
 }
 
 type welcomeView struct {
-	Open     bool                `json:"open"`
-	Revision int64               `json:"revision"`
-	Step     *visibleWelcomeStep `json:"step"`
+	Open             bool                `json:"open"`
+	Revision         int64               `json:"revision"`
+	ProgressRevision int64               `json:"progressRevision"`
+	Step             *visibleWelcomeStep `json:"step"`
+	CanPrevious      bool                `json:"canPrevious"`
+	CanNext          bool                `json:"canNext"`
+	CanFinish        bool                `json:"canFinish"`
 }
 
 type visibleWelcomeStep struct {
-	Position    int                 `json:"position"`
-	Title       string              `json:"title"`
-	Body        string              `json:"body"`
-	Action      *string             `json:"action"`
-	MediaUpload *welcomeMediaUpload `json:"mediaUpload,omitempty"`
-}
-
-func (a *App) getWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
-	var view welcomeView
-	var position int
-	var current []byte
-	// Select only the current step: future instructions never enter a guest response.
-	err := a.db.QueryRowContext(r.Context(), `SELECT is_open,revision,current_step,
- CASE WHEN NOT is_open AND current_step>0 THEN steps->(current_step-1) END
- FROM welcome WHERE id=1`).Scan(&view.Open, &view.Revision, &position, &current)
-	if err != nil {
-		internal(w, err)
-		return
-	}
-	if !view.Open && position > 0 && len(current) > 0 {
-		var step welcomeStep
-		if err := json.Unmarshal(current, &step); err != nil {
-			internal(w, err)
-			return
-		}
-		view.Step = &visibleWelcomeStep{Position: position, Title: step.Title, Body: step.Body, Action: step.Action, MediaUpload: step.MediaUpload}
-	}
-	respond(w, 200, view)
+	Position int             `json:"position"`
+	Widgets  []welcomeWidget `json:"widgets"`
 }
 
 func (a *App) getAdminWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
-	state, err := scanWelcome(a.db.QueryRowContext(r.Context(), "SELECT is_open,revision,current_step,steps FROM welcome WHERE id=1"))
+	state, err := scanWelcome(a.db.QueryRowContext(r.Context(), welcomeSelect))
 	if err != nil {
 		internal(w, err)
 		return
@@ -93,7 +112,7 @@ func (a *App) getAdminWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
 func scanWelcome(row *sql.Row) (welcomeState, error) {
 	var state welcomeState
 	var steps []byte
-	if err := row.Scan(&state.Open, &state.Revision, &state.CurrentStep, &steps); err != nil {
+	if err := row.Scan(&state.Open, &state.Revision, &state.CurrentStep, &state.Required, &state.Generation, &steps); err != nil {
 		return state, err
 	}
 	err := json.Unmarshal(steps, &state.Steps)
@@ -105,7 +124,7 @@ func (a *App) lockWelcome(ctx context.Context) (*sql.Tx, welcomeState, error) {
 	if err != nil {
 		return nil, welcomeState{}, err
 	}
-	state, err := scanWelcome(tx.QueryRowContext(ctx, "SELECT is_open,revision,current_step,steps FROM welcome WHERE id=1 FOR UPDATE"))
+	state, err := scanWelcome(tx.QueryRowContext(ctx, welcomeSelect+" FOR UPDATE"))
 	if err != nil {
 		tx.Rollback()
 		return nil, state, err
@@ -118,7 +137,8 @@ func (a *App) updateWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
 		Revision *int64        `json:"revision"`
 		Steps    []welcomeStep `json:"steps"`
 	}
-	if !decode(w, r, &input) {
+	// The bounded widget collection can exceed the usual 64 KiB JSON limit.
+	if !decodeLimit(w, r, &input, 1<<20) {
 		return
 	}
 	if input.Revision == nil || *input.Revision < 0 || input.Steps == nil || len(input.Steps) > 12 {
@@ -127,20 +147,45 @@ func (a *App) updateWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
 	}
 	for i := range input.Steps {
 		step := &input.Steps[i]
-		step.Title = strings.TrimSpace(step.Title)
-		step.Body = strings.TrimSpace(step.Body)
-		if step.Title == "" || utf8.RuneCountInString(step.Title) > 120 || utf8.RuneCountInString(step.Body) > 1000 {
+		if len(step.Widgets) < 1 || len(step.Widgets) > 12 {
 			fail(w, 400, "invalid_welcome_steps")
 			return
 		}
-		if step.Action != nil && *step.Action != "profile_photo" && *step.Action != "media_upload" {
-			fail(w, 400, "invalid_welcome_action")
-			return
-		}
-		media := step.Action != nil && *step.Action == "media_upload"
-		if media != (step.MediaUpload != nil) || step.MediaUpload != nil && step.MediaUpload.CategoryID != nil && *step.MediaUpload.CategoryID < 1 {
-			fail(w, 400, "invalid_welcome_action")
-			return
+		profile, notifications := false, false
+		for j := range step.Widgets {
+			widget := &step.Widgets[j]
+			switch widget.Type {
+			case "title", "text":
+				widget.Text = strings.TrimSpace(widget.Text)
+				limit := 1000
+				if widget.Type == "title" {
+					limit = 120
+				}
+				if widget.Text == "" || utf8.RuneCountInString(widget.Text) > limit {
+					fail(w, 400, "invalid_welcome_steps")
+					return
+				}
+			case "profile_photo":
+				if profile {
+					fail(w, 400, "invalid_welcome_action")
+					return
+				}
+				profile = true
+			case "enable_notifications":
+				if notifications {
+					fail(w, 400, "invalid_welcome_action")
+					return
+				}
+				notifications = true
+			case "media_upload":
+				if widget.MediaUpload == nil || widget.MediaUpload.CategoryID != nil && *widget.MediaUpload.CategoryID < 1 {
+					fail(w, 400, "invalid_welcome_action")
+					return
+				}
+			default:
+				fail(w, 400, "invalid_welcome_action")
+				return
+			}
 		}
 	}
 	tx, state, err := a.lockWelcome(r.Context())
@@ -153,23 +198,25 @@ func (a *App) updateWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
 		fail(w, 409, "welcome_conflict")
 		return
 	}
-	if !state.Open && state.CurrentStep > 0 {
+	if state.CurrentStep > 0 {
 		fail(w, 409, "welcome_steps_locked")
 		return
 	}
 	for _, step := range input.Steps {
-		if step.MediaUpload == nil || step.MediaUpload.CategoryID == nil {
-			continue
-		}
-		var id int64
-		err := tx.QueryRowContext(r.Context(), "SELECT id FROM media_categories WHERE id=$1 FOR SHARE", *step.MediaUpload.CategoryID).Scan(&id)
-		if errors.Is(err, sql.ErrNoRows) {
-			fail(w, 404, "media_category_not_found")
-			return
-		}
-		if err != nil {
-			internal(w, err)
-			return
+		for _, widget := range step.Widgets {
+			if widget.MediaUpload == nil || widget.MediaUpload.CategoryID == nil {
+				continue
+			}
+			var id int64
+			err := tx.QueryRowContext(r.Context(), "SELECT id FROM media_categories WHERE id=$1 FOR SHARE", *widget.MediaUpload.CategoryID).Scan(&id)
+			if errors.Is(err, sql.ErrNoRows) {
+				fail(w, 404, "media_category_not_found")
+				return
+			}
+			if err != nil {
+				internal(w, err)
+				return
+			}
 		}
 	}
 	state.Steps = input.Steps
@@ -209,6 +256,7 @@ func (a *App) transitionWelcome(w http.ResponseWriter, r *http.Request, _ Guest)
 			return
 		}
 		state.Open, state.CurrentStep = false, 0
+		state.Generation++
 	case "next":
 		if state.Open || state.CurrentStep >= len(state.Steps) {
 			fail(w, 409, "invalid_welcome_transition")
@@ -220,9 +268,13 @@ func (a *App) transitionWelcome(w http.ResponseWriter, r *http.Request, _ Guest)
 			fail(w, 409, "invalid_welcome_transition")
 			return
 		}
-		state.Open, state.CurrentStep = true, 0
+		state.Open, state.CurrentStep = true, len(state.Steps)
 	default:
 		fail(w, 409, "invalid_welcome_transition")
+		return
+	}
+	if err := a.queueWelcomeNotifications(r.Context(), tx, state, input.Action); err != nil {
+		internal(w, err)
 		return
 	}
 	if err := saveWelcome(r.Context(), tx, &state); err != nil {
@@ -238,7 +290,7 @@ func saveWelcome(ctx context.Context, tx *sql.Tx, state *welcomeState) error {
 		return err
 	}
 	state.Revision++
-	if _, err = tx.ExecContext(ctx, "UPDATE welcome SET is_open=$1,revision=$2,current_step=$3,steps=$4 WHERE id=1", state.Open, state.Revision, state.CurrentStep, steps); err != nil {
+	if _, err = tx.ExecContext(ctx, "UPDATE welcome SET is_open=$1,revision=$2,current_step=$3,steps=$4,required=$5,generation=$6 WHERE id=1", state.Open, state.Revision, state.CurrentStep, steps, state.Required, state.Generation); err != nil {
 		return err
 	}
 	return tx.Commit()

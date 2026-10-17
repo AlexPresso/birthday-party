@@ -13,6 +13,7 @@ import {
   errorMessage,
   readResponse,
   responseError,
+  remove,
 } from "../src/lib/api.ts";
 import { commonMessages } from "../src/lib/messages/common.ts";
 import { adminMessages } from "../src/lib/messages/admin.ts";
@@ -20,6 +21,9 @@ import { mediaMessages } from "../src/lib/messages/media.ts";
 import { welcomeMessages } from "../src/lib/messages/welcome.ts";
 import { profileMessages } from "../src/lib/messages/profile.ts";
 import { categoryMessages } from "../src/lib/messages/categories.ts";
+import { widgetMessages } from "../src/lib/messages/widgets.ts";
+import { slideshowMessages } from "../src/lib/messages/slideshow.ts";
+import { notificationMessages } from "../src/lib/messages/notifications.ts";
 import { errorMessages } from "../src/lib/messages/errors.ts";
 
 test("locale negotiation follows language preferences and region variants", () => {
@@ -61,6 +65,9 @@ test("all catalogs contain the same nonempty keys and interpolation parameters",
     welcomeMessages,
     profileMessages,
     categoryMessages,
+    widgetMessages,
+    slideshowMessages,
+    notificationMessages,
     errorMessages,
   ]) {
     const expected = family.en as Record<string, string>;
@@ -232,6 +239,31 @@ test("network failures are translated while request cancellations remain cancell
     api("/invitations/preview", schema),
     (error: unknown) => error === aborted,
   );
+});
+
+test("subscription removal sends its endpoint and accepts an empty successful response", async (context) => {
+  const controller = new AbortController();
+  const body = { endpoint: "https://push.example.test/endpoint" };
+  const fetchMock = context.mock.method(
+    globalThis,
+    "fetch",
+    async (_path: string, options: RequestInit) => {
+      assert.equal(options.method, "DELETE");
+      assert.equal(options.signal, controller.signal);
+      assert.equal(options.credentials, "same-origin");
+      assert.equal(options.body, JSON.stringify(body));
+      assert.equal(
+        new Headers(options.headers).get("Content-Type"),
+        "application/json",
+      );
+      return new Response(null, { status: 204 });
+    },
+  );
+  await remove("/notifications/subscription", "DELETE", {
+    body,
+    signal: controller.signal,
+  });
+  assert.equal(fetchMock.mock.callCount(), 1);
 });
 
 test("date labels use the selected language and party timezone without zone suffixes", () => {

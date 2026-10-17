@@ -34,6 +34,51 @@
   margin: 12px 0 0;
 }
 
+.welcome-required {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.welcome-required > p {
+  margin: 4px 0 0;
+}
+
+.welcome-required .checkbox-field {
+  margin-bottom: 4px;
+}
+
+.welcome-required input {
+  appearance: none;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.welcome-required input::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.welcome-required input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.welcome-required input:checked::before {
+  transform: translateX(18px);
+  background: var(--background);
+}
+
 .welcome-admin-notice {
   min-height: 1.6em;
   margin: 14px 0 18px;
@@ -229,62 +274,6 @@
   opacity: 1;
 }
 
-.welcome-action-panel {
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-small);
-  background: #201a25;
-}
-
-.welcome-action-panel h3 {
-  margin-bottom: 6px;
-}
-
-.welcome-action-card {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 16px;
-  align-items: center;
-  width: 100%;
-  min-height: 72px;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: left;
-}
-
-.welcome-action-card[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: #392c43;
-}
-
-.welcome-action-card > svg {
-  color: var(--accent);
-}
-
-.welcome-action-settings {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid var(--border);
-}
-
-.welcome-action-settings h4 {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.welcome-action-settings .fine-print {
-  margin-bottom: 6px;
-}
-
-.welcome-action-empty {
-  margin: 14px 0 0;
-}
-
 .welcome-editor-actions {
   padding-top: 20px;
   border-top: 1px solid var(--border);
@@ -293,28 +282,10 @@
 
 @container (min-width: 600px) {
   .welcome-editor-workspace {
-    grid-template-columns: 190px minmax(0, 1fr);
-  }
-  .welcome-step-rail {
-    grid-row: span 2;
-  }
-  .welcome-action-panel {
-    grid-column: 2;
+    grid-template-columns: 175px minmax(0, 1fr);
   }
   .welcome-step-list {
     max-height: 440px;
-  }
-}
-
-@container (min-width: 800px) {
-  .welcome-editor-workspace {
-    grid-template-columns: 190px minmax(0, 1fr) 220px;
-  }
-  .welcome-step-rail {
-    grid-row: auto;
-  }
-  .welcome-action-panel {
-    grid-column: 3;
   }
 }
 

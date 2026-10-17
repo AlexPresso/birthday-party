@@ -45,20 +45,38 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - Guest welcome state belongs in PostgreSQL. Protect every party, programme,
   guestbook, media and upload route with the welcome access check, including
   thumbnails and range requests. Session/logout/welcome status remain available.
-  Administrators bypass the welcome restriction. Return only the current step
-  to guests, and use revision-checked transactions for host edits/transitions.
+  Administrators bypass the welcome restriction. Return only each guest's
+  selected step. Host transitions unlock a shared boundary; guest next/previous
+  commands persist independent positions, with revisions checked in transactions.
+  A global required flag makes first-time late arrivals start at the first step,
+  including after host opening. Existing participants finish explicitly; opening
+  unlocks remaining steps without moving their position. Keep initial access open
+  until a welcome run starts. Lock structural edits after the first unlock until
+  the host restarts the welcome. PostgreSQL stores the run generation and guest
+  progress; use a sequence-backed progress revision for navigation and uploads.
+  Host unlocks and required changes must preserve this token and in-flight work.
   Accepted media jobs may finish privately while welcome access is closed.
-  The current step's optional `profile_photo` action permits only the viewer's
+  Steps contain 1–12 ordered typed widgets: `title`, `text`, `profile_photo`,
+  `media_upload` and `enable_notifications`. Titles/texts are authored content; a fixed step title/body does
+  not exist. Validate field combinations and limits explicitly. Multiple media
+  widgets may coexist, but allow at most one profile editor and one notification
+  widget in a step.
+  A current `profile_photo` widget permits only the viewer's
   own profile read, photo mutation and avatar GET/HEAD during welcome. Keep party
-  content and other guests' avatars locked. Recheck the current action under the
-  welcome row lock before saving; a completed photo never advances the sequence.
-  Validate supported action types explicitly and return only the current action.
-  The `media_upload` action permits upload reception and the owner's queue only.
+  content and other guests' avatars locked. Recheck the current widgets under the
+  welcome/progress row locks before saving; a completed photo never advances the guest.
+  Return only the current step's widgets, never future steps.
+  A current `media_upload` widget permits upload reception and the owner's queue only.
   Its typed `mediaUpload.categoryId` selects the main gallery (`null`) or a
-  category. Require the welcome revision and recheck it and the destination under
+  category. Require the guest progress revision and zero-based widget index, and recheck
+  both and the destination under
   the welcome lock at acceptance; stale transfers must not become ordinary uploads.
-  Keep the accepted destination on the job and resulting photo across recovery.
-  Return no photo details in guest queue responses while welcome access is closed.
+  Keep the accepted revision/index/destination on the job across recovery and
+  retain the destination on the resulting photo. An upload ID cannot switch
+  widgets, even when they have the same destination. Legacy accepted jobs may
+  have a welcome revision with a null widget index after migration 0007.
+  Return no photo details in guest queue responses while that guest's welcome
+  access is closed, even if the host has opened the application for others.
 
 - Go owns business rules, access control, and the authoritative unlock decision. Check access
   for each protected resource, including photo reads and writes.
@@ -71,6 +89,20 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   schedules, convert at input/output boundaries, and never depend on the server's local timezone.
 - Make unlock boundary behavior explicit and test immediately before, at, and after the boundary.
   Pass a clock or time value into time-sensitive logic when useful for deterministic tests.
+
+## Notifications
+
+Web Push subscriptions are private session data. Permit creation for full-access
+guests, administrators or guests on a current `enable_notifications` widget;
+recheck permissions in the transaction. Configuration, own status and removal
+remain available to authenticated guests. Bound subscriptions per guest, validate
+browser keys and HTTPS endpoints, reject private-network destinations at dial time
+and disable redirects/proxies for push delivery. Never log endpoint URLs or keys.
+Store stable VAPID keys and the durable, coalesced outbox in PostgreSQL. Queue
+generic welcome unlock/open notifications in the host transaction and send them
+with a bounded worker owned by the existing startup/shutdown lifecycle. Recheck
+session expiry and guest activity at delivery. Expired endpoints are removed;
+transient failures have bounded retries. Keep private content out of push payloads.
 
 ## Media uploads
 

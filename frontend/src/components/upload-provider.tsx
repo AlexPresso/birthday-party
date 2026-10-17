@@ -30,6 +30,7 @@ import {
 export type UploadDestination = {
   categoryId: number | null;
   welcomeRevision: number | null;
+  welcomeWidgetIndex: number | null;
 };
 
 type Transfer = UploadDestination & {
@@ -55,7 +56,7 @@ type UploadContextValue = {
   retryJob: (job: UploadJob) => void;
   canRetryJob: (job: UploadJob) => boolean;
   dismiss: (id: string) => void;
-  clearFinished: () => void;
+  clearFinished: (widgetIndex?: number) => void;
   forgetPhoto: (id: number) => void;
 };
 
@@ -166,6 +167,11 @@ export function UploadProvider({
         request.setRequestHeader(
           "X-Welcome-Revision",
           String(item.welcomeRevision),
+        );
+      if (item.welcomeWidgetIndex !== null)
+        request.setRequestHeader(
+          "X-Welcome-Widget-Index",
+          String(item.welcomeWidgetIndex),
         );
       request.timeout = 600000;
       request.upload.onprogress = (event) => {
@@ -340,18 +346,28 @@ export function UploadProvider({
         file,
         categoryId: job.categoryId,
         welcomeRevision: job.welcomeRevision,
+        welcomeWidgetIndex: job.welcomeWidgetIndex,
         status: "queued",
         progress: 0,
         retryable: true,
       },
     ]);
   }
-  function clearFinished() {
+  function clearFinished(widgetIndex?: number) {
     transfers
-      .filter((item) => item.status === "error")
+      .filter(
+        (item) =>
+          item.status === "error" &&
+          (widgetIndex === undefined ||
+            item.welcomeWidgetIndex === widgetIndex),
+      )
       .forEach((item) => dismiss(item.clientUploadId));
     jobs
-      .filter((job) => job.status === "ready" || job.status === "failed")
+      .filter(
+        (job) =>
+          (job.status === "ready" || job.status === "failed") &&
+          (widgetIndex === undefined || job.welcomeWidgetIndex === widgetIndex),
+      )
       .forEach((job) => dismiss(job.clientUploadId));
   }
 

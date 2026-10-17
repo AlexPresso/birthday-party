@@ -88,11 +88,23 @@ export async function api<T>(
   return readResponse(response, schema);
 }
 
-export async function remove(path: string, method = "DELETE") {
+export async function remove(
+  path: string,
+  method = "DELETE",
+  options?: { body?: unknown; signal?: AbortSignal },
+) {
   const response = await fetchResponse(`/api${path}`, {
     method,
     credentials: "same-origin",
-    headers: { "X-Requested-With": "birthday-party" },
+    signal: options?.signal,
+    headers: {
+      "X-Requested-With": "birthday-party",
+      ...(options?.body !== undefined
+        ? { "Content-Type": "application/json" }
+        : {}),
+    },
+    body:
+      options?.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
   if (response.status === 401) returnToInvitation();
   if (response.status === 423) returnToWelcome();

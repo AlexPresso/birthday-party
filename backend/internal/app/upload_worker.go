@@ -31,7 +31,8 @@ func (a *App) reportWorkerError(err error) {
 }
 
 // StartWorkers acquires exclusive queue ownership, recovers interrupted uploads,
-// and starts two workers until parent is cancelled or Close is called.
+// and starts two media workers and one notification worker until parent is
+// cancelled or Close is called.
 // Only the serving process calls it; invitation and migration commands do not.
 func (a *App) StartWorkers(parent context.Context) error {
 	a.workerMu.Lock()
@@ -83,6 +84,8 @@ func (a *App) StartWorkers(parent context.Context) error {
 		a.workers.Add(1)
 		go func() { defer a.workers.Done(); a.mediaWorker(ctx) }()
 	}
+	a.workers.Add(1)
+	go func() { defer a.workers.Done(); a.notificationWorker(ctx) }()
 	a.workers.Add(1)
 	go func() {
 		defer a.workers.Done()
