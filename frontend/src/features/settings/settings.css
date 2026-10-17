@@ -1,0 +1,105 @@
+.settings-profile {
+  min-width: 0;
+}
+
+.settings-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px 16px;
+  padding: 26px;
+}
+
+.settings-identity h2 {
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
+}
+
+.settings-identity .status-label {
+  font-size: 12px;
+}
+
+.settings-identity > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  max-width: 56ch;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.settings-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 26px;
+  gap: 24px;
+  border-block: 1px solid var(--border);
+}
+
+.settings-controls > .profile-photo-editor,
+.settings-controls > .notification-control {
+  padding: 0;
+  border: 0;
+}
+
+.settings-controls > .notification-control {
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-account {
+  padding: 12px 26px;
+}
+
+.settings-account > .text-button {
+  color: var(--muted);
+  text-align: left;
+}
+
+.settings-account > .text-button:hover {
+  color: var(--text);
+}
+
+.settings-admin > .settings-admin-heading {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+}
+
+.settings-admin > .settings-admin-heading > .status-label {
+  white-space: normal;
+  font-size: 12px;
+}
+
+.settings-admin .admin-accordion > summary > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1100px) {
+  .settings-identity > p {
+    grid-column: 2;
+  }
+
+  .settings-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px;
+  }
+
+  .settings-controls > .notification-control {
+    padding-top: 0;
+    padding-left: 32px;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-identity,
+  .settings-controls {
+    padding: 20px;
+  }
+
+  .settings-account {
+    padding: 10px 20px;
+  }
+}

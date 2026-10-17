@@ -136,7 +136,7 @@ func TestVideoToolsRejectCorruptInputAndRetryOutputFailures(t *testing.T) {
 	if err := os.WriteFile(inputPath, data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := prepareVideo(context.Background(), inputPath, filepath.Join(t.TempDir(), "absent-output-directory"), "mov", defaultMaxVideoBytes)
+	_, err := prepareVideo(context.Background(), inputPath, filepath.Join(t.TempDir(), "absent-output-directory"), "mov")
 	var validation *media.Error
 	var exit *exec.ExitError
 	if err == nil || errors.As(err, &validation) || !errors.As(err, &exit) {

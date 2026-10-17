@@ -26,7 +26,7 @@ const languages = [
     welcome: "Bienvenue !",
     invalidInvitation:
       "Ce lien est invalide ou a expiré. Demande un nouveau lien à l’organisateur.",
-    tabs: ["Médias", "Programme", "Livre d'or", "Paramètres"],
+    tabs: ["Programme", "Médias", "Livre d'or", "Paramètres"],
     mediaInput: "Ajouter des médias",
     uploadError:
       "Choisis une photo JPEG, PNG ou WebP, ou une vidéo MP4, MOV ou WebM. Convertis d’abord les fichiers HEIC en JPEG.",
@@ -48,7 +48,7 @@ const languages = [
     welcome: "Welcome!",
     invalidInvitation:
       "This link is invalid or has expired. Ask the host for a new invitation.",
-    tabs: ["Media", "Schedule", "Guestbook", "Settings"],
+    tabs: ["Schedule", "Media", "Guestbook", "Settings"],
     mediaInput: "Add media",
     uploadError:
       "Choose a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video. Convert HEIC files to JPEG first.",
@@ -70,7 +70,7 @@ const languages = [
     welcome: "Willkommen!",
     invalidInvitation:
       "Dieser Link ist ungültig oder abgelaufen. Bitte den Gastgeber um eine neue Einladung.",
-    tabs: ["Medien", "Programm", "Gästebuch", "Einstellungen"],
+    tabs: ["Programm", "Medien", "Gästebuch", "Einstellungen"],
     mediaInput: "Medien hinzufügen",
     uploadError:
       "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM. Wandle HEIC-Dateien zuerst in JPEG um.",
@@ -92,7 +92,7 @@ const languages = [
     welcome: "Benvenuto!",
     invalidInvitation:
       "Questo link non è valido o è scaduto. Chiedi un nuovo invito a chi organizza.",
-    tabs: ["Media", "Programma", "Dediche", "Impostazioni"],
+    tabs: ["Programma", "Media", "Dediche", "Impostazioni"],
     mediaInput: "Aggiungi foto e video",
     uploadError:
       "Scegli una foto JPEG, PNG o WebP, oppure un video MP4, MOV o WebM. Converti prima i file HEIC in JPEG.",
@@ -114,7 +114,7 @@ const languages = [
     welcome: "¡Te damos la bienvenida!",
     invalidInvitation:
       "Este enlace no es válido o ha caducado. Pide una nueva invitación a quien organiza.",
-    tabs: ["Multimedia", "Programa", "Dedicatorias", "Ajustes"],
+    tabs: ["Programa", "Multimedia", "Dedicatorias", "Ajustes"],
     mediaInput: "Añadir fotos y vídeos",
     uploadError:
       "Elige una foto JPEG, PNG o WebP, o un vídeo MP4, MOV o WebM. Convierte primero los archivos HEIC a JPEG.",
@@ -305,7 +305,7 @@ for (const language of languages) {
       }
 
       await navigation
-        .getByRole("link", { name: language.tabs[1], exact: true })
+        .getByRole("link", { name: language.tabs[0], exact: true })
         .click();
       const surprise = page.locator("article").filter({
         has: page.getByRole("heading", {

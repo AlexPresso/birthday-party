@@ -265,8 +265,12 @@ export function WelcomeWidgetEditor({
                   </button>
                   <span className="welcome-widget-name">
                     <Icon size={17} aria-hidden="true" />
-                    {t(labels[widget.type])}
-                    <span>{number(index + 1)}</span>
+                    <span className="welcome-widget-label">
+                      {t(labels[widget.type])}
+                    </span>
+                    <span className="welcome-widget-number">
+                      {number(index + 1)}
+                    </span>
                   </span>
                   <div className="welcome-widget-controls">
                     <button

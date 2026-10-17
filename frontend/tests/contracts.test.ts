@@ -467,6 +467,25 @@ test("media responses cannot point a private gallery at an external host", () =>
     thumbnailUrl: "/api/photos/2/image?size=thumb",
   };
   assert.equal(photoSchema.safeParse(valid).success, true);
+  for (const mimeType of [
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+    "video/x-matroska",
+  ]) {
+    const video = {
+      ...valid,
+      kind: "video",
+      mimeType,
+      width: 3840,
+      height: 2160,
+    };
+    assert.deepEqual(photoSchema.parse(video), video);
+  }
+  assert.equal(
+    photoSchema.safeParse({ ...valid, mimeType: "text/html" }).success,
+    false,
+  );
   assert.equal(
     photoSchema.safeParse({ ...valid, categoryId: 12 }).success,
     true,

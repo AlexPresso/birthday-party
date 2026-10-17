@@ -408,6 +408,129 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   expect(ownJobs.items[0].id).toBe(acceptedJob.id);
 });
 
+test("one upload progress bar counts queued files and realtime receipts without duplicates", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const invitation = await invite("Aggregate Upload Progress Test");
+  await enter(page, invitation.invitationUrl);
+  const image = await page.screenshot({ caret: "initial" });
+  const reception = Array.from({ length: 3 }, () =>
+    Promise.withResolvers<void>(),
+  );
+  const firstResponse = Promise.withResolvers<void>();
+  let started = 0;
+  await page.route("**/api/photos", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const index = started++;
+    await reception[index].promise;
+    const response = await route.fetch();
+    expect(response.status()).toBe(202);
+    // Let realtime confirm the first receipt while its original XHR stays open.
+    if (index === 0) await firstResponse.promise;
+    await route.fulfill({ response });
+  });
+
+  try {
+    await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles(
+      ["first", "second", "third"].map((name) => ({
+        name: `aggregate-${name}.png`,
+        mimeType: "image/png",
+        buffer: image,
+      })),
+    );
+    const queue = page.getByRole("region", {
+      name: "Envoi des médias",
+      exact: true,
+    });
+    const bar = queue.getByRole("progressbar", {
+      name: "Progression des envois",
+      exact: true,
+    });
+    const count = queue.locator(".upload-progress-count");
+    await expect.poll(() => started).toBe(2);
+    await expect(queue.getByRole("progressbar")).toHaveCount(1);
+    await expect(bar).toHaveAttribute("max", "100");
+    await expect(count).toHaveText("0 / 3 fichiers envoyés");
+    await expect(
+      queue.locator(".upload-item").filter({ hasText: "aggregate-third.png" }),
+    ).toContainText("En attente");
+
+    reception[0].resolve();
+    await expect(count).toHaveText("1 / 3 fichiers envoyés");
+    await expect(queue.locator(".upload-item")).toHaveCount(3);
+    expect(started).toBe(2);
+    const progress = Number(await bar.getAttribute("value"));
+    expect(progress).toBeGreaterThan(0);
+    expect(progress).toBeLessThan(100);
+
+    for (const { width, height, name } of [
+      { width: 320, height: 740, name: "mobile-320" },
+      { width: 1440, height: 1000, name: "desktop" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        )
+        .toBe(true);
+      await expect(bar).toBeVisible();
+      await page.screenshot({
+        path: `test-results/upload-progress-${name}.png`,
+        fullPage: true,
+        caret: "initial",
+      });
+    }
+
+    firstResponse.resolve();
+    await expect.poll(() => started).toBe(3);
+    await expect(count).toHaveText("1 / 3 fichiers envoyés");
+    reception[1].resolve();
+    reception[2].resolve();
+    await expect(count).toHaveText("3 / 3 fichiers envoyés");
+    await expect(bar).toHaveAttribute("value", "100");
+    await expect(queue.getByRole("progressbar")).toHaveCount(1);
+    await expect(queue.locator(".upload-item")).toHaveCount(3);
+
+    await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
+      name: "aggregate-empty.png",
+      mimeType: "image/png",
+      buffer: Buffer.alloc(0),
+    });
+    const invalid = queue
+      .locator(".upload-item")
+      .filter({ hasText: "aggregate-empty.png" });
+    await expect(invalid).toContainText(
+      "Ce fichier est vide. Choisis un autre fichier.",
+    );
+    await expect(count).toHaveText("3 / 4 fichiers envoyés");
+    await expect(bar).toHaveAttribute("value", "75");
+    expect(started).toBe(3);
+    await invalid
+      .getByRole("button", {
+        name: "Retirer aggregate-empty.png de la liste",
+        exact: true,
+      })
+      .click();
+    await expect(count).toHaveText("3 / 3 fichiers envoyés");
+    await expect(bar).toHaveAttribute("value", "100");
+
+    const jobs = await (await page.request.get("/api/uploads")).json();
+    expect(jobs.items).toHaveLength(3);
+    expect(
+      new Set(
+        jobs.items.map((job: { clientUploadId: string }) => job.clientUploadId),
+      ).size,
+    ).toBe(3);
+  } finally {
+    for (const gate of reception) gate.resolve();
+    firstResponse.resolve();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});
+
 test("retrying a lost upload response reuses its receipt without duplicating media", async ({
   page,
 }) => {
@@ -441,12 +564,25 @@ test("retrying a lost upload response reuses its receipt without duplicating med
       "L'envoi s'est interrompu. Vérifie ta connexion et réessaie.",
     ),
   ).toBeVisible();
+  const queue = page.locator(".upload-queue");
+  await expect(queue.locator(".upload-progress-count")).toHaveText(
+    "0 / 1 fichier envoyé",
+  );
+  await expect(queue.getByRole("progressbar")).toHaveCount(1);
+  expect(
+    Number(await queue.getByRole("progressbar").getAttribute("value")),
+  ).toBeLessThan(100);
   await page
     .getByRole("button", { name: "Réessayer l'envoi de lost-response.png" })
     .click();
   await expect(
     page.locator(".upload-item").filter({ hasText: "lost-response.png" }),
   ).toContainText("Ajouté", { timeout: 15_000 });
+  await expect(queue.locator(".upload-progress-count")).toHaveText(
+    "1 / 1 fichier envoyé",
+  );
+  await expect(queue.getByRole("progressbar")).toHaveAttribute("value", "100");
+  await expect(queue.locator(".upload-item")).toHaveCount(1);
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
   const jobs = await (await page.request.get("/api/uploads")).json();
@@ -580,8 +716,18 @@ test("a guest can upload, play, download and delete a video without loading orig
     true,
   );
   const download = page.waitForEvent("download");
+  await expect(dialog.getByRole("link")).toHaveAttribute(
+    "href",
+    `${media.url}?download=1`,
+  );
   await dialog.getByRole("link").click();
-  expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
+  const original = await download;
+  expect(original.suggestedFilename()).toBe(`media-${media.id}.mp4`);
+  const downloadedPath = await original.path();
+  expect(downloadedPath).not.toBeNull();
+  expect(readFileSync(downloadedPath!)).toEqual(
+    readFileSync("tests/fixtures/party-video.mp4"),
+  );
   await page.screenshot({
     path: "test-results/media-player-mobile.png",
     fullPage: true,
@@ -600,6 +746,9 @@ test("a guest can upload, play, download and delete a video without loading orig
   await expect(dialog).toBeHidden();
   await expect(tile).toHaveCount(0);
   expect((await page.request.get(media.url)).status()).toBe(404);
+  expect((await page.request.get(`${media.url}?download=1`)).status()).toBe(
+    404,
+  );
   expect((await page.request.get(media.thumbnailUrl)).status()).toBe(404);
 });
 
@@ -634,9 +783,7 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
     .getByRole("button", { name: "Publier le message", exact: true })
     .click();
   await expect(
-    page
-      .getByRole("region", { name: "Messages des invités" })
-      .getByRole("alert"),
+    page.getByRole("form", { name: "Laisse un message" }).getByRole("alert"),
   ).toBeVisible();
   expect(requests).toEqual([{ body: message, anonymous: true }]);
   await expect(input).toHaveValue(message);

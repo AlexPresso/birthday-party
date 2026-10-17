@@ -130,7 +130,7 @@ test("guests preview, save, replace and remove their profile photo across tab ch
   const browserErrors: string[] = [];
   page.on("pageerror", (error) => browserErrors.push(error.message));
   await enterGuest(page, "Camille Profile Test");
-  const card = page.locator(".profile-card");
+  const card = page.locator(".settings-profile");
   const input = card.locator('input[type="file"]');
   const headerAvatar = page.locator(".app-header .avatar");
   const preview = card.getByRole("img", {
@@ -233,7 +233,7 @@ test("a failed profile photo save retains the current avatar and selected previe
   page,
 }) => {
   await enterGuest(page, "Alex Profile Retry Test");
-  const card = page.locator(".profile-card");
+  const card = page.locator(".settings-profile");
   const input = card.locator('input[type="file"]');
   await input.setInputFiles(await profileImage(page));
   const firstURL = await savePhoto(page);
@@ -291,7 +291,7 @@ test("profile photos appear on named guestbook posts while anonymous posts keep 
 }) => {
   const guest = await enterGuest(page, "Morgan Profile Guestbook Test");
   await page
-    .locator('.profile-card input[type="file"]')
+    .locator('.settings-profile input[type="file"]')
     .setInputFiles(await profileImage(page));
   const avatarURL = await savePhoto(page);
   const namedBody = "A named message with a profile photo.";

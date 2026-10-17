@@ -42,6 +42,7 @@ func (a *App) servePhoto(w http.ResponseWriter, r *http.Request, guest identity.
 		return
 	}
 	filename, mime := metadata.Filename, metadata.MIME
+	download := r.URL.Query().Get("download") == "1"
 	if r.URL.Query().Get("size") == "thumb" {
 		filename, mime = metadata.Thumbnail, "image/jpeg"
 	}
@@ -51,8 +52,12 @@ func (a *App) servePhoto(w http.ResponseWriter, r *http.Request, guest identity.
 		return
 	}
 	defer file.Close()
+	disposition := "inline"
+	if download {
+		disposition = "attachment"
+	}
 	w.Header().Set("Content-Type", mime)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"media-%d.%s\"", id, filepath.Ext(filename)[1:]))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=\"media-%d.%s\"", disposition, id, filepath.Ext(filename)[1:]))
 	w.Header().Set("Cache-Control", "private, no-store")
 	http.ServeContent(w, r, filename, time.Time{}, file)
 }

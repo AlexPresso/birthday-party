@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: frontendRoot,
   turbopack: { root: frontendRoot },
   poweredByHeader: false,
+  // The development indicator overlaps the first mobile navigation tab.
+  devIndicators: false,
   experimental: {
     proxyClientMaxBodySize: uploadProxyBodyLimit(),
     proxyTimeout: 600000,

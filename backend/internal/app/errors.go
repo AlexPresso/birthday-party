@@ -15,7 +15,6 @@ var errorMessages = map[string]string{
 	"invalid_welcome_steps":             "Add up to 12 steps with 1 to 12 widgets each. Titles can have 120 characters and texts 1,000.",
 	"invalid_welcome_action":            "Choose an available widget and check its settings.",
 	"invalid_welcome_transition":        "This action isn't available now. Refresh the welcome sequence.",
-	"welcome_steps_locked":              "Restart the welcome before editing steps that have been unlocked.",
 	"invalid_body":                      "We couldn’t read what you sent. Try again.",
 	"internal_error":                    "Something went wrong. Try again in a moment.",
 	"invalid_id":                        "We couldn’t find this item. Refresh the page.",

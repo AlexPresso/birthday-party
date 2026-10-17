@@ -79,13 +79,24 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   Administrators bypass the welcome restriction. Return only each guest's
   selected step. Host transitions unlock a shared boundary; guest next/previous
   commands persist independent positions, with revisions checked in transactions.
+  When a current-run incomplete guest is still at position zero and a step is
+  available, enrollment moves them to step one and rotates their progress token
+  in the same transaction. Repeated reads and later unlocks preserve that position
+  and token. This also recovers waiting guests after missed unlocks or reconnects.
   A global required flag makes first-time late arrivals start at the first step,
   including after host opening. Existing participants finish explicitly; opening
-  unlocks remaining steps without moving their position. Keep initial access open
-  until a welcome run starts. Lock structural edits after the first unlock until
-  the host restarts the welcome. PostgreSQL stores the run generation and guest
-  progress; use a sequence-backed progress revision for navigation and uploads.
-  Host unlocks and required changes must preserve this token and in-flight work.
+  unlocks remaining steps without moving guests already on a step. Keep initial
+  access open until a welcome run starts. Allow administrators to edit steps during any
+  phase without changing the run generation or completed guests' access. Edits
+  preserve numeric positions, clamping incomplete guests and the unlock boundary
+  when steps are removed. An open run makes all saved steps available. Preserve
+  progress tokens for text-only corrections and other-step edits; rotate them
+  when the selected position or widget types, order or destinations change.
+  Reconcile progress atomically under welcome then progress locks, without
+  acquiring guest locks after the welcome lock. PostgreSQL stores the run
+  generation and guest progress; use a sequence-backed progress revision for
+  navigation and uploads.
+  Later host unlocks and required changes preserve this token and in-flight work.
   Accepted media jobs may finish privately while welcome access is closed.
   Steps contain 1–12 ordered typed widgets: `title`, `text`, `profile_photo`,
   `media_upload` and `enable_notifications`. Titles/texts are authored content; a fixed step title/body does
@@ -176,8 +187,13 @@ transient failures have bounded retries. Keep private content out of push payloa
 - Video inputs are MP4/MOV/WebM up to the configured size, 5 minutes and 4K. FFmpeg and
   ffprobe are runtime dependencies (included in Compose). Restrict demuxers and
   protocols, bound dimensions, threads, execution time and temporary output.
-  Convert to H.264/AAC MP4 with a private JPEG thumbnail; keep range requests
-  authenticated. Existing /api/photos URLs also serve videos.
+  Validate and retain the input byte-for-byte; do not downscale, change frame
+  rate or re-encode video/audio. FFmpeg only creates a private JPEG thumbnail.
+  Detect the stored MIME type and extension from the validated container. Include
+  the original and thumbnail in publication, quotas, restart recovery and deletion.
+  Existing /api/photos URLs serve the stored original; `?download=1` serves it as
+  an attachment with the same authorization. Keep range requests authenticated.
+  Existing converted videos remain usable without attempting to restore lost data.
 - Accept uploads into a private spool and PostgreSQL job queue before processing.
   Return 202 once durable, process two jobs in the background, and recover
   interrupted jobs on restart. Only the owner may read their queue/status.

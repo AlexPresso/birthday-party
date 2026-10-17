@@ -168,13 +168,20 @@ Guest browsers share one authenticated `/api/realtime` WebSocket with upload and
 programme updates. Refresh `/api/welcome` on its invalidation signal, connection
 readiness and return to the page. Keep the displayed step during connection failures.
 Use a full navigation when effective guest access closes to discard cached private
-routes. Host commands unlock steps; each guest chooses next/previous and enters
-explicitly with finish. The public `open` field describes that guest's effective
-access, so redirect to `/photos` only when it becomes true. A global Required
+routes. Waiting guests enter the first unlocked step automatically through the
+normal welcome response; Go persists that position. Do not add a client progress
+mutation for this transition. Hide Start while waiting and show Next only when
+`canNext` is true. Later host unlocks preserve the current step; each guest chooses
+next/previous and enters explicitly with finish. The public `open` field describes
+that guest's effective access, so redirect to `/photos` only when it becomes true. A global Required
 switch makes late arrivals follow the full sequence even after host opening.
 Administrators retain the four tabs and unlock steps in settings. Save the switch
-separately without losing step drafts. Preserve drafts on conflicts. Already
-unlocked steps stay immutable until the host restarts from an open application.
+separately without losing step drafts. Preserve drafts on conflicts. Allow editing
+and reordering steps during every phase, including after opening access. Live
+edits retain guests' numeric positions unless removed trailing steps require
+clamping. Completed guests keep access. Text-only corrections and other-step
+edits preserve the active widget instances; changed widget contexts receive a
+new progress revision and discard unaccepted transfers and selections.
 Responses carry host `revision` and guest `progressRevision`; compare both and reject
 older responses after navigation. Key widgets by `progressRevision`, which host
 unlocks preserve, so uploads and profile selections remain active.
@@ -236,10 +243,21 @@ queue when its WebSocket signal arrives, distinguish transfer from waiting/prepa
 and refresh the gallery
 when a job becomes ready. Reload restores accepted jobs; unsent browser files
 still require the page to remain open. Reuse X-Upload-ID for ambiguous retries.
+Each displayed queue has one combined progress bar and a localized sent/total
+file counter. Count a file as sent only after server acceptance, including jobs
+still being prepared. Include local waiting files in the total and deduplicate
+transfers/jobs by upload ID. Keep individual status, errors, retries and removal
+controls without per-file progress bars. Welcome widgets aggregate only their
+own uploads.
 Each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos
-accept MP4/MOV/WebM up to 5 minutes and 4K input; Go converts them to
-MP4 and generates JPEG thumbnails. Render thumbnails in the gallery and use a
+accept MP4/MOV/WebM up to 5 minutes and 4K input; Go preserves uploaded bytes
+and generates JPEG thumbnails without re-encoding or downscaling the video.
+Accept the original video MIME types in response validation. Render thumbnails in the gallery and use a
 native video player with controls, playsInline and no autoplay when opened.
+The media download link uses `?download=1`; Go supplies the filename and extension.
+Playback and slideshow use the same stored file. Browser support depends on its
+container and codecs; downloading remains available. Previously converted videos
+keep their existing file.
 The gallery can explicitly start a slideshow of its current category, including
 uncategorized media. Keep a snapshot of the loaded list and fetch subsequent
 metadata pages only as needed, retaining the category on every request. Show
@@ -255,8 +273,8 @@ The Next proxy permits the larger configured limit plus 64 KiB and a 10-minute
 timeout. next.config.ts and the standalone startup.mjs share the runtime parser;
 Compose changes must apply on recreation without rebuilding the image.
 
-The chosen theme is dark plum. Keep these four tabs and their order: `Médias`,
-`Programme`, `Livre d'or`, `Paramètres` in French. Capitalize labels in the
+The chosen theme is dark plum. Keep these four tabs and their order: `Programme`,
+`Médias`, `Livre d'or`, `Paramètres` in French. Capitalize labels in the
 selected language while keeping routes unchanged. Host controls live inside
 settings. Empty states must never invent guest contributions or events.
 Scheduled timestamps are submitted as UTC; host date inputs identify their

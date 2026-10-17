@@ -92,6 +92,7 @@ function observe(page: Page) {
   const sockets: { socket: WebSocket; ready: boolean; closed: boolean }[] = [];
   const frames: Frame[] = [];
   const requests: string[] = [];
+  const progressRequests: string[] = [];
   const pending = new Set<Request>();
   const watched = new Set(["/api/welcome", "/api/uploads", "/api/programme"]);
   page.on("websocket", (socket) => {
@@ -109,6 +110,8 @@ function observe(page: Page) {
   });
   page.on("request", (incoming) => {
     const path = new URL(incoming.url()).pathname;
+    if (incoming.method() === "POST" && path === "/api/welcome/progress")
+      progressRequests.push(path);
     if (incoming.method() === "GET" && watched.has(path)) {
       requests.push(path);
       pending.add(incoming);
@@ -120,6 +123,7 @@ function observe(page: Page) {
     sockets,
     frames,
     requests,
+    progressRequests,
     active: () => sockets.filter((item) => item.ready && !item.closed).length,
     readyCount: () => frames.filter((frame) => frame.type === "ready").length,
     invalidations: (topic: string) =>
@@ -232,21 +236,24 @@ test("welcome and media widgets share one socket and refresh only after changes"
   const network = observe(page);
   await page.goto("/attente");
   await expect.poll(network.active).toBe(1);
+  await expect(
+    page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
+  ).toHaveCount(0);
   await network.settled();
   const idleBefore = network.requests.length;
   await page.waitForTimeout(7000);
   expect(network.requests).toHaveLength(idleBefore);
   await transition("next");
   await expect(
-    page.getByRole("button", { name: "Commencer", exact: true }),
-  ).toBeEnabled();
-  await expect(
     page.getByRole("heading", {
       name: "Share a photo from your table",
       exact: true,
     }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Commencer", exact: true }).click();
+  expect(network.progressRequests).toEqual([]);
   const widgets = page.locator(".welcome-media");
   await expect(widgets).toHaveCount(2);
   await expect.poll(network.active).toBe(1);
@@ -312,6 +319,7 @@ test("welcome and media widgets share one socket and refresh only after changes"
   await page.waitForTimeout(7000);
   expect(network.requests).toHaveLength(completeBefore);
   expect(network.readyCount()).toBe(1);
+  expect(network.progressRequests).toEqual([]);
   expect(network.sockets[0].socket.url()).toBe(
     "ws://localhost:3300/api/realtime",
   );
@@ -460,7 +468,7 @@ test("queue reads retry explicitly and socket receipts recover a lost upload res
   expect(network.invalidations("uploads")).toBeGreaterThan(0);
 });
 
-test("reconnection resynchronizes a missed unlock and revoked sessions leave the app", async ({
+test("reconnection shows the first step, preserves position on later unlocks, and handles revocation", async ({
   page,
   context,
 }) => {
@@ -469,7 +477,6 @@ test("reconnection resynchronizes a missed unlock and revoked sessions leave the
     { widgets: [{ type: "title", text: "Keep your place at the table" }] },
     { widgets: [{ type: "title", text: "PRIVATE-REALTIME-OFFLINE-STEP" }] },
   ]);
-  await transition("next");
   const guest = await invite(page, "Realtime Reconnect Guest");
   await page.addInitScript(() => {
     const NativeSocket = window.WebSocket;
@@ -496,17 +503,34 @@ test("reconnection resynchronizes a missed unlock and revoked sessions leave the
   await expect.poll(network.active).toBe(1);
   await expect(
     page.getByRole("heading", {
-      name: "Keep your place at the table",
+      name: `Bienvenue ${guest.name}`,
       exact: true,
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Suivant", exact: true }),
-  ).toBeDisabled();
-  const originalProgress = (
-    await (await page.request.get("/api/welcome")).json()
-  ).progressRevision;
+    page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
+  ).toHaveCount(0);
+  let originalProgress: number | undefined;
   try {
+    await context.setOffline(true);
+    await expect.poll(network.active).toBe(0);
+    await transition("next");
+    await context.setOffline(false);
+    await expect.poll(network.active).toBe(1);
+    await expect(
+      page.getByRole("heading", {
+        name: "Keep your place at the table",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
+    ).toHaveCount(0);
+    const first = await (await page.request.get("/api/welcome")).json();
+    expect(first.step.position).toBe(1);
+    originalProgress = first.progressRevision;
+    expect(network.progressRequests).toEqual([]);
+
     await context.setOffline(true);
     await expect.poll(network.active).toBe(0);
     await network.settled();
@@ -514,7 +538,7 @@ test("reconnection resynchronizes a missed unlock and revoked sessions leave the
     await transition("next");
     await expect(
       page.getByRole("button", { name: "Suivant", exact: true }),
-    ).toBeDisabled();
+    ).toHaveCount(0);
     await page.waitForTimeout(3500);
     expect(network.requests).toHaveLength(offlineReads);
     await context.setOffline(false);
@@ -525,7 +549,8 @@ test("reconnection resynchronizes a missed unlock and revoked sessions leave the
   } finally {
     await context.setOffline(false);
   }
-  expect(network.readyCount()).toBe(2);
+  expect(network.readyCount()).toBe(3);
+  expect(network.progressRequests).toEqual([]);
   await expect(
     page.getByRole("heading", {
       name: "Keep your place at the table",
@@ -548,6 +573,6 @@ test("reconnection resynchronizes a missed unlock and revoked sessions leave the
   ).toContain(4401);
   expectPrivateFrames(network.frames);
   console.log(
-    "Realtime reconnect: one missed unlock recovered without moving the guest; server4401 revocation redirected to invitation.",
+    "Realtime reconnect: the first step arrived automatically, a later missed unlock preserved the guest's position, and server4401 revocation redirected to invitation.",
   );
 });

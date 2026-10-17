@@ -41,8 +41,9 @@ conservées telles quelles, avec leurs ressources utiles et les crédits d'origi
 ## Démarrer en local
 
 Prérequis : Node.js 24+, npm, Go 1.26+, `ffmpeg` et `ffprobe` dans le `PATH`
-pour les vidéos. [FFmpeg](https://ffmpeg.org/download.html) doit inclure les
-encodeurs H.264 (`libx264`) et AAC. Docker les fournit automatiquement.
+pour vérifier les vidéos et créer leurs vignettes JPEG. Docker fournit
+[FFmpeg](https://ffmpeg.org/download.html) automatiquement. Les tests vidéo
+utilisent aussi les encodeurs H.264/AAC et VP9/Opus pour créer leurs fichiers.
 PostgreSQL 18 est fourni par Docker Compose. Les commandes ci-dessous fonctionnent
 dans PowerShell à la racine du projet.
 
@@ -129,14 +130,20 @@ Les fichiers partagent la file d’attente habituelle, limitée à deux transfer
 simultanés. Débloquer une nouvelle étape laisse les envois en cours continuer.
 Quand l’invité change lui-même d’étape, les transferts que le serveur n’a pas
 encore acceptés s’arrêtent ; les envois déjà acceptés continuent leur préparation.
+Dans les médias comme dans chaque widget, une seule barre suit l’ensemble des
+envois, avec le nombre de fichiers reçus sur le total. Les fichiers en attente
+comptent dans ce total. La liste garde le statut de chaque fichier et permet de
+réessayer un envoi en échec ; une vidéo reçue peut encore être en préparation.
 
 **Activer l’écran d’attente** place tous les invités sur un écran séparé, y compris
 ceux déjà connectés. Ton accès administrateur reste disponible. Clique sur
-**Débloquer la première étape**, puis **Débloquer l’étape suivante**. Chaque invité
-utilise **Commencer**, **Suivant** et **Précédent** à son rythme. Débloquer une étape
-ne déplace personne et ne ferme pas les widgets en cours d’utilisation.
-Les écrans vérifient automatiquement les changements toutes les trois secondes
-quand le navigateur est visible et connecté.
+**Débloquer la première étape** : elle s’affiche automatiquement pour les invités
+en attente. Aucun bouton **Commencer** n’apparaît avant ce déblocage. Pour la suite,
+utilise **Débloquer l’étape suivante**. Le bouton **Suivant** apparaît alors chez
+les invités, qui avancent à leur rythme et peuvent revenir avec **Précédent**.
+Débloquer la suite laisse chacun sur son étape et garde ses widgets ouverts.
+Les changements arrivent en direct par WebSocket ; après une reconnexion,
+l’application retrouve la progression enregistrée.
 
 Le switch **Obligatoire** impose toutes les étapes aux invités qui arrivent pour
 la première fois, même si l’application est déjà ouverte. Sans cette option, un
@@ -148,10 +155,15 @@ choisir **Entrer dans l’application**. Ceux qui suivent un parcours obligatoir
 doivent d’abord atteindre la dernière étape. Chacun garde sa position tant qu’il
 n’a pas choisi d’entrer.
 
-Les étapes se modifient avant le premier déblocage. Pour les modifier ensuite,
-ouvre l’application puis choisis **Relancer l’accueil** : les invités reprennent
-depuis le début. Les étapes et la progression individuelle sont conservées après
-un rechargement de page ou un redémarrage des conteneurs.
+Tu peux modifier les étapes et leurs widgets à tout moment, même après leur
+déblocage ou l’ouverture de l’application. Les changements enregistrés s’affichent
+en direct. Une correction de texte conserve les sélections en cours ; un changement
+de widget ou de destination réinitialise les widgets de l’étape concernée. Les envois déjà
+acceptés gardent leur destination. Si la liste raccourcit, les invités concernés
+reviennent à la dernière position disponible. Ceux qui ont terminé gardent leur accès.
+Les étapes et la progression individuelle sont conservées après un rechargement
+de page ou un redémarrage des conteneurs. **Relancer l’accueil** recommence le
+parcours pour tous les invités.
 
 L’application reste ouverte tant que tu n’as pas activé l’écran d’attente.
 
@@ -275,7 +287,8 @@ Avec `npm run dev`, relancer la commande après modification du `.env`.
 
 La durée maximale des vidéos reste de 5 minutes ; les limites de résolution
 restent de 40 mégapixels pour les images et de 4K pour les vidéos. Le poids réglé
-concerne le fichier envoyé : une vidéo convertie peut avoir un poids différent.
+concerne le fichier envoyé, conservé sans modification. Seule une vignette JPEG
+supplémentaire est créée.
 
 ## Langue de l’interface
 
@@ -364,9 +377,15 @@ L'application n'envoie aucun e-mail ni message WhatsApp.
   Les vidéos acceptées sont MP4, MOV et WebM, jusqu’à 5 minutes et 4K.
   Les poids maximaux viennent du `.env` : 15 Mio par image et 100 Mio par vidéo
   par défaut.
-  Elles sont converties en MP4 H.264/AAC, jusqu’à 1280×720 et 30 images/seconde,
-  puis leur fichier d’origine est supprimé. La galerie accepte au plus 5 000
-  fichiers et 10 Gio ; les nouveaux envois comptent aussi leur vignette.
+  Le fichier vidéo d’origine est conservé sans modification pour la lecture et
+  le téléchargement : résolution, fréquence d’images, audio et qualité restent
+  identiques. FFmpeg crée uniquement la vignette. La lecture dépend des formats
+  et codecs pris en charge par le navigateur ; le téléchargement reste disponible.
+  Les anciennes vidéos déjà converties gardent leur version MP4 ; leurs originaux
+  supprimés ne peuvent pas être récupérés.
+  La galerie accepte au plus 5 000 médias et 10 Gio ; le poids total inclut les
+  originaux et les vignettes. Supprimer un média retire
+  tous ses fichiers. Le volume Docker `party-data` conserve ces versions ensemble.
 - Les fichiers reçus sont placés dans une file persistante, puis préparés deux
   par deux. L'invité peut changer d'onglet pendant l'envoi et retrouver les fichiers
   déjà reçus après un rechargement. Les fichiers encore sur le téléphone exigent

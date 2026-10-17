@@ -7,7 +7,6 @@ const en = {
     "The next step is ready. Continue when you’re ready.",
   "welcome.previous": "Previous",
   "welcome.next": "Next",
-  "welcome.start": "Start",
   "welcome.finish": "Enter the app",
   "welcome.moving": "Loading…",
   "welcome.nextLocked": "The next step isn’t available yet.",
@@ -36,7 +35,7 @@ const en = {
     "All steps are unlocked. Open the app when you’re ready.",
   "adminWelcome.stepsTitle": "Your steps",
   "adminWelcome.stepsHint":
-    "Up to 12 steps. Guests can move between unlocked steps.",
+    "Up to 12 steps. Saved changes also apply to guests already on the edited step.",
   "adminWelcome.empty":
     "Add the instructions you want to reveal one at a time.",
   "adminWelcome.add": "Add a step",
@@ -55,10 +54,6 @@ const en = {
   "adminWelcome.saving": "Saving…",
   "adminWelcome.saved": "Steps saved.",
   "adminWelcome.unsaved": "Save your steps before continuing.",
-  "adminWelcome.draftLocked":
-    "Your changes are still here. Restart the welcome to save them.",
-  "adminWelcome.locked":
-    "To edit the steps, open the app and restart the welcome.",
   "adminWelcome.start": "Turn on the waiting screen",
   "adminWelcome.restart": "Restart the welcome",
   "adminWelcome.startConfirmation":
@@ -91,7 +86,6 @@ const fr: WelcomeMessages = {
     "La suite est disponible. Continue quand tu es prêt.",
   "welcome.previous": "Précédent",
   "welcome.next": "Suivant",
-  "welcome.start": "Commencer",
   "welcome.finish": "Entrer dans l’application",
   "welcome.moving": "Chargement…",
   "welcome.nextLocked": "La suite n’est pas encore disponible.",
@@ -120,7 +114,7 @@ const fr: WelcomeMessages = {
     "Toutes les étapes sont débloquées. Ouvre l’application quand tu es prêt.",
   "adminWelcome.stepsTitle": "Tes étapes",
   "adminWelcome.stepsHint":
-    "Jusqu’à 12 étapes. Les invités peuvent naviguer entre les étapes débloquées.",
+    "Jusqu’à 12 étapes. Les changements enregistrés s’appliquent aussi aux invités déjà sur l’étape.",
   "adminWelcome.empty": "Ajoute les consignes que tu dévoileras une par une.",
   "adminWelcome.add": "Ajouter une étape",
   "adminWelcome.selectStep": "Modifier l’étape {number}",
@@ -138,10 +132,6 @@ const fr: WelcomeMessages = {
   "adminWelcome.saving": "Enregistrement…",
   "adminWelcome.saved": "Les étapes sont enregistrées.",
   "adminWelcome.unsaved": "Enregistre les étapes avant de continuer.",
-  "adminWelcome.draftLocked":
-    "Tes modifications sont conservées. Relance l’accueil pour les enregistrer.",
-  "adminWelcome.locked":
-    "Pour modifier les étapes, ouvre l’application puis relance l’accueil.",
   "adminWelcome.start": "Activer l’écran d’attente",
   "adminWelcome.restart": "Relancer l’accueil",
   "adminWelcome.startConfirmation":
@@ -172,7 +162,6 @@ const de: WelcomeMessages = {
     "Der nächste Schritt ist verfügbar. Mach weiter, wenn du bereit bist.",
   "welcome.previous": "Zurück",
   "welcome.next": "Weiter",
-  "welcome.start": "Starten",
   "welcome.finish": "Zur App",
   "welcome.moving": "Wird geladen…",
   "welcome.nextLocked": "Der nächste Schritt ist noch nicht verfügbar.",
@@ -201,7 +190,7 @@ const de: WelcomeMessages = {
     "Alle Schritte sind freigegeben. Öffne die App, sobald du bereit bist.",
   "adminWelcome.stepsTitle": "Deine Schritte",
   "adminWelcome.stepsHint":
-    "Bis zu 12 Schritte. Gäste können zwischen freigegebenen Schritten wechseln.",
+    "Bis zu 12 Schritte. Gespeicherte Änderungen sehen auch Gäste, die diesen Schritt gerade geöffnet haben.",
   "adminWelcome.empty":
     "Füge die Anweisungen hinzu, die du nacheinander zeigen möchtest.",
   "adminWelcome.add": "Schritt hinzufügen",
@@ -220,10 +209,6 @@ const de: WelcomeMessages = {
   "adminWelcome.saving": "Wird gespeichert…",
   "adminWelcome.saved": "Schritte gespeichert.",
   "adminWelcome.unsaved": "Speichere deine Schritte, bevor du fortfährst.",
-  "adminWelcome.draftLocked":
-    "Deine Änderungen sind noch da. Starte die Begrüßung neu, um sie zu speichern.",
-  "adminWelcome.locked":
-    "Öffne die App und starte die Begrüßung neu, um die Schritte zu bearbeiten.",
   "adminWelcome.start": "Wartebildschirm aktivieren",
   "adminWelcome.restart": "Begrüßung neu starten",
   "adminWelcome.startConfirmation":
@@ -255,7 +240,6 @@ const it: WelcomeMessages = {
     "Il prossimo passo è disponibile. Continua quando sei pronto.",
   "welcome.previous": "Indietro",
   "welcome.next": "Avanti",
-  "welcome.start": "Inizia",
   "welcome.finish": "Entra nell’app",
   "welcome.moving": "Caricamento…",
   "welcome.nextLocked": "Il prossimo passo non è ancora disponibile.",
@@ -285,7 +269,7 @@ const it: WelcomeMessages = {
     "Tutti i passi sono sbloccati. Apri l’app quando sei pronto.",
   "adminWelcome.stepsTitle": "I tuoi passi",
   "adminWelcome.stepsHint":
-    "Fino a 12 passi. Gli invitati possono spostarsi tra quelli sbloccati.",
+    "Fino a 12 passi. Le modifiche salvate si applicano anche a chi sta già seguendo il passo.",
   "adminWelcome.empty":
     "Aggiungi le istruzioni che vuoi mostrare una alla volta.",
   "adminWelcome.add": "Aggiungi un passo",
@@ -304,10 +288,6 @@ const it: WelcomeMessages = {
   "adminWelcome.saving": "Salvataggio…",
   "adminWelcome.saved": "Passi salvati.",
   "adminWelcome.unsaved": "Salva i passi prima di continuare.",
-  "adminWelcome.draftLocked":
-    "Le tue modifiche sono ancora qui. Riavvia l’accoglienza per salvarle.",
-  "adminWelcome.locked":
-    "Per modificare i passi, apri l’app e riavvia l’accoglienza.",
   "adminWelcome.start": "Attiva la schermata d’attesa",
   "adminWelcome.restart": "Riavvia l’accoglienza",
   "adminWelcome.startConfirmation":
@@ -338,7 +318,6 @@ const es: WelcomeMessages = {
     "El siguiente paso está disponible. Continúa cuando estés listo.",
   "welcome.previous": "Anterior",
   "welcome.next": "Siguiente",
-  "welcome.start": "Empezar",
   "welcome.finish": "Entrar en la aplicación",
   "welcome.moving": "Cargando…",
   "welcome.nextLocked": "El siguiente paso aún no está disponible.",
@@ -367,7 +346,7 @@ const es: WelcomeMessages = {
     "Todos los pasos están desbloqueados. Abre la aplicación cuando estés listo.",
   "adminWelcome.stepsTitle": "Tus pasos",
   "adminWelcome.stepsHint":
-    "Hasta 12 pasos. Los invitados pueden moverse entre los pasos desbloqueados.",
+    "Hasta 12 pasos. Los cambios guardados también se muestran a quienes ya están en ese paso.",
   "adminWelcome.empty":
     "Añade las instrucciones que quieras mostrar una a una.",
   "adminWelcome.add": "Añadir un paso",
@@ -386,10 +365,6 @@ const es: WelcomeMessages = {
   "adminWelcome.saving": "Guardando…",
   "adminWelcome.saved": "Pasos guardados.",
   "adminWelcome.unsaved": "Guarda los pasos antes de continuar.",
-  "adminWelcome.draftLocked":
-    "Tus cambios siguen aquí. Reinicia la bienvenida para guardarlos.",
-  "adminWelcome.locked":
-    "Para editar los pasos, abre la aplicación y reinicia la bienvenida.",
   "adminWelcome.start": "Activar la pantalla de espera",
   "adminWelcome.restart": "Reiniciar la bienvenida",
   "adminWelcome.startConfirmation":

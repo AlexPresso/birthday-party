@@ -79,8 +79,7 @@ export function WelcomeAdmin({
     }),
   }));
   const dirty = JSON.stringify(steps) !== JSON.stringify(state.steps);
-  const editable = state.currentStep === 0;
-  const mutationDisabled = !!busy || !editable;
+  const mutationDisabled = !!busy || conflict;
   const selectedIndex = draft.findIndex((step) => step.key === selectedKey);
   const selected = draft[selectedIndex];
   const hasNext = state.currentStep < state.steps.length;
@@ -114,18 +113,16 @@ export function WelcomeAdmin({
     setError(errorMessage(cause, t));
     if (
       cause instanceof ApiError &&
-      [
-        "errors.welcome_conflict",
-        "errors.welcome_steps_locked",
-        "errors.invalid_welcome_transition",
-      ].includes(cause.code)
+      ["errors.welcome_conflict", "errors.invalid_welcome_transition"].includes(
+        cause.code,
+      )
     ) {
       setConflict(true);
     }
   }
 
   function move(from: number, to: number) {
-    if (mutationDisabled || conflict) return;
+    if (mutationDisabled) return;
     setDraft((current) => moveItem(current, from, to));
     setReorderNotice(
       t("adminWelcome.moved", { from: number(from + 1), to: number(to + 1) }),
@@ -178,7 +175,7 @@ export function WelcomeAdmin({
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    if (busy || !editable || !dirty || conflict) return;
+    if (mutationDisabled || !dirty) return;
     setError(null);
     setValidationError(null);
     setNotice("");
@@ -224,12 +221,7 @@ export function WelcomeAdmin({
   }
 
   async function transition(action: Action) {
-    if (
-      busy ||
-      conflict ||
-      (dirty && (action === "next" || (action === "start" && editable)))
-    )
-      return;
+    if (busy || conflict || (dirty && action !== "open")) return;
     if (
       action !== "next" &&
       !window.confirm(
@@ -349,7 +341,7 @@ export function WelcomeAdmin({
               <button
                 type="button"
                 className="button primary"
-                disabled={!!busy || (dirty && editable) || conflict}
+                disabled={!!busy || dirty || conflict}
                 onClick={() => transition("start")}
               >
                 {busy === "start"
@@ -395,9 +387,7 @@ export function WelcomeAdmin({
           </div>
           {dirty && (
             <p className="fine-print welcome-unsaved">
-              {t(
-                editable ? "adminWelcome.unsaved" : "adminWelcome.draftLocked",
-              )}
+              {t("adminWelcome.unsaved")}
             </p>
           )}
         </div>
@@ -463,9 +453,7 @@ export function WelcomeAdmin({
           <div className="welcome-editor-heading">
             <div>
               <h3>{t("adminWelcome.stepsTitle")}</h3>
-              <p className="fine-print">
-                {t(editable ? "adminWelcome.stepsHint" : "adminWelcome.locked")}
-              </p>
+              <p className="fine-print">{t("adminWelcome.stepsHint")}</p>
             </div>
             <span className="status-label">
               {number(draft.length)} / {number(12)}
@@ -479,7 +467,7 @@ export function WelcomeAdmin({
                 <WelcomeStepList
                   steps={draft}
                   selectedKey={selectedKey}
-                  disabled={mutationDisabled || conflict}
+                  disabled={mutationDisabled}
                   onSelect={setSelectedKey}
                   onMove={move}
                 />
@@ -489,7 +477,7 @@ export function WelcomeAdmin({
                   <fieldset
                     className="welcome-step-editor"
                     key={selected.key}
-                    disabled={mutationDisabled || conflict}
+                    disabled={mutationDisabled}
                   >
                     <legend>
                       {t("welcome.step", { number: number(selectedIndex + 1) })}
@@ -498,9 +486,7 @@ export function WelcomeAdmin({
                       <button
                         type="button"
                         className="icon-button"
-                        disabled={
-                          mutationDisabled || conflict || selectedIndex === 0
-                        }
+                        disabled={mutationDisabled || selectedIndex === 0}
                         onClick={(event) =>
                           moveSelected(selectedIndex - 1, event.currentTarget)
                         }
@@ -514,9 +500,7 @@ export function WelcomeAdmin({
                         type="button"
                         className="icon-button"
                         disabled={
-                          mutationDisabled ||
-                          conflict ||
-                          selectedIndex === draft.length - 1
+                          mutationDisabled || selectedIndex === draft.length - 1
                         }
                         onClick={(event) =>
                           moveSelected(selectedIndex + 1, event.currentTarget)
@@ -540,11 +524,11 @@ export function WelcomeAdmin({
                     </div>
                     <WelcomeWidgetEditor
                       step={selected}
-                      disabled={mutationDisabled || conflict}
+                      disabled={mutationDisabled}
                       categories={categories}
                       createKey={() => nextWidgetKey.current++}
                       onChange={(widgets) => {
-                        if (mutationDisabled || conflict) return;
+                        if (mutationDisabled) return;
                         setDraft((current) =>
                           current.map((step) =>
                             step.key === selected.key
@@ -569,7 +553,7 @@ export function WelcomeAdmin({
               ref={addButton}
               type="button"
               className="button secondary"
-              disabled={mutationDisabled || conflict || draft.length >= 12}
+              disabled={mutationDisabled || draft.length >= 12}
               onClick={() => {
                 const key = nextKey.current++;
                 setDraft((current) => [...current, { key, widgets: [] }]);
@@ -588,7 +572,7 @@ export function WelcomeAdmin({
             </button>
             <button
               className="button primary"
-              disabled={mutationDisabled || !dirty || conflict}
+              disabled={mutationDisabled || !dirty}
             >
               <Save size={17} aria-hidden="true" />
               {t(busy === "save" ? "adminWelcome.saving" : "adminWelcome.save")}

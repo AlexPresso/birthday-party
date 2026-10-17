@@ -324,6 +324,9 @@ test("several media widgets keep separate destinations and queues alongside a pr
   const profile = page.locator(".welcome-profile");
   await expect(media).toHaveCount(2);
   await expect(profile).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
+  ).toHaveCount(0);
   const current = await (await page.request.get("/api/welcome")).json();
   expect(current.step).toEqual({ position: 1, ...steps[0] });
   for (const key of ["title", "body", "action", "mediaUpload"])
@@ -386,6 +389,11 @@ test("several media widgets keep separate destinations and queues alongside a pr
     );
     try {
       await expect.poll(() => held).toBe(true);
+      await expect(media.nth(0).getByRole("progressbar")).toHaveCount(1);
+      await expect(media.nth(0).locator(".upload-progress-count")).toHaveText(
+        "0 / 1 fichier envoyé",
+      );
+      await expect(media.nth(1).getByRole("progressbar")).toHaveCount(0);
       await transition("next");
       await expect(
         page.getByRole("button", { name: "Suivant", exact: true }),
@@ -429,6 +437,16 @@ test("several media widgets keep separate destinations and queues alongside a pr
   await expect(media.nth(1).locator(".upload-queue")).not.toContainText(
     privateJob.filename,
   );
+  for (const widget of [media.nth(0), media.nth(1)]) {
+    await expect(widget.getByRole("progressbar")).toHaveCount(1);
+    await expect(widget.getByRole("progressbar")).toHaveAttribute(
+      "value",
+      "100",
+    );
+    await expect(widget.locator(".upload-progress-count")).toHaveText(
+      "1 / 1 fichier envoyé",
+    );
+  }
   await expect(preview).toHaveAttribute("src", previewURL!);
   const saved = page.waitForResponse(
     (response) =>
@@ -452,6 +470,12 @@ test("several media widgets keep separate destinations and queues alongside a pr
   await expect(media.nth(1).locator(".upload-queue")).not.toContainText(
     privateJob.filename,
   );
+  await expect(media.nth(0).locator(".upload-progress-count")).toHaveText(
+    "1 / 1 fichier envoyé",
+  );
+  await expect(media.nth(1).locator(".upload-progress-count")).toHaveText(
+    "1 / 1 fichier envoyé",
+  );
   await expect(profile.locator(".avatar img")).toBeVisible();
   await page.setViewportSize({ width: 320, height: 740 });
   await expectNoOverflow(page);
@@ -471,6 +495,10 @@ test("several media widgets keep separate destinations and queues alongside a pr
   await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,
+  );
+  await expect(page.getByRole("progressbar")).toHaveCount(1);
+  await expect(media.nth(1).locator(".upload-progress-count")).toHaveText(
+    "1 / 1 fichier envoyé",
   );
   await Promise.all([
     page.waitForResponse(

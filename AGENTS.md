@@ -102,7 +102,7 @@ use, a personal visual identity, simple code, and responsive interactions.
 
 ## Selected implementation
 
-- The approved design is dark plum with the tabs `Médias`, `Programme`,
+- The approved design is dark plum with the tabs `Programme`, `Médias`,
   `Livre d'or`, `Paramètres` in French. Capitalize translated labels while preserving their
   order and routes; see `docs/design.md` and its reference image.
 - Guest profiles are prepared by the host. Individual, single-use invitation
@@ -112,16 +112,22 @@ use, a personal visual identity, simple code, and responsive interactions.
   replacement. Versioned avatar URLs require an active session and full app access,
   except a guest's own avatar during a current `profile_photo` welcome action.
   Keep anonymous guestbook entries free of all author details, including avatars.
-- The host starts a welcome sequence and unlocks its steps from settings. Each
-  guest chooses when to advance or return to a previous unlocked step; persist
-  their own position in PostgreSQL. Return only that guest's selected step.
+- The host starts a welcome sequence and unlocks its steps from settings. Waiting
+  guests enter the first step automatically when it becomes available. After
+  that, each guest chooses when to advance or return to a previous unlocked step.
+  Persist their own position in PostgreSQL. Return only that guest's selected step.
   The global `required` switch makes late arrivals follow every step before
   entering, including after the host opens the app. Existing participants enter
-  explicitly when ready; host unlocks never move them or interrupt their widgets.
+  explicitly when ready; later unlocks never move them or interrupt their widgets.
   Go enforces each guest's effective access; administrators retain full access.
   Host commands use the shared revision; guest navigation and widget uploads use
   a separate stable progress revision. Keep initial access open until the host
-  starts the welcome. Restart the welcome before editing already unlocked steps.
+  starts the welcome. Administrators can edit steps at any time. Keep each
+  participant's numeric position, clamping it to the last unlocked position if
+  the sequence shrinks; keep completed guests admitted. Preserve progress tokens
+  for text-only corrections and edits to other steps. Rotate affected tokens
+  when a position or current widget type, order or destination changes, and
+  reject stale uploads while preserving already accepted jobs.
 - Welcome steps contain an ordered list of 1 to 12 typed widgets, with no fixed
   title or body: `title`, `text`, `profile_photo`, `media_upload` and
   `enable_notifications`. Text and media widgets may repeat; allow at most one
@@ -130,8 +136,10 @@ use, a personal visual identity, simple code, and responsive interactions.
   Each media widget accepts queued uploads into its configured destination,
   without granting gallery or file access. Recheck its index and the current
   progress revision at acceptance and retain both with the upload destination.
-  The host unlocks regardless of completion; guests navigate explicitly. Add
-  widget types explicitly with validation, permissions and a matching component.
+  The host unlocks regardless of completion; after automatic entry to the first
+  step, guests navigate explicitly. Hide Next until another step is available,
+  and do not show a Start button while waiting. Add widget types explicitly with
+  validation, permissions and a matching component.
   Migrate existing steps without losing
   authored content or accepted uploads.
 - The notification widget asks permission only after an explicit guest click.
@@ -166,10 +174,18 @@ use, a personal visual identity, simple code, and responsive interactions.
   page. Do not restore recurring browser HTTP polling. Keep socket payloads free
   of private content, and close connections when their session loses access.
 - The media gallery retains `/photos` and `/api/photos` for existing links.
-  Videos use FFmpeg to produce private MP4 playback files and JPEG thumbnails;
-  Compose includes FFmpeg. Keep processing and file sizes bounded.
+  Keep uploaded videos byte-for-byte for playback and download, preserving their
+  resolution, frame rate, codecs, audio and metadata. FFprobe validates videos and
+  FFmpeg generates JPEG thumbnails only; never downscale or transcode the video.
+  Existing converted videos remain usable, but deleted originals cannot be restored.
+  Apply the same permissions to originals and thumbnails, count both in storage
+  quotas, preserve them during recovery and remove them together. Compose includes
+  FFmpeg. Keep processing and file sizes bounded.
   Accepted uploads enter a persistent queue; two background workers prepare them.
   Preserve progress across navigation and restore accepted jobs after reload.
+  Show one combined upload progress bar per visible queue, with a count of
+  server-accepted files over the total. Keep file-specific preparation status,
+  errors and retry controls; separate welcome widgets retain their own queues.
 - Guestbook posts can be anonymous. Keep their owner ID private in PostgreSQL for
   deletion permissions; never send their identity to guests or administrators.
 - Shared runtime configuration belongs in the repository-root `.env`.

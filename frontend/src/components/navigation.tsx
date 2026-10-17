@@ -5,8 +5,8 @@ import { Images, CalendarDays, BookOpen, Settings } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
 
 const tabs = [
-  { href: "/photos", label: "nav.photos", Icon: Images },
   { href: "/programme", label: "nav.programme", Icon: CalendarDays },
+  { href: "/photos", label: "nav.photos", Icon: Images },
   { href: "/livre-d-or", label: "nav.guestbook", Icon: BookOpen },
   { href: "/parametres", label: "nav.settings", Icon: Settings },
 ] as const;

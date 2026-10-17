@@ -1,7 +1,34 @@
+.media-picker {
+  min-width: 0;
+}
+
 .media-picker input[hidden] {
   display: none;
 }
 
+.media-picker .upload-button {
+  max-width: 100%;
+  min-height: 47px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.media-picker > .fine-print {
+  margin: 10px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .media-picker .photo-privacy {
-  margin-top: 12px;
+  margin: 10px 0 0;
+  max-width: 60ch;
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .media-picker .upload-button {
+    width: 100%;
+  }
 }

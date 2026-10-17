@@ -8,6 +8,7 @@ import type { PartyEvent } from "../programme/contracts";
 import { PartyEditor } from "../party/party-editor";
 import { GuestManager } from "../guests/guest-manager";
 import { EventManager } from "../programme/event-manager";
+import "./settings.css";
 
 export function AdminPanel({
   guest,
@@ -23,8 +24,8 @@ export function AdminPanel({
   const { t } = useI18n();
   const [party, setParty] = useState(initialParty);
   return (
-    <section className="admin-section">
-      <div className="section-row">
+    <section className="admin-section settings-admin">
+      <div className="section-row settings-admin-heading">
         <div>
           <h2>{t("admin.title")}</h2>
         </div>

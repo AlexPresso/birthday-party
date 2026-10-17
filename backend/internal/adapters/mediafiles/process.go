@@ -1,12 +1,13 @@
 package mediafiles
 
 import (
-	"birthday-party/backend/internal/media"
 	"context"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+
+	"birthday-party/backend/internal/media"
 )
 
 func (f *Files) Prepare(ctx context.Context, job media.Pending) (media.Output, error) {
@@ -24,7 +25,7 @@ func (f *Files) Prepare(ctx context.Context, job media.Pending) (media.Output, e
 	defer os.RemoveAll(workDir)
 	var prepared preparedMedia
 	if job.Kind == "video" {
-		prepared, err = prepareVideo(ctx, inputPath, workDir, job.Format, f.maxVideoBytes)
+		prepared, err = prepareVideo(ctx, inputPath, workDir, job.Format)
 	} else {
 		input, openErr := os.Open(inputPath)
 		if openErr != nil {
@@ -49,23 +50,29 @@ func (f *Files) Prepare(ctx context.Context, job media.Pending) (media.Output, e
 	}
 	filename, thumbname := job.Key+"-"+job.Attempt+"."+prepared.extension, job.Key+"-"+job.Attempt+".thumb.jpg"
 	finalPath, finalThumb := filepath.Join(f.root, "photos", filename), filepath.Join(f.root, "photos", thumbname)
-	committed := false
+	output := media.Output{
+		Filename: filename, Thumbnail: thumbname, MIME: prepared.mimeType,
+		Width: prepared.width, Height: prepared.height, Bytes: info.Size() + thumbInfo.Size(),
+	}
+	retained := false
 	defer func() {
-		if !committed {
-			os.Remove(finalPath)
-			os.Remove(finalThumb)
+		if !retained {
+			f.RemoveAttempt(job)
 		}
 	}()
 	// Copy outside the quota transaction so large files do not delay other receivers.
-	// The original remains available until both metadata and job status commit.
+	// The staged input remains available until both metadata and job status commit.
 	if err = copyPrivateFile(prepared.path, finalPath); err != nil {
 		return media.Output{}, err
 	}
 	if err = copyPrivateFile(prepared.thumbnailPath, finalThumb); err != nil {
 		return media.Output{}, err
 	}
-	committed = true
-	return media.Output{Filename: filename, Thumbnail: thumbname, MIME: prepared.mimeType, Width: prepared.width, Height: prepared.height, Bytes: info.Size() + thumbInfo.Size()}, nil
+	if err = ctx.Err(); err != nil {
+		return media.Output{}, err
+	}
+	retained = true
+	return output, nil
 }
 
 func copyPrivateFile(source, destination string) error {
