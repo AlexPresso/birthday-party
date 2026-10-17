@@ -52,9 +52,9 @@ func TestWelcomeSequenceRevealsOnlyCurrentStepAndSurvivesRestart(t *testing.T) {
 	if !initial.Open || initial.Revision != 0 || initial.CurrentStep != 0 || len(initial.Steps) != 0 {
 		t.Fatalf("unexpected initial welcome state: %+v", initial)
 	}
-	steps := []welcomeStep{{Title: "  First instruction  ", Body: "  Keep this text.\nTwo lines.  "}, {Title: "Private future step", Body: "Private future details"}}
+	steps := []welcomeStep{testWelcomeStep("  First instruction  ", "  Keep this text.\nTwo lines.  "), testWelcomeStep("Private future step", "Private future details")}
 	saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": initial.Revision, "steps": steps}, host))
-	if saved.Revision != 1 || saved.Steps[0].Title != "First instruction" || saved.Steps[0].Body != "Keep this text.\nTwo lines." {
+	if saved.Revision != 1 || saved.Steps[0].Widgets[0].Text != "First instruction" || saved.Steps[0].Widgets[1].Text != "Keep this text.\nTwo lines." {
 		t.Fatalf("unexpected saved welcome state: %+v", saved)
 	}
 	waiting := changeWelcome(t, a, host, saved.Revision, "start")
@@ -75,11 +75,11 @@ func TestWelcomeSequenceRevealsOnlyCurrentStepAndSurvivesRestart(t *testing.T) {
 		if wantStep == 0 && view.Step != nil {
 			t.Fatalf("waiting or open response contains a step: %s", response.Body.String())
 		}
-		if wantStep > 0 && (view.Open || view.Step == nil || view.Step.Position != wantStep || view.Step.Title != saved.Steps[wantStep-1].Title || view.Step.Body != saved.Steps[wantStep-1].Body) {
+		if wantStep > 0 && (view.Open || view.Step == nil || view.Step.Position != wantStep || view.Step.Widgets[0].Text != saved.Steps[wantStep-1].Widgets[0].Text || view.Step.Widgets[1].Text != saved.Steps[wantStep-1].Widgets[1].Text) {
 			t.Fatalf("wrong visible step: %s", response.Body.String())
 		}
 		for i, step := range saved.Steps {
-			if i+1 != wantStep && strings.Contains(response.Body.String(), step.Title) {
+			if i+1 != wantStep && strings.Contains(response.Body.String(), step.Widgets[0].Text) {
 				t.Fatalf("hidden step appeared in guest response: %s", response.Body.String())
 			}
 		}
@@ -89,6 +89,7 @@ func TestWelcomeSequenceRevealsOnlyCurrentStepAndSurvivesRestart(t *testing.T) {
 	}
 	assertView(a, 0)
 	first := changeWelcome(t, a, host, waiting.Revision, "next")
+	selectGuestWelcomeStep(t, a, visitor, 1)
 	assertView(a, 1)
 	if err := a.Close(); err != nil {
 		t.Fatal(err)
@@ -101,13 +102,15 @@ func TestWelcomeSequenceRevealsOnlyCurrentStepAndSurvivesRestart(t *testing.T) {
 	reopened.now = a.now
 	assertView(reopened, 1)
 	second := changeWelcome(t, reopened, host, first.Revision, "next")
+	selectGuestWelcomeStep(t, reopened, visitor, 2)
 	assertView(reopened, 2)
 	assertWelcomeError(t, request(t, reopened, "POST", "/api/admin/welcome/transition", map[string]any{"revision": second.Revision, "action": "next"}, host), 409, "invalid_welcome_transition")
 	assertView(reopened, 2)
 	opened := changeWelcome(t, reopened, host, second.Revision, "open")
-	if !opened.Open || opened.CurrentStep != 0 || opened.Revision != second.Revision+1 {
+	if !opened.Open || opened.CurrentStep != len(steps) || opened.Revision != second.Revision+1 {
 		t.Fatalf("unexpected open state: %+v", opened)
 	}
+	moveGuestWelcome(t, reopened, visitor, "finish")
 	assertView(reopened, 0)
 	status(t, request(t, reopened, "GET", "/api/photos", nil, visitor), 200)
 	changeWelcome(t, reopened, host, opened.Revision, "start")
@@ -163,16 +166,16 @@ func TestWelcomeBlocksGuestContentAndMutationsButKeepsIdentity(t *testing.T) {
 func TestWelcomeEditsAndTransitionsEnforceRevisionAndBounds(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)
-	validSteps := []welcomeStep{{Title: strings.Repeat("é", 120), Body: strings.Repeat("🙂", 1000)}}
+	validSteps := []welcomeStep{testWelcomeStep(strings.Repeat("é", 120), strings.Repeat("🙂", 1000))}
 	for _, input := range []any{
 		map[string]any{"revision": 0},
 		map[string]any{"revision": 0, "steps": nil},
 		map[string]any{"steps": validSteps},
 		map[string]any{"revision": -1, "steps": validSteps},
 		map[string]any{"revision": 0, "steps": make([]welcomeStep, 13)},
-		map[string]any{"revision": 0, "steps": []welcomeStep{{Title: "  "}}},
-		map[string]any{"revision": 0, "steps": []welcomeStep{{Title: strings.Repeat("é", 121)}}},
-		map[string]any{"revision": 0, "steps": []welcomeStep{{Title: "Title", Body: strings.Repeat("🙂", 1001)}}},
+		map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("  ", "")}},
+		map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep(strings.Repeat("é", 121), "")}},
+		map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("Title", strings.Repeat("🙂", 1001))}},
 	} {
 		assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", input, host), 400, "invalid_welcome_steps")
 	}
@@ -188,8 +191,9 @@ func TestWelcomeEditsAndTransitionsEnforceRevisionAndBounds(t *testing.T) {
 	shown := changeWelcome(t, a, host, saved.Revision, "next")
 	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": shown.Revision, "steps": []welcomeStep{}}, host), 409, "welcome_steps_locked")
 	opened := changeWelcome(t, a, host, shown.Revision, "open")
-	empty := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": opened.Revision, "steps": []welcomeStep{}}, host))
-	waiting = changeWelcome(t, a, host, empty.Revision, "start")
+	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": opened.Revision, "steps": []welcomeStep{}}, host), 409, "welcome_steps_locked")
+	waiting = changeWelcome(t, a, host, opened.Revision, "start")
+	waiting = readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": waiting.Revision, "steps": []welcomeStep{}}, host))
 	assertWelcomeError(t, request(t, a, "POST", "/api/admin/welcome/transition", map[string]any{"revision": waiting.Revision, "action": "next"}, host), 409, "invalid_welcome_transition")
 	changeWelcome(t, a, host, waiting.Revision, "open")
 }
@@ -197,7 +201,7 @@ func TestWelcomeEditsAndTransitionsEnforceRevisionAndBounds(t *testing.T) {
 func TestConcurrentWelcomeAdvanceCannotSkipSteps(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)
-	saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{{Title: "First"}, {Title: "Second"}}}, host))
+	saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("First", ""), testWelcomeStep("Second", "")}}, host))
 	waiting := changeWelcome(t, a, host, saved.Revision, "start")
 	var group sync.WaitGroup
 	results := make(chan *httptest.ResponseRecorder, 2)
@@ -279,6 +283,15 @@ type welcomeClosureReader struct {
 	io.Reader
 	onRead func()
 	once   sync.Once
+}
+
+func testWelcomeStep(title, body string, widgets ...welcomeWidget) welcomeStep {
+	step := welcomeStep{Widgets: []welcomeWidget{{Type: "title", Text: title}}}
+	if body != "" {
+		step.Widgets = append(step.Widgets, welcomeWidget{Type: "text", Text: body})
+	}
+	step.Widgets = append(step.Widgets, widgets...)
+	return step
 }
 
 func (r *welcomeClosureReader) Read(p []byte) (int, error) {

@@ -1,14 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Cake, LogOut, RefreshCw } from "lucide-react";
-import { remove, returnToInvitation, errorMessage } from "@/lib/api";
-import type { Guest, Welcome } from "@/lib/contracts";
+import { NotificationControl } from "./notification-control";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Cake,
+  DoorOpen,
+  LogOut,
+  RefreshCw,
+} from "lucide-react";
+import {
+  api,
+  ApiError,
+  remove,
+  returnToInvitation,
+  errorMessage,
+} from "@/lib/api";
+import {
+  welcomeSchema,
+  type Guest,
+  type Welcome,
+  type WelcomeStep,
+} from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { useWelcome } from "@/lib/use-welcome";
 import { ErrorNotice } from "./ui";
 import { WelcomeProfile } from "./welcome-profile";
 import { WelcomeMedia } from "./welcome-media";
+import { UploadProvider, useUploads } from "./upload-provider";
 import "./waiting-room.css";
 
 export function WaitingRoom({
@@ -23,14 +44,72 @@ export function WaitingRoom({
   title: string;
 }) {
   const { t } = useI18n();
-  const { welcome, failed, refresh } = useWelcome(initial);
+  const { welcome, failed, refresh, accept } = useWelcome(initial);
   const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState<"previous" | "next" | "finish" | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
+  const progressRequest = useRef<AbortController | null>(null);
   const state = welcome ?? initial;
 
   useEffect(() => {
     if (state.open) window.location.replace("/photos");
   }, [state.open]);
+
+  useEffect(
+    () => () => {
+      progressRequest.current?.abort();
+      progressRequest.current = null;
+    },
+    [],
+  );
+
+  async function navigate(action: "previous" | "next" | "finish") {
+    if (busy || progressRequest.current) return;
+    const controller = new AbortController();
+    progressRequest.current = controller;
+    let timedOut = false;
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 10000);
+    setMoving(action);
+    setError(null);
+    try {
+      const next = await api("/welcome/progress", welcomeSchema, {
+        method: "POST",
+        body: { revision: state.progressRevision, action },
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted || progressRequest.current !== controller)
+        return;
+      accept(next);
+      if (!next.open)
+        requestAnimationFrame(() => {
+          document
+            .getElementById(next.step ? "welcome-position" : "welcome-heading")
+            ?.focus();
+        });
+    } catch (cause) {
+      if (
+        progressRequest.current !== controller ||
+        (controller.signal.aborted && !timedOut)
+      )
+        return;
+      setError(
+        timedOut ? t("common.connectionFailed") : errorMessage(cause, t),
+      );
+      if (cause instanceof ApiError && cause.code === "errors.welcome_conflict")
+        refresh();
+    } finally {
+      clearTimeout(deadline);
+      if (progressRequest.current === controller) {
+        progressRequest.current = null;
+        setMoving(null);
+      }
+    }
+  }
 
   async function logout() {
     if (!window.confirm(t("settings.logoutConfirmation"))) return;
@@ -54,52 +133,113 @@ export function WaitingRoom({
           </span>
           {title && <strong>{title}</strong>}
         </div>
-        <button className="text-button" onClick={logout} disabled={busy}>
+        <button
+          className="text-button"
+          onClick={logout}
+          disabled={busy || moving !== null}
+        >
           <LogOut size={17} aria-hidden="true" />
           {busy ? t("welcome.signingOut") : t("welcome.signOut")}
         </button>
       </header>
       <section className="welcome-content" aria-labelledby="welcome-heading">
         <div className="welcome-stage panel">
-          <div aria-live="polite" aria-atomic="true">
-            {state.step ? (
-              <p className="welcome-step-number">
+          {state.step ? (
+            <>
+              <p
+                id="welcome-position"
+                className="welcome-step-number"
+                role="status"
+                aria-atomic="true"
+                tabIndex={-1}
+              >
                 {t("welcome.step", { number: state.step.position })}
               </p>
-            ) : (
+              {!state.step.widgets.some(
+                (widget) => widget.type === "title",
+              ) && (
+                <h1
+                  id="welcome-heading"
+                  className="visually-hidden"
+                  tabIndex={-1}
+                >
+                  {t("welcome.step", { number: state.step.position })}
+                </h1>
+              )}
+              {!state.open && (
+                <WelcomeWidgets
+                  key={state.progressRevision}
+                  step={state.step}
+                  revision={state.progressRevision}
+                />
+              )}
+            </>
+          ) : (
+            <div aria-live="polite" aria-atomic="true">
               <Cake
                 className="welcome-cake"
                 size={36}
                 strokeWidth={1.5}
                 aria-hidden="true"
               />
-            )}
-            <h1 id="welcome-heading">
-              {state.step?.title ?? t("welcome.heading", { name: guest.name })}
-            </h1>
-            {state.step ? (
-              state.step.body && (
-                <p className="welcome-body">{state.step.body}</p>
-              )
-            ) : (
-              <p className="welcome-body muted">
-                {t("welcome.waitingDescription")}
-              </p>
-            )}
-          </div>
-          {!state.open && state.step?.action === "profile_photo" && (
-            <WelcomeProfile key={state.revision} />
+              <h1 id="welcome-heading" tabIndex={-1}>
+                {t("welcome.heading", { name: guest.name })}
+              </h1>
+              {!state.canNext && !state.canFinish && (
+                <p className="welcome-body muted">
+                  {t("welcome.waitingDescription")}
+                </p>
+              )}
+            </div>
           )}
-          {!state.open && state.step?.action === "media_upload" && (
-            <WelcomeMedia key={state.revision} revision={state.revision} />
+          {!state.open && (
+            <div className="welcome-navigation" aria-busy={moving !== null}>
+              {state.step && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={busy || moving !== null || !state.canPrevious}
+                  onClick={() => void navigate("previous")}
+                >
+                  <ArrowLeft size={17} aria-hidden="true" />
+                  {t("welcome.previous")}
+                </button>
+              )}
+              {(state.canNext || !state.canFinish) && (
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={busy || moving !== null || !state.canNext}
+                  onClick={() => void navigate("next")}
+                >
+                  {t(state.step ? "welcome.next" : "welcome.start")}
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+              )}
+              {state.canFinish && (
+                <button
+                  type="button"
+                  className={`button ${state.canNext ? "secondary" : "primary"} welcome-finish`}
+                  disabled={busy || moving !== null}
+                  onClick={() => void navigate("finish")}
+                >
+                  <DoorOpen size={17} aria-hidden="true" />
+                  {t("welcome.finish")}
+                </button>
+              )}
+            </div>
           )}
         </div>
         <p className="welcome-follow-up muted" role="status">
           {state.open
             ? t("welcome.opening")
-            : state.step
-              ? t("welcome.nextDescription")
-              : null}
+            : moving
+              ? t("welcome.moving")
+              : state.canNext
+                ? t("welcome.nextDescription")
+                : !state.canFinish && state.step
+                  ? t("welcome.nextLocked")
+                  : null}
         </p>
         {failed && (
           <div className="welcome-connection">
@@ -114,4 +254,71 @@ export function WaitingRoom({
       </section>
     </main>
   );
+}
+
+function WelcomeWidgets({
+  step,
+  revision,
+}: {
+  step: WelcomeStep;
+  revision: number;
+}) {
+  const firstTitle = step.widgets.findIndex(
+    (widget) => widget.type === "title",
+  );
+  const content = (
+    <div className="welcome-widgets">
+      {step.widgets.map((widget, index) => {
+        switch (widget.type) {
+          case "title":
+            return index === firstTitle ? (
+              <h1
+                key={index}
+                id="welcome-heading"
+                className="welcome-widget-title"
+                tabIndex={-1}
+              >
+                {widget.text}
+              </h1>
+            ) : (
+              <h2 key={index} className="welcome-widget-title">
+                {widget.text}
+              </h2>
+            );
+          case "text":
+            return (
+              <p key={index} className="welcome-body">
+                {widget.text}
+              </p>
+            );
+          case "profile_photo":
+            return <WelcomeProfile key={index} />;
+          case "enable_notifications":
+            return <NotificationControl key={index} />;
+          case "media_upload":
+            return (
+              <WelcomeMedia
+                key={index}
+                revision={revision}
+                widgetIndex={index}
+              />
+            );
+        }
+      })}
+    </div>
+  );
+  // One provider bounds transfers and queue polling across every widget in this step.
+  return step.widgets.some((widget) => widget.type === "media_upload") ? (
+    <UploadProvider welcomeRevision={revision}>
+      {content}
+      <WelcomeUploadError />
+    </UploadProvider>
+  ) : (
+    content
+  );
+}
+
+function WelcomeUploadError() {
+  const { error } = useUploads();
+  return <ErrorNotice message={error} />;
 }

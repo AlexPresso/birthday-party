@@ -25,6 +25,13 @@ export const profileSchema = z.object({
   }),
 });
 export type Profile = z.infer<typeof profileSchema>;
+export const notificationConfigSchema = z.object({
+  publicKey: z.string().regex(/^B[A-Za-z0-9_-]{86}$/),
+});
+export const notificationStatusSchema = z.object({ subscribed: z.boolean() });
+export const notificationSavedSchema = z.object({
+  subscribed: z.literal(true),
+});
 export const mediaCategorySchema = z.object({
   id,
   name: z
@@ -49,63 +56,74 @@ const uploadLimitsSchema = z.object({
     .positive()
     .max(1024 ** 3),
 });
-const welcomeStepFields = {
-  title: z.string().min(1),
-  body: z.string(),
-};
-const welcomeStepSchema = z.discriminatedUnion("action", [
-  z.object({
-    ...welcomeStepFields,
-    action: z.null(),
-    mediaUpload: z.null().optional(),
-  }),
-  z.object({
-    ...welcomeStepFields,
-    action: z.literal("profile_photo"),
-    mediaUpload: z.null().optional(),
-  }),
-  z.object({
-    ...welcomeStepFields,
-    action: z.literal("media_upload"),
+const widgetText = (limit: number) =>
+  z
+    .string()
+    .refine(
+      (value) => value.trim().length > 0 && Array.from(value).length <= limit,
+    );
+export const welcomeWidgetSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("title"), text: widgetText(120) }),
+  z.strictObject({ type: z.literal("text"), text: widgetText(1000) }),
+  z.strictObject({ type: z.literal("profile_photo") }),
+  z.strictObject({ type: z.literal("enable_notifications") }),
+  z.strictObject({
+    type: z.literal("media_upload"),
     mediaUpload: z.strictObject({ categoryId: id.nullable() }),
   }),
 ]);
+const welcomeWidgets = z
+  .array(welcomeWidgetSchema)
+  .min(1)
+  .max(12)
+  .refine(
+    (widgets) =>
+      widgets.filter((widget) => widget.type === "profile_photo").length <= 1 &&
+      widgets.filter((widget) => widget.type === "enable_notifications")
+        .length <= 1,
+  );
+export const welcomeStepSchema = z.strictObject({ widgets: welcomeWidgets });
+export type WelcomeWidget = z.infer<typeof welcomeWidgetSchema>;
+export type WelcomeStep = z.infer<typeof welcomeStepSchema>;
 const welcomeRevision = z.number().int().nonnegative();
+const welcomeWidgetIndex = z.number().int().min(0).max(11);
 export const welcomeUploadContextSchema = z.object({
   revision: welcomeRevision,
+  widgetIndex: welcomeWidgetIndex,
   category: mediaCategorySchema.nullable(),
   limits: uploadLimitsSchema,
 });
 export type WelcomeUploadContext = z.infer<typeof welcomeUploadContextSchema>;
-export const welcomeSchema = z.discriminatedUnion("open", [
-  z.object({
-    open: z.literal(true),
+export const welcomeSchema = z
+  .object({
+    open: z.boolean(),
     revision: welcomeRevision,
-    step: z.null(),
-  }),
-  z.object({
-    open: z.literal(false),
-    revision: welcomeRevision,
-    step: z
-      .intersection(
-        welcomeStepSchema,
-        z.object({ position: z.number().int().min(1).max(12) }),
-      )
+    progressRevision: welcomeRevision,
+    step: welcomeStepSchema
+      .extend({ position: z.number().int().min(1).max(12) })
       .nullable(),
-  }),
-]);
+    canPrevious: z.boolean(),
+    canNext: z.boolean(),
+    canFinish: z.boolean(),
+  })
+  .refine(
+    (value) =>
+      (!value.open ||
+        (value.step === null &&
+          !value.canPrevious &&
+          !value.canNext &&
+          !value.canFinish)) &&
+      (!value.canPrevious || (value.step !== null && value.step.position > 1)),
+  );
 export const adminWelcomeSchema = z
   .object({
     open: z.boolean(),
     revision: welcomeRevision,
     currentStep: z.number().int().min(0).max(12),
+    required: z.boolean(),
     steps: z.array(welcomeStepSchema).max(12),
   })
-  .refine(
-    (value) =>
-      value.currentStep <= value.steps.length &&
-      (!value.open || value.currentStep === 0),
-  );
+  .refine((value) => value.currentStep <= value.steps.length);
 export type Welcome = z.infer<typeof welcomeSchema>;
 export type AdminWelcome = z.infer<typeof adminWelcomeSchema>;
 export const partySchema = z.object({
@@ -135,31 +153,36 @@ const uploadFields = {
   id,
   categoryId: id.nullable(),
   welcomeRevision: welcomeRevision.nullable(),
+  welcomeWidgetIndex: welcomeWidgetIndex.nullable(),
   clientUploadId: z.uuid(),
   filename: z.string().min(1),
   kind: z.enum(["image", "video"]),
   createdAt: instant,
 };
-export const uploadSchema = z.discriminatedUnion("status", [
-  z.object({
-    ...uploadFields,
-    status: z.enum(["queued", "processing"]),
-    errorCode: z.null(),
-    photo: z.null(),
-  }),
-  z.object({
-    ...uploadFields,
-    status: z.literal("ready"),
-    errorCode: z.null(),
-    photo: photoSchema.nullable(),
-  }),
-  z.object({
-    ...uploadFields,
-    status: z.literal("failed"),
-    errorCode: z.string().regex(/^[a-z_]+$/),
-    photo: z.null(),
-  }),
-]);
+export const uploadSchema = z
+  .discriminatedUnion("status", [
+    z.object({
+      ...uploadFields,
+      status: z.enum(["queued", "processing"]),
+      errorCode: z.null(),
+      photo: z.null(),
+    }),
+    z.object({
+      ...uploadFields,
+      status: z.literal("ready"),
+      errorCode: z.null(),
+      photo: photoSchema.nullable(),
+    }),
+    z.object({
+      ...uploadFields,
+      status: z.literal("failed"),
+      errorCode: z.string().regex(/^[a-z_]+$/),
+      photo: z.null(),
+    }),
+  ])
+  .refine(
+    (job) => job.welcomeWidgetIndex === null || job.welcomeRevision !== null,
+  );
 export const uploadsSchema = z.object({
   items: z.array(uploadSchema).max(150),
 });

@@ -7,6 +7,7 @@ import type { Guest } from "@/lib/contracts";
 import { ErrorNotice } from "./ui";
 import { Avatar } from "./avatar";
 import { ProfilePhotoEditor } from "./profile-photo-editor";
+import { NotificationControl } from "./notification-control";
 
 export function SettingsPanel({
   guest,
@@ -54,6 +55,7 @@ export function SettingsPanel({
           setPhoto((current) => ({ ...current, url: updated.avatarUrl }))
         }
       />
+      <NotificationControl />
       <button className="button secondary" disabled={busy} onClick={logout}>
         <LogOut size={17} />
         {busy ? t("settings.signingOut") : t("settings.signOut")}

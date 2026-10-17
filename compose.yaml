@@ -28,6 +28,7 @@ services:
       PGUSER: ${POSTGRES_USER:-birthday}
       PGPASSWORD: ${POSTGRES_PASSWORD:-birthday-local-only}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       PRINT_ADMIN_INVITATION: ${PRINT_ADMIN_INVITATION:-true}
       MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-15}

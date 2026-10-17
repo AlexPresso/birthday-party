@@ -19,15 +19,30 @@ import {
   adminWelcomeSchema,
   type AdminWelcome,
   type MediaCategory,
+  type WelcomeStep,
+  type WelcomeWidget,
 } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { moveItem } from "@/lib/reorder";
 import { ErrorNotice } from "./ui";
 import { WelcomeStepList } from "./welcome-step-list";
-import { WelcomeActionPanel } from "./welcome-action-panel";
+import { WelcomeWidgetEditor, focusWidget } from "./welcome-widget-editor";
 import "./welcome-admin.css";
 
-export type StepDraft = AdminWelcome["steps"][number] & { key: number };
+export type WidgetDraft = WelcomeWidget & { key: number };
+export type StepDraft = { key: number; widgets: WidgetDraft[] };
+export type DraftWelcomeStep = StepDraft;
+
+export function stepLabel(step: WelcomeStep | StepDraft) {
+  const title = step.widgets.find(
+    (widget) => widget.type === "title" && widget.text.trim(),
+  );
+  if (title?.type === "title") return title.text;
+  const text = step.widgets.find(
+    (widget) => widget.type === "text" && widget.text.trim(),
+  );
+  return text?.type === "text" ? text.text : "";
+}
 type Action = "start" | "next" | "open";
 
 export function WelcomeAdmin({
@@ -40,32 +55,44 @@ export function WelcomeAdmin({
   const { t, locale } = useI18n();
   const [state, setState] = useState(initial);
   const [draft, setDraft] = useState<StepDraft[]>(() =>
-    initial.steps.map((step, key) => ({ ...step, key })),
+    initial.steps.map((step, key) => ({
+      key,
+      widgets: step.widgets.map((widget, index) => ({
+        ...widget,
+        key: key * 12 + index,
+      })),
+    })),
   );
   const nextKey = useRef(initial.steps.length);
+  const nextWidgetKey = useRef(initial.steps.length * 12);
   const addButton = useRef<HTMLButtonElement>(null);
   const [selectedKey, setSelectedKey] = useState<number | null>(
     initial.steps.length ? 0 : null,
   );
   const [reorderNotice, setReorderNotice] = useState("");
   const [busy, setBusy] = useState<
-    Action | "save" | "reload" | "discard" | null
+    Action | "save" | "reload" | "discard" | "required" | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [notice, setNotice] = useState("");
-  const steps = draft.map((step) =>
-    step.action === "media_upload"
-      ? {
-          title: step.title,
-          body: step.body,
-          action: step.action,
-          mediaUpload: step.mediaUpload,
-        }
-      : { title: step.title, body: step.body, action: step.action },
-  );
+  const steps: WelcomeStep[] = draft.map((step) => ({
+    widgets: step.widgets.map((widget) => {
+      switch (widget.type) {
+        case "title":
+        case "text":
+          return { type: widget.type, text: widget.text };
+        case "profile_photo":
+        case "enable_notifications":
+          return { type: widget.type };
+        case "media_upload":
+          return { type: widget.type, mediaUpload: widget.mediaUpload };
+      }
+    }),
+  }));
   const dirty = JSON.stringify(steps) !== JSON.stringify(state.steps);
-  const editable = state.open || state.currentStep === 0;
+  const editable = state.currentStep === 0;
   const mutationDisabled = !!busy || !editable;
   const selectedIndex = draft.findIndex((step) => step.key === selectedKey);
   const selected = draft[selectedIndex];
@@ -83,9 +110,13 @@ export function WelcomeAdmin({
   }, [dirty]);
 
   function replaceDraft(updated: AdminWelcome) {
+    setValidationError(null);
     const replacement = updated.steps.map((step, index) => ({
-      ...step,
       key: draft[index]?.key ?? nextKey.current++,
+      widgets: step.widgets.map((widget, widgetIndex) => ({
+        ...widget,
+        key: draft[index]?.widgets[widgetIndex]?.key ?? nextWidgetKey.current++,
+      })),
     }));
     setDraft(replacement);
     if (!replacement.some((step) => step.key === selectedKey))
@@ -106,17 +137,6 @@ export function WelcomeAdmin({
     }
   }
 
-  function edit(
-    key: number,
-    update: Partial<Pick<StepDraft, "title" | "body">>,
-  ) {
-    if (mutationDisabled) return;
-    setDraft((current) =>
-      current.map((step) => (step.key === key ? { ...step, ...update } : step)),
-    );
-    setNotice("");
-  }
-
   function move(from: number, to: number) {
     if (mutationDisabled || conflict) return;
     setDraft((current) => moveItem(current, from, to));
@@ -124,6 +144,7 @@ export function WelcomeAdmin({
       t("adminWelcome.moved", { from: number(from + 1), to: number(to + 1) }),
     );
     setNotice("");
+    setValidationError(null);
   }
 
   function moveSelected(to: number, button: HTMLButtonElement) {
@@ -144,7 +165,7 @@ export function WelcomeAdmin({
     if (mutationDisabled) return;
     const step = draft[index];
     if (
-      (step.title || step.body || step.action) &&
+      step.widgets.length > 0 &&
       !window.confirm(
         t("adminWelcome.removeConfirmation", { number: number(index + 1) }),
       )
@@ -156,34 +177,59 @@ export function WelcomeAdmin({
       setSelectedKey(next);
       requestAnimationFrame(() => {
         if (next === null) addButton.current?.focus();
-        else document.getElementById(`welcome-title-${next}`)?.focus();
+        else
+          document
+            .querySelector<HTMLButtonElement>(
+              `.welcome-step-list [data-step-key="${next}"] .welcome-step-select`,
+            )
+            ?.focus();
       });
     }
     setNotice("");
+    setValidationError(null);
   }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (busy || !editable || !dirty || conflict) return;
     setError(null);
+    setValidationError(null);
     setNotice("");
-    const invalidIndex = steps.findIndex(
-      ({ title, body }) =>
-        !title.trim() ||
-        Array.from(title.trim()).length > 120 ||
-        Array.from(body).length > 1000,
+    const invalidIndex = draft.findIndex(
+      ({ widgets }) =>
+        widgets.length === 0 ||
+        widgets.some(
+          (widget) =>
+            (widget.type === "title" || widget.type === "text") &&
+            (!widget.text.trim() ||
+              Array.from(widget.text.trim()).length >
+                (widget.type === "title" ? 120 : 1000)),
+        ),
     );
     if (invalidIndex !== -1) {
-      setError(t("errors.invalid_welcome_steps"));
       const invalid = draft[invalidIndex];
-      setSelectedKey(invalid.key);
-      const field =
-        !invalid.title.trim() || Array.from(invalid.title.trim()).length > 120
-          ? "title"
-          : "body";
-      requestAnimationFrame(() =>
-        document.getElementById(`welcome-${field}-${invalid.key}`)?.focus(),
+      setValidationError(
+        t(
+          invalid.widgets.length === 0
+            ? "widgets.emptyError"
+            : "widgets.invalidText",
+        ),
       );
+      setSelectedKey(invalid.key);
+      const invalidWidget = invalid.widgets.find(
+        (widget) =>
+          (widget.type === "title" || widget.type === "text") &&
+          (!widget.text.trim() ||
+            Array.from(widget.text.trim()).length >
+              (widget.type === "title" ? 120 : 1000)),
+      );
+      requestAnimationFrame(() => {
+        if (invalidWidget) focusWidget(invalidWidget.key);
+        else
+          document
+            .querySelector<HTMLButtonElement>(".welcome-widget-add")
+            ?.focus();
+      });
       return;
     }
     setBusy("save");
@@ -204,7 +250,12 @@ export function WelcomeAdmin({
   }
 
   async function transition(action: Action) {
-    if (busy || (dirty && action !== "open") || conflict) return;
+    if (
+      busy ||
+      conflict ||
+      (dirty && (action === "next" || (action === "start" && editable)))
+    )
+      return;
     if (
       action !== "next" &&
       !window.confirm(
@@ -230,6 +281,24 @@ export function WelcomeAdmin({
       );
       setState(updated);
       if (!dirty) replaceDraft(updated);
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function updateRequired(required: boolean) {
+    if (busy || conflict) return;
+    setBusy("required");
+    setError(null);
+    setNotice("");
+    try {
+      const updated = await api("/admin/welcome/required", adminWelcomeSchema, {
+        method: "PATCH",
+        body: { revision: state.revision, required },
+      });
+      setState(updated);
     } catch (cause) {
       fail(cause);
     } finally {
@@ -294,7 +363,8 @@ export function WelcomeAdmin({
                 ? t("adminWelcome.accessOpenDescription")
                 : state.currentStep === 0
                   ? t("adminWelcome.waitingDescription")
-                  : state.steps[state.currentStep - 1]?.title}
+                  : state.steps[state.currentStep - 1] &&
+                    stepLabel(state.steps[state.currentStep - 1])}
             </p>
             {!state.open && !hasNext && state.currentStep > 0 && (
               <p className="fine-print">{t("adminWelcome.allShown")}</p>
@@ -305,12 +375,16 @@ export function WelcomeAdmin({
               <button
                 type="button"
                 className="button primary"
-                disabled={!!busy || dirty || conflict}
+                disabled={!!busy || (dirty && editable) || conflict}
                 onClick={() => transition("start")}
               >
                 {busy === "start"
                   ? t("adminWelcome.updating")
-                  : t("adminWelcome.start")}
+                  : t(
+                      state.currentStep > 0
+                        ? "adminWelcome.restart"
+                        : "adminWelcome.start",
+                    )}
               </button>
             ) : (
               <>
@@ -354,7 +428,29 @@ export function WelcomeAdmin({
           )}
         </div>
 
-        <ErrorNotice message={error} />
+        <div className="welcome-required" aria-busy={busy === "required"}>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={state.required}
+              disabled={!!busy || conflict}
+              aria-describedby="welcome-required-hint"
+              onChange={(event) => void updateRequired(event.target.checked)}
+            />
+            {t("adminWelcome.required")}
+          </label>
+          <p id="welcome-required-hint" className="fine-print">
+            {t("adminWelcome.requiredHint")}
+          </p>
+          {busy === "required" && (
+            <p className="fine-print" role="status">
+              {t("adminWelcome.requiredSaving")}
+            </p>
+          )}
+        </div>
+
+        <ErrorNotice message={error ?? validationError} />
         {(conflict || dirty) && (
           <div className="form-actions">
             {conflict && (
@@ -419,7 +515,7 @@ export function WelcomeAdmin({
                   <fieldset
                     className="welcome-step-editor"
                     key={selected.key}
-                    disabled={mutationDisabled}
+                    disabled={mutationDisabled || conflict}
                   >
                     <legend>
                       {t("welcome.step", { number: number(selectedIndex + 1) })}
@@ -468,65 +564,25 @@ export function WelcomeAdmin({
                         <Trash2 size={18} aria-hidden="true" />
                       </button>
                     </div>
-                    <label htmlFor={`welcome-title-${selected.key}`}>
-                      {t("adminWelcome.stepTitle", {
-                        number: number(selectedIndex + 1),
-                      })}
-                    </label>
-                    <input
-                      id={`welcome-title-${selected.key}`}
-                      value={selected.title}
-                      required
-                      maxLength={240}
-                      onChange={(event) =>
-                        edit(selected.key, { title: event.target.value })
-                      }
-                      aria-describedby={`welcome-title-count-${selected.key}`}
+                    <WelcomeWidgetEditor
+                      step={selected}
+                      disabled={mutationDisabled || conflict}
+                      categories={categories}
+                      createKey={() => nextWidgetKey.current++}
+                      onChange={(widgets) => {
+                        if (mutationDisabled || conflict) return;
+                        setDraft((current) =>
+                          current.map((step) =>
+                            step.key === selected.key
+                              ? { ...step, widgets }
+                              : step,
+                          ),
+                        );
+                        setNotice("");
+                        setValidationError(null);
+                      }}
                     />
-                    <p
-                      id={`welcome-title-count-${selected.key}`}
-                      className="fine-print welcome-character-count"
-                    >
-                      {number(Array.from(selected.title).length)} /{" "}
-                      {number(120)}
-                    </p>
-                    <label htmlFor={`welcome-body-${selected.key}`}>
-                      {t("adminWelcome.stepBody", {
-                        number: number(selectedIndex + 1),
-                      })}
-                    </label>
-                    <textarea
-                      id={`welcome-body-${selected.key}`}
-                      value={selected.body}
-                      rows={6}
-                      maxLength={2000}
-                      onChange={(event) =>
-                        edit(selected.key, { body: event.target.value })
-                      }
-                      aria-describedby={`welcome-body-count-${selected.key}`}
-                    />
-                    <p
-                      id={`welcome-body-count-${selected.key}`}
-                      className="fine-print welcome-character-count"
-                    >
-                      {number(Array.from(selected.body).length)} /{" "}
-                      {number(1000)}
-                    </p>
                   </fieldset>
-                  <WelcomeActionPanel
-                    step={selected}
-                    disabled={mutationDisabled}
-                    categories={categories}
-                    onChange={(updated) => {
-                      if (mutationDisabled) return;
-                      setDraft((current) =>
-                        current.map((step) =>
-                          step.key === updated.key ? updated : step,
-                        ),
-                      );
-                      setNotice("");
-                    }}
-                  />
                 </>
               )}
             </div>
@@ -539,17 +595,17 @@ export function WelcomeAdmin({
               ref={addButton}
               type="button"
               className="button secondary"
-              disabled={mutationDisabled || draft.length >= 12}
+              disabled={mutationDisabled || conflict || draft.length >= 12}
               onClick={() => {
                 const key = nextKey.current++;
-                setDraft((current) => [
-                  ...current,
-                  { key, title: "", body: "", action: null },
-                ]);
+                setDraft((current) => [...current, { key, widgets: [] }]);
                 setSelectedKey(key);
                 setNotice("");
+                setValidationError(null);
                 requestAnimationFrame(() =>
-                  document.getElementById(`welcome-title-${key}`)?.focus(),
+                  document
+                    .querySelector<HTMLButtonElement>(".welcome-widget-add")
+                    ?.focus(),
                 );
               }}
             >

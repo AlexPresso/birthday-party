@@ -8,6 +8,7 @@ import {
   Images,
   Download,
   Play,
+  Presentation,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api, errorMessage, remove } from "@/lib/api";
@@ -24,6 +25,7 @@ import { PageHeading, EmptyState, ErrorNotice } from "./ui";
 import { useUploads } from "./upload-provider";
 import { UploadQueue } from "./upload-queue";
 import { MediaPicker } from "./media-picker";
+import { MediaSlideshow } from "./media-slideshow";
 import "./media-categories.css";
 
 export function PhotoGallery({
@@ -45,6 +47,11 @@ export function PhotoGallery({
   const router = useRouter();
   const [filterPending, startFilter] = useTransition();
   const category = categories.find((item) => item.id === categoryId);
+  const categoryName = category
+    ? category.isPublic
+      ? category.name
+      : t("categories.privateOption", { name: category.name })
+    : t("categories.main");
   const [storedPhotos, setPhotos] = useState(initial.items);
   const uploads = useUploads();
   const photos = [
@@ -60,6 +67,7 @@ export function PhotoGallery({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [slideshow, setSlideshow] = useState<PhotoPage | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
 
@@ -160,15 +168,16 @@ export function PhotoGallery({
       )}
       <MediaPicker
         limits={initial.limits}
-        destination={{ categoryId, welcomeRevision: null }}
+        destination={{
+          categoryId,
+          welcomeRevision: null,
+          welcomeWidgetIndex: null,
+        }}
       >
         {category && (
           <p className="fine-print">
-            {t("categories.destination", { name: category.name })}
+            {t("categories.destination", { name: categoryName })}
           </p>
-        )}
-        {category && !category.isPublic && (
-          <p className="fine-print">{t("categories.privateHint")}</p>
         )}
       </MediaPicker>
       <UploadQueue />
@@ -189,17 +198,34 @@ export function PhotoGallery({
       ) : (
         <section aria-label={t("photos.all")}>
           <div className="section-row gallery-heading">
-            <h2>{t("photos.allHeading")}</h2>
-            <span className="fine-print">
-              {t(
-                plurals.select(photos.length) === "one"
-                  ? "photos.countOne"
-                  : "photos.countOther",
-                {
-                  count: `${numbers.format(photos.length)}${cursor ? "+" : ""}`,
-                },
-              )}
-            </span>
+            <div>
+              <h2>{category ? categoryName : t("photos.allHeading")}</h2>
+              <span className="fine-print">
+                {t(
+                  plurals.select(photos.length) === "one"
+                    ? "photos.countOne"
+                    : "photos.countOther",
+                  {
+                    count: `${numbers.format(photos.length)}${cursor ? "+" : ""}`,
+                  },
+                )}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="button secondary slideshow-launch"
+              disabled={filterPending}
+              onClick={() =>
+                setSlideshow({
+                  items: photos,
+                  nextCursor: cursor,
+                  limits: initial.limits,
+                })
+              }
+            >
+              <Presentation size={18} aria-hidden="true" />
+              {t("slideshow.start")}
+            </button>
           </div>
           <div className="photo-grid">
             {photos.map((photo) => (
@@ -245,6 +271,14 @@ export function PhotoGallery({
             </button>
           )}
         </section>
+      )}
+      {slideshow && (
+        <MediaSlideshow
+          initial={slideshow}
+          categoryId={categoryId}
+          categoryName={categoryName}
+          onClose={() => setSlideshow(null)}
+        />
       )}
       <dialog
         ref={dialog}

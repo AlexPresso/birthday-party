@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 	_ "time/tzdata"
+
+	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
 const (
@@ -43,6 +45,7 @@ type Config struct {
 	PrintAdminInvitation bool
 	MaxImageBytes        int64
 	MaxVideoBytes        int64
+	VAPIDSubject         string
 }
 
 // ConfigFromEnv reads and validates process environment variables without loading files.
@@ -75,6 +78,9 @@ func ConfigFromEnv() (Config, error) {
 		return c, err
 	}
 	if c.MaxVideoBytes, err = uploadLimitFromEnv("MAX_VIDEO_SIZE_MB", defaultMaxVideoBytes); err != nil {
+		return c, err
+	}
+	if c.VAPIDSubject, err = notificationSubject(os.Getenv("VAPID_SUBJECT"), c.PublicURL); err != nil {
 		return c, err
 	}
 	return c, nil
@@ -118,29 +124,36 @@ type Author struct {
 	AvatarURL *string `json:"avatarUrl"`
 }
 
-// App owns the database pool, media workers and authenticated HTTP handlers.
+// App owns the database pool, background workers and authenticated HTTP handlers.
 // Construct it with Open and release its resources with Close.
 type App struct {
-	db               *sql.DB
-	config           Config
-	now              func() time.Time
-	receivers        chan struct{}
-	avatarProcessors chan struct{}
-	workerMu         sync.Mutex
-	workerCancel     context.CancelFunc
-	workerConn       *sql.Conn
-	workerErrors     chan error
-	workers          sync.WaitGroup
-	closeOnce        sync.Once
-	closeErr         error
-	authMu           sync.Mutex
-	authWindow       time.Time
-	authCount        int
+	db                 *sql.DB
+	config             Config
+	now                func() time.Time
+	receivers          chan struct{}
+	avatarProcessors   chan struct{}
+	workerMu           sync.Mutex
+	workerCancel       context.CancelFunc
+	workerConn         *sql.Conn
+	workerErrors       chan error
+	workers            sync.WaitGroup
+	closeOnce          sync.Once
+	closeErr           error
+	authMu             sync.Mutex
+	authWindow         time.Time
+	authCount          int
+	notificationKeys   notificationKeys
+	notificationClient webpush.HTTPClient
 }
 
 // Open prepares private storage, opens PostgreSQL and applies pending migrations.
-// It does not start media workers; serving processes must call StartWorkers.
+// It does not start workers; serving processes must call StartWorkers.
 func Open(config Config) (*App, error) {
+	subject, err := notificationSubject(config.VAPIDSubject, config.PublicURL)
+	if err != nil {
+		return nil, err
+	}
+	config.VAPIDSubject = subject
 	if config.MaxImageBytes == 0 {
 		config.MaxImageBytes = defaultMaxImageBytes
 	}
@@ -165,10 +178,15 @@ func Open(config Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), avatarProcessors: make(chan struct{}, 1), workerErrors: make(chan error, 1)}, nil
+	keys, err := loadNotificationKeys(ctx, db)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("load notification keys: %w", err)
+	}
+	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), avatarProcessors: make(chan struct{}, 1), workerErrors: make(chan error, 1), notificationKeys: keys, notificationClient: newNotificationClient()}, nil
 }
 
-// Close cancels and waits for media workers, releases their lock and closes the database.
+// Close cancels and waits for workers, releases their lock and closes the database.
 // Repeated calls return the result of the first call.
 func (a *App) Close() error {
 	a.closeOnce.Do(func() {
@@ -197,14 +215,20 @@ func (a *App) Handler() http.Handler {
 		respond(w, 200, map[string]any{"guest": guest})
 	}))
 	mux.HandleFunc("POST /api/logout", a.auth(false, a.logout))
+	mux.HandleFunc("GET /api/notifications", a.auth(false, a.getNotifications))
+	mux.HandleFunc("POST /api/notifications/status", a.auth(false, a.notificationStatus))
+	mux.HandleFunc("PUT /api/notifications/subscription", a.auth(false, a.saveNotificationSubscription))
+	mux.HandleFunc("DELETE /api/notifications/subscription", a.auth(false, a.deleteNotificationSubscription))
 	mux.HandleFunc("GET /api/profile", a.authProfile(a.getProfile))
 	mux.HandleFunc("PUT /api/profile/avatar", a.authProfile(a.updateAvatar))
 	mux.HandleFunc("DELETE /api/profile/avatar", a.authProfile(a.deleteAvatar))
 	mux.HandleFunc("GET /api/guests/{id}/avatar", a.authProfile(a.serveAvatar))
 	mux.HandleFunc("GET /api/welcome", a.auth(false, a.getWelcome))
+	mux.HandleFunc("POST /api/welcome/progress", a.auth(false, a.transitionGuestWelcome))
 	mux.HandleFunc("GET /api/welcome/upload-context", a.auth(false, a.getWelcomeUploadContext))
 	mux.HandleFunc("GET /api/admin/welcome", a.auth(true, a.getAdminWelcome))
 	mux.HandleFunc("PUT /api/admin/welcome", a.auth(true, a.updateWelcome))
+	mux.HandleFunc("PATCH /api/admin/welcome/required", a.auth(true, a.updateWelcomeRequired))
 	mux.HandleFunc("POST /api/admin/welcome/transition", a.auth(true, a.transitionWelcome))
 	mux.HandleFunc("GET /api/party", a.authContent(a.getParty))
 	mux.HandleFunc("PATCH /api/admin/party", a.auth(true, a.updateParty))
@@ -274,12 +298,14 @@ func (a *App) authorize(admin bool, scope accessScope, next func(http.ResponseWr
 		var guest Guest
 		var avatarVersion int64
 		var open bool
-		var welcomeAction *string
-		err = a.db.QueryRowContext(r.Context(), `SELECT g.id,g.name,g.role,g.active,w.is_open,
+		var profileWidget, mediaWidget bool
+		err = a.db.QueryRowContext(r.Context(), `SELECT g.id,g.name,g.role,g.active,`+welcomeAccessSQL+`,
  CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END,
- CASE WHEN NOT w.is_open AND w.current_step>0 THEN w.steps->(w.current_step-1)->>'action' END
+ COALESCE(`+welcomePositionSQL+` AND w.steps->(p.position-1)->'widgets' @> '[{"type":"profile_photo"}]'::jsonb,false),
+ COALESCE(`+welcomePositionSQL+` AND w.steps->(p.position-1)->'widgets' @> '[{"type":"media_upload"}]'::jsonb,false)
  FROM sessions s JOIN guests g ON g.id=s.guest_id CROSS JOIN welcome w
- WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active=1`, hashToken(cookie.Value), a.now().Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &open, &avatarVersion, &welcomeAction)
+ LEFT JOIN guest_welcome_progress p ON p.guest_id=g.id
+ WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active=1`, hashToken(cookie.Value), a.now().Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &open, &avatarVersion, &profileWidget, &mediaWidget)
 		if errors.Is(err, sql.ErrNoRows) {
 			fail(w, 401, "session_expired")
 			return
@@ -293,11 +319,11 @@ func (a *App) authorize(admin bool, scope accessScope, next func(http.ResponseWr
 			return
 		}
 		if scope != sessionAccess && guest.Role != "admin" && !open {
-			selfProfile := scope == profileAccess && welcomeAction != nil && *welcomeAction == "profile_photo"
+			selfProfile := scope == profileAccess && profileWidget
 			if target := r.PathValue("id"); target != "" && target != strconv.FormatInt(guest.ID, 10) {
 				selfProfile = false
 			}
-			welcomeUpload := scope == uploadAccess && welcomeAction != nil && *welcomeAction == "media_upload"
+			welcomeUpload := scope == uploadAccess && mediaWidget
 			if !selfProfile && !welcomeUpload {
 				fail(w, http.StatusLocked, "welcome_required")
 				return
@@ -309,7 +335,11 @@ func (a *App) authorize(admin bool, scope accessScope, next func(http.ResponseWr
 }
 
 func decode(w http.ResponseWriter, r *http.Request, value any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	return decodeLimit(w, r, value, 64<<10)
+}
+
+func decodeLimit(w http.ResponseWriter, r *http.Request, value any, limit int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {

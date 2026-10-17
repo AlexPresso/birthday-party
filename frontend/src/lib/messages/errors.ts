@@ -1,24 +1,27 @@
 const en = {
+  invalid_notification_subscription:
+    "Notifications couldn't be set up. Try again.",
+  notification_subscription_limit:
+    "You've reached the notification device limit. Turn notifications off on another device first.",
   request_forbidden: "This action isn’t allowed.",
   invitation_required: "Open your invitation to sign in.",
   session_expired:
     "Your session has expired. Ask the host for a new invitation.",
   admin_required: "Only the host can access this area.",
-  welcome_required:
-    "The host hasn't opened the app yet. Return to the waiting screen.",
+  welcome_required: "Complete the welcome before accessing the app.",
   welcome_conflict:
     "The welcome sequence changed. Refresh it before trying again.",
   invalid_welcome_steps:
-    "Add up to 12 steps, each with a title of up to 120 characters and text of up to 1000.",
+    "Add up to 12 steps with 1 to 12 widgets each. Titles can have 120 characters and texts 1,000.",
   invalid_media_category:
     "Choose a category with a name of 1 to 80 characters and a visibility setting.",
   media_category_not_found: "This category is no longer available.",
   media_category_limit: "You can create up to 100 media categories.",
-  invalid_welcome_action: "Choose an available action for this step.",
+  invalid_welcome_action: "Choose an available widget and check its settings.",
   invalid_welcome_transition:
     "This action isn't available now. Refresh the welcome sequence.",
   welcome_steps_locked:
-    "The steps are being shown. Open the app before editing them.",
+    "Restart the welcome before editing steps that have been unlocked.",
   invalid_body: "We couldn’t read what you sent. Try again.",
   internal_error: "Something went wrong. Try again in a moment.",
   invalid_id: "We couldn’t find this item. Refresh the page.",
@@ -89,26 +92,30 @@ export type ErrorCode = keyof typeof en;
 export const errorMessages = {
   en,
   fr: {
+    invalid_notification_subscription:
+      "Les notifications n’ont pas pu être configurées. Réessaie.",
+    notification_subscription_limit:
+      "Tu as atteint la limite d’appareils pour les notifications. Désactive-les sur un autre appareil d’abord.",
     request_forbidden: "Cette action n’est pas autorisée.",
     invitation_required: "Connecte-toi avec ton invitation.",
     session_expired:
       "Ta connexion a expiré. Demande un nouveau lien à l’organisateur.",
     admin_required: "Cet espace est réservé à l’organisateur.",
-    welcome_required:
-      "L’organisateur n’a pas encore ouvert l’application. Retourne sur l’écran d’attente.",
+    welcome_required: "Termine l’accueil avant d’accéder à l’application.",
     welcome_conflict:
       "L’accueil a changé. Actualise son état avant de réessayer.",
     invalid_welcome_steps:
-      "Ajoute jusqu’à 12 étapes, avec un titre de 120 caractères maximum et un texte de 1000 caractères maximum chacune.",
+      "Ajoute jusqu’à 12 étapes avec 1 à 12 widgets chacune. Les titres peuvent avoir 120 caractères, les textes 1000.",
     invalid_media_category:
       "Choisis un nom de 1 à 80 caractères et la visibilité de la catégorie.",
     media_category_not_found: "Cette catégorie n’est plus disponible.",
     media_category_limit: "Tu peux créer jusqu’à 100 catégories de médias.",
-    invalid_welcome_action: "Choisis une action disponible pour cette étape.",
+    invalid_welcome_action:
+      "Choisis un widget disponible et vérifie ses réglages.",
     invalid_welcome_transition:
       "Cette action n’est pas disponible pour le moment. Actualise l’état de l’accueil.",
     welcome_steps_locked:
-      "Les étapes sont en cours d’affichage. Ouvre l’application avant de les modifier.",
+      "Relance l’accueil avant de modifier les étapes déjà débloquées.",
     invalid_body: "Impossible de lire ce que tu as envoyé. Réessaie.",
     internal_error: "Ça n’a pas fonctionné. Réessaie dans un instant.",
     invalid_id: "Impossible de trouver cet élément. Actualise la page.",
@@ -183,26 +190,30 @@ export const errorMessages = {
       "Cette vidéo dépasse {size} Mo. Choisis un fichier plus petit.",
   },
   de: {
+    invalid_notification_subscription:
+      "Benachrichtigungen konnten nicht eingerichtet werden. Versuch es erneut.",
+    notification_subscription_limit:
+      "Du hast die Gerätegrenze für Benachrichtigungen erreicht. Deaktiviere sie zuerst auf einem anderen Gerät.",
     request_forbidden: "Diese Aktion ist nicht erlaubt.",
     invitation_required: "Öffne deine Einladung, um dich anzumelden.",
     session_expired:
       "Deine Sitzung ist abgelaufen. Bitte den Gastgeber um eine neue Einladung.",
     admin_required: "Dieser Bereich ist dem Gastgeber vorbehalten.",
-    welcome_required:
-      "Der Gastgeber hat die App noch nicht geöffnet. Kehre zum Wartebildschirm zurück.",
+    welcome_required: "Schließe die Begrüßung ab, bevor du die App nutzt.",
     welcome_conflict:
       "Der Empfangsablauf hat sich geändert. Aktualisiere den Status und versuche es erneut.",
     invalid_welcome_steps:
-      "Füge bis zu 12 Schritte hinzu, jeweils mit einem Titel bis 120 Zeichen und einem Text bis 1000 Zeichen.",
+      "Füge bis zu 12 Schritte mit jeweils 1 bis 12 Widgets hinzu. Titel dürfen 120 Zeichen haben, Texte 1000.",
     invalid_media_category:
       "Wähle einen Namen mit 1 bis 80 Zeichen und die Sichtbarkeit der Kategorie.",
     media_category_not_found: "Diese Kategorie ist nicht mehr verfügbar.",
     media_category_limit: "Du kannst bis zu 100 Medienkategorien erstellen.",
-    invalid_welcome_action: "Wähle eine verfügbare Aktion für diesen Schritt.",
+    invalid_welcome_action:
+      "Wähle ein verfügbares Widget und prüfe seine Einstellungen.",
     invalid_welcome_transition:
       "Diese Aktion ist gerade nicht verfügbar. Aktualisiere den Empfangsablauf.",
     welcome_steps_locked:
-      "Die Schritte werden gerade angezeigt. Öffne die App, bevor du sie bearbeitest.",
+      "Starte die Begrüßung neu, bevor du freigegebene Schritte bearbeitest.",
     invalid_body:
       "Wir konnten deine Angaben nicht lesen. Versuch es noch einmal.",
     internal_error: "Etwas ist schiefgelaufen. Versuch es gleich noch einmal.",
@@ -281,26 +292,30 @@ export const errorMessages = {
       "Dieses Video ist größer als {size} MB. Wähle eine kleinere Datei.",
   },
   it: {
+    invalid_notification_subscription:
+      "Non è stato possibile configurare le notifiche. Riprova.",
+    notification_subscription_limit:
+      "Hai raggiunto il limite di dispositivi per le notifiche. Disattivale prima su un altro dispositivo.",
     request_forbidden: "Questa azione non è consentita.",
     invitation_required: "Apri il tuo invito per accedere.",
     session_expired:
       "La tua sessione è scaduta. Chiedi un nuovo invito a chi organizza.",
     admin_required: "Quest’area è riservata a chi organizza.",
-    welcome_required:
-      "Chi organizza non ha ancora aperto l’app. Torna alla schermata d’attesa.",
+    welcome_required: "Completa l’accoglienza prima di accedere all’app.",
     welcome_conflict:
       "L’accoglienza è cambiata. Aggiorna lo stato prima di riprovare.",
     invalid_welcome_steps:
-      "Aggiungi fino a 12 passi, ciascuno con un titolo fino a 120 caratteri e un testo fino a 1000.",
+      "Aggiungi fino a 12 passi con 1–12 widget ciascuno. I titoli possono avere 120 caratteri, i testi 1000.",
     invalid_media_category:
       "Scegli un nome da 1 a 80 caratteri e la visibilità della categoria.",
     media_category_not_found: "Questa categoria non è più disponibile.",
     media_category_limit: "Puoi creare fino a 100 categorie di foto e video.",
-    invalid_welcome_action: "Scegli un’azione disponibile per questo passo.",
+    invalid_welcome_action:
+      "Scegli un widget disponibile e controlla le sue impostazioni.",
     invalid_welcome_transition:
       "Questa azione non è disponibile ora. Aggiorna lo stato dell’accoglienza.",
     welcome_steps_locked:
-      "I passi sono in corso. Apri l’app prima di modificarli.",
+      "Riavvia l’accoglienza prima di modificare i passi già sbloccati.",
     invalid_body: "Non riusciamo a leggere ciò che hai inviato. Riprova.",
     internal_error: "Qualcosa è andato storto. Riprova tra poco.",
     invalid_id: "Non troviamo questo elemento. Ricarica la pagina.",
@@ -372,27 +387,31 @@ export const errorMessages = {
       "Questo video supera i {size} MB. Scegli un file più piccolo.",
   },
   es: {
+    invalid_notification_subscription:
+      "No se han podido configurar las notificaciones. Inténtalo de nuevo.",
+    notification_subscription_limit:
+      "Has alcanzado el límite de dispositivos para las notificaciones. Desactívalas primero en otro dispositivo.",
     request_forbidden: "Esta acción no está permitida.",
     invitation_required: "Abre tu invitación para entrar.",
     session_expired:
       "Tu sesión ha caducado. Pide una nueva invitación a quien organiza.",
     admin_required: "Esta sección está reservada para quien organiza.",
     welcome_required:
-      "Quien organiza aún no ha abierto la aplicación. Vuelve a la pantalla de espera.",
+      "Completa la bienvenida antes de acceder a la aplicación.",
     welcome_conflict:
       "La bienvenida ha cambiado. Actualiza el estado antes de volver a intentarlo.",
     invalid_welcome_steps:
-      "Añade hasta 12 pasos, cada uno con un título de hasta 120 caracteres y un texto de hasta 1000.",
+      "Añade hasta 12 pasos con entre 1 y 12 widgets cada uno. Los títulos admiten 120 caracteres y los textos 1000.",
     invalid_media_category:
       "Elige un nombre de 1 a 80 caracteres y la visibilidad de la categoría.",
     media_category_not_found: "Esta categoría ya no está disponible.",
     media_category_limit:
       "Puedes crear hasta 100 categorías de fotos y vídeos.",
-    invalid_welcome_action: "Elige una acción disponible para este paso.",
+    invalid_welcome_action: "Elige un widget disponible y revisa sus ajustes.",
     invalid_welcome_transition:
       "Esta acción no está disponible ahora. Actualiza el estado de la bienvenida.",
     welcome_steps_locked:
-      "Los pasos ya se están mostrando. Abre la aplicación antes de editarlos.",
+      "Reinicia la bienvenida antes de editar los pasos ya desbloqueados.",
     invalid_body: "No podemos leer lo que has enviado. Inténtalo de nuevo.",
     internal_error: "Algo ha fallado. Vuelve a intentarlo en un momento.",
     invalid_id: "No encontramos este elemento. Recarga la página.",

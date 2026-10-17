@@ -49,10 +49,11 @@ The normalized JPEG is at most 128 KiB and stored in PostgreSQL alongside the
 profile. This small bound allows atomic replacement/removal without coordinating
 database commits with a file store. The version changes on replacement/removal;
 all responses use `no-store`, so old image URLs cannot bypass current permissions.
-While welcome access is closed, the current `profile_photo` step permits a guest
-to read their own profile and save, remove or view their own photo. Other guests'
-photos remain locked. An upload rechecks session, active identity and the current
-welcome action before saving, so advancing to a plain step revokes that permission.
+Until a guest finishes the welcome, a selected step containing a `profile_photo`
+widget permits them to read their own profile and save, remove or view their own photo.
+Other guests' photos remain locked. An upload rechecks session, active identity
+and the current widgets before saving. Advancing to a step without a profile
+widget revokes that permission.
 
 Profile photos appear beside named contributions and in the host's guest list.
 An anonymous guestbook entry still returns `author: null`, including its photo.
@@ -61,91 +62,191 @@ their author's name and profile photo for other authorized viewers.
 
 ## Guest welcome
 
-The host can close guest access while presenting an ordered welcome sequence.
-New and existing guests share the same current step. Administrators retain full
-access. The initial state is open; deploying this feature does not lock out guests.
+The host unlocks an ordered welcome sequence. Each guest chooses when to advance
+and can revisit earlier unlocked steps. Progress is stored per guest, across
+sessions and restarts. Administrators retain full access. The initial state is
+open until the host explicitly starts the welcome, even when `required` is enabled.
 
-`WelcomeStep = { title, body, action: "profile_photo" | "media_upload" | null, mediaUpload?: { categoryId: number | null } }`
-`Welcome = { open: boolean, revision: number, step: (WelcomeStep & { position }) | null }`
-`AdminWelcome = { open: boolean, revision: number, currentStep: number, steps: WelcomeStep[] }`
+`WelcomeWidget = { type: "title" | "text", text: string } | { type: "profile_photo" | "enable_notifications" } | { type: "media_upload", mediaUpload: { categoryId: number | null } }`
+`WelcomeStep = { widgets: WelcomeWidget[] }`
+`Welcome = { open: boolean, revision: number, progressRevision: number, step: (WelcomeStep & { position: number }) | null, canPrevious: boolean, canNext: boolean, canFinish: boolean }`
+`AdminWelcome = { open: boolean, revision: number, currentStep: number, required: boolean, steps: WelcomeStep[] }`
 
-- `GET /api/welcome` -> `Welcome`. Only the current step is returned, never future
-  steps. `step` is null during initial waiting and when the application is open.
+- `GET /api/welcome` -> `Welcome`. Initializes the guest's progress for the current
+  run if needed. `open` is this guest's effective access, rather than the host's
+  global setting. Only the guest's selected step is returned, never future steps.
+  `step` is null during initial waiting and once the guest has full access.
+- `POST /api/welcome/progress { revision, action }` -> `Welcome`. Use the last
+  `progressRevision` as `revision`. `next` advances one unlocked step, `previous`
+  goes back one step, and `finish` enters the application when `canFinish` is true.
+  The first step has no previous step. Invalid movement returns 409
+  `invalid_welcome_transition`; stale progress returns 409 `welcome_conflict`.
 - `GET /api/admin/welcome` -> `AdminWelcome`.
-- `PUT /api/admin/welcome { revision, steps }` -> `AdminWelcome`. Up to 12 steps;
-  each has a required title of 1–120 characters and an optional body of up to
-  1000 characters, after trimming. An optional `action` selects the interactive
-  widget: `null` for text alone, `"profile_photo"` for the guest's photo editor,
-  or `"media_upload"` for sending photos and videos to the configured destination.
-  Omitted actions are accepted as null for older clients; responses always include
-  the field. Unknown action strings return 400 `invalid_welcome_action`.
-  A media action requires `mediaUpload: { categoryId: null | positiveId }`;
+- `PATCH /api/admin/welcome/required { revision, required }` -> `AdminWelcome`.
+  Saves the global requirement independently of the step list. It can be changed
+  during a run and does not reset guest progress or invalidate their widgets.
+- `PUT /api/admin/welcome { revision, steps }` -> `AdminWelcome`. Up to 12 steps,
+  each with 1–12 ordered widgets. There are no fixed title, body or action fields.
+  Title widgets require 1–120 characters, and text widgets require 1–1000
+  characters, after trimming. Lengths count Unicode code points. A step can repeat
+  titles, texts and media upload widgets; it may contain at most one profile photo
+  widget and at most one notification widget. Profile, notification and media
+  widgets can coexist. A step does not need a title.
+  A media upload widget requires `mediaUpload: { categoryId: null | positiveId }`;
   null selects the main gallery. The `categoryId` field must be present and
-  reference an existing category when non-null. Other actions accept omitted or
-  null `mediaUpload`, and reject non-null settings. Responses omit unused settings.
-  Unknown settings and incorrect JSON types return 400 `invalid_body`; missing
-  action settings or an invalid action/settings combination return 400
-  `invalid_welcome_action`. An unknown category returns 404 `media_category_not_found`.
-  Edit steps while open or at initial waiting;
-  editing after a step is displayed returns 409 `welcome_steps_locked`.
+  reference an existing category when non-null. Only title/text widgets accept
+  `text`, and only media upload widgets accept `mediaUpload`. Unused fields are
+  rejected even when null. Widget/settings field names are case-sensitive.
+  Unknown fields and incorrect JSON types return 400 `invalid_body`; unknown
+  widget types, duplicate profile widgets or invalid media settings return 400
+  `invalid_welcome_action`. Collection/text bounds return 400 `invalid_welcome_steps`.
+  An unknown category returns 404 `media_category_not_found`. The JSON body limit
+  is 1 MiB so a full bounded widget collection fits.
+  Edit steps only while `currentStep` is zero. Once any step is unlocked, editing
+  returns 409 `welcome_steps_locked`, including after the host opens the app.
+  To edit again, open the app if necessary and start a new welcome run.
 - `POST /api/admin/welcome/transition { revision, action }` -> `AdminWelcome`.
-  `start` closes an open application at `currentStep: 0`. `next` displays exactly
-  one more step while closed. `open` grants full access and resets `currentStep`
-  to zero. Opening is explicit, including after the last step; it can also end
-  the welcome early. Invalid transitions return 409 `invalid_welcome_transition`.
+  `start` closes an open application at `currentStep: 0` and begins a new run.
+  `next` unlocks exactly one more step while closed. `open` unlocks all remaining
+  steps and allows guests to finish; `currentStep` stays at the number of steps.
+  Neither unlock nor open moves an existing participant to another step or grants
+  them access automatically. Invalid transitions return 409 `invalid_welcome_transition`.
 
-Every mutation uses the last observed revision. Changes are atomic; a stale
-revision returns 409 `welcome_conflict`, preventing concurrent clicks from
-skipping a step or overwriting another host's changes. Steps and progress are
-stored in PostgreSQL and survive restarts. Host-authored text is not translated.
-Migration `0005_welcome_actions.sql` adds null actions to existing stored
-steps without changing their content, order or progress. New action types need
-explicit validation, permissions and presentation; arbitrary widgets cannot be
-submitted by a client.
-The profile-photo action has no parameters. Media-upload settings have a concrete
-shape; arbitrary action configuration is not accepted.
+Host mutations use `AdminWelcome.revision`; guest movement uses
+`Welcome.progressRevision`. Changes are atomic and revision checked, preventing
+concurrent clicks from skipping steps or overwriting changes. A host unlock or
+requirement change increments only the host revision. Guest movement changes
+the progress revision and invalidates the previous widget context.
 
-The `profile_photo` action reuses the profile endpoints and image limits. The
+With `required: true`, a guest first joining a run starts at step one if it is
+unlocked, or waits at position zero. This also applies after the host opens the
+app. Finishing requires reaching the final step and the host having opened access.
+With `required: false`, a new participant joins the latest unlocked step while
+the welcome is closed, or enters directly after the host opens the app. Existing
+participants keep their position and may finish from any step once access opens.
+Completed guests keep access until a new run starts. A run with no steps can be
+finished as soon as the host opens access. Widget submissions are optional;
+advancing does not require saving a profile photo or uploading media.
+
+Steps and progress are stored in PostgreSQL. Host-authored text is not translated.
+Migration `0007_welcome_widgets.sql` converts each legacy step to its title widget,
+nonempty body text widget and optional profile/media widget, in that order.
+It preserves authored content, destinations and progress, and increments the
+revision when existing steps are converted to invalidate old in-flight welcome
+requests. Accepted jobs keep their destination and finish normally. Their new
+`welcomeWidgetIndex` field is null; newly accepted welcome jobs always capture it.
+New widget types need explicit validation, permissions and presentation.
+Migration `0008_guest_welcome_progress.sql` adds the global requirement, run
+generation and per-guest progress. Guests with sessions in an existing closed
+welcome retain its current position. A database sequence produces progress tokens
+above legacy welcome/upload revisions; already accepted uploads remain valid.
+
+The `profile_photo` widget reuses the profile endpoints and image limits. The
 guest can preview, save, replace or remove their photo on `/attente`. Saving does
-not advance the welcome; only the host decides when to proceed, regardless of
-whether guests have added a photo. Only the current action is sent to guests.
+not advance the welcome. The host unlocks steps independently of submissions,
+and guests navigate when ready. Only the guest's selected widgets are returned.
 
-The `media_upload` action reuses the upload queue and image/video limits. It does
-not require participation or advance the welcome. While this action is current:
+The `media_upload` widget reuses the upload queue and image/video limits. It does
+not require participation or advance the welcome. While this widget is current:
 
-- `GET /api/welcome/upload-context` returns
-  `{ revision, category: MediaCategory | null, limits: { imageBytes, videoBytes } }`.
-  Only the current destination's metadata is exposed, including its visibility;
+- `GET /api/welcome/upload-context?widgetIndex=N` returns
+  `{ revision, widgetIndex, category: MediaCategory | null, limits: { imageBytes, videoBytes } }`.
+  `revision` is the guest's stable `progressRevision`. The index is zero-based
+  within their selected step's ordered widgets. A missing,
+  repeated, malformed or out-of-bounds index (outside 0–11) returns 400 `invalid_body`.
+  Only the selected current destination's metadata is exposed, including its visibility;
   no other categories or future instructions are returned. A null category means
-  the main gallery. Outside the current closed media step this endpoint returns
-  423 `welcome_required`, including for administrators.
-- Guests may `POST /api/photos` with `X-Welcome-Revision: <revision>`. The server
+  the main gallery. Outside a guest's active media step this endpoint returns
+  423 `welcome_required`, including for administrators. The same response applies
+  to an index that does not identify a current media upload widget.
+- Guests may `POST /api/photos` with `X-Welcome-Revision: <revision>` and
+  `X-Welcome-Widget-Index: <index>`. Both headers are required together. The server
   assigns the configured destination, including a private category. An omitted
   `categoryId` query is allowed; a supplied conflicting category returns 400
-  `invalid_media_category`. Missing or malformed revision returns 400 `invalid_body`.
+  `invalid_media_category`. Missing or malformed headers return 400 `invalid_body`.
 - Guests may read their own `/api/uploads` and `/api/uploads/{id}`. All ready
-  results have `photo: null` while access is closed; filenames, status and captured
-  destination/revision remain available to the owner. Other owners' jobs stay private.
+  results have `photo: null` while that guest lacks full access; filenames, status and captured
+  destination/revision/widget index remain available to the owner. Other owners' jobs stay private.
 
-Upload acceptance rechecks the active session, current action, revision and
-destination under database locks after reception. A stale revision returns 409
-`welcome_conflict`, even if access has since opened. Retries must retain their
-original revision and destination; the same upload ID cannot be retargeted.
+Upload acceptance rechecks the active session, selected current widget, revision and
+destination under database locks after reception. Host unlocks and opening access
+preserve the guest's context and any transfer in progress. A stale guest progress
+revision returns 409 `welcome_conflict`, including after the guest finishes or
+a new run starts. Retries must retain their
+original revision, widget index and destination; the same upload ID cannot be
+retargeted, even between two widgets with the same destination.
 Advancing to another media step requires new upload IDs and the new revision.
 
-While closed, other guest requests for party details, programme, guestbook, media,
+Until the guest has full access, other requests for party details, programme, guestbook, media,
 categories, thumbnails, video ranges and upload queues return 423 `welcome_required`.
 Invitation acceptance, session checks, logout and welcome status remain available.
 Already accepted uploads can finish privately; guests cannot read their media until
-access reopens and the destination is public. A read authorized before closure may finish.
+the guest finishes and the destination is public. A read authorized before closure may finish.
 
 The guest page is `/attente`, outside the four-tab layout. Visible guest browsers
 check welcome status every three seconds; hidden tabs pause and check again on
-return. A failed check keeps the current step visible and offers retry. Opening
-the application sends guests to `/photos`; closing it discards cached private
-routes with a full navigation to `/attente`.
-Changing steps disposes the previous widget, aborts its requests and releases
-local previews. Polling an unchanged step preserves the guest's selection.
+return. A failed check keeps the current step visible and offers retry. Finishing
+sends that guest to `/photos`; starting a new run discards cached private routes
+with a full navigation to `/attente`. Guest movement disposes the previous widgets,
+aborts their requests and releases local previews. Host unlocks and repeated polls
+preserve the current widgets and selection. Older polling responses cannot undo
+an acknowledged guest movement.
+
+## Notifications
+
+The `enable_notifications` widget offers Web Push enrollment. Browser permission
+is requested only after an explicit click. Declining it does not prevent guest
+navigation. Settings reuse the same control to enable or disable notifications
+for the current browser. A browser requires a secure context (HTTPS, with a
+localhost development exception); iPhone/iPad users must open the app from the
+Home Screen. The app manifest enables installation; the service worker does not
+cache authenticated pages, API responses or media.
+
+- `GET /api/notifications` -> `{ publicKey: string }`. The public VAPID key is
+  URL-safe base64. No private signing material is returned.
+- `POST /api/notifications/status { endpoint }` -> `{ subscribed: boolean }`.
+  Checks whether this endpoint belongs to the current guest and session. It does
+  not reveal another guest's registration.
+- `PUT /api/notifications/subscription { endpoint, keys: { p256dh, auth }, locale }`
+  -> `{ subscribed: true }`. Requires full access, an administrator, or a current
+  `enable_notifications` widget. The backend rechecks access before saving.
+  `locale` is one of `en`, `fr`, `de`, `it`, `es`. The browser sends its push
+  subscription endpoint and URL-safe base64 key values. Enrolling an existing
+  browser endpoint explicitly binds it to the current guest/session and discards
+  its previous pending notification. A guest may have at most 10 subscriptions.
+  Endpoints are limited to 2048 characters and public HTTPS hosts on port 443.
+  Keys must decode to a valid uncompressed P-256 point and a 16-byte auth secret.
+  Invalid subscriptions return 400 `invalid_notification_subscription`; exceeding
+  the device limit returns 409 `notification_subscription_limit`. The JSON body
+  limit is 8 KiB for saving and 4 KiB for status/removal.
+- `DELETE /api/notifications/subscription { endpoint }` -> 204. Removes only the
+  current guest/session's registration and its pending notification.
+
+Configuration, status and removal require an active session but remain available
+during the welcome. Browser permission alone is insufficient: the interface shows
+enabled only after the subscription is stored successfully. Retries can reuse a
+browser subscription after an interrupted server save.
+
+Migration `0009` adds persistent VAPID signing keys, private session subscriptions
+and a durable notification outbox. Keys are generated once and survive restarts.
+`VAPID_SUBJECT` optionally sets a contact URI; HTTPS deployments default to their
+configured public origin. Subscriptions are removed when the session is deleted,
+and delivery rechecks session expiry and guest activity.
+
+Host `next` and `open` transitions enqueue notifications in the same transaction
+as the welcome update. This includes administrators who explicitly opt in from
+settings. Delivery runs separately from the request, with one latest pending
+welcome notification per subscription, at most five attempts and a 15-minute
+lifetime. Expired push endpoints are removed. Payloads contain only an explicit event type
+(`welcome_step` or `welcome_open`) and the selected supported locale. The service
+worker displays generic translated text; it never includes names, private content,
+future instructions or tokens. Clicking opens same-origin `/attente`, where the
+server selects the guest's current position or redirects to their available app.
+It never advances the guest automatically.
+
+Push delivery validates HTTPS endpoints, resolves and pins public destination
+addresses, and disables redirects and proxy forwarding. Endpoints and subscription
+keys are private and must not appear in logs or error responses.
 
 ## Party
 
@@ -220,16 +321,16 @@ are discarded after conversion. Media and thumbnails stay authenticated.
 The UI uploads a bounded queue with per-file progress and retry. Thumbnails
 are at most 720 pixels per side. The gallery is capped at 5000 files and
 10 GiB; new upload accounting includes the playback/original file and thumbnail.
-`UploadJob = { id, clientUploadId, categoryId: number | null, welcomeRevision: number | null, status: "queued" | "processing" | "ready" | "failed", filename, kind: "image" | "video", createdAt, errorCode: string | null, photo: Photo | null }`
+`UploadJob = { id, clientUploadId, categoryId: number | null, welcomeRevision: number | null, welcomeWidgetIndex: number | null, status: "queued" | "processing" | "ready" | "failed", filename, kind: "image" | "video", createdAt, errorCode: string | null, photo: Photo | null }`
 
 202 confirms the raw input and queue record have been saved. Preparation continues
 after navigation, disconnection or reload. `ready` publishes the media in the
 chosen gallery; `photo` is null while access is closed, the category is private,
 or that media was deleted. The captured category and optional welcome revision
-survive worker restarts. Failed jobs expose
+and widget index survive worker restarts. Failed jobs expose
 a translated error code; retry by sending the file again with a fresh upload ID.
 Reusing an existing upload ID returns the same job instead of adding another file,
-after validating its original destination/revision and current permissions.
+after validating its original destination, revision, widget index and current permissions.
 
 Two background workers prepare queued files; up to four request bodies are read
 at a time independently. The durable queue allows 100 active jobs per guest,

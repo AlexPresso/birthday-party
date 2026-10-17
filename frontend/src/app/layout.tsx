@@ -12,6 +12,16 @@ export async function generateMetadata(): Promise<Metadata> {
       ? { default: title, template: `%s · ${title}` }
       : t("birthday.fallback"),
     description: description || undefined,
+    applicationName: title || t("birthday.fallback"),
+    appleWebApp: {
+      capable: true,
+      title: title || t("birthday.fallback"),
+      statusBarStyle: "black",
+    },
+    icons: {
+      icon: "/icons/app.svg",
+      apple: "/icons/apple-touch-icon.png",
+    },
     robots: { index: false, follow: false },
   };
 }

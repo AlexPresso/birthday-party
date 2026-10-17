@@ -1,0 +1,52 @@
+.notification-control {
+  width: 100%;
+  min-width: 0;
+  padding-block: 18px;
+  border-block: 1px solid var(--border);
+  text-align: left;
+}
+
+.notification-control h3,
+.notification-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.notification-control h3 {
+  margin-bottom: 6px;
+}
+.notification-control svg {
+  flex: 0 0 auto;
+}
+.notification-status {
+  margin-block: 14px 10px;
+}
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.notification-actions .button {
+  white-space: normal;
+  text-align: center;
+}
+.notification-control > .fine-print {
+  margin-bottom: 12px;
+}
+
+.profile-photo-editor + .notification-control {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.welcome-widgets > .notification-control:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+@media (max-width: 420px) {
+  .notification-actions .button {
+    width: 100%;
+  }
+}

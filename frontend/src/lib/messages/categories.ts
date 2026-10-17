@@ -18,11 +18,9 @@ const en = {
   "categories.updated": "Visibility updated.",
   "categories.main": "Main gallery",
   "categories.filter": "Category",
-  "categories.privateOption": "{name} · Hosts only",
+  "categories.privateOption": "{name} (private category)",
   "categories.mainHint":
     "These photos and videos are visible to guests once the app opens.",
-  "categories.privateHint":
-    "Only the host can see these photos and videos until this category is published.",
   "categories.publicHint":
     "These photos and videos are visible to guests once the app opens.",
   "categories.destination": "Uploads go to: {name}",
@@ -57,11 +55,9 @@ const fr: CategoryMessages = {
   "categories.updated": "Visibilité mise à jour.",
   "categories.main": "Médias principaux",
   "categories.filter": "Catégorie",
-  "categories.privateOption": "{name} · Organisateurs uniquement",
+  "categories.privateOption": "{name} (catégorie privée)",
   "categories.mainHint":
     "Ces photos et vidéos seront visibles par les invités à l’ouverture de l’application.",
-  "categories.privateHint":
-    "Seul l’organisateur peut voir ces photos et vidéos tant que cette catégorie reste privée.",
   "categories.publicHint":
     "Ces photos et vidéos seront visibles par les invités à l’ouverture de l’application.",
   "categories.destination": "Destination des envois : {name}",
@@ -95,11 +91,9 @@ const de: CategoryMessages = {
   "categories.updated": "Sichtbarkeit aktualisiert.",
   "categories.main": "Hauptgalerie",
   "categories.filter": "Kategorie",
-  "categories.privateOption": "{name} · Nur für Organisatoren",
+  "categories.privateOption": "{name} (private Kategorie)",
   "categories.mainHint":
     "Diese Fotos und Videos sind für Gäste sichtbar, sobald die App geöffnet wird.",
-  "categories.privateHint":
-    "Nur der Gastgeber kann diese Fotos und Videos sehen, bis diese Kategorie freigegeben wird.",
   "categories.publicHint":
     "Diese Fotos und Videos sind für Gäste sichtbar, sobald die App geöffnet wird.",
   "categories.destination": "Ziel für Uploads: {name}",
@@ -133,11 +127,9 @@ const it: CategoryMessages = {
   "categories.updated": "Visibilità aggiornata.",
   "categories.main": "Galleria principale",
   "categories.filter": "Categoria",
-  "categories.privateOption": "{name} · Solo organizzatori",
+  "categories.privateOption": "{name} (categoria privata)",
   "categories.mainHint":
     "Queste foto e questi video saranno visibili agli invitati quando l’app sarà aperta.",
-  "categories.privateHint":
-    "Solo chi organizza può vedere queste foto e questi video finché la categoria resta privata.",
   "categories.publicHint":
     "Queste foto e questi video saranno visibili agli invitati quando l’app sarà aperta.",
   "categories.destination": "Destinazione dei caricamenti: {name}",
@@ -171,11 +163,9 @@ const es: CategoryMessages = {
   "categories.updated": "Visibilidad actualizada.",
   "categories.main": "Galería principal",
   "categories.filter": "Categoría",
-  "categories.privateOption": "{name} · Solo organizadores",
+  "categories.privateOption": "{name} (categoría privada)",
   "categories.mainHint":
     "Los invitados podrán ver estas fotos y vídeos cuando se abra la aplicación.",
-  "categories.privateHint":
-    "Solo quien organiza puede ver estas fotos y vídeos hasta que se publique la categoría.",
   "categories.publicHint":
     "Los invitados podrán ver estas fotos y vídeos cuando se abra la aplicación.",
   "categories.destination": "Destino de los archivos: {name}",
