@@ -395,6 +395,8 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   });
   await completedMedia(page.request, acceptedJob.id);
   showPending = false;
+  // The mocked completion becomes visible on an explicit resync, without polling.
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(row).toContainText("Ajouté", { timeout: 15_000 });
   await expect(
     page.getByRole("button", {
@@ -414,6 +416,11 @@ test("retrying a lost upload response reuses its receipt without duplicating med
   const image = await page.screenshot({ caret: "initial" });
   const keys: string[] = [];
   let firstJobId = 0;
+  // Delay automatic receipt recovery so this case still exercises an explicit retry.
+  await page.route("**/api/uploads", async (route) => {
+    if (keys.length < 2) return route.fulfill({ json: { items: [] } });
+    await route.continue();
+  });
   await page.route("**/api/photos", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
     keys.push(route.request().headers()["x-upload-id"]);

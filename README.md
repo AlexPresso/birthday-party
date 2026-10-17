@@ -463,6 +463,19 @@ conteneurs. Conserver le backend sur le réseau privé et le volume de données 
 un stockage persistant. Les invitations générées utilisent `PUBLIC_URL` :
 `localhost` ne permet pas aux invités de se connecter depuis leur téléphone.
 
+L’accueil, la file d’envoi des médias et le programme se mettent à jour par une
+connexion WebSocket partagée, sans requêtes périodiques du navigateur. Le serveur
+signale les changements et les déblocages programmés ; l’écran recharge alors les
+données concernées. Après une coupure, la connexion se rétablit et l’écran récupère
+l’état actuel. Les envois déjà acceptés continuent leur traitement sur le serveur.
+
+Le proxy Next transmet aussi `/api/realtime` au backend. Aucun port ni variable
+supplémentaire n’est nécessaire dans Compose. Le reverse proxy HTTPS doit laisser
+passer les connexions WebSocket (`Upgrade` et `Connection`) sur ce chemin et les
+garder ouvertes, avec un délai d’inactivité supérieur à 30 secondes. `PUBLIC_URL`
+doit correspondre exactement à l’origine utilisée par les invités ; le serveur
+refuse les connexions WebSocket provenant d’une autre origine.
+
 Le reverse proxy doit accepter le plus grand des deux poids configurés,
 avec au moins 64 Kio pour le formulaire, et un délai de 10 minutes pour
 l’envoi des fichiers. La préparation des vidéos continue en arrière-plan après

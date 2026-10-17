@@ -227,5 +227,6 @@ func (a *App) deletePhoto(w http.ResponseWriter, r *http.Request, guest Guest) {
 			log.Printf("remove private photo %d: %v", id, err)
 		}
 	}
+	a.realtime.notify(author, realtimeUploads)
 	w.WriteHeader(204)
 }

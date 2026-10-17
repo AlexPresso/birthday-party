@@ -1,7 +1,7 @@
 import type { Welcome } from "./contracts";
 
-// Guest movement takes precedence over an earlier poll, even when that poll
-// observed a newer host unlock. The next poll fills in the latest host state.
+// Guest movement takes precedence over an earlier read, even when that read
+// observed a newer host unlock. The next refresh fills in the latest host state.
 export function latestWelcome(
   previous: Welcome | null,
   next: Welcome,

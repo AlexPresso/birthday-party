@@ -18,6 +18,8 @@ import {
   returnToWelcome,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
+import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
+import { retryRealtime, subscribeRealtime } from "@/lib/realtime-browser";
 import {
   uploadProblem,
   uploadSchema,
@@ -47,6 +49,7 @@ type UploadContextValue = {
   jobs: UploadJob[];
   completed: Photo[];
   error: string | null;
+  refresh: () => Promise<void>;
   addFiles: (
     files: File[],
     limits: UploadLimits,
@@ -87,7 +90,8 @@ export function UploadProvider({
   const [completed, setCompleted] = useState<Photo[]>([]);
   const [hidden, setHidden] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
+  const [connectionFailed, setConnectionFailed] = useState(false);
+  const refreshQueue = useRef<() => Promise<void>>(() => Promise.resolve());
   const requests = useRef(new Map<string, XMLHttpRequest>());
   const files = useRef(new Map<string, File>());
   const mounted = useRef(true);
@@ -207,7 +211,7 @@ export function UploadProvider({
             ...items.filter((entry) => entry.id !== job.id),
           ]);
           if (job.status === "ready") files.current.delete(job.clientUploadId);
-          setRevision((value) => value + 1);
+          void refreshQueue.current();
         } catch (err) {
           update({ status: "error", error: errorMessage(err, t) });
         }
@@ -226,55 +230,44 @@ export function UploadProvider({
   }, [transfers, t]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    let running = false;
-    async function refresh() {
-      clearTimeout(timer);
-      if (running || document.hidden) return;
-      running = true;
-      try {
+    const refresh = createInvalidationRefresh(
+      async (signal) => {
         const data = await api("/uploads", uploadsSchema, {
-          signal: controller.signal,
+          signal,
         });
-        if (controller.signal.aborted) return;
+        signal.throwIfAborted();
         const items =
           welcomeRevision === null
             ? data.items
             : data.items.filter(
                 (job) => job.welcomeRevision === welcomeRevision,
               );
+        const accepted = new Set(items.map((job) => job.clientUploadId));
+        // The queue can confirm acceptance before the original HTTP response.
+        // Keep its XHR alive, but show only the durable job, including failures.
+        setTransfers((previous) =>
+          previous.filter((item) => !accepted.has(item.clientUploadId)),
+        );
         setJobs(items);
         rememberCompleted(items, true);
         setError(null);
         for (const job of data.items)
           if (job.status === "ready") files.current.delete(job.clientUploadId);
-        if (
-          data.items.some(
-            (job) => job.status === "queued" || job.status === "processing",
-          )
-        )
-          timer = setTimeout(refresh, 3000);
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(err, t));
-          timer = setTimeout(refresh, 10000);
-        }
-      } finally {
-        running = false;
-      }
-    }
-    void refresh();
-    const visible = () => {
-      if (!document.hidden) void refresh();
-    };
-    document.addEventListener("visibilitychange", visible);
+      },
+      (err) => setError(errorMessage(err, t)),
+    );
+    refreshQueue.current = refresh.request;
+    const unsubscribe = subscribeRealtime(
+      "uploads",
+      () => void refresh.request(),
+      (connected) => setConnectionFailed(!connected),
+    );
     return () => {
-      controller.abort();
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", visible);
+      refreshQueue.current = () => Promise.resolve();
+      unsubscribe();
+      refresh.dispose();
     };
-  }, [revision, t, welcomeRevision]);
+  }, [t, welcomeRevision]);
 
   function addFiles(
     selected: File[],
@@ -375,7 +368,12 @@ export function UploadProvider({
     <UploadContext
       value={{
         transfers,
-        error,
+        refresh: () => {
+          retryRealtime();
+          return refreshQueue.current();
+        },
+        error:
+          error ?? (connectionFailed ? t("common.connectionFailed") : null),
         addFiles,
         retryTransfer,
         retryJob,

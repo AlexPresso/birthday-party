@@ -26,6 +26,46 @@ stored hashed, single use, and expire. New invitations preserve guest identity.
 Invitation lifetime is 7 days; session lifetime is 90 days. The HttpOnly cookie
 uses path `/` so both Next.js server rendering and API requests receive it.
 
+## Realtime updates
+
+`GET /api/realtime` upgrades to a WebSocket through the same-origin Next.js proxy.
+The browser uses `ws:` locally or `wss:` over HTTPS and authenticates with its
+existing HttpOnly session cookie. No token is sent in the URL. A valid session
+is required, including during the welcome; the `Origin` must exactly match
+`PUBLIC_URL`. Missing or foreign origins are rejected before upgrading.
+
+The server sends these JSON messages:
+
+```json
+{ "type": "ready" }
+{ "type": "invalidate", "topics": ["welcome", "uploads", "programme"] }
+{ "type": "heartbeat" }
+```
+
+An invalidation contains only the changed topics, never records, media URLs,
+names or authored content. The browser fetches current data from the existing
+authorized HTTP endpoints. Welcome changes notify connected participants;
+individual progress and upload changes target the affected guest. Programme
+changes and scheduled unlocks notify viewers with full access. Signals are
+coalesced and emitted after successful commits. They are not a replayable event log.
+
+Each browser tab shares one connection across mounted consumers. `ready`
+resynchronizes active views, including changes missed while disconnected.
+Invalidations during an active request cause a trailing refresh so updates are
+not lost. Returning to the page also resynchronizes. There is no recurring HTTP
+polling fallback; failures retain the current view and existing retry controls.
+
+The server sends heartbeats and native ping frames every 20 seconds. Heartbeats
+check the connection without fetching application data. Clients reconnect with
+bounded backoff after interruption. Session logout, revocation and expiry close
+the connection with code `4401`; the browser returns to `/invitation` and discards
+its private route cache. The client sends no application messages.
+
+Connections and pending signals are bounded: at most 8 sockets per session and
+512 per Go process. Excess connections return HTTP 429 before upgrading. Server
+shutdown closes sockets and waits for their handlers. This uses the existing
+single Go process; durable upload and push-notification workers remain server-side.
+
 ## Profile photos
 
 `Profile = { guest: Guest, limits: { imageBytes: number } }`
@@ -183,13 +223,13 @@ Invitation acceptance, session checks, logout and welcome status remain availabl
 Already accepted uploads can finish privately; guests cannot read their media until
 the guest finishes and the destination is public. A read authorized before closure may finish.
 
-The guest page is `/attente`, outside the four-tab layout. Visible guest browsers
-check welcome status every three seconds; hidden tabs pause and check again on
-return. A failed check keeps the current step visible and offers retry. Finishing
+The guest page is `/attente`, outside the four-tab layout. Guest browsers refresh
+welcome status on WebSocket signals, connection readiness and return to the page.
+A failed check keeps the current step visible and offers retry. Finishing
 sends that guest to `/photos`; starting a new run discards cached private routes
 with a full navigation to `/attente`. Guest movement disposes the previous widgets,
-aborts their requests and releases local previews. Host unlocks and repeated polls
-preserve the current widgets and selection. Older polling responses cannot undo
+aborts their requests and releases local previews. Host unlocks and repeated updates
+preserve the current widgets and selection. Older responses cannot undo
 an acknowledged guest movement.
 
 ## Notifications

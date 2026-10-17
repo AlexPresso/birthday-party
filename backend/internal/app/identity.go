@@ -210,6 +210,7 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: token, Path: "/", Expires: expires, MaxAge: int(sessionTTL.Seconds()), HttpOnly: true, Secure: a.config.CookieSecure, SameSite: http.SameSiteLaxMode})
+	a.realtime.notify(guest.ID, realtimeAuth)
 	guest.AvatarURL = avatarURL(guest.ID, avatarVersion)
 	respond(w, 200, map[string]any{"guest": guest})
 }
@@ -220,6 +221,7 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request, _ Guest) {
 		internal(w, err)
 		return
 	}
+	a.realtime.endSessions(0, hashToken(cookie.Value))
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", Expires: time.Unix(1, 0), MaxAge: -1, HttpOnly: true, Secure: a.config.CookieSecure, SameSite: http.SameSiteLaxMode})
 	w.WriteHeader(204)
 }
@@ -357,5 +359,6 @@ func (a *App) revokeGuest(w http.ResponseWriter, r *http.Request, guest Guest) {
 		internal(w, err)
 		return
 	}
+	a.realtime.endSessions(id, "")
 	w.WriteHeader(204)
 }

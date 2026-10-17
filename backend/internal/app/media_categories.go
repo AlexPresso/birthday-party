@@ -67,6 +67,7 @@ func (a *App) saveMediaCategory(w http.ResponseWriter, r *http.Request, _ Guest)
 			internal(w, err)
 			return
 		}
+		a.notifyCategoryUploads(r.Context(), category.ID)
 		respond(w, 200, category)
 		return
 	}

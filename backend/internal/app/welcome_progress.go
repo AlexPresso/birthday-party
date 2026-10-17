@@ -167,6 +167,7 @@ func (a *App) transitionGuestWelcome(w http.ResponseWriter, r *http.Request, gue
 		internal(w, err)
 		return
 	}
+	a.realtime.notify(guest.ID, realtimeWelcome)
 	respond(w, 200, guestWelcomeView(state, progress))
 }
 
@@ -193,7 +194,7 @@ func (a *App) updateWelcomeRequired(w http.ResponseWriter, r *http.Request, _ Gu
 		return
 	}
 	state.Required = *input.Required
-	if err = saveWelcome(r.Context(), tx, &state); err != nil {
+	if err = a.saveWelcome(r.Context(), tx, &state); err != nil {
 		internal(w, err)
 		return
 	}

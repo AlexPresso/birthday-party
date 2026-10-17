@@ -63,7 +63,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
   Titles and text may
   repeat or be omitted; preserve authored wording. A profile-photo widget reuses
   the preview, save, replace and remove controls from settings. Keep feedback
-  and selections across unchanged polls; changing steps removes the widgets.
+  and selections across unchanged updates; changing steps removes the widgets.
   The host controls unlocks regardless of widget completion; guests choose when
   to advance.
 - The host's editor separates the ordered step list, the selected step's widget
