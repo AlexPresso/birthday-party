@@ -23,7 +23,38 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 
 ## Structure and code
 
-- Begin with one Go service. Add packages around clear responsibilities when the code needs them.
+- Keep one Go service with hexagonal boundaries organized by feature. Each core
+  package owns its models, rules, concrete service and consumer-owned ports.
+  Avoid repeating domain/application/repository directory layers for small features.
+- `cmd/server` owns command startup. `internal/app` composes concrete services and
+  adapters, owns the database pool, and handles HTTP routing/error mapping, database
+  bootstrap, migrations, realtime connections and worker lifecycle. Its HTTP
+  handlers call access and feature services; do not put business SQL in handlers.
+- The core packages are `access`, `identity`, `programme`, `guestbook`, `welcome`,
+  `profile`, `party`, `media` and `notifications`. They must not import `app`,
+  adapters, database drivers or HTTP/image/process infrastructure. Dependencies
+  between feature models and pure rules must remain acyclic.
+- Put feature SQL in `internal/adapters/postgres/<feature>`. Profile image processing
+  belongs in `adapters/avatar`; private media storage and FFmpeg belong in
+  `adapters/mediafiles`. `adapters/webpush` implements notification delivery using
+  `adapters/pushtransport` for bounded public HTTPS access.
+- Ports describe required capabilities in domain types. Keep transaction handles,
+  generic query interfaces and SQL statements out of the core. Pass initialized
+  dependencies explicitly and return concrete services from constructors. Keep
+  time-sensitive policy testable with an explicit instant or injected clock.
+- PostgreSQL adapters own complete atomic operations and invoke core rules using
+  locked state. Preserve the existing quota/guest/session/welcome/progress/category
+  lock order. Profile writes and notification registration must recheck current
+  authorization in their save transaction. Shared PostgreSQL welcome helpers stay
+  inside the adapter layer; never replace atomic checks with separate service reads.
+- Compose the notification enqueue callback into the welcome PostgreSQL adapter so
+  host transitions and the durable outbox commit together. Map feature errors to
+  stable API codes in HTTP adapters and emit realtime invalidations after commit.
+- Keep core tests beside their behavior using small in-memory ports. Test external
+  processing and transport beside their adapters. HTTP/database integration tests
+  in `app` verify composed permissions, concurrency and transaction boundaries.
+  Preserve import-boundary checks and applied migration paths and checksums.
+  See [code organization](../docs/architecture.md) for dependency direction.
 - Prefer the standard library where it solves the problem cleanly. Choose a framework, database,
   or storage provider only when the requirements justify it.
 - Use concrete types by default. Introduce small interfaces at the consuming boundary when
@@ -167,7 +198,9 @@ transient failures have bounded retries. Keep private content out of push payloa
 ## Implementation and commands
 
 - Module: `birthday-party/backend`, Go 1.26+. One standard-library HTTP service
-  under `cmd/server`; concrete app/database/handlers under `internal/app`.
+  under `cmd/server`; composition, HTTP and lifecycle under `internal/app`, core
+  feature services/ports under `internal/`, and persistence/external I/O under
+  `internal/adapters`. Atomic feature transactions belong in PostgreSQL adapters.
 - PostgreSQL uses `pgx` through `database/sql`, with `$n` placeholders and
   `RETURNING` for generated IDs. Use row/advisory locks for concurrent invariants.
   `DATABASE_URL` is required; Compose supplies private connection settings.

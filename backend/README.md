@@ -9,11 +9,32 @@ private when deploying. The API contract is [docs/api.md](../docs/api.md).
 
 ## Code organization
 
-`cmd/server` wires configuration, commands and the HTTP server. `internal/app`
-owns application behavior and persistence. Upload reception, queue storage,
-worker lifecycle, restart recovery and media publication have separate files
-within that package. Extract a package when it gains a clear responsibility and
-dependency boundary; keep simple CRUD direct.
+The backend uses hexagonal architecture organized by feature. `cmd/server` wires
+configuration, commands and the HTTP server. `internal/app` composes services and
+concrete adapters, translates HTTP requests/errors, and owns database bootstrap,
+realtime connections and worker startup/shutdown.
+
+Core packages keep models, rules, concrete services and required ports together:
+`access`, `identity`, `programme`, `guestbook`, `welcome`, `profile`, `party`,
+`media` and `notifications`. Their ports use domain types and have no dependency
+on SQL, HTTP handlers, media libraries or infrastructure implementations.
+
+- `internal/adapters/postgres/<feature>` implements persistence and complete atomic
+  operations, including authorization rechecks and the established lock order.
+- `internal/adapters/avatar` normalizes profile images.
+- `internal/adapters/mediafiles` owns private media storage and image/video processing.
+- `internal/adapters/webpush` delivers notifications through the restricted
+  HTTPS transport in `internal/adapters/pushtransport`.
+
+The application passes adapters to services through constructors. PostgreSQL
+transactions remain inside adapters; the core receives no SQL transaction handles.
+Welcome transitions and notification enqueueing share one transaction through a
+callback between the two PostgreSQL adapters. Realtime signals follow commits.
+
+Migrations remain in `internal/app/migrations` with their existing checksums.
+Database bootstrap and the legacy SQLite import remain at the outer application
+boundary. See [code organization](../docs/architecture.md) for ownership, dependency
+rules and the testing strategy.
 
 Go changes use the project-local [Go Style Guide](../.agents/skills/go-style-guide/SKILL.md).
 [AGENTS.md](AGENTS.md) defines the project's conventions and when to grow the

@@ -7,11 +7,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"birthday-party/backend/internal/guestbook"
 )
 
-func decodeEntry(t *testing.T, response *httptest.ResponseRecorder) Entry {
+func decodeEntry(t *testing.T, response *httptest.ResponseRecorder) guestbook.Entry {
 	t.Helper()
-	var entry Entry
+	var entry guestbook.Entry
 	if err := json.Unmarshal(response.Body.Bytes(), &entry); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +63,7 @@ func TestAnonymousGuestbookRedactsIdentityForEveryViewer(t *testing.T) {
 				t.Fatalf("expected one entry, got %d", len(page.Items))
 			}
 			assertAnonymousEntry(t, page.Items[0], identity.Name)
-			var listed Entry
+			var listed guestbook.Entry
 			if err := json.Unmarshal(page.Items[0], &listed); err != nil {
 				t.Fatal(err)
 			}
@@ -132,7 +134,7 @@ func TestGuestbookKeepsNamedPostingAsDefault(t *testing.T) {
 	response := request(t, a, "GET", "/api/guestbook", nil, other)
 	status(t, response, http.StatusOK)
 	var page struct {
-		Items []Entry `json:"items"`
+		Items []guestbook.Entry `json:"items"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
 		t.Fatal(err)

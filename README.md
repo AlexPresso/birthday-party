@@ -8,6 +8,8 @@ Next.js et TypeScript affichent l'application. Un service Go gère les invitatio
 les sessions, les permissions, PostgreSQL et les médias sur disque. Le navigateur
 utilise uniquement l'origine du frontend ; Next transmet `/api/*` au serveur Go.
 Le [contrat HTTP](docs/api.md) décrit les échanges.
+L'[organisation du code](docs/architecture.md) précise les responsabilités des
+features frontend, des packages Go et des modules partagés.
 
 ## Skills du projet
 
@@ -18,6 +20,12 @@ Les skills sont inclus dans `.agents/skills/`, avec leurs références et licenc
   (Apache-2.0), pour le code Go et l'évolution de l'architecture. Le commit source
   est fixé dans [UPSTREAM.md](.agents/skills/go-style-guide/UPSTREAM.md) ; les choix
   du projet sont précisés dans [backend/AGENTS.md](backend/AGENTS.md).
+- [Vercel React Best Practices](.agents/skills/vercel-react-best-practices/SKILL.md),
+  issu de [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills),
+  sous licence MIT, pour les composants React, les échanges réseau et les bundles.
+  La provenance est conservée dans
+  [UPSTREAM.md](.agents/skills/vercel-react-best-practices/UPSTREAM.md). Les règles
+  du projet gardent la priorité, notamment pour les données privées et le rôle de Go.
 - [UX Writing](.agents/skills/ux-writing/SKILL.md), issu de
   [content-designer/ux-writing-skill](https://github.com/content-designer/ux-writing-skill),
   sous licence MIT, pour les textes de l'interface.

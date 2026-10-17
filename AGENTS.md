@@ -32,6 +32,12 @@ use, a personal visual identity, simple code, and responsive interactions.
 - Use the repository's [Go Style Guide](.agents/skills/go-style-guide/SKILL.md)
   for Go implementation, reviews, refactors and architecture decisions. Apply the
   project-specific scope and simplicity rules in [backend/AGENTS.md](backend/AGENTS.md).
+- Use the repository's [Vercel React Best Practices](.agents/skills/vercel-react-best-practices/SKILL.md)
+  for React/Next.js implementation, reviews, refactors and performance work. Read
+  relevant rules and apply project instructions first. Keep authenticated fetches
+  `cache: "no-store"`; cross-request caches are only for explicitly public data.
+  Go owns API endpoints, authorization and business mutations. Preserve the shared
+  WebSocket refresh flow, and add dependencies only for a concrete benefit.
 - Use the repository's [UX Writing](.agents/skills/ux-writing/SKILL.md) skill
   when creating or editing interface labels, descriptions, errors or empty states.
 - Use the repository's [Humanizer](.agents/skills/humanizer/SKILL.md) skill to
@@ -46,6 +52,12 @@ use, a personal visual identity, simple code, and responsive interactions.
 
 ## Architecture and simplicity
 
+- Follow the ownership and dependency directions in [docs/architecture.md](docs/architecture.md).
+  Keep frontend feature code together. The Go backend uses feature packages for
+  hexagonal services, models and consumer-owned ports, with concrete infrastructure
+  under `internal/adapters`. Keep the core independent of HTTP, SQL and adapters;
+  compose dependencies in `internal/app`. Preserve complete atomic authorization
+  and persistence operations at adapter boundaries.
 - Use Next.js with TypeScript for the frontend and Go for the backend.
 - Start with one frontend application and one Go service. Go owns business
   rules, authorization, persistence, and scheduled availability; Next.js owns

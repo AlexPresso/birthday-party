@@ -422,13 +422,15 @@ test("an existing browser subscription is not silently assigned to another guest
     control.getByText("Activées sur cet appareil.", { exact: true }),
   ).toBeVisible();
   expect(await status(page, fixture.endpoint)).toBe(true);
-  expect(
-    (
-      await page.request.post("/api/logout", { headers: mutationHeaders })
-    ).status(),
-  ).toBe(204);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Se déconnecter", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/invitation$/);
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  expect((await page.request.get("/api/session")).status()).toBe(401);
   await invite(page, "Second Notification Guest");
-  await page.reload();
+  await page.goto("/parametres");
   await expect(enable).toBeEnabled();
   expect(saves).toBe(1);
   expect(await status(page, fixture.endpoint)).toBe(false);

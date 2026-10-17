@@ -141,6 +141,7 @@ func uploadStream(t *testing.T, a *App, cookie *http.Cookie, data io.Reader) *ht
 func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
 	a := testApp(t)
 	a.config.MaxImageBytes, a.config.MaxVideoBytes = 16<<20, 1<<20
+	refreshTestMediaFiles(a)
 	host, _ := admin(t, a)
 	data := pngBytes(t)
 	padded := func(size int64) io.Reader {
@@ -155,6 +156,7 @@ func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
 	}
 	assertMediaFiles(t, a, 2)
 	a.config.MaxImageBytes = 1 << 20
+	refreshTestMediaFiles(a)
 	status(t, uploadStream(t, a, host, padded((1<<20)+1)), 413)
 	assertMediaFiles(t, a, 2)
 }
@@ -163,6 +165,7 @@ func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	a.config.MaxImageBytes, a.config.MaxVideoBytes = 1<<20, 101<<20
+	refreshTestMediaFiles(a)
 	host, _ := admin(t, a)
 	padded := func(size int64) io.Reader {
 		freeBox := make([]byte, 8)
@@ -179,6 +182,7 @@ func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
 	}
 	assertMediaFiles(t, a, 2)
 	a.config.MaxVideoBytes = 1 << 20
+	refreshTestMediaFiles(a)
 	status(t, uploadStream(t, a, host, padded((1<<20)+1)), 413)
 	assertMediaFiles(t, a, 2)
 }
@@ -190,6 +194,7 @@ func TestConfiguredVideoLimitAppliesToInputBeforeConversion(t *testing.T) {
 	}
 	a := testApp(t)
 	a.config.MaxVideoBytes = 1 << 20
+	refreshTestMediaFiles(a)
 	host, _ := admin(t, a)
 	response := upload(t, a, host, data)
 	status(t, response, 201)

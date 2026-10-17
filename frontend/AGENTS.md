@@ -27,6 +27,39 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
 - Validate external data at its boundary; TypeScript types alone do not validate
   API responses. Keep the API contract consistent with the Go implementation.
 
+## Source ownership and dependencies
+
+- `src/app/` owns routes, layouts, metadata and server composition. Keep route
+  paths stable; feature directories do not define public URLs.
+- `src/features/` groups components, hooks, CSS, response schemas and types by
+  responsibility: `guests`, `profile`, `party`, `media`, `programme`, `guestbook`,
+  `welcome`, `notifications` and `settings`. Add files within the owning feature
+  before adding another directory or generic abstraction.
+- `settings` composes host and guest controls from the other features. Guest
+  administration belongs to `guests`, party details to `party`, event editing to
+  `programme`, and category editing to `media`.
+- `welcome` composes the profile, media and notification controls. Those features
+  must not import welcome UI. Keep welcome draft types and labeling in
+  `welcome/editor-model.ts`, independent of editor components.
+- Feature contracts live in each feature's `contracts.ts`. Reuse guest/author
+  schemas from `guests` and media destination schemas from `media` where needed.
+  Shared scalar validation and date formatting belong in `lib/schema.ts` and
+  `lib/dates.ts`. Keep transport validation at the API boundary.
+- `src/components/` contains reusable presentation such as Avatar, navigation and
+  UI notices. `src/lib/` contains shared HTTP, realtime, localization and browser
+  utilities. Neither directory imports routes or features; ESLint enforces this
+  direction. Features also must not import routes.
+- Import concrete files directly, without feature-wide barrel exports. Keep
+  cross-feature dependencies deliberate and acyclic. Do not import settings
+  composition from the features it combines.
+- Feature `server.ts` files own server-only reads and per-request React cache
+  wrappers. `lib/server-api.ts` owns the uncached authenticated HTTP transport.
+  Keep server-only modules out of client imports and retain parallel independent
+  reads in route composition.
+- The persistent party layout owns the media UploadProvider. The shared realtime
+  client remains in `lib/`; moving feature files must not create extra sockets or
+  shorten the lifetime of uploads during tab navigation.
+
 ## Responsiveness and resource use
 
 - Avoid unnecessary sequential requests. Keep client bundles small and use CSS

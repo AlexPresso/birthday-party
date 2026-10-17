@@ -205,14 +205,24 @@ test("returning to the programme fetches host changes without a manual refresh",
   }
 });
 
-test("a revoked guest returns to the invitation when revisiting a tab", async ({
+test("a revoked guest returns to the invitation when revisiting a tab without realtime", async ({
   page,
 }) => {
+  // Exercise authorization on navigation when the realtime connection is unavailable.
+  let blockedConnections = 0;
+  await page.routeWebSocket(
+    (url) => url.pathname === "/api/realtime",
+    async (socket) => {
+      blockedConnections++;
+      await socket.close({ code: 1013, reason: "Connection unavailable" });
+    },
+  );
   const guest = await enterGuest(page, "Revoked Navigation Guest");
   await page.goto("/programme");
   await expect(
     page.getByRole("heading", { name: "Programme", exact: true }),
   ).toBeVisible();
+  await expect.poll(() => blockedConnections).toBeGreaterThan(0);
   const navigation = page.getByRole("navigation");
   await navigation
     .getByRole("link", { name: "Médias", exact: true })

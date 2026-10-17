@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { Welcome } from "../src/lib/contracts.ts";
-import { latestWelcome } from "../src/lib/welcome-state.ts";
+import type { Welcome } from "../src/features/welcome/contracts.ts";
+import { latestWelcome } from "../src/features/welcome/welcome-state.ts";
 
 const waiting: Welcome = {
   open: false,

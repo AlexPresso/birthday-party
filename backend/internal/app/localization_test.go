@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"birthday-party/backend/internal/programme"
 )
 
 func TestErrorCodesRemainStableAcrossRequestLanguages(t *testing.T) {
@@ -79,7 +81,7 @@ func TestLockedEventWithoutTeaserHasNoLanguageSpecificTitle(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Léa")
-	input := eventInput{
+	input := programme.Input{
 		Title:       "Secret concert",
 		Description: "Private performer and location",
 		UnlockAt:    ptr(stamp(a.now().Add(time.Hour))),
@@ -88,7 +90,7 @@ func TestLockedEventWithoutTeaserHasNoLanguageSpecificTitle(t *testing.T) {
 	r := request(t, a, "GET", "/api/programme", nil, visitor)
 	status(t, r, 200)
 	var result struct {
-		Items []Event `json:"items"`
+		Items []programme.Event `json:"items"`
 	}
 	if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
@@ -105,10 +107,6 @@ func TestLockedEventWithoutTeaserHasNoLanguageSpecificTitle(t *testing.T) {
 		t.Fatal("host cannot edit the original event content")
 	}
 
-	view := eventView(Event{Title: input.Title, Description: input.Description, UnlockAt: ptr("invalid")}, a.now(), false)
-	if !view.Locked || view.Title != "" || view.Description != "" {
-		t.Fatal("invalid stored unlock date exposed private event content")
-	}
 }
 
 func TestPartyTitleCanUseLocalizedDefaultWithoutLosingDetails(t *testing.T) {

@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"birthday-party/backend/internal/guestbook"
+	guestidentity "birthday-party/backend/internal/identity"
 )
 
 const legacySchema = `
@@ -69,18 +72,18 @@ DELETE FROM photos WHERE id=129;
 			t.Fatal(err)
 		}
 	}
-	session, err := newToken()
+	session, err := guestidentity.NewToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-	invitation, err := newToken()
+	invitation, err := guestidentity.NewToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec("INSERT INTO sessions(token_hash,guest_id,created_at,expires_at) VALUES(?,7,1791979200,1893456000)", hashToken(session)); err != nil {
+	if _, err := db.Exec("INSERT INTO sessions(token_hash,guest_id,created_at,expires_at) VALUES(?,7,1791979200,1893456000)", guestidentity.HashToken(session)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec("INSERT INTO invitations(token_hash,guest_id,expires_at) VALUES(?,7,1893456000)", hashToken(invitation)); err != nil {
+	if _, err := db.Exec("INSERT INTO invitations(token_hash,guest_id,expires_at) VALUES(?,7,1893456000)", guestidentity.HashToken(invitation)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec("INSERT INTO invitations(token_hash,guest_id,expires_at,used_at) VALUES('previously-used',8,1893456000,1791979200)"); err != nil {
@@ -116,7 +119,7 @@ func TestSQLiteImportPreservesDataAndCredentials(t *testing.T) {
 			status(t, request(t, a, "POST", "/api/invitations/preview", map[string]string{"token": fixture.invitationToken}, nil), http.StatusOK)
 			entries := request(t, a, "GET", "/api/guestbook", nil, cookie)
 			status(t, entries, http.StatusOK)
-			var page struct{ Items []Entry }
+			var page struct{ Items []guestbook.Entry }
 			if err := json.Unmarshal(entries.Body.Bytes(), &page); err != nil {
 				t.Fatal(err)
 			}

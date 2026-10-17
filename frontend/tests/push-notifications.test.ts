@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   enableNotifications,
   waitForPush,
-} from "../src/lib/push-notifications.ts";
+} from "../src/features/notifications/push-notifications.ts";
 
 const publicKey = "B" + "A".repeat(86);
 const serialized = {

@@ -252,7 +252,7 @@ func TestWelcomeClosurePreservesAcceptedUploadsWithoutExposingThem(t *testing.T)
 	if err := a.db.QueryRow("SELECT photo_id FROM upload_jobs WHERE id=$1", job.id).Scan(&photo.ID); err != nil {
 		t.Fatal(err)
 	}
-	photo.urls()
+	photo.SetURLs()
 	assertWelcomeError(t, request(t, a, "GET", "/api/uploads/"+strconv.FormatInt(job.id, 10), nil, visitor), 423, "welcome_required")
 	for _, path := range []string{photo.URL, photo.ThumbnailURL} {
 		for _, header := range []struct{ name, value string }{{"Range", "bytes=0-3"}, {"If-Modified-Since", "Thu, 01 Jan 2099 00:00:00 GMT"}} {

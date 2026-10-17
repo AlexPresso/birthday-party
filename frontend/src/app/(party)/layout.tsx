@@ -1,9 +1,10 @@
-import { getParty, getSession } from "@/lib/server-api";
-import { getBirthdayConfig } from "@/lib/birthday-config";
+import { getParty } from "@/features/party/server";
+import { getSession } from "@/features/guests/server";
+import { getBirthdayConfig } from "@/features/party/birthday-config";
 import { Navigation } from "@/components/navigation";
 import { getI18n } from "@/lib/server-i18n";
-import { UploadProvider, UploadNotice } from "@/components/upload-provider";
-import { GuestAccessMonitor } from "@/components/guest-access-monitor";
+import { UploadProvider, UploadNotice } from "@/features/media/upload-provider";
+import { GuestAccessMonitor } from "@/features/welcome/guest-access-monitor";
 import { Avatar } from "@/components/avatar";
 
 export const dynamic = "force-dynamic";

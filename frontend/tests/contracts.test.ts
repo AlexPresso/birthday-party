@@ -3,22 +3,26 @@ import assert from "node:assert/strict";
 import {
   photoSchema,
   photosSchema,
-  uploadProblem,
-  eventsSchema,
-  sessionSchema,
-  entrySchema,
   uploadSchema,
   uploadsSchema,
-  welcomeSchema,
-  adminWelcomeSchema,
-  profileSchema,
   mediaCategorySchema,
   mediaCategoriesSchema,
+} from "../src/features/media/contracts.ts";
+import { uploadProblem } from "../src/features/media/upload-validation.ts";
+import { eventsSchema } from "../src/features/programme/contracts.ts";
+import { sessionSchema } from "../src/features/guests/contracts.ts";
+import { entrySchema } from "../src/features/guestbook/contracts.ts";
+import {
+  welcomeSchema,
+  adminWelcomeSchema,
   welcomeUploadContextSchema,
+} from "../src/features/welcome/contracts.ts";
+import { profileSchema } from "../src/features/profile/contracts.ts";
+import {
   notificationConfigSchema,
   notificationStatusSchema,
   notificationSavedSchema,
-} from "../src/lib/contracts.ts";
+} from "../src/features/notifications/contracts.ts";
 
 const waitingWelcome = {
   open: false,

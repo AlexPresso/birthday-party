@@ -1,5 +1,5 @@
-import { Invitation } from "@/components/invitation";
-import { getBirthdayConfig } from "@/lib/birthday-config";
+import { Invitation } from "@/features/guests/invitation";
+import { getBirthdayConfig } from "@/features/party/birthday-config";
 
 export default async function InvitationPage() {
   const { age, title, description } = await getBirthdayConfig();

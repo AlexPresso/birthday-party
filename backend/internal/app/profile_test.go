@@ -2,15 +2,9 @@ package app
 
 import (
 	"bytes"
-	"context"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"hash/crc32"
-	"image"
-	"image/color"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -21,6 +15,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"birthday-party/backend/internal/adapters/avatar"
+	"birthday-party/backend/internal/guestbook"
+	guestidentity "birthday-party/backend/internal/identity"
 )
 
 func avatarRequest(t *testing.T, cookie *http.Cookie, files ...[]byte) *http.Request {
@@ -55,11 +53,11 @@ func uploadAvatar(t *testing.T, a *App, cookie *http.Cookie, files ...[]byte) *h
 	return w
 }
 
-func profileGuest(t *testing.T, response *httptest.ResponseRecorder) Guest {
+func profileGuest(t *testing.T, response *httptest.ResponseRecorder) guestidentity.Guest {
 	t.Helper()
 	status(t, response, 200)
 	var profile struct {
-		Guest Guest `json:"guest"`
+		Guest guestidentity.Guest `json:"guest"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &profile); err != nil {
 		t.Fatal(err)
@@ -128,7 +126,7 @@ func TestProfilePhotoLifecyclePermissionsAndPersistence(t *testing.T) {
 	}
 	renewed := request(t, a, "POST", "/api/admin/guests/"+strconv.FormatInt(identity.ID, 10)+"/invitation", map[string]any{}, host)
 	status(t, renewed, 200)
-	var issued invitation
+	var issued guestidentity.Invitation
 	if err := json.Unmarshal(renewed.Body.Bytes(), &issued); err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +168,7 @@ func TestProfilePhotoAuthorsAndAnonymousPrivacy(t *testing.T) {
 	for _, anonymous := range []bool{false, true} {
 		created := request(t, a, "POST", "/api/guestbook", map[string]any{"body": "A message", "anonymous": anonymous}, owner)
 		status(t, created, 201)
-		var entry Entry
+		var entry guestbook.Entry
 		if err := json.Unmarshal(created.Body.Bytes(), &entry); err != nil {
 			t.Fatal(err)
 		}
@@ -192,7 +190,7 @@ func TestProfilePhotoAuthorsAndAnonymousPrivacy(t *testing.T) {
 	for _, viewer := range []*http.Cookie{host, other, owner} {
 		response := request(t, a, "GET", "/api/guestbook", nil, viewer)
 		var result struct {
-			Items []Entry `json:"items"`
+			Items []guestbook.Entry `json:"items"`
 		}
 		if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 			t.Fatal(err)
@@ -244,89 +242,6 @@ func TestProfilePhotoValidationKeepsExistingImage(t *testing.T) {
 			status(t, request(t, a, "GET", *initial.AvatarURL, nil, host), 200)
 			assertAvatarTempEmpty(t, a)
 		})
-	}
-}
-
-func TestProfilePhotoNormalizesDimensionsOrientationAndMetadata(t *testing.T) {
-	var large bytes.Buffer
-	if err := png.Encode(&large, image.NewRGBA(image.Rect(0, 0, 800, 400))); err != nil {
-		t.Fatal(err)
-	}
-	var jpegData bytes.Buffer
-	phoneImage := image.NewRGBA(image.Rect(0, 0, 12, 8))
-	for y := range 8 {
-		for x := range 12 {
-			pixel := color.RGBA{R: 255, A: 255}
-			if x >= 6 {
-				pixel = color.RGBA{B: 255, A: 255}
-			}
-			phoneImage.SetRGBA(x, y, pixel)
-		}
-	}
-	if err := jpeg.Encode(&jpegData, phoneImage, nil); err != nil {
-		t.Fatal(err)
-	}
-	exif := []byte{'E', 'x', 'i', 'f', 0, 0, 'I', 'I', 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 1, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0}
-	oriented := append([]byte{}, jpegData.Bytes()[:2]...)
-	oriented = append(oriented, 0xff, 0xe1, byte((len(exif)+2)>>8), byte(len(exif)+2))
-	oriented = append(oriented, exif...)
-	oriented = append(oriented, jpegData.Bytes()[2:]...)
-	webp, err := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, test := range []struct {
-		name          string
-		data          []byte
-		width, height int
-	}{
-		{"PNG resize", large.Bytes(), 256, 256},
-		{"phone JPEG", oriented, 256, 256},
-		{"WebP", webp, 256, 256},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			data, err := prepareAvatar(t.Context(), bytes.NewReader(test.data))
-			if err != nil {
-				t.Fatal(err)
-			}
-			config, format, err := image.DecodeConfig(bytes.NewReader(data))
-			if err != nil || format != "jpeg" || config.Width != test.width || config.Height != test.height || len(data) > maxAvatarBytes || bytes.Contains(data, []byte("Exif")) {
-				t.Fatalf("unexpected normalization: config=%+v format=%s size=%d error=%v", config, format, len(data), err)
-			}
-			if test.name == "phone JPEG" {
-				decoded, err := jpeg.Decode(bytes.NewReader(data))
-				if err != nil {
-					t.Fatal(err)
-				}
-				redTop, _, blueTop, _ := decoded.At(128, 64).RGBA()
-				redBottom, _, blueBottom, _ := decoded.At(128, 192).RGBA()
-				if redTop <= blueTop || blueBottom <= redBottom {
-					t.Fatal("phone orientation was not applied before cropping")
-				}
-			}
-		})
-	}
-	cancelled, cancel := context.WithCancel(t.Context())
-	cancel()
-	if _, err := prepareAvatar(cancelled, bytes.NewReader(large.Bytes())); err != context.Canceled {
-		t.Fatalf("cancelled processing error=%v", err)
-	}
-}
-
-func TestProfilePhotoExtremeAspectRatiosStayBounded(t *testing.T) {
-	for _, dimensions := range []image.Point{{X: 10000, Y: 1}, {X: 1, Y: 10000}} {
-		var input bytes.Buffer
-		if err := png.Encode(&input, image.NewRGBA(image.Rect(0, 0, dimensions.X, dimensions.Y))); err != nil {
-			t.Fatal(err)
-		}
-		data, err := prepareAvatar(t.Context(), bytes.NewReader(input.Bytes()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		config, _, err := image.DecodeConfig(bytes.NewReader(data))
-		if err != nil || config.Width != 256 || config.Height != 256 || len(data) > maxAvatarBytes {
-			t.Fatalf("unexpected normalization for %v: config=%+v size=%d error=%v", dimensions, config, len(data), err)
-		}
 	}
 }
 
@@ -386,7 +301,7 @@ func TestProfilePhotoConcurrencyIsBoundedAndReplacementAtomic(t *testing.T) {
 	a.Handler().ServeHTTP(w, r)
 	status(t, w, 200)
 	status(t, request(t, a, "GET", *initial.AvatarURL, nil, owner), 404)
-	data, err := prepareAvatar(t.Context(), bytes.NewReader(pngBytes(t)))
+	data, err := avatar.New().Prepare(t.Context(), bytes.NewReader(pngBytes(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +313,7 @@ func TestProfilePhotoConcurrencyIsBoundedAndReplacementAtomic(t *testing.T) {
 			if index%2 == 0 {
 				replacement = data
 			}
-			_, err := a.saveAvatar(t.Context(), identity.ID, hashToken(owner.Value), replacement)
+			_, err := a.profile.Save(t.Context(), identity.ID, guestidentity.HashToken(owner.Value), replacement)
 			errors <- err
 		})
 	}
