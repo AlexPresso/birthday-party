@@ -20,8 +20,6 @@ const en = {
   invalid_welcome_action: "Choose an available widget and check its settings.",
   invalid_welcome_transition:
     "This action isn't available now. Refresh the welcome sequence.",
-  welcome_steps_locked:
-    "Restart the welcome before editing steps that have been unlocked.",
   invalid_body: "We couldn’t read what you sent. Try again.",
   internal_error: "Something went wrong. Try again in a moment.",
   invalid_id: "We couldn’t find this item. Refresh the page.",
@@ -114,8 +112,6 @@ export const errorMessages = {
       "Choisis un widget disponible et vérifie ses réglages.",
     invalid_welcome_transition:
       "Cette action n’est pas disponible pour le moment. Actualise l’état de l’accueil.",
-    welcome_steps_locked:
-      "Relance l’accueil avant de modifier les étapes déjà débloquées.",
     invalid_body: "Impossible de lire ce que tu as envoyé. Réessaie.",
     internal_error: "Ça n’a pas fonctionné. Réessaie dans un instant.",
     invalid_id: "Impossible de trouver cet élément. Actualise la page.",
@@ -212,8 +208,6 @@ export const errorMessages = {
       "Wähle ein verfügbares Widget und prüfe seine Einstellungen.",
     invalid_welcome_transition:
       "Diese Aktion ist gerade nicht verfügbar. Aktualisiere den Empfangsablauf.",
-    welcome_steps_locked:
-      "Starte die Begrüßung neu, bevor du freigegebene Schritte bearbeitest.",
     invalid_body:
       "Wir konnten deine Angaben nicht lesen. Versuch es noch einmal.",
     internal_error: "Etwas ist schiefgelaufen. Versuch es gleich noch einmal.",
@@ -314,8 +308,6 @@ export const errorMessages = {
       "Scegli un widget disponibile e controlla le sue impostazioni.",
     invalid_welcome_transition:
       "Questa azione non è disponibile ora. Aggiorna lo stato dell’accoglienza.",
-    welcome_steps_locked:
-      "Riavvia l’accoglienza prima di modificare i passi già sbloccati.",
     invalid_body: "Non riusciamo a leggere ciò che hai inviato. Riprova.",
     internal_error: "Qualcosa è andato storto. Riprova tra poco.",
     invalid_id: "Non troviamo questo elemento. Ricarica la pagina.",
@@ -410,8 +402,6 @@ export const errorMessages = {
     invalid_welcome_action: "Elige un widget disponible y revisa sus ajustes.",
     invalid_welcome_transition:
       "Esta acción no está disponible ahora. Actualiza el estado de la bienvenida.",
-    welcome_steps_locked:
-      "Reinicia la bienvenida antes de editar los pasos ya desbloqueados.",
     invalid_body: "No podemos leer lo que has enviado. Inténtalo de nuevo.",
     internal_error: "Algo ha fallado. Vuelve a intentarlo en un momento.",
     invalid_id: "No encontramos este elemento. Recarga la página.",

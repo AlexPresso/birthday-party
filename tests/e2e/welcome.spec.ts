@@ -133,7 +133,7 @@ async function guestNext(page: Page) {
       new URL(response.url()).pathname === "/api/welcome/progress" &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: /^(Commencer|Suivant)$/ }).click();
+  await page.getByRole("button", { name: "Suivant", exact: true }).click();
   expect((await response).status()).toBe(200);
 }
 
@@ -220,6 +220,14 @@ test("guests navigate unlocked steps independently and keep their position acros
   await saveSteps(steps);
   await transition("start");
   const invitation = await invite("Camille Welcome Test");
+  const progressRequests: string[] = [];
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname === "/api/welcome/progress" &&
+      request.method() === "POST"
+    )
+      progressRequests.push(request.url());
+  });
   await enterWaiting(page, invitation.invitationUrl);
   await expect(
     page.getByRole("heading", {
@@ -227,6 +235,10 @@ test("guests navigate unlocked steps independently and keep their position acros
       exact: true,
     }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
+  ).toHaveCount(0);
+  await expect(page.locator(".welcome-navigation")).toHaveCount(0);
   const waitingResponse = await page.request.get("/api/welcome");
   expect(waitingResponse.status()).toBe(200);
   expect(await waitingResponse.json()).toEqual({
@@ -264,21 +276,13 @@ test("guests navigate unlocked steps independently and keep their position acros
   );
 
   await transition("next");
-  await expect(
-    page.getByRole("button", { name: "Commencer", exact: true }),
-  ).toBeEnabled();
-  await expect(
-    page.getByRole("heading", {
-      name: `Bienvenue ${invitation.guest.name}`,
-      exact: true,
-    }),
-  ).toBeVisible();
-  expect(
-    (await (await page.request.get("/api/welcome")).json()).step,
-  ).toBeNull();
-  await guestNext(page);
   await expectStep(page, steps[0]);
-  await expect(page.locator("#welcome-position")).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: /^(Commencer|Suivant)$/ }),
+  ).toHaveCount(0);
+  expect(progressRequests).toEqual([]);
+  await page.reload();
+  await expectStep(page, steps[0]);
   expect(await (await page.request.get("/api/welcome")).json()).toEqual({
     open: false,
     revision: expect.any(Number),
@@ -351,6 +355,10 @@ test("guests navigate unlocked steps independently and keep their position acros
     await expectStep(latePage, steps[0]);
     await guestNext(latePage);
     await expectStep(latePage, steps[1]);
+    await expect(latePage.locator("#welcome-position")).toBeFocused();
+    await expect(
+      latePage.getByRole("button", { name: "Suivant", exact: true }),
+    ).toHaveCount(0);
     // Unlocking a step and another guest moving must preserve this guest's position.
     await page.bringToFront();
     await expectStep(page, steps[0]);
@@ -440,6 +448,9 @@ test("required late arrivals complete every step before entering an already open
   await expectStep(page, steps[1]);
   await guestNext(page);
   await expectStep(page, steps[2]);
+  await expect(
+    page.getByRole("button", { name: "Suivant", exact: true }),
+  ).toHaveCount(0);
   expect((await page.request.get("/api/photos")).status()).toBe(423);
   await expect(
     page.getByRole("button", {
@@ -622,7 +633,11 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
     expect((await response).status()).toBe(200);
   }
 
-  await pressTransition("Activer l’écran d’attente");
+  await pressTransition(
+    (await adminState()).currentStep > 0
+      ? "Relancer l’accueil"
+      : "Activer l’écran d’attente",
+  );
   await expect(page).toHaveURL(/\/parametres$/);
   await expect(page.getByRole("navigation")).toBeVisible();
   expect(await adminState()).toMatchObject({ open: false, currentStep: 0 });
@@ -732,7 +747,7 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
     ),
   ).toBeVisible();
   await expect(title).toHaveValue(draftTitle);
-  await expect(title).toBeDisabled();
+  await expect(title).toBeEnabled();
   const next = page.getByRole("button", {
     name: "Débloquer l’étape suivante",
     exact: true,
@@ -770,7 +785,7 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
   expect((await adminState()).open).toBe(true);
 });
 
-test("the host restarts an unlocked welcome without losing a conflicting draft", async ({
+test("the host saves a conflicting draft after an unlock and edits again after opening the app", async ({
   page,
   context,
 }) => {
@@ -783,7 +798,7 @@ test("the host restarts an unlocked welcome without losing a conflicting draft",
   await context.addCookies((await host.storageState()).cookies);
   await page.goto("/parametres");
   const title = page.getByLabel("Titre du widget 1", { exact: true });
-  const draftTitle = "Keep this unsaved title after restarting";
+  const draftTitle = "Keep this unsaved title after the unlock";
   await title.fill(draftTitle);
   await transition("next");
   const rejectedSave = page.waitForResponse(
@@ -798,8 +813,11 @@ test("the host restarts an unlocked welcome without losing a conflicting draft",
   await page
     .getByRole("button", { name: "Actualiser l’état", exact: true })
     .click();
-  await expect(title).toBeDisabled();
+  await expect(title).toBeEnabled();
   await expect(title).toHaveValue(draftTitle);
+  await saveEditor(page);
+  expect(await adminState()).toMatchObject({ open: false, currentStep: 1 });
+  expect(titleOf((await adminState()).steps[0])).toBe(draftTitle);
   page.on("dialog", (dialog) => void dialog.accept());
   await page
     .getByRole("button", { name: "Ouvrir l’application", exact: true })
@@ -809,12 +827,13 @@ test("the host restarts an unlocked welcome without losing a conflicting draft",
     exact: true,
   });
   await expect(restart).toBeEnabled();
-  await restart.click();
   await expect(title).toBeEnabled();
-  await expect(title).toHaveValue(draftTitle);
-  expect(await adminState()).toMatchObject({ open: false, currentStep: 0 });
+  const openTitle = "Instructions updated after opening the app";
+  await title.fill(openTitle);
+  await expect(restart).toBeDisabled();
   await saveEditor(page);
-  expect(titleOf((await adminState()).steps[0])).toBe(draftTitle);
+  expect(await adminState()).toMatchObject({ open: true, currentStep: 2 });
+  expect(titleOf((await adminState()).steps[0])).toBe(openTitle);
 });
 
 const editorSteps: WelcomeStep[] = [
@@ -1373,16 +1392,29 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
     await page.reload();
     await expect(
       editor.getByRole("button", { name: "Déplacer l’étape 1", exact: true }),
-    ).toBeDisabled();
-    await expect(
-      editor.getByRole("button", {
-        name: "Ajouter le widget Photo de profil",
-        exact: true,
-      }),
-    ).toBeDisabled();
-    await expect(
-      page.getByLabel("Titre du widget 1", { exact: true }),
-    ).toBeDisabled();
+    ).toBeEnabled();
+    const photoAction = editor.getByRole("button", {
+      name: "Ajouter le widget Photo de profil",
+      exact: true,
+    });
+    await expect(photoAction).toBeEnabled();
+    const title = page.getByLabel("Titre du widget 1", { exact: true });
+    await expect(title).toBeEnabled();
+    const updatedTitle = "Choose a photo while the first step is unlocked";
+    await title.fill(updatedTitle);
+    await photoAction.click();
+    await saveEditor(page);
+    const updated = await adminState();
+    expect(updated).toMatchObject({ open: false, currentStep: 1 });
+    expect(updated.steps).toEqual([
+      step(updatedTitle, bodyOf(editorSteps[1]), "profile_photo"),
+      editorSteps[0],
+      step(titleOf(editorSteps[2]), draftBody, "profile_photo"),
+    ]);
+    await page.reload();
+    await expect(title).toHaveValue(updatedTitle);
+    await expect(title).toBeEnabled();
+    await expect(photoAction).toBeDisabled();
   } finally {
     await context.close();
   }
@@ -1534,6 +1566,114 @@ async function profileImage(page: Page) {
   };
 }
 
+test("live welcome edits preserve the guest's position and photo selection before and after opening", async ({
+  page,
+}) => {
+  const currentStep = step(
+    "Choose your profile photo",
+    "Choose a photo that the other guests will recognize.",
+    "profile_photo",
+  );
+  const futureStep = step(
+    "Read your table card",
+    "Keep the instructions on your card for later.",
+  );
+  await saveSteps([currentStep, futureStep]);
+  await transition("start");
+  await transition("next");
+  const invitation = await invite("Camille Live Welcome Edit Test");
+  await enterWaiting(page, invitation.invitationUrl);
+  await expectStep(page, currentStep);
+  const widget = page.locator(".welcome-profile");
+  await widget
+    .locator('input[type="file"]')
+    .setInputFiles(await profileImage(page));
+  const preview = widget.getByRole("img", {
+    name: "Aperçu de ta photo de profil",
+    exact: true,
+  });
+  await expect(preview).toBeVisible();
+  const previewURL = await preview.getAttribute("src");
+  expect(previewURL).toBeTruthy();
+  const initial = await (await page.request.get("/api/welcome")).json();
+
+  const correctedStep = step(
+    "Choose a photo for your profile",
+    "You can change it later in settings.",
+    "profile_photo",
+  );
+  const corrected = await saveSteps([correctedStep, futureStep]);
+  await expectStep(page, correctedStep);
+  await expect(preview).toHaveAttribute("src", previewURL!);
+  expect(await (await page.request.get("/api/welcome")).json()).toMatchObject({
+    progressRevision: initial.progressRevision,
+    revision: corrected.revision,
+    step: { position: 1 },
+  });
+
+  const revisedFuture = step(
+    "PRIVATE-FUTURE-LIVE-EDIT",
+    "These updated instructions belong to the next step.",
+    "media_upload",
+  );
+  const [futureRefresh, futureSaved] = await Promise.all([
+    page.waitForResponse(async (response) => {
+      if (new URL(response.url()).pathname !== "/api/welcome" || !response.ok())
+        return false;
+      return (await response.json()).revision > corrected.revision;
+    }),
+    saveSteps([correctedStep, revisedFuture]),
+  ]);
+  expect(await futureRefresh.json()).toMatchObject({
+    progressRevision: initial.progressRevision,
+    revision: futureSaved.revision,
+    step: { position: 1 },
+  });
+  await expectStep(page, correctedStep);
+  await expect(preview).toHaveAttribute("src", previewURL!);
+  expect(await page.content()).not.toContain(titleOf(revisedFuture));
+
+  await transition("open");
+  await expect(
+    page.getByRole("button", {
+      name: "Entrer dans l’application",
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await expectStep(page, correctedStep);
+  const openStep = step(
+    "Your profile photo is ready to save",
+    "Save your photo when you are ready.",
+    "profile_photo",
+  );
+  const opened = await saveSteps([openStep, revisedFuture]);
+  expect(opened).toMatchObject({ open: true, currentStep: 2 });
+  await expectStep(page, openStep);
+  await expect(preview).toHaveAttribute("src", previewURL!);
+  expect(await (await page.request.get("/api/welcome")).json()).toMatchObject({
+    open: false,
+    progressRevision: initial.progressRevision,
+    revision: opened.revision,
+    step: { position: 1 },
+  });
+
+  const savedResponse = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/profile/avatar" &&
+      response.request().method() === "PUT",
+  );
+  await widget
+    .getByRole("button", { name: "Enregistrer la photo", exact: true })
+    .click();
+  const saved = await savedResponse;
+  expect(saved.status()).toBe(200);
+  await expect(widget.locator(".avatar img")).toHaveAttribute(
+    "src",
+    (await saved.json()).guest.avatarUrl,
+  );
+  await expectStep(page, openStep);
+});
+
 test("a welcome profile action becomes available only for its step and keeps the rest of the app closed", async ({
   page,
 }) => {
@@ -1567,7 +1707,6 @@ test("a welcome profile action becomes available only for its step and keeps the
   const widget = page.locator(".welcome-profile");
   await expect(widget).toHaveCount(0);
   await transition("next");
-  await guestNext(page);
   await expectStep(page, steps[0]);
   expect(profileRequests).toEqual([]);
   const plainState = await (await page.request.get("/api/welcome")).json();

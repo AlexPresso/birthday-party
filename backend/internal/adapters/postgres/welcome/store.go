@@ -78,9 +78,27 @@ func (s *Store) Edit(ctx context.Context, revision int64, steps []welcome.Step) 
 		return state, err
 	}
 	defer tx.Rollback()
+	previous := state
 	state, err = welcome.Edit(state, revision, steps)
 	if err != nil {
 		return state, err
+	}
+	// The welcome lock excludes navigation and widget writes. Update positions
+	// in ascending order so guests clamped backward are never processed twice.
+	for position := 1; position <= previous.CurrentStep; position++ {
+		progress, changed := welcome.ReconcileProgress(previous, state, welcome.Progress{
+			Generation: previous.Generation,
+			Position:   position,
+		})
+		if !changed {
+			continue
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE guest_welcome_progress
+ SET position=$1,revision=nextval('welcome_progress_revision_seq')
+ WHERE generation=$2 AND position=$3 AND NOT completed`, progress.Position, previous.Generation, position)
+		if err != nil {
+			return state, err
+		}
 	}
 	for _, step := range steps {
 		for _, widget := range step.Widgets {
@@ -174,6 +192,16 @@ func (s *Store) Enroll(ctx context.Context, guestID int64) (welcome.State, welco
 		progress, err = readProgress(ctx, tx, guestID, " FOR UPDATE")
 		if err != nil {
 			return state, progress, err
+		}
+		var entered bool
+		progress, entered = welcome.EnterFirstStep(state, progress)
+		if entered {
+			err = tx.QueryRowContext(ctx, `UPDATE guest_welcome_progress
+ SET position=$1,revision=nextval('welcome_progress_revision_seq')
+ WHERE guest_id=$2 RETURNING revision`, progress.Position, guestID).Scan(&progress.Revision)
+			if err != nil {
+				return state, progress, err
+			}
 		}
 	}
 	return state, progress, tx.Commit()

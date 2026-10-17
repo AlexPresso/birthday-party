@@ -145,7 +145,7 @@ const eligibleSQL = `FROM notification_subscriptions s
  AND guest.active=1 AND session.expires_at>$1
  AND o.generation=w.generation AND o.expires_at>$1 AND o.attempts<5
  AND (guest.role='admin' OR ((p.guest_id IS NULL OR NOT p.completed)
- AND (o.kind='welcome_open' OR COALESCE(p.position,0)<o.unlocked_step)))`
+ AND (o.kind='welcome_open' OR COALESCE(p.position,0)<LEAST(o.unlocked_step,w.current_step))))`
 
 func (s *Store) Next(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
 	var pending notifications.Pending

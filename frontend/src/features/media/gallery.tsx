@@ -128,57 +128,63 @@ export function PhotoGallery({
         title={t("photos.title")}
         description={t("photos.description")}
       />
-      {categories.length > 0 && (
-        <div className="media-category-filter">
+      <div className="gallery-controls">
+        {categories.length > 0 && (
           <label htmlFor="media-category-filter">
             {t("categories.filter")}
           </label>
-          <select
-            id="media-category-filter"
-            value={categoryId ?? ""}
-            disabled={filterPending}
-            onChange={(event) => {
-              const value = event.target.value;
-              startFilter(() =>
-                router.push(
-                  value
-                    ? "/photos?categoryId=" + encodeURIComponent(value)
-                    : "/photos",
-                  { scroll: false },
-                ),
-              );
+        )}
+        <div className="gallery-controls-row">
+          {categories.length > 0 && (
+            <div className="media-category-filter">
+              <select
+                id="media-category-filter"
+                value={categoryId ?? ""}
+                disabled={filterPending}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  startFilter(() =>
+                    router.push(
+                      value
+                        ? "/photos?categoryId=" + encodeURIComponent(value)
+                        : "/photos",
+                      { scroll: false },
+                    ),
+                  );
+                }}
+              >
+                <option value="">{t("categories.main")}</option>
+                {categories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.isPublic
+                      ? item.name
+                      : t("categories.privateOption", { name: item.name })}
+                  </option>
+                ))}
+              </select>
+              {filterPending && (
+                <span className="fine-print" role="status">
+                  {t("photos.loading")}
+                </span>
+              )}
+            </div>
+          )}
+          <MediaPicker
+            limits={initial.limits}
+            destination={{
+              categoryId,
+              welcomeRevision: null,
+              welcomeWidgetIndex: null,
             }}
           >
-            <option value="">{t("categories.main")}</option>
-            {categories.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.isPublic
-                  ? item.name
-                  : t("categories.privateOption", { name: item.name })}
-              </option>
-            ))}
-          </select>
-          {filterPending && (
-            <span className="fine-print" role="status">
-              {t("photos.loading")}
-            </span>
-          )}
+            {category && (
+              <p className="fine-print">
+                {t("categories.destination", { name: categoryName })}
+              </p>
+            )}
+          </MediaPicker>
         </div>
-      )}
-      <MediaPicker
-        limits={initial.limits}
-        destination={{
-          categoryId,
-          welcomeRevision: null,
-          welcomeWidgetIndex: null,
-        }}
-      >
-        {category && (
-          <p className="fine-print">
-            {t("categories.destination", { name: categoryName })}
-          </p>
-        )}
-      </MediaPicker>
+      </div>
       <UploadQueue />
       <ErrorNotice message={selected === null ? error : null} />
       {photos.length === 0 ? (
@@ -367,12 +373,8 @@ export function PhotoGallery({
               <div className="button-row">
                 <a
                   className="icon-button"
-                  href={current.url}
-                  download={`media-${current.id}.${
-                    current.mimeType === "image/jpeg"
-                      ? "jpg"
-                      : current.mimeType.split("/")[1]
-                  }`}
+                  href={`${current.url}?download=1`}
+                  download
                   aria-label={t("photos.download")}
                 >
                   <Download size={19} />

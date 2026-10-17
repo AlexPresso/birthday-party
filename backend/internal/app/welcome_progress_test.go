@@ -60,7 +60,7 @@ func setWelcomeRequired(t *testing.T, a *App, host *http.Cookie, state welcomeSt
 func TestGuestWelcomeProgressRemainsIndependentOfHostUnlocks(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)
-	first, _, _ := guest(t, a, host, "First participant")
+	first, firstIdentity, _ := guest(t, a, host, "First participant")
 	second, _, _ := guest(t, a, host, "Second participant")
 	steps := []welcomeStep{testWelcomeStep("First", ""), testWelcomeStep("Second", ""), testWelcomeStep("Still locked", "")}
 	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": steps}, host))
@@ -71,16 +71,29 @@ func TestGuestWelcomeProgressRemainsIndependentOfHostUnlocks(t *testing.T) {
 		t.Fatalf("unexpected waiting view: %+v", firstView)
 	}
 	state = changeWelcome(t, a, host, state.Revision, "next")
-	if view := readGuestWelcome(t, a, first); view.Step != nil || !view.CanNext || view.ProgressRevision != firstView.ProgressRevision {
-		t.Fatalf("unlock moved the guest or invalidated the context: %+v", view)
+	waitingRevision := firstView.ProgressRevision
+	firstView = readGuestWelcome(t, a, first)
+	if firstView.Step == nil || firstView.Step.Position != 1 || firstView.CanNext || firstView.CanPrevious || firstView.ProgressRevision <= waitingRevision {
+		t.Fatalf("first unlock did not enter the first step automatically: %+v", firstView)
 	}
-	firstView = moveGuestWelcome(t, a, first, "next")
+	var position int
+	var revision int64
+	if err := a.db.QueryRow("SELECT position,revision FROM guest_welcome_progress WHERE guest_id=$1", firstIdentity.ID).Scan(&position, &revision); err != nil {
+		t.Fatal(err)
+	}
+	if position != 1 || revision != firstView.ProgressRevision {
+		t.Fatalf("first step was returned before progress was persisted: position=%d revision=%d", position, revision)
+	}
+	if repeated := readGuestWelcome(t, a, first); repeated.Step == nil || repeated.Step.Position != 1 || repeated.ProgressRevision != firstView.ProgressRevision {
+		t.Fatalf("refresh changed the automatically selected step: %+v", repeated)
+	}
+	assertWelcomeError(t, request(t, a, "POST", "/api/welcome/progress", map[string]any{"revision": waitingRevision, "action": "next"}, first), 409, "welcome_conflict")
 	state = changeWelcome(t, a, host, state.Revision, "next")
-	if view := readGuestWelcome(t, a, first); view.Step.Position != 1 || view.ProgressRevision != firstView.ProgressRevision || !view.CanNext {
+	if view := readGuestWelcome(t, a, first); view.Step == nil || view.Step.Position != 1 || view.ProgressRevision != firstView.ProgressRevision || !view.CanNext {
 		t.Fatalf("later unlock changed an active step: %+v", view)
 	}
-	if view := readGuestWelcome(t, a, second); view.Step != nil || view.ProgressRevision != secondView.ProgressRevision {
-		t.Fatalf("another participant was moved: %+v", view)
+	if view := readGuestWelcome(t, a, second); view.Step == nil || view.Step.Position != 1 || view.ProgressRevision <= secondView.ProgressRevision || !view.CanNext {
+		t.Fatalf("a participant who missed unlocks did not start at the first step: %+v", view)
 	}
 	firstView = moveGuestWelcome(t, a, first, "next")
 	if firstView.Step.Position != 2 || !firstView.CanPrevious || firstView.CanNext {
@@ -156,7 +169,10 @@ func TestRequiredWelcomeAppliesToLateGuestsAndPersistsCompletion(t *testing.T) {
 	}
 	status(t, request(t, reopened, "GET", "/api/photos", nil, late), 200)
 	status(t, request(t, reopened, "GET", photo.URL, nil, late), 200)
-	assertWelcomeError(t, request(t, reopened, "PUT", "/api/admin/welcome", map[string]any{"revision": state.Revision, "steps": steps}, host), 409, "welcome_steps_locked")
+	state = readWelcomeState(t, request(t, reopened, "PUT", "/api/admin/welcome", map[string]any{"revision": state.Revision, "steps": steps}, host))
+	if edited := readGuestWelcome(t, reopened, late); !edited.Open || edited.ProgressRevision != view.ProgressRevision {
+		t.Fatalf("saving welcome steps reset completed progress: %+v", edited)
+	}
 	state = changeWelcome(t, reopened, host, state.Revision, "start")
 	if restarted := readGuestWelcome(t, reopened, late); restarted.Open || restarted.Step != nil || restarted.ProgressRevision <= view.ProgressRevision {
 		t.Fatalf("new run did not reset progress safely: %+v", restarted)
@@ -241,8 +257,9 @@ func TestConcurrentGuestWelcomeNavigationAcceptsOneCommand(t *testing.T) {
 	visitor, _, _ := guest(t, a, host, "Concurrent participant")
 	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("First", ""), testWelcomeStep("Second", "")}}, host))
 	state = changeWelcome(t, a, host, state.Revision, "start")
-	view := readGuestWelcome(t, a, visitor)
+	readGuestWelcome(t, a, visitor)
 	state = changeWelcome(t, a, host, state.Revision, "open")
+	view := readGuestWelcome(t, a, visitor)
 	var results [2]*httptest.ResponseRecorder
 	var group sync.WaitGroup
 	for i := range results {
@@ -254,7 +271,7 @@ func TestConcurrentGuestWelcomeNavigationAcceptsOneCommand(t *testing.T) {
 	if results[0].Code+results[1].Code != 200+409 {
 		t.Fatalf("duplicate navigation statuses: %d, %d", results[0].Code, results[1].Code)
 	}
-	if current := readGuestWelcome(t, a, visitor); current.Step == nil || current.Step.Position != 1 {
+	if current := readGuestWelcome(t, a, visitor); current.Step == nil || current.Step.Position != 2 {
 		t.Fatalf("concurrent commands skipped a step: %+v", current)
 	}
 }

@@ -172,7 +172,11 @@ export function WaitingRoom({
               )}
             </>
           ) : (
-            <div aria-live="polite" aria-atomic="true">
+            <div
+              className="welcome-intro"
+              aria-live="polite"
+              aria-atomic="true"
+            >
               <Cake
                 className="welcome-cake"
                 size={36}
@@ -189,7 +193,7 @@ export function WaitingRoom({
               )}
             </div>
           )}
-          {!state.open && (
+          {!state.open && (state.step || state.canNext || state.canFinish) && (
             <div className="welcome-navigation" aria-busy={moving !== null}>
               {state.step && (
                 <button
@@ -202,14 +206,14 @@ export function WaitingRoom({
                   {t("welcome.previous")}
                 </button>
               )}
-              {(state.canNext || !state.canFinish) && (
+              {state.canNext && (
                 <button
                   type="button"
                   className="button primary"
-                  disabled={busy || moving !== null || !state.canNext}
+                  disabled={busy || moving !== null}
                   onClick={() => void navigate("next")}
                 >
-                  {t(state.step ? "welcome.next" : "welcome.start")}
+                  {t("welcome.next")}
                   <ArrowRight size={17} aria-hidden="true" />
                 </button>
               )}

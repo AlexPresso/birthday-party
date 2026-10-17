@@ -189,9 +189,15 @@ func TestWelcomeEditsAndTransitionsEnforceRevisionAndBounds(t *testing.T) {
 	assertWelcomeError(t, request(t, a, "POST", "/api/admin/welcome/transition", map[string]any{"revision": waiting.Revision, "action": "start"}, host), 409, "invalid_welcome_transition")
 	saved = readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": waiting.Revision, "steps": validSteps}, host))
 	shown := changeWelcome(t, a, host, saved.Revision, "next")
-	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": shown.Revision, "steps": []welcomeStep{}}, host), 409, "welcome_steps_locked")
+	shown = readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": shown.Revision, "steps": []welcomeStep{}}, host))
+	if shown.CurrentStep != 0 || shown.Open {
+		t.Fatalf("editing an active sequence did not clamp its unlocked boundary: %+v", shown)
+	}
 	opened := changeWelcome(t, a, host, shown.Revision, "open")
-	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": opened.Revision, "steps": []welcomeStep{}}, host), 409, "welcome_steps_locked")
+	opened = readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": opened.Revision, "steps": validSteps}, host))
+	if !opened.Open || opened.CurrentStep != len(validSteps) {
+		t.Fatalf("editing an open sequence did not unlock its new steps: %+v", opened)
+	}
 	waiting = changeWelcome(t, a, host, opened.Revision, "start")
 	waiting = readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": waiting.Revision, "steps": []welcomeStep{}}, host))
 	assertWelcomeError(t, request(t, a, "POST", "/api/admin/welcome/transition", map[string]any{"revision": waiting.Revision, "action": "next"}, host), 409, "invalid_welcome_transition")

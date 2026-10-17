@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -187,7 +188,7 @@ func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
 	assertMediaFiles(t, a, 2)
 }
 
-func TestConfiguredVideoLimitAppliesToInputBeforeConversion(t *testing.T) {
+func TestConfiguredVideoLimitPreservesInputWithoutTranscoding(t *testing.T) {
 	data := videoFixtureDuration(t, "mp4", "90")
 	if len(data) >= 1<<20 {
 		t.Fatalf("input fixture must fit the configured 1 MiB limit: %d bytes", len(data))
@@ -198,12 +199,24 @@ func TestConfiguredVideoLimitAppliesToInputBeforeConversion(t *testing.T) {
 	host, _ := admin(t, a)
 	response := upload(t, a, host, data)
 	status(t, response, 201)
+	var filename, thumbnail string
 	var stored int64
-	if err := a.db.QueryRow("SELECT byte_size FROM photos").Scan(&stored); err != nil {
+	if err := a.db.QueryRow("SELECT filename,thumbnail,byte_size FROM photos").Scan(&filename, &thumbnail, &stored); err != nil {
 		t.Fatal(err)
 	}
-	if stored <= a.config.MaxVideoBytes {
-		t.Fatalf("fixture must exercise output growth: stored=%d limit=%d", stored, a.config.MaxVideoBytes)
+	original, err := os.ReadFile(filepath.Join(a.config.DataDir, "photos", filename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(original, data) {
+		t.Fatal("video storage changed the uploaded bytes")
+	}
+	info, err := os.Stat(filepath.Join(a.config.DataDir, "photos", thumbnail))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := int64(len(data)) + info.Size(); stored != want {
+		t.Fatalf("stored quota=%d want original and thumbnail=%d", stored, want)
 	}
 	assertMediaFiles(t, a, 2)
 }

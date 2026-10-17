@@ -14,13 +14,15 @@
 }
 
 .notification-control h3 {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .notification-control svg {
   flex: 0 0 auto;
 }
 .notification-status {
-  margin-block: 14px 10px;
+  margin-block: 0 16px;
+  font-size: 13px;
+  line-height: 1.65;
 }
 .notification-actions {
   display: flex;
@@ -28,16 +30,12 @@
   gap: 10px;
 }
 .notification-actions .button {
+  max-width: 100%;
   white-space: normal;
   text-align: center;
 }
 .notification-control > .fine-print {
   margin-bottom: 12px;
-}
-
-.profile-photo-editor + .notification-control {
-  border-top: 0;
-  padding-top: 0;
 }
 
 .welcome-widgets > .notification-control:last-child {

@@ -15,7 +15,6 @@ const (
 	ErrInvalidSteps     Error = "invalid_welcome_steps"
 	ErrInvalidAction    Error = "invalid_welcome_action"
 	ErrConflict         Error = "welcome_conflict"
-	ErrStepsLocked      Error = "welcome_steps_locked"
 	ErrTransition       Error = "invalid_welcome_transition"
 	ErrCategoryNotFound Error = "media_category_not_found"
 )
@@ -137,10 +136,12 @@ func Edit(state State, revision int64, steps []Step) (State, error) {
 	if err := CheckRevision(state, revision); err != nil {
 		return state, err
 	}
-	if state.CurrentStep > 0 {
-		return state, ErrStepsLocked
-	}
 	state.Steps = steps
+	if state.Open && state.Generation > 0 {
+		state.CurrentStep = len(steps)
+	} else {
+		state.CurrentStep = min(state.CurrentStep, len(steps))
+	}
 	return state, nil
 }
 
@@ -178,6 +179,16 @@ func InitialProgress(state State) Progress {
 		position = 1
 	}
 	return Progress{Generation: state.Generation, Position: position, Completed: state.Open && !state.Required}
+}
+
+// EnterFirstStep starts waiting participants once a step is available. Later
+// steps remain guest-controlled. The caller assigns a new revision on entry.
+func EnterFirstStep(state State, progress Progress) (Progress, bool) {
+	if state.Generation == 0 || progress.Generation != state.Generation || progress.Completed || progress.Position != 0 || state.CurrentStep == 0 {
+		return progress, false
+	}
+	progress.Position = 1
+	return progress, true
 }
 
 func Navigate(state State, progress Progress, revision int64, action string) (Progress, error) {

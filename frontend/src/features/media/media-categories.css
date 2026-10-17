@@ -60,12 +60,21 @@
   overflow-wrap: anywhere;
   white-space: normal;
 }
-.media-category-filter {
-  max-width: 420px;
-  margin-bottom: 20px;
+.gallery-controls {
+  margin-bottom: 24px;
 }
-.media-picker > .fine-print {
-  margin: 12px 0;
+.gallery-controls-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  align-items: start;
+  gap: 16px 24px;
+}
+.media-category-filter {
+  min-width: 0;
+}
+.media-category-filter > .fine-print {
+  display: block;
+  margin-top: 8px;
 }
 .welcome-media-settings select,
 .media-category-filter select {

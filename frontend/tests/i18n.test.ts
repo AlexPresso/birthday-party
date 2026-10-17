@@ -99,12 +99,12 @@ test("all catalogs contain the same nonempty keys and interpolation parameters",
   const french = getMessages("fr");
   assert.deepEqual(
     [
-      french["nav.photos"],
       french["nav.programme"],
+      french["nav.photos"],
       french["nav.guestbook"],
       french["nav.settings"],
     ],
-    ["Médias", "Programme", "Livre d'or", "Paramètres"],
+    ["Programme", "Médias", "Livre d'or", "Paramètres"],
   );
 });
 

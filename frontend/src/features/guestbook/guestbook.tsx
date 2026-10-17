@@ -37,6 +37,7 @@ export function Guestbook({
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const text = useRef<HTMLTextAreaElement>(null);
 
@@ -44,7 +45,7 @@ export function Guestbook({
     event.preventDefault();
     if (!body.trim() || sending) return;
     setSending(true);
-    setError(null);
+    setPublishError(null);
     setNotice(null);
     try {
       const entry = await api("/guestbook", entrySchema, {
@@ -56,7 +57,7 @@ export function Guestbook({
       setAnonymous(false);
       setNotice(t("guestbook.published"));
     } catch (err) {
-      setError(errorMessage(err, t));
+      setPublishError(errorMessage(err, t));
     } finally {
       setSending(false);
     }
@@ -115,11 +116,13 @@ export function Guestbook({
               <BookOpen size={26} strokeWidth={1.5} />
             </div>
             <div>
-              <h2>{t("guestbook.composeTitle")}</h2>
+              <h2 id="guestbook-compose-title">
+                {t("guestbook.composeTitle")}
+              </h2>
               <p className="muted">{t("guestbook.composeDescription")}</p>
             </div>
           </div>
-          <form onSubmit={publish}>
+          <form onSubmit={publish} aria-labelledby="guestbook-compose-title">
             <label htmlFor="guestbook-message">{t("guestbook.message")}</label>
             <textarea
               id="guestbook-message"
@@ -151,6 +154,7 @@ export function Guestbook({
               />
               <span>{t("guestbook.postAnonymously")}</span>
             </label>
+            <ErrorNotice message={publishError} />
             <button
               className="button primary wide"
               disabled={sending || !body.trim()}

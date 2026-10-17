@@ -44,9 +44,10 @@ architecture. The skill's upstream commit and license are included in the reposi
 
 From `backend/`, with Go 1.26 or newer and `DATABASE_URL` pointing to PostgreSQL:
 
-Video uploads also require `ffmpeg` and `ffprobe` on `PATH`, including the
-H.264 (`libx264`) and AAC encoders. The Docker image includes them. For local
+Video uploads also require `ffmpeg` and `ffprobe` on `PATH` for validation and
+JPEG thumbnails. The Docker image includes them. For local
 development, install a build from the [FFmpeg download page](https://ffmpeg.org/download.html).
+Video test fixtures additionally use the H.264/AAC and VP9/Opus encoders.
 
 ```sh
 go mod download
@@ -116,8 +117,11 @@ HTTP request logs never include these tokens.
   log out; party, programme, guestbook and media browsing endpoints return 423.
   The current step may include the profile and upload widgets described below.
   Administrators retain access. PostgreSQL stores up to 12 steps, the unlocked
-  boundary and each guest's selected position. Guests navigate forwards/backwards
-  explicitly; revision-checked transactions prevent duplicate advances. A global
+  boundary and each guest's selected position. Waiting guests enter step one
+  automatically on their next welcome refresh once it is available. Go persists
+  the position and rotates its revision in the same transaction. Later unlocks
+  keep the current position; guests navigate forwards/backwards explicitly.
+  Revision-checked transactions prevent duplicate advances. A global
   required switch makes late arrivals follow every step even after host opening.
   Existing participants enter explicitly when ready; required participants finish
   the steps first. Host opening unlocks all remaining steps. Access is
@@ -198,17 +202,20 @@ HTTP request logs never include these tokens.
   remain accessible only to authenticated guests with access to their category.
 - Video uploads allow MP4, MOV and WebM up to `MAX_VIDEO_SIZE_MB` MiB
   (100 by default), 5 minutes and 4K input.
-  FFmpeg converts them to H.264/AAC MP4, at most 1280×720 and 30 fps, and creates
-  a JPEG thumbnail. The input video is discarded after conversion. Video
-  processing has a five-minute timeout, bounded threads and restricted input
+  The original file is retained byte-for-byte for playback and download, including
+  resolution, frame rate, codecs, audio and metadata. FFprobe validates its
+  dimensions and duration; FFmpeg only creates a JPEG thumbnail. Browser playback
+  depends on support for the original container and codecs. Older converted
+  videos remain available, but their deleted originals cannot be restored.
+  Thumbnail processing has a five-minute timeout, bounded threads and restricted input
   formats/protocols. Probe output and captured diagnostics are each capped at
   64 KiB; raw tool diagnostics are never sent to guests or written to logs.
   Each byte-range request checks the current session and category visibility.
-  Input limits apply before conversion. Converted output is bounded by the
-  larger of 100 MiB and the configured video input limit; it may exceed the
-  input limit for a small uploaded clip. Shortened conversions are rejected.
+  Input limits apply to the unchanged uploaded file. No separate playback video
+  is created; only the thumbnail is resized.
 - The gallery is capped at 5000 files and 10 GiB. New upload accounting includes
-  originals or normalized videos plus their thumbnails. Lists are paginated
+  photo/video originals and their thumbnails. Both share permissions, survive
+  recovery and are deleted together. Lists are paginated
   at 24 items by default, maximum 48. Hosts can manage up to 500 guest identities
   and 200 programme entries. These are initial explicit bounds, not performance
   claims.

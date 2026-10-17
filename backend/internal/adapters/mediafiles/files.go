@@ -9,8 +9,6 @@ import (
 	"birthday-party/backend/internal/media"
 )
 
-const defaultMaxVideoBytes int64 = 100 << 20
-
 type Files struct {
 	root                         string
 	maxImageBytes, maxVideoBytes int64
@@ -28,13 +26,16 @@ func (f *Files) RemoveInput(key string) {
 }
 func (f *Files) RemoveReceived(input media.Received) { _ = os.Remove(input.Path) }
 func (f *Files) RemoveAttempt(job media.Pending) {
-	for _, suffix := range []string{".jpg", ".png", ".webp", ".mp4", ".thumb.jpg"} {
+	for _, suffix := range []string{".jpg", ".png", ".webp", ".mp4", ".mov", ".webm", ".mkv", ".thumb.jpg"} {
 		_ = os.Remove(filepath.Join(f.root, "photos", job.Key+"-"+job.Attempt+suffix))
 	}
 }
 func (f *Files) RemovePublished(file media.File) error {
 	var result error
 	for _, name := range []string{file.Filename, file.Thumbnail} {
+		if name == "" {
+			continue
+		}
 		if err := os.Remove(filepath.Join(f.root, "photos", name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			result = errors.Join(result, err)
 		}

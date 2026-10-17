@@ -152,7 +152,7 @@ func TestRealtimeScopesWelcomeUploadsAndProgramme(t *testing.T) {
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First live guest")
 	second, _, _ := guest(t, a, host, "Second live guest")
-	steps := []welcomeStep{{Widgets: []welcomeWidget{{Type: "media_upload", MediaUpload: &welcomeMediaUpload{}}}}}
+	steps := []welcomeStep{testWelcomeStep("First instruction", ""), {Widgets: []welcomeWidget{{Type: "media_upload", MediaUpload: &welcomeMediaUpload{}}}}}
 	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": steps}, host))
 	server := httptest.NewServer(a.Handler())
 	defer server.Close()
@@ -166,6 +166,13 @@ func TestRealtimeScopesWelcomeUploadsAndProgramme(t *testing.T) {
 	}
 	readGuestWelcome(t, a, first)
 	readGuestWelcome(t, a, second)
+	state = changeWelcome(t, a, host, state.Revision, "next")
+	for _, socket := range []*testRealtimeConnection{hostSocket, firstSocket, secondSocket} {
+		readRealtime(t, socket, "invalidate", "welcome")
+	}
+	if view := readGuestWelcome(t, a, first); view.Step == nil || view.Step.Position != 1 {
+		t.Fatalf("welcome invalidation did not reveal the first step on refresh: %+v", view)
+	}
 	state = changeWelcome(t, a, host, state.Revision, "next")
 	for _, socket := range []*testRealtimeConnection{hostSocket, firstSocket, secondSocket} {
 		readRealtime(t, socket, "invalidate", "welcome")

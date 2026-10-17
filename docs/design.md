@@ -7,7 +7,7 @@ new decision; do not revisit the rejected directions without a reason.
 
 - A friendly app for a 30th birthday party.
 - A Next.js frontend with a Go backend.
-- Four tabs, in order: `Médias`, `Programme`, `Livre d'or`, `Paramètres` in French,
+- Four tabs, in order: `Programme`, `Médias`, `Livre d'or`, `Paramètres` in French,
   with translated labels and unchanged routes in the other supported languages.
 - Events and other content that become available later.
 - A guestbook with named messages and an optional anonymous posting checkbox.
@@ -26,7 +26,7 @@ not actual event content and must not be seeded into the production application.
 
 Use a near-black plum background (`#151218`), slightly lighter surfaces (`#231D29`),
 fine plum borders (`#3B3043`), light text (`#F3EEF5`), readable secondary text
-(`#BEB1C5`), and mauve accents (`#B99ACB`). Primary buttons use dark text on mauve.
+(`#BEB1C5`), and mauve accents (`#C5A2D7`). Primary buttons use dark text on mauve.
 Use a crisp humanist sans-serif and medium-weight headings, compact readable
 sections, modest rounded corners, and consistent outline icons.
 
@@ -38,6 +38,16 @@ Do not invent party details, guest contributions, dates, or activity counts.
 ## Layout and visual language
 
 - Design for guests using phones, then adapt deliberately for larger screens.
+- Keep headings and content aligned to a shared page gutter. Center empty states
+  and the waiting greeting; align forms, messages and authored step content for
+  reading. Use quiet borders to separate content rather than enclosing every row.
+- Keep mobile navigation labels readable, including longer translations. Use
+  44px or larger touch targets and let action groups wrap without clipping.
+- Group the media filter and upload controls, with a full-width upload button on
+  phones. Use two gallery columns on phones and three on larger screens. Keep
+  file limits secondary but readable, and let programme entries share a timeline.
+- Group settings into identity, photo, notifications and account controls. Place
+  photo and notification controls side by side only when there is enough room.
 - Keep the four confirmed tabs in the same order, including translated labels.
   Use a fixed bottom navigation
   on phones and a comfortable equivalent on larger screens.
@@ -45,8 +55,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
   During the host-led welcome, guests see a separate waiting screen without tabs.
   Use a personalized welcome heading while waiting, then show the current
   host-authored step in the existing plum theme. Do not add a separate greeting.
-  The host unlocks steps without moving guests. Show Start, Previous and Next
-  controls so each guest advances when ready and can revisit unlocked steps.
+  Before the first unlock, show the waiting screen without a Start button.
+  Automatically show step one when the host unlocks it. Later unlocks leave
+  guests on their current step. Show Next only when the following step is
+  available, and keep Previous so guests can revisit earlier unlocked steps.
   Preserve their position across reloads and keep locked steps private.
   Allow logout and show a retry action when connection checks fail. Administrators
   prepare the sequence and control waiting, each unlock and opening from settings.
@@ -54,9 +66,13 @@ Do not invent party details, guest contributions, dates, or activity counts.
   including after opening. Existing participants enter explicitly when ready.
   Opening unlocks remaining steps; required participants finish them first.
   Preserve widget selections and transfers when the host unlocks another step.
-  Already unlocked steps are edited after restarting the welcome, so active
-  participants keep the instructions they are following. Do not invent step
-  content. Programme includes timed surprises; there is no separate home or surprises tab.
+  Administrators can edit steps at any time. Apply saved changes live while
+  retaining each guest's numeric position, or the last unlocked position if the
+  sequence becomes shorter. Text corrections preserve widget selections;
+  changing widget types, order or upload destinations resets the affected guest's
+  active widget context. Accepted uploads keep their original destination and
+  completed guests keep access. Do not invent step content. Programme includes
+  timed surprises; there is no separate home or surprises tab.
 - A welcome step consists of an ordered list of widgets, with no fixed title or
   text outside that list. The supported widgets are title, text, profile photo,
   media upload and enabling notifications. Render them in the host's chosen order.
@@ -64,8 +80,8 @@ Do not invent party details, guest contributions, dates, or activity counts.
   repeat or be omitted; preserve authored wording. A profile-photo widget reuses
   the preview, save, replace and remove controls from settings. Keep feedback
   and selections across unchanged updates; changing steps removes the widgets.
-  The host controls unlocks regardless of widget completion; guests choose when
-  to advance.
+  The host controls unlocks regardless of widget completion; after entering
+  step one automatically, guests choose when to advance.
 - The host's editor separates the ordered step list, the selected step's widget
   canvas and a widget palette. Drag a palette item into the canvas to insert it
   at the indicated position; drag widget handles to reorder. Provide add buttons,
@@ -110,6 +126,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Make upload easy to find and operate with touch, keyboard, and screen readers.
 - Explain supported files and limits when those are defined by the product.
 - Show selected files, upload progress, success, and useful per-file errors.
+  Use one combined progress bar per queue with a sent/total file counter,
+  including files waiting to upload. Count server-accepted files as sent, while
+  keeping preparation and failures visible in each file's status. Welcome media
+  widgets keep separate counters for their own queues.
 - Distinguish sending a file from waiting for preparation and being ready in the
   gallery. Guests can navigate between tabs while transfers continue. Accepted
   jobs survive reloads and server restarts; never imply an unsent file is saved.

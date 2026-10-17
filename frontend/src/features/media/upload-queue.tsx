@@ -4,7 +4,9 @@ import { Upload, Check, RotateCw, X } from "lucide-react";
 import { responseError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { useUploads } from "./upload-provider";
+import { uploadProgress } from "./upload-progress";
 import { ErrorNotice } from "@/components/ui";
+import "./upload-queue.css";
 export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
   const { locale, t } = useI18n();
   const numbers = new Intl.NumberFormat(locale);
@@ -20,14 +22,24 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
     widgetIndex === undefined
       ? uploads.jobs
       : uploads.jobs.filter((job) => job.welcomeWidgetIndex === widgetIndex);
-  const transmitting = transfers.some((item) => item.status !== "error");
+  const { pendingTransfers, sent, total, percent } = uploadProgress(
+    transfers,
+    jobs,
+  );
+  const sentCount = t(
+    plurals.select(total) === "one"
+      ? "photos.sentCountOne"
+      : "photos.sentCountOther",
+    { sent: numbers.format(sent), total: numbers.format(total) },
+  );
+  const transmitting = pendingTransfers.some((item) => item.status !== "error");
   const active =
     transmitting ||
     jobs.some((job) => job.status === "queued" || job.status === "processing");
   const completed = jobs.filter((job) => job.status === "ready").length;
   return (
     <>
-      {(transfers.length > 0 || jobs.length > 0) && (
+      {total > 0 && (
         <section
           className="upload-queue panel"
           aria-label={t("photos.uploadQueue")}
@@ -43,37 +55,39 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
               </button>
             )}
           </div>
-          {transfers.map((item) => (
+          <div className="upload-progress-summary">
+            <p
+              className="upload-progress-count"
+              role="status"
+              aria-atomic="true"
+            >
+              {sentCount}
+            </p>
+            <progress
+              aria-label={t("photos.uploadProgress")}
+              aria-valuetext={sentCount}
+              max={100}
+              value={percent}
+            />
+          </div>
+          {pendingTransfers.map((item) => (
             <div className="upload-item" key={item.clientUploadId}>
               <div className={`upload-status ${item.status}`}>
                 <Upload size={20} aria-hidden="true" />
               </div>
               <div className="upload-details">
                 <span className="file-name">{item.file.name}</span>
-                {item.status === "uploading" ? (
-                  <>
-                    <progress
-                      aria-label={t("photos.fileProgress", {
-                        name: item.file.name,
-                      })}
-                      max={100}
-                      value={item.progress}
-                    />
-                    <span className="fine-print">
-                      {item.progress === 100
-                        ? t("photos.receiving")
-                        : new Intl.NumberFormat(locale, {
-                            style: "percent",
-                          }).format(item.progress / 100)}
-                    </span>
-                  </>
-                ) : (
-                  <span
-                    className={`fine-print ${item.status === "error" ? "error-text" : ""}`}
-                  >
-                    {item.error || t("photos.queued")}
-                  </span>
-                )}
+                <span
+                  className={`fine-print ${item.status === "error" ? "error-text" : ""}`}
+                >
+                  {item.status === "uploading"
+                    ? t(
+                        item.progress === 100
+                          ? "photos.receiving"
+                          : "photos.uploading",
+                      )
+                    : item.error || t("photos.queued")}
+                </span>
               </div>
               {item.status === "error" && item.retryable && (
                 <button

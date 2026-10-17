@@ -102,8 +102,9 @@ their author's name and profile photo for other authorized viewers.
 
 ## Guest welcome
 
-The host unlocks an ordered welcome sequence. Each guest chooses when to advance
-and can revisit earlier unlocked steps. Progress is stored per guest, across
+The host unlocks an ordered welcome sequence. Waiting guests enter the first step
+automatically when it becomes available. They then choose when to advance and
+can revisit earlier unlocked steps. Progress is stored per guest, across
 sessions and restarts. Administrators retain full access. The initial state is
 open until the host explicitly starts the welcome, even when `required` is enabled.
 
@@ -116,6 +117,12 @@ open until the host explicitly starts the welcome, even when `required` is enabl
   run if needed. `open` is this guest's effective access, rather than the host's
   global setting. Only the guest's selected step is returned, never future steps.
   `step` is null during initial waiting and once the guest has full access.
+  If an incomplete current-run participant is still at position zero and at
+  least one step is unlocked, this read atomically persists position one and a
+  new progress revision. Repeated reads preserve both. A participant who missed
+  several unlocks still enters step one, rather than skipping to the latest.
+  No Start button or client progress mutation is needed for this transition.
+  Render Next only when `canNext` is true.
 - `POST /api/welcome/progress { revision, action }` -> `Welcome`. Use the last
   `progressRevision` as `revision`. `next` advances one unlocked step, `previous`
   goes back one step, and `finish` enters the application when `canFinish` is true.
@@ -142,21 +149,35 @@ open until the host explicitly starts the welcome, even when `required` is enabl
   `invalid_welcome_action`. Collection/text bounds return 400 `invalid_welcome_steps`.
   An unknown category returns 404 `media_category_not_found`. The JSON body limit
   is 1 MiB so a full bounded widget collection fits.
-  Edit steps only while `currentStep` is zero. Once any step is unlocked, editing
-  returns 409 `welcome_steps_locked`, including after the host opens the app.
-  To edit again, open the app if necessary and start a new welcome run.
+  Administrators can edit steps at any time, including after unlocking or opening
+  access. The run, open/required settings and completed guests remain unchanged.
+  Steps are positional: guests stay at their numeric position when steps are
+  edited or reordered. Removing trailing steps clamps incomplete guests and the
+  unlock boundary to the last remaining unlocked position (zero for no steps).
+  When a run is open, all saved steps are available, including newly added ones;
+  before the first run the unlock boundary remains zero. A guest's progress token
+  changes only if their position or current widget types, order or destinations
+  change. Text-only corrections and edits to other steps preserve active widgets.
+  Affected unaccepted uploads must obtain a fresh widget context; accepted jobs
+  retain their recorded revision, widget index and destination and finish normally.
+  Changes reach connected guests through the shared welcome WebSocket signal.
 - `POST /api/admin/welcome/transition { revision, action }` -> `AdminWelcome`.
   `start` closes an open application at `currentStep: 0` and begins a new run.
   `next` unlocks exactly one more step while closed. `open` unlocks all remaining
   steps and allows guests to finish; `currentStep` stays at the number of steps.
-  Neither unlock nor open moves an existing participant to another step or grants
-  them access automatically. Invalid transitions return 409 `invalid_welcome_transition`.
+  Participants waiting at position zero enter step one on their next welcome
+  refresh. Guests already on a step retain their position, and existing
+  participants still finish explicitly to gain full access. Invalid transitions
+  return 409 `invalid_welcome_transition`.
 
 Host mutations use `AdminWelcome.revision`; guest movement uses
 `Welcome.progressRevision`. Changes are atomic and revision checked, preventing
 concurrent clicks from skipping steps or overwriting changes. A host unlock or
 requirement change increments only the host revision. Guest movement changes
-the progress revision and invalidates the previous widget context.
+the progress revision and invalidates the previous widget context. Automatic
+first-step entry also changes the progress revision once, during enrollment.
+An edit that changes a guest's position or widget context also rotates their progress revision
+in the same transaction; editing other steps does not interrupt that guest.
 
 With `required: true`, a guest first joining a run starts at step one if it is
 unlocked, or waits at position zero. This also applies after the host opens the
@@ -311,7 +332,9 @@ may contain up to 120 characters and remains in the host's original language.
 
 The route and type names retain `photos` for compatibility; the collection
 contains both photos and videos. `mimeType` is `image/jpeg`, `image/png`,
-`image/webp` or `video/mp4`.
+`image/webp`, `video/mp4`, `video/quicktime`, `video/webm` or `video/x-matroska`.
+Video MIME types describe the original container; the existing backend Matroska
+support is preserved, while the picker offers MP4, MOV and WebM.
 
 - `GET /api/media-categories` -> `{ items: MediaCategory[] }`, ordered by ID.
   Guests receive public categories; administrators receive all categories.
@@ -334,8 +357,12 @@ contains both photos and videos. `mimeType` is `image/jpeg`, `image/png`,
 - `GET /api/uploads` -> `{ items: UploadJob[] }`: the owner's active jobs plus
   their 50 most recent terminal jobs. Other guests and administrators cannot read them.
 - `GET /api/uploads/{id}` -> `UploadJob`, only for its owner; otherwise 404.
-- `GET /api/photos/{id}/image` -> original image or normalized MP4 video;
-  `?size=thumb` -> JPEG thumbnail. Video requests support authenticated byte ranges.
+- `GET /api/photos/{id}/image` -> stored original image or video;
+  `?size=thumb` -> JPEG thumbnail. `?download=1` -> attachment containing the
+  same file. Videos converted by earlier versions keep their existing MP4.
+  The server supplies the download filename and MIME type.
+  `size=thumb` takes precedence if both parameters are provided. These variants
+  support authenticated HEAD and byte-range requests with the same permissions.
 - `DELETE /api/photos/{id}` -> 204, only author or admin with access to its category.
 
 Private categories are administrator-only, including for their uploaders. Every
@@ -355,12 +382,18 @@ Videos accept MP4, MOV and WebM, up to 5 minutes and 4K input.
 Both accept whole MiB from 1 to 1024. The browser uses these values for selection
 validation and displayed limits. Go validates file content and enforces its
 corresponding limit independently of client headers.
-The server inspects file contents, converts videos to H.264/AAC MP4 at up to
-1280×720 and 30 fps, and generates JPEG thumbnails. Uploaded video originals
-are discarded after conversion. Media and thumbnails stay authenticated.
-The UI uploads a bounded queue with per-file progress and retry. Thumbnails
+The server inspects file contents and generates JPEG thumbnails. Uploaded videos
+are retained byte-for-byte for playback and download, preserving resolution,
+frame rate, codecs, audio and metadata. FFmpeg only creates the thumbnail; the
+video is never re-encoded or downscaled. Native browser playback depends on its
+support for the original container and codecs. Previously converted videos remain
+usable, but their deleted inputs cannot be recovered. Originals and thumbnails
+stay authenticated, survive restart recovery and are removed together.
+The UI uploads a bounded queue with one combined progress bar, a sent/total file
+counter and per-file status and retry. Server acceptance counts as sent;
+preparation can continue afterward. Thumbnails
 are at most 720 pixels per side. The gallery is capped at 5000 files and
-10 GiB; new upload accounting includes the playback/original file and thumbnail.
+10 GiB; new upload accounting includes the image/video original and thumbnail.
 `UploadJob = { id, clientUploadId, categoryId: number | null, welcomeRevision: number | null, welcomeWidgetIndex: number | null, status: "queued" | "processing" | "ready" | "failed", filename, kind: "image" | "video", createdAt, errorCode: string | null, photo: Photo | null }`
 
 202 confirms the raw input and queue record have been saved. Preparation continues

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getParty } from "@/features/party/server";
 import { getSession } from "@/features/guests/server";
 import { getBirthdayConfig } from "@/features/party/birthday-config";
@@ -35,10 +36,14 @@ export default async function PartyLayout({
             <strong>{party.title || title || t("birthday.fallback")}</strong>
           </div>
         </div>
-        <div className="guest-chip">
+        <Link
+          className="guest-chip"
+          href="/parametres"
+          aria-label={`${t("nav.settings")}: ${guest.name}`}
+        >
           <Avatar name={guest.name} avatarUrl={guest.avatarUrl} />
           <span>{guest.name}</span>
-        </div>
+        </Link>
       </header>
       <UploadProvider>
         <main id="content" className="main-content">

@@ -108,7 +108,10 @@ export function ProfilePhotoEditor({
       role="group"
       aria-labelledby={`${id}-title`}
     >
-      <h3 id={`${id}-title`}>{t("profile.photo")}</h3>
+      <h3 id={`${id}-title`}>
+        <Camera size={19} aria-hidden="true" />
+        {t("profile.photo")}
+      </h3>
       <p className="fine-print" id={`${id}-hint`}>
         {t("profile.formats", { size })}
       </p>

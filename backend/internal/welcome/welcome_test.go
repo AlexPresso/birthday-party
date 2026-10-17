@@ -43,9 +43,6 @@ func TestHostUnlockPreservesGuestPositionAndRevision(t *testing.T) {
 	if _, err = Transition(state, 4, "next"); !errors.Is(err, ErrConflict) {
 		t.Fatalf("stale host command error=%v", err)
 	}
-	if _, err = Edit(unlocked, 5, []Step{}); !errors.Is(err, ErrStepsLocked) {
-		t.Fatalf("unlocked edit error=%v", err)
-	}
 }
 
 func TestRequiredLateArrivalNavigatesBeforeFinishing(t *testing.T) {

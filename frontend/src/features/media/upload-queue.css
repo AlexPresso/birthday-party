@@ -1,0 +1,19 @@
+.upload-progress-summary {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.upload-progress-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.upload-progress-summary progress {
+  height: 6px;
+  margin: 0;
+}

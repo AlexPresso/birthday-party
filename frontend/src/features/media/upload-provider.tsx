@@ -35,7 +35,7 @@ export type UploadDestination = {
   welcomeWidgetIndex: number | null;
 };
 
-type Transfer = UploadDestination & {
+export type Transfer = UploadDestination & {
   clientUploadId: string;
   file: File;
   status: "queued" | "uploading" | "error";

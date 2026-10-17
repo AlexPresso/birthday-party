@@ -8,6 +8,7 @@ import { ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 import { ProfilePhotoEditor } from "@/features/profile/profile-photo-editor";
 import { NotificationControl } from "@/features/notifications/notification-control";
+import "./settings.css";
 
 export function SettingsPanel({
   guest,
@@ -39,28 +40,34 @@ export function SettingsPanel({
     }
   }
   return (
-    <section className="profile-card panel">
-      <Avatar name={guest.name} avatarUrl={photo.url} className="large" />
-      <div>
-        <h2>{guest.name}</h2>
-        <span className="status-label">
-          {guest.role === "admin" ? t("settings.host") : t("settings.guest")}
-        </span>
+    <section className="settings-profile panel">
+      <header className="settings-identity">
+        <Avatar name={guest.name} avatarUrl={photo.url} className="large" />
+        <div>
+          <h2>{guest.name}</h2>
+          <span className="status-label">
+            {guest.role === "admin" ? t("settings.host") : t("settings.guest")}
+          </span>
+        </div>
+        <p className="muted">{t("settings.attribution")}</p>
+      </header>
+      <div className="settings-controls">
+        <ProfilePhotoEditor
+          avatarUrl={photo.url}
+          imageBytes={imageBytes}
+          onSaved={(updated) =>
+            setPhoto((current) => ({ ...current, url: updated.avatarUrl }))
+          }
+        />
+        <NotificationControl />
       </div>
-      <p className="muted">{t("settings.attribution")}</p>
-      <ProfilePhotoEditor
-        avatarUrl={photo.url}
-        imageBytes={imageBytes}
-        onSaved={(updated) =>
-          setPhoto((current) => ({ ...current, url: updated.avatarUrl }))
-        }
-      />
-      <NotificationControl />
-      <button className="button secondary" disabled={busy} onClick={logout}>
-        <LogOut size={17} />
-        {busy ? t("settings.signingOut") : t("settings.signOut")}
-      </button>
-      <ErrorNotice message={error} />
+      <footer className="settings-account">
+        <button className="text-button" disabled={busy} onClick={logout}>
+          <LogOut size={17} />
+          {busy ? t("settings.signingOut") : t("settings.signOut")}
+        </button>
+        <ErrorNotice message={error} />
+      </footer>
     </section>
   );
 }

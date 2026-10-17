@@ -1,7 +1,6 @@
 package mediafiles
 
 import (
-	"birthday-party/backend/internal/media"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"birthday-party/backend/internal/media"
 )
 
 const maxVideoSeconds = 300
@@ -54,10 +55,16 @@ type videoProbe struct {
 		Disposition struct {
 			AttachedPicture int `json:"attached_pic"`
 		} `json:"disposition"`
+		SideData []struct {
+			Rotation float64 `json:"rotation"`
+		} `json:"side_data_list"`
 	} `json:"streams"`
 	Format struct {
 		Name     string `json:"format_name"`
 		Duration string `json:"duration"`
+		Tags     struct {
+			MajorBrand string `json:"major_brand"`
+		} `json:"tags"`
 	} `json:"format"`
 }
 
@@ -120,7 +127,7 @@ func probeVideo(ctx context.Context, path, format string) (videoProbe, error) {
 	defer cancel()
 	args := []string{"-v", "error", "-max_alloc", "134217728"}
 	args = append(args, videoInputArgs(format)...)
-	args = append(args, "-show_error", "-show_entries", "error=code:format=format_name,duration:stream=codec_type,codec_name,width,height,duration,channels:stream_disposition=attached_pic", "-of", "json", path)
+	args = append(args, "-show_error", "-show_entries", "error=code:format=format_name,duration:format_tags=major_brand:stream=codec_type,codec_name,width,height,duration,channels:stream_disposition=attached_pic:stream_side_data=rotation", "-of", "json", path)
 	cmd := exec.CommandContext(ctx, "ffprobe", args...)
 	var output limitedProbeOutput
 	cmd.Stdout = &output
@@ -198,7 +205,7 @@ func runFFmpeg(ctx context.Context, args []string) error {
 	if err == nil {
 		return nil
 	}
-	cause := &videoCommandError{"video conversion", errors.Join(err, ctx.Err())}
+	cause := &videoCommandError{"video processing", errors.Join(err, ctx.Err())}
 	var exit *exec.ExitError
 	if ctx.Err() == nil && errors.As(err, &exit) && exit.ExitCode() >= 0 && diagnostics.invalidInput() {
 		return errors.Join(&media.Error{Code: "video_processing_failed"}, cause)
@@ -244,6 +251,13 @@ func (p videoProbe) validate(maxSeconds float64) (int, int, error) {
 		if max(width, height) > 4096 || min(width, height) > 2160 || int64(width)*int64(height) > maxVideoPixels {
 			return 0, 0, &media.Error{Code: "video_dimensions_too_large"}
 		}
+		// Keep the gallery aspect ratio aligned with rotated phone playback and previews.
+		for _, data := range stream.SideData {
+			if math.Mod(math.Abs(data.Rotation), 180) == 90 {
+				width, height = height, width
+				break
+			}
+		}
 	}
 	if width == 0 {
 		return 0, 0, invalid
@@ -251,66 +265,37 @@ func (p videoProbe) validate(maxSeconds float64) (int, int, error) {
 	return width, height, nil
 }
 
-func prepareVideo(ctx context.Context, inputPath, workDir, format string, maxInputBytes int64) (preparedMedia, error) {
+func prepareVideo(ctx context.Context, inputPath, workDir, format string) (preparedMedia, error) {
 	probe, err := probeVideo(ctx, inputPath, format)
 	if err != nil {
 		return preparedMedia{}, err
 	}
-	if _, _, err := probe.validate(maxVideoSeconds); err != nil {
+	width, height, err := probe.validate(maxVideoSeconds)
+	if err != nil {
 		return preparedMedia{}, err
 	}
 	prepared := preparedMedia{
-		path: filepath.Join(workDir, "video.mp4"), thumbnailPath: filepath.Join(workDir, "thumb.jpg"),
-		mimeType: "video/mp4", extension: "mp4",
+		path: inputPath, thumbnailPath: filepath.Join(workDir, "thumb.jpg"),
+		width: width, height: height,
+	}
+	prepared.extension, prepared.mimeType, err = originalVideoType(inputPath, probe)
+	if err != nil {
+		return preparedMedia{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	// Conversion may grow a small input. Bound its output separately from uploads.
-	maxOutputBytes := max(maxInputBytes, defaultMaxVideoBytes)
+	// Only the preview is resized. Playback and downloads use the untouched input.
 	args := []string{"-nostdin", "-v", "error", "-xerror", "-max_alloc", "134217728", "-filter_threads", "2"}
 	args = append(args, videoInputArgs(format)...)
 	args = append(args,
-		"-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1", "-map_chapters", "-1",
-		"-vf", "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1,fps=30",
-		"-c:v", "libx264", "-preset", "veryfast", "-crf", "24", "-maxrate", "2200k", "-bufsize", "4400k",
-		"-pix_fmt", "yuv420p", "-threads", "2", "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "48000",
-		"-t", "300.1", "-fs", strconv.FormatInt(maxOutputBytes+1, 10), "-movflags", "+faststart", "-f", "mp4", prepared.path,
+		"-i", inputPath, "-map", "0:v:0", "-frames:v", "1", "-map_metadata", "-1", "-map_chapters", "-1",
+		"-vf", "scale=720:720:force_original_aspect_ratio=decrease", "-threads", "2", "-q:v", "3", "-update", "1", prepared.thumbnailPath,
 	)
 	if err := runFFmpeg(ctx, args); err != nil {
 		return preparedMedia{}, err
 	}
-	info, err := os.Stat(prepared.path)
-	if err != nil {
+	if err := os.Chmod(prepared.thumbnailPath, 0600); err != nil {
 		return preparedMedia{}, err
-	}
-	if info.Size() > maxOutputBytes {
-		return preparedMedia{}, &media.Error{Code: "video_processing_failed"}
-	}
-	normalized, err := probeVideo(ctx, prepared.path, "mov")
-	if err != nil {
-		return preparedMedia{}, err
-	}
-	// AAC packet boundaries can extend a valid five-minute input by milliseconds.
-	prepared.width, prepared.height, err = normalized.validate(maxVideoSeconds + 0.1)
-	if err != nil {
-		return preparedMedia{}, err
-	}
-	inputDuration, _ := strconv.ParseFloat(probe.Format.Duration, 64)
-	outputDuration, _ := strconv.ParseFloat(normalized.Format.Duration, 64)
-	// A size guard or damaged input must not turn a shortened clip into success.
-	if outputDuration+0.15 < inputDuration {
-		return preparedMedia{}, &media.Error{Code: "video_processing_failed"}
-	}
-	args = []string{"-nostdin", "-v", "error", "-max_alloc", "134217728", "-filter_threads", "2"}
-	args = append(args, videoInputArgs("mov")...)
-	args = append(args, "-i", prepared.path, "-map", "0:v:0", "-frames:v", "1", "-vf", "scale=720:720:force_original_aspect_ratio=decrease", "-threads", "2", "-q:v", "3", "-update", "1", prepared.thumbnailPath)
-	if err := runFFmpeg(ctx, args); err != nil {
-		return preparedMedia{}, err
-	}
-	for _, path := range []string{prepared.path, prepared.thumbnailPath} {
-		if err := os.Chmod(path, 0600); err != nil {
-			return preparedMedia{}, err
-		}
 	}
 	return prepared, nil
 }
