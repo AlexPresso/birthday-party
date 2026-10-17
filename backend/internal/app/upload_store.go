@@ -153,7 +153,11 @@ func (a *App) enqueueUpload(ctx context.Context, guestID int64, clientID string,
 	// A lost commit response is ambiguous. Keep the spool file so a retry with the
 	// same client ID can recover a committed job; startup removes unused files.
 	retained = true
-	return job, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return job, err
+	}
+	a.realtime.notify(guestID, realtimeUploads)
+	return job, nil
 }
 
 func (a *App) claimUpload(ctx context.Context) (pendingUpload, error) {
@@ -178,5 +182,9 @@ func (a *App) claimUpload(ctx context.Context) (pendingUpload, error) {
 	if err != nil {
 		return job, err
 	}
-	return job, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return job, err
+	}
+	a.realtime.notify(job.guestID, realtimeUploads)
+	return job, nil
 }

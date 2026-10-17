@@ -108,6 +108,7 @@ func (a *App) prepareAndStoreUpload(ctx context.Context, job pendingUpload) erro
 	if err = tx.Commit(); err != nil {
 		return err
 	}
+	a.realtime.notify(job.guestID, realtimeUploads)
 	return nil
 }
 

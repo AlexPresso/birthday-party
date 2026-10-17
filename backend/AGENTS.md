@@ -90,6 +90,24 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - Make unlock boundary behavior explicit and test immediately before, at, and after the boundary.
   Pass a clock or time value into time-sensitive logic when useful for deterministic tests.
 
+## Realtime connections
+
+Serve authenticated WebSockets at `/api/realtime`, including during welcome.
+Require the exact configured public origin and the existing session cookie;
+never accept a session token in a URL. Bound connections and queued signals.
+Send only topic invalidations, with no private records or authored content.
+Emit changes after database commit, target guest progress and uploads to their
+owner, and filter programme updates by current access. The existing HTTP handlers
+remain the authority for data and permissions. Recheck the session after joining
+the hub so a concurrent logout cannot leave an authenticated socket behind.
+
+Use bounded writes, ping/pong, application heartbeats and session-expiry handling.
+Disconnect sessions on logout or revocation. Track hijacked connections through
+shutdown; every goroutine must terminate before closing the database. Run one
+programme timer for the next scheduled unlock and reschedule after host edits.
+Realtime delivery is transient: browsers resynchronize after reconnect. Keep
+durable media jobs and Web Push delivery independent of browser connections.
+
 ## Notifications
 
 Web Push subscriptions are private session data. Permit creation for full-access

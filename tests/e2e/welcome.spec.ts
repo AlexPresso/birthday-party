@@ -307,8 +307,9 @@ test("guests navigate unlocked steps independently and keep their position acros
   await page.route("**/api/welcome", (route) => route.abort("failed"), {
     times: 1,
   });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   const connectionError = page.getByText(
-    "Impossible de vérifier s’il y a du nouveau. On réessaie automatiquement.",
+    "Impossible de vérifier s’il y a du nouveau.",
     { exact: true },
   );
   await expect(connectionError).toBeVisible();
@@ -631,20 +632,16 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
   await page
     .locator(".welcome-control")
     .screenshot({ path: "artifacts/welcome-progress/host-unlock-mobile.png" });
-  await page
-    .locator(".welcome-required")
-    .screenshot({
-      path: "artifacts/welcome-progress/host-required-mobile.png",
-    });
+  await page.locator(".welcome-required").screenshot({
+    path: "artifacts/welcome-progress/host-required-mobile.png",
+  });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page
     .locator(".welcome-control")
     .screenshot({ path: "artifacts/welcome-progress/host-unlock-desktop.png" });
-  await page
-    .locator(".welcome-required")
-    .screenshot({
-      path: "artifacts/welcome-progress/host-required-desktop.png",
-    });
+  await page.locator(".welcome-required").screenshot({
+    path: "artifacts/welcome-progress/host-required-desktop.png",
+  });
   await expect(action).toBeDisabled();
   await pressTransition("Débloquer l’étape suivante");
   expect(await adminState()).toMatchObject({ open: false, currentStep: 2 });
@@ -1597,9 +1594,12 @@ test("a welcome profile action becomes available only for its step and keeps the
   });
   await expect(preview).toBeVisible();
   const previewURL = await preview.getAttribute("src");
-  await page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/welcome",
-  );
+  await Promise.all([
+    page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/welcome",
+    ),
+    page.evaluate(() => window.dispatchEvent(new Event("focus"))),
+  ]);
   await expect(preview).toHaveAttribute("src", previewURL!);
   await page.screenshot({
     path: "test-results/welcome-photo-preview-mobile.png",

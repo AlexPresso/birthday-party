@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Gift,
@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
+import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
+import { retryRealtime, subscribeRealtime } from "@/lib/realtime-browser";
 import {
   eventsSchema,
   formatDate,
@@ -29,70 +31,42 @@ export function Programme({
   const { locale, t } = useI18n();
   const [events, setEvents] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  const [connectionFailed, setConnectionFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const retry = useRef<() => void>(() => {});
 
   useEffect(() => {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    const schedule = (items: PartyEvent[]) => {
-      const instants = items
-        .filter((event) => event.locked && event.unlockAt)
-        .map((event) => Date.parse(event.unlockAt!));
-      // Re-fetch at an unlock boundary; periodic refresh also discovers host edits.
-      const delay = instants.length
-        ? Math.min(
-            60000,
-            Math.max(5000, Math.min(...instants) - Date.now() + 500),
-          )
-        : 60000;
-      timer = setTimeout(refresh, delay);
-    };
-    const refresh = async () => {
-      if (document.hidden) {
-        timer = setTimeout(refresh, 60000);
-        return;
-      }
-      try {
+    let disposed = false;
+    const refresh = createInvalidationRefresh(
+      async (signal) => {
         const data = await api("/programme", eventsSchema, {
-          signal: controller.signal,
+          signal,
         });
+        signal.throwIfAborted();
         setEvents(data.items);
         setError(null);
-        schedule(data.items);
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(err, t));
-          timer = setTimeout(refresh, 60000);
-        }
-      }
+      },
+      (err) => setError(errorMessage(err, t)),
+    );
+    retry.current = () => {
+      retryRealtime();
+      setBusy(true);
+      void refresh.request().finally(() => {
+        if (!disposed) setBusy(false);
+      });
     };
-    const visible = () => {
-      if (!document.hidden) {
-        clearTimeout(timer);
-        void refresh();
-      }
-    };
-    schedule(initial);
-    document.addEventListener("visibilitychange", visible);
+    const unsubscribe = subscribeRealtime(
+      "programme",
+      () => void refresh.request(),
+      (connected) => setConnectionFailed(!connected),
+    );
     return () => {
-      controller.abort();
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", visible);
+      disposed = true;
+      retry.current = () => {};
+      unsubscribe();
+      refresh.dispose();
     };
   }, [initial, t]);
-
-  async function refreshNow() {
-    setBusy(true);
-    try {
-      const data = await api("/programme", eventsSchema);
-      setEvents(data.items);
-      setError(null);
-    } catch (err) {
-      setError(errorMessage(err, t));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <>
@@ -102,7 +76,7 @@ export function Programme({
       >
         <button
           className="icon-button"
-          onClick={refreshNow}
+          onClick={() => retry.current()}
           disabled={busy}
           aria-label={t("programme.refresh")}
         >
@@ -127,7 +101,11 @@ export function Programme({
           )}
         </div>
       )}
-      <ErrorNotice message={error} />
+      <ErrorNotice
+        message={
+          error ?? (connectionFailed ? t("common.connectionFailed") : null)
+        }
+      />
       {events.length === 0 ? (
         <EmptyState
           icon={<CalendarDays size={36} strokeWidth={1.4} />}

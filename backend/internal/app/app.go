@@ -127,23 +127,25 @@ type Author struct {
 // App owns the database pool, background workers and authenticated HTTP handlers.
 // Construct it with Open and release its resources with Close.
 type App struct {
-	db                 *sql.DB
-	config             Config
-	now                func() time.Time
-	receivers          chan struct{}
-	avatarProcessors   chan struct{}
-	workerMu           sync.Mutex
-	workerCancel       context.CancelFunc
-	workerConn         *sql.Conn
-	workerErrors       chan error
-	workers            sync.WaitGroup
-	closeOnce          sync.Once
-	closeErr           error
-	authMu             sync.Mutex
-	authWindow         time.Time
-	authCount          int
-	notificationKeys   notificationKeys
-	notificationClient webpush.HTTPClient
+	db                  *sql.DB
+	config              Config
+	now                 func() time.Time
+	receivers           chan struct{}
+	avatarProcessors    chan struct{}
+	workerMu            sync.Mutex
+	workerCancel        context.CancelFunc
+	workerConn          *sql.Conn
+	workerErrors        chan error
+	workers             sync.WaitGroup
+	closeOnce           sync.Once
+	closeErr            error
+	authMu              sync.Mutex
+	authWindow          time.Time
+	authCount           int
+	notificationKeys    notificationKeys
+	notificationClient  webpush.HTTPClient
+	realtime            *realtimeHub
+	programmeReschedule chan struct{}
 }
 
 // Open prepares private storage, opens PostgreSQL and applies pending migrations.
@@ -183,13 +185,14 @@ func Open(config Config) (*App, error) {
 		db.Close()
 		return nil, fmt.Errorf("load notification keys: %w", err)
 	}
-	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), avatarProcessors: make(chan struct{}, 1), workerErrors: make(chan error, 1), notificationKeys: keys, notificationClient: newNotificationClient()}, nil
+	return &App{db: db, config: config, now: time.Now, receivers: make(chan struct{}, 4), avatarProcessors: make(chan struct{}, 1), workerErrors: make(chan error, 1), notificationKeys: keys, notificationClient: newNotificationClient(), realtime: newRealtimeHub(), programmeReschedule: make(chan struct{}, 1)}, nil
 }
 
 // Close cancels and waits for workers, releases their lock and closes the database.
 // Repeated calls return the result of the first call.
 func (a *App) Close() error {
 	a.closeOnce.Do(func() {
+		a.realtime.close()
 		a.workerMu.Lock()
 		if a.workerCancel != nil {
 			a.workerCancel()
@@ -215,6 +218,7 @@ func (a *App) Handler() http.Handler {
 		respond(w, 200, map[string]any{"guest": guest})
 	}))
 	mux.HandleFunc("POST /api/logout", a.auth(false, a.logout))
+	mux.HandleFunc("GET /api/realtime", a.realtimeHTTP)
 	mux.HandleFunc("GET /api/notifications", a.auth(false, a.getNotifications))
 	mux.HandleFunc("POST /api/notifications/status", a.auth(false, a.notificationStatus))
 	mux.HandleFunc("PUT /api/notifications/subscription", a.auth(false, a.saveNotificationSubscription))

@@ -220,7 +220,7 @@ func (a *App) updateWelcome(w http.ResponseWriter, r *http.Request, _ Guest) {
 		}
 	}
 	state.Steps = input.Steps
-	if err := saveWelcome(r.Context(), tx, &state); err != nil {
+	if err := a.saveWelcome(r.Context(), tx, &state); err != nil {
 		internal(w, err)
 		return
 	}
@@ -277,14 +277,14 @@ func (a *App) transitionWelcome(w http.ResponseWriter, r *http.Request, _ Guest)
 		internal(w, err)
 		return
 	}
-	if err := saveWelcome(r.Context(), tx, &state); err != nil {
+	if err := a.saveWelcome(r.Context(), tx, &state); err != nil {
 		internal(w, err)
 		return
 	}
 	respond(w, 200, state)
 }
 
-func saveWelcome(ctx context.Context, tx *sql.Tx, state *welcomeState) error {
+func (a *App) saveWelcome(ctx context.Context, tx *sql.Tx, state *welcomeState) error {
 	steps, err := json.Marshal(state.Steps)
 	if err != nil {
 		return err
@@ -293,5 +293,9 @@ func saveWelcome(ctx context.Context, tx *sql.Tx, state *welcomeState) error {
 	if _, err = tx.ExecContext(ctx, "UPDATE welcome SET is_open=$1,revision=$2,current_step=$3,steps=$4,required=$5,generation=$6 WHERE id=1", state.Open, state.Revision, state.CurrentStep, steps, state.Required, state.Generation); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	a.realtime.notify(0, realtimeWelcome)
+	return nil
 }

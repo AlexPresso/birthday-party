@@ -206,6 +206,7 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 		internal(w, err)
 		return
 	}
+	a.programmeChanged()
 	respond(w, 201, eventView(Event{ID: id, Title: input.Title, Description: input.Description, Teaser: input.Teaser, StartsAt: input.StartsAt, UnlockAt: input.UnlockAt}, a.now(), true))
 }
 
@@ -222,6 +223,7 @@ func (a *App) updateEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 	if !affected(w, result, err) {
 		return
 	}
+	a.programmeChanged()
 	respond(w, 200, eventView(Event{ID: id, Title: input.Title, Description: input.Description, Teaser: input.Teaser, StartsAt: input.StartsAt, UnlockAt: input.UnlockAt}, a.now(), true))
 }
 
@@ -232,6 +234,7 @@ func (a *App) deleteEvent(w http.ResponseWriter, r *http.Request, _ Guest) {
 	}
 	result, err := a.db.ExecContext(r.Context(), "DELETE FROM events WHERE id=$1", id)
 	if affected(w, result, err) {
+		a.programmeChanged()
 		w.WriteHeader(204)
 	}
 }

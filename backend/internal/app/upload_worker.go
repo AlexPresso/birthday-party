@@ -68,7 +68,12 @@ func (a *App) StartWorkers(parent context.Context) error {
 	if _, err = recovery.ExecContext(startup, "SELECT pg_advisory_xact_lock(hashtext(current_schema()),73003)"); err != nil {
 		return failStart(err)
 	}
-	if _, err = recovery.ExecContext(startup, "UPDATE upload_jobs SET status='queued',updated_at=$1 WHERE status='processing'", stamp(a.now())); err != nil {
+	recovered, err := recovery.QueryContext(startup, "UPDATE upload_jobs SET status='queued',updated_at=$1 WHERE status='processing' RETURNING guest_id", stamp(a.now()))
+	if err != nil {
+		return failStart(err)
+	}
+	owners, err := readUploadOwners(recovered)
+	if err != nil {
 		return failStart(err)
 	}
 	if err = a.recoverUploadFiles(startup); err != nil {
@@ -76,6 +81,9 @@ func (a *App) StartWorkers(parent context.Context) error {
 	}
 	if err = recovery.Commit(); err != nil {
 		return failStart(err)
+	}
+	for owner := range owners {
+		a.realtime.notify(owner, realtimeUploads)
 	}
 	ctx, cancel := context.WithCancel(parent)
 	a.workerCancel = cancel
@@ -86,6 +94,8 @@ func (a *App) StartWorkers(parent context.Context) error {
 	}
 	a.workers.Add(1)
 	go func() { defer a.workers.Done(); a.notificationWorker(ctx) }()
+	a.workers.Add(1)
+	go func() { defer a.workers.Done(); a.programmeWorker(ctx) }()
 	a.workers.Add(1)
 	go func() {
 		defer a.workers.Done()
@@ -179,6 +189,7 @@ func (a *App) processUpload(ctx context.Context, job pendingUpload) {
 		}
 		var status string
 		if a.db.QueryRowContext(updateCtx, "SELECT status FROM upload_jobs WHERE id=$1", job.id).Scan(&status) == nil && status == "ready" {
+			a.realtime.notify(job.guestID, realtimeUploads)
 			os.Remove(filepath.Join(a.config.DataDir, "uploads", job.key+".input"))
 			return
 		}
@@ -190,6 +201,7 @@ func (a *App) processUpload(ctx context.Context, job pendingUpload) {
 		}
 		if updateErr == nil {
 			if count, _ := result.RowsAffected(); count > 0 {
+				a.realtime.notify(job.guestID, realtimeUploads)
 				a.removeAttemptOutputs(job)
 			}
 		}
@@ -207,6 +219,7 @@ func (a *App) processUpload(ctx context.Context, job pendingUpload) {
 		return
 	}
 	if count, _ := result.RowsAffected(); count > 0 {
+		a.realtime.notify(job.guestID, realtimeUploads)
 		os.Remove(filepath.Join(a.config.DataDir, "uploads", job.key+".input"))
 	}
 	a.removeAttemptOutputs(job)

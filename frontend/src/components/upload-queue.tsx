@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
 import { Upload, Check, RotateCw, X } from "lucide-react";
 import { responseError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
@@ -165,7 +166,43 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
           )}
         </section>
       )}
-      {widgetIndex === undefined && <ErrorNotice message={uploads.error} />}
+      {widgetIndex === undefined && <UploadQueueError />}
     </>
+  );
+}
+
+export function UploadQueueError() {
+  const { error, refresh } = useUploads();
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  if (!error) return null;
+  return (
+    <div
+      className="upload-error"
+      role="group"
+      aria-label={t("photos.uploadQueue")}
+    >
+      <ErrorNotice message={error} />
+      <button
+        type="button"
+        className="button secondary"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void refresh().finally(() => {
+            if (mounted.current) setBusy(false);
+          });
+        }}
+      >
+        {t("common.retry")}
+      </button>
+    </div>
   );
 }

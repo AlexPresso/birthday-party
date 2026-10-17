@@ -81,6 +81,16 @@ func (a *App) recoverUploadFiles(ctx context.Context) error {
 func (a *App) cleanUploadHistory(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, workerQueryTimeout)
 	defer cancel()
-	_, err := a.db.ExecContext(ctx, "DELETE FROM upload_jobs WHERE status IN ('ready','failed') AND updated_at::timestamptz<$1::timestamptz", stamp(a.now().Add(-uploadHistoryTTL)))
-	return err
+	rows, err := a.db.QueryContext(ctx, "DELETE FROM upload_jobs WHERE status IN ('ready','failed') AND updated_at::timestamptz<$1::timestamptz RETURNING guest_id", stamp(a.now().Add(-uploadHistoryTTL)))
+	if err != nil {
+		return err
+	}
+	owners, err := readUploadOwners(rows)
+	if err != nil {
+		return err
+	}
+	for owner := range owners {
+		a.realtime.notify(owner, realtimeUploads)
+	}
+	return nil
 }

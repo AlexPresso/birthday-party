@@ -472,9 +472,12 @@ test("several media widgets keep separate destinations and queues alongside a pr
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,
   );
-  await page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/welcome",
-  );
+  await Promise.all([
+    page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/welcome",
+    ),
+    page.evaluate(() => window.dispatchEvent(new Event("focus"))),
+  ]);
   await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,

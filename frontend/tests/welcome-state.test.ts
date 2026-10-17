@@ -13,7 +13,7 @@ const waiting: Welcome = {
   canFinish: false,
 };
 
-test("welcome polls update unlock controls without replacing identical state", () => {
+test("welcome updates unlock controls without replacing identical state", () => {
   assert.equal(latestWelcome(null, waiting), waiting);
   assert.equal(latestWelcome(waiting, { ...waiting }), waiting);
   const unlocked = { ...waiting, revision: 4, canNext: true };
@@ -21,7 +21,7 @@ test("welcome polls update unlock controls without replacing identical state", (
   assert.equal(latestWelcome(unlocked, waiting), unlocked);
 });
 
-test("a guest navigation response takes precedence over an older concurrent poll", () => {
+test("a guest navigation response takes precedence over an older concurrent read", () => {
   const unlocked = { ...waiting, revision: 5, canNext: true };
   const moved: Welcome = {
     ...waiting,

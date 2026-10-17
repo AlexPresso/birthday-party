@@ -29,7 +29,8 @@ import { useWelcome } from "@/lib/use-welcome";
 import { ErrorNotice } from "./ui";
 import { WelcomeProfile } from "./welcome-profile";
 import { WelcomeMedia } from "./welcome-media";
-import { UploadProvider, useUploads } from "./upload-provider";
+import { UploadProvider } from "./upload-provider";
+import { UploadQueueError } from "./upload-queue";
 import "./waiting-room.css";
 
 export function WaitingRoom({
@@ -307,18 +308,13 @@ function WelcomeWidgets({
       })}
     </div>
   );
-  // One provider bounds transfers and queue polling across every widget in this step.
+  // One provider bounds transfers and shares queue updates across this step.
   return step.widgets.some((widget) => widget.type === "media_upload") ? (
     <UploadProvider welcomeRevision={revision}>
       {content}
-      <WelcomeUploadError />
+      <UploadQueueError />
     </UploadProvider>
   ) : (
     content
   );
-}
-
-function WelcomeUploadError() {
-  const { error } = useUploads();
-  return <ErrorNotice message={error} />;
 }

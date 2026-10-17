@@ -111,6 +111,16 @@ entering a custom name.
 
 ## Sessions and interface behavior
 
+Use one shared WebSocket connection per browser tab for `welcome`, `uploads` and
+`programme` invalidations. Validate the small message contract and refetch only
+the affected mounted resources through the existing API. Initial subscription,
+reconnection and return to a visible page resynchronize current state. Coalesce
+signals during a request into a trailing refresh; abort requests on unmount.
+Reconnect with bounded, jittered backoff and detect stalled connections using
+heartbeats. Do not add recurring HTTP polling as a fallback. Session close code
+4401 requires a full navigation to the invitation page. Release the socket and
+listeners when the last consumer unmounts. Server timers signal programme unlocks.
+
 The shared layout validates the backend session and forwards cookies on private
 server fetches with `cache: "no-store"`. The backend owns the HttpOnly cookie.
 Use a full navigation after logout or session expiry to discard the private
@@ -121,8 +131,9 @@ them, and removed after deliberate acceptance.
 The host-controlled welcome uses `/attente`, outside the party layout. API status
 423 means guests must return there; handle it in server fetches, client API calls
 and upload requests. Never fetch or embed future welcome steps in guest pages.
-Guest browsers poll `/api/welcome` every three seconds while visible, pause while
-hidden, and check on return. Keep the displayed step during connection failures.
+Guest browsers share one authenticated `/api/realtime` WebSocket with upload and
+programme updates. Refresh `/api/welcome` on its invalidation signal, connection
+readiness and return to the page. Keep the displayed step during connection failures.
 Use a full navigation when effective guest access closes to discard cached private
 routes. Host commands unlock steps; each guest chooses next/previous and enters
 explicitly with finish. The public `open` field describes that guest's effective
@@ -131,7 +142,7 @@ switch makes late arrivals follow the full sequence even after host opening.
 Administrators retain the four tabs and unlock steps in settings. Save the switch
 separately without losing step drafts. Preserve drafts on conflicts. Already
 unlocked steps stay immutable until the host restarts from an open application.
-Polls carry host `revision` and guest `progressRevision`; compare both and reject
+Responses carry host `revision` and guest `progressRevision`; compare both and reject
 older responses after navigation. Key widgets by `progressRevision`, which host
 unlocks preserve, so uploads and profile selections remain active.
 Each step has an ordered list of typed widgets and no fixed title or body fields.
@@ -139,7 +150,7 @@ Render title, text, profile-photo, media-upload and notification widgets in thei
 saved order.
 The current `profile_photo` widget mounts the shared photo editor on `/attente`
 and fetches `/api/profile` only while active.
-Keep it across unchanged polls; unmount and abort requests when the step changes.
+Keep it across unchanged responses; unmount and abort requests when the step changes.
 Keep interactive controls outside the text's atomic live region. Saving a photo
 updates the widget without refreshing or advancing the welcome route.
 The host editor keeps stable draft keys while selecting or reordering steps.
@@ -154,7 +165,7 @@ at most one profile-photo widget and one notification widget, neither with
 settings. Text and media widgets can repeat. Strip local draft keys before saving.
 Each media-upload widget has a typed category destination. Fetch its upload
 context by widget index only while current, and key the step by progress revision.
-Share one bounded uploader and queue poller across the step's media widgets;
+Share one bounded uploader and queue subscription across the step's media widgets;
 filter displayed queues and dismissal by widget index. Capture the destination,
 progress revision and widget index per transfer and retry,
 and abort unaccepted browser transfers when the step changes. Accepted jobs remain
@@ -187,8 +198,9 @@ Authenticated media deliberately uses native images: the Go service already
 creates thumbnails, and Next image optimization would not forward guest cookies.
 Uploads accept at most 20 selected files and run two requests concurrently.
 The authenticated layout owns transfers so tab navigation does not cancel them.
-POST /api/photos returns a persistent job with 202. Poll the owner's /api/uploads
-queue, distinguish transfer from waiting/preparation, and refresh the gallery
+POST /api/photos returns a persistent job with 202. Refresh the owner's /api/uploads
+queue when its WebSocket signal arrives, distinguish transfer from waiting/preparation,
+and refresh the gallery
 when a job becomes ready. Reload restores accepted jobs; unsent browser files
 still require the page to remain open. Reuse X-Upload-ID for ambiguous retries.
 Each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos

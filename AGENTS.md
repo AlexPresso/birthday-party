@@ -143,6 +143,12 @@ use, a personal visual identity, simple code, and responsive interactions.
   intact; SQLite is used only for this legacy import.
 - The frontend proxies same-origin `/api/*` to Go. The public API contract is in
   `docs/api.md`; keep frontend validators and backend responses aligned.
+- Use one shared, authenticated `/api/realtime` WebSocket per browser tab for
+  welcome, upload queue and programme updates. Send scoped invalidation signals
+  after database commits; fetch current data through the authorized HTTP APIs.
+  Reconnect with backoff and resynchronize after reconnect or returning to the
+  page. Do not restore recurring browser HTTP polling. Keep socket payloads free
+  of private content, and close connections when their session loses access.
 - The media gallery retains `/photos` and `/api/photos` for existing links.
   Videos use FFmpeg to produce private MP4 playback files and JPEG thumbnails;
   Compose includes FFmpeg. Keep processing and file sizes bounded.

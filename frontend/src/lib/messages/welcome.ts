@@ -12,8 +12,7 @@ const en = {
   "welcome.moving": "Loading…",
   "welcome.nextLocked": "The next step isn’t available yet.",
   "welcome.step": "Step {number}",
-  "welcome.connectionLost":
-    "We couldn’t check for updates. We’ll try again automatically.",
+  "welcome.connectionLost": "We couldn’t check for updates.",
   "welcome.retry": "Try again",
   "welcome.signOut": "Sign out",
   "welcome.signingOut": "Signing out…",
@@ -97,8 +96,7 @@ const fr: WelcomeMessages = {
   "welcome.moving": "Chargement…",
   "welcome.nextLocked": "La suite n’est pas encore disponible.",
   "welcome.step": "Étape {number}",
-  "welcome.connectionLost":
-    "Impossible de vérifier s’il y a du nouveau. On réessaie automatiquement.",
+  "welcome.connectionLost": "Impossible de vérifier s’il y a du nouveau.",
   "welcome.retry": "Réessayer",
   "welcome.signOut": "Se déconnecter",
   "welcome.signingOut": "Déconnexion…",
@@ -179,8 +177,7 @@ const de: WelcomeMessages = {
   "welcome.moving": "Wird geladen…",
   "welcome.nextLocked": "Der nächste Schritt ist noch nicht verfügbar.",
   "welcome.step": "Schritt {number}",
-  "welcome.connectionLost":
-    "Wir konnten nicht nach Neuigkeiten suchen. Wir versuchen es automatisch erneut.",
+  "welcome.connectionLost": "Wir konnten nicht nach Neuigkeiten suchen.",
   "welcome.retry": "Erneut versuchen",
   "welcome.signOut": "Abmelden",
   "welcome.signingOut": "Abmeldung…",
@@ -264,7 +261,7 @@ const it: WelcomeMessages = {
   "welcome.nextLocked": "Il prossimo passo non è ancora disponibile.",
   "welcome.step": "Passo {number}",
   "welcome.connectionLost":
-    "Non siamo riusciti a controllare gli aggiornamenti. Riproveremo automaticamente.",
+    "Non siamo riusciti a controllare gli aggiornamenti.",
   "welcome.retry": "Riprova",
   "welcome.signOut": "Esci",
   "welcome.signingOut": "Uscita…",
@@ -346,8 +343,7 @@ const es: WelcomeMessages = {
   "welcome.moving": "Cargando…",
   "welcome.nextLocked": "El siguiente paso aún no está disponible.",
   "welcome.step": "Paso {number}",
-  "welcome.connectionLost":
-    "No hemos podido comprobar si hay novedades. Lo intentaremos de nuevo automáticamente.",
+  "welcome.connectionLost": "No hemos podido comprobar si hay novedades.",
   "welcome.retry": "Volver a intentar",
   "welcome.signOut": "Cerrar sesión",
   "welcome.signingOut": "Cerrando sesión…",

@@ -1,7 +1,10 @@
 # Birthday API
 
 Go owns identities, access checks, PostgreSQL persistence, media and scheduled reveals.
-The browser calls the same-origin Next.js `/api/*` proxy. Keep Go's listening port
+The browser calls the same-origin Next.js `/api/*` proxy, including the authenticated
+`/api/realtime` WebSocket. Welcome, upload queue and programme updates use scoped
+signals followed by authorized HTTP reads. No browser HTTP polling is required.
+Connections reconnect and resynchronize after interruptions. Keep Go's listening port
 private when deploying. The API contract is [docs/api.md](../docs/api.md).
 
 ## Code organization
