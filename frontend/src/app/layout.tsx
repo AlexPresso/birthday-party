@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { getBirthdayConfig } from "@/lib/birthday-config";
+import { getBirthdayConfig } from "@/features/party/birthday-config";
 import { getI18n } from "@/lib/server-i18n";
 import { I18nProvider } from "@/lib/i18n-context";
 import "./globals.css";

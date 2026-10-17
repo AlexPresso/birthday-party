@@ -22,6 +22,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"birthday-party/backend/internal/guestbook"
+	guestidentity "birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/programme"
 )
 
 func testApp(t *testing.T) *App {
@@ -77,7 +81,7 @@ func tokenFromURL(t *testing.T, link string) string {
 	return values.Get("token")
 }
 
-func admin(t *testing.T, a *App) (*http.Cookie, Guest) {
+func admin(t *testing.T, a *App) (*http.Cookie, guestidentity.Guest) {
 	t.Helper()
 	link, err := a.InviteAdmin(context.Background(), "Camille")
 	if err != nil {
@@ -86,7 +90,7 @@ func admin(t *testing.T, a *App) (*http.Cookie, Guest) {
 	r := request(t, a, "POST", "/api/invitations/accept", map[string]string{"token": tokenFromURL(t, link)}, nil)
 	status(t, r, 200)
 	var result struct {
-		Guest Guest `json:"guest"`
+		Guest guestidentity.Guest `json:"guest"`
 	}
 	if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
@@ -94,13 +98,13 @@ func admin(t *testing.T, a *App) (*http.Cookie, Guest) {
 	return r.Result().Cookies()[0], result.Guest
 }
 
-func guest(t *testing.T, a *App, host *http.Cookie, name string) (*http.Cookie, Guest, string) {
+func guest(t *testing.T, a *App, host *http.Cookie, name string) (*http.Cookie, guestidentity.Guest, string) {
 	t.Helper()
 	r := request(t, a, "POST", "/api/admin/guests", map[string]string{"name": name}, host)
 	status(t, r, 201)
 	var result struct {
-		Guest         Guest  `json:"guest"`
-		InvitationURL string `json:"invitationUrl"`
+		Guest         guestidentity.Guest `json:"guest"`
+		InvitationURL string              `json:"invitationUrl"`
 	}
 	if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
@@ -134,7 +138,7 @@ func TestInvitationLifecycle(t *testing.T) {
 	if err := a.db.QueryRow("SELECT token_hash FROM sessions").Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	if stored == cookie.Value || stored != hashToken(cookie.Value) {
+	if stored == cookie.Value || stored != guestidentity.HashToken(cookie.Value) {
 		t.Fatal("session token must only be stored hashed")
 	}
 	status(t, request(t, a, "POST", "/api/logout", map[string]any{}, cookie), 204)
@@ -148,14 +152,14 @@ func TestInvitationExpiresAndSessionExpires(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expires := a.now().Add(invitationTTL)
+		expires := a.now().Add(guestidentity.InvitationTTL)
 		a.now = func() time.Time { return expires }
 		status(t, request(t, a, "POST", "/api/invitations/accept", map[string]string{"token": tokenFromURL(t, link)}, nil), 401)
 	})
 	t.Run("session", func(t *testing.T) {
 		a := testApp(t)
 		cookie, _ := admin(t, a)
-		expires := a.now().Add(sessionTTL)
+		expires := a.now().Add(guestidentity.SessionTTL)
 		a.now = func() time.Time { return expires }
 		status(t, request(t, a, "GET", "/api/session", nil, cookie), 401)
 	})
@@ -220,14 +224,14 @@ func TestRenewAndRevokePreserveIdentity(t *testing.T) {
 	base := "/api/admin/guests/" + strconv.FormatInt(identity.ID, 10)
 	r := request(t, a, "POST", base+"/invitation", map[string]any{}, host)
 	status(t, r, 200)
-	var renewed invitation
+	var renewed guestidentity.Invitation
 	if err := json.Unmarshal(r.Body.Bytes(), &renewed); err != nil {
 		t.Fatal(err)
 	}
 	r = request(t, a, "POST", "/api/invitations/accept", map[string]string{"token": tokenFromURL(t, renewed.InvitationURL)}, nil)
 	status(t, r, 200)
 	var accepted struct {
-		Guest Guest `json:"guest"`
+		Guest guestidentity.Guest `json:"guest"`
 	}
 	if err := json.Unmarshal(r.Body.Bytes(), &accepted); err != nil {
 		t.Fatal(err)
@@ -266,7 +270,7 @@ func TestUnlockBoundaryAndPrivateContent(t *testing.T) {
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Léa")
 	unlock := a.now().Add(time.Hour)
-	input := eventInput{Title: "Concert secret", Description: "Le groupe et le lieu secrets", Teaser: "Garde ta soirée libre", UnlockAt: ptr(stamp(unlock))}
+	input := programme.Input{Title: "Concert secret", Description: "Le groupe et le lieu secrets", Teaser: "Garde ta soirée libre", UnlockAt: ptr(stamp(unlock))}
 	status(t, request(t, a, "POST", "/api/admin/programme", input, host), 201)
 	for _, test := range []struct {
 		name   string
@@ -278,7 +282,7 @@ func TestUnlockBoundaryAndPrivateContent(t *testing.T) {
 			r := request(t, a, "GET", "/api/programme", nil, visitor)
 			status(t, r, 200)
 			var result struct {
-				Items []Event `json:"items"`
+				Items []programme.Event `json:"items"`
 			}
 			if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 				t.Fatal(err)
@@ -321,8 +325,8 @@ func TestGuestbookPaginationOwnershipAndValidation(t *testing.T) {
 	r := request(t, a, "GET", "/api/guestbook?limit=2", nil, two)
 	status(t, r, 200)
 	var page struct {
-		Items []Entry `json:"items"`
-		Next  *string `json:"nextCursor"`
+		Items []guestbook.Entry `json:"items"`
+		Next  *string           `json:"nextCursor"`
 	}
 	if err := json.Unmarshal(r.Body.Bytes(), &page); err != nil {
 		t.Fatal(err)
@@ -497,7 +501,7 @@ func TestRenewalInvalidatesPendingLinkAndSessionsAreBounded(t *testing.T) {
 	for range 2 {
 		r := request(t, a, "POST", path, map[string]any{}, host)
 		status(t, r, 200)
-		var result invitation
+		var result guestidentity.Invitation
 		if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 			t.Fatal(err)
 		}
@@ -511,7 +515,7 @@ func TestRenewalInvalidatesPendingLinkAndSessionsAreBounded(t *testing.T) {
 	for range 7 {
 		r := request(t, a, "POST", path, map[string]any{}, host)
 		status(t, r, 200)
-		var result invitation
+		var result guestidentity.Invitation
 		if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil {
 			t.Fatal(err)
 		}

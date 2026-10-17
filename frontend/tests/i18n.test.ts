@@ -5,8 +5,8 @@ import { z } from "zod";
 import { detectLocale, locales } from "../src/lib/locale.ts";
 import { createTranslator } from "../src/lib/i18n.ts";
 import { getMessages } from "../src/lib/dictionaries.ts";
-import { birthdayCopy } from "../src/lib/birthday-copy.ts";
-import { formatDate } from "../src/lib/contracts.ts";
+import { birthdayCopy } from "../src/features/party/birthday-copy.ts";
+import { formatDate } from "../src/lib/dates.ts";
 import {
   ApiError,
   api,

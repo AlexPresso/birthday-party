@@ -1,10 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { cache } from "react";
 import type { z } from "zod";
 import { readResponse } from "./api";
-import { sessionSchema, partySchema, welcomeSchema } from "./contracts";
 
 export async function serverApi<T>(
   path: string,
@@ -23,7 +21,3 @@ export async function serverApi<T>(
   if (response.status === 423) redirect("/attente");
   return readResponse(response, schema);
 }
-
-export const getSession = cache(() => serverApi("/session", sessionSchema));
-export const getParty = cache(() => serverApi("/party", partySchema));
-export const getWelcome = cache(() => serverApi("/welcome", welcomeSchema));

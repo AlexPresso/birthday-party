@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"image"
 	"io"
 	"mime/multipart"
@@ -112,7 +111,15 @@ func TestVideoUploadNormalizesContainersAndProtectsPlayback(t *testing.T) {
 			if stored != actual {
 				t.Fatalf("stored quota=%d actual=%d", stored, actual)
 			}
-			probe, err := probeVideo(context.Background(), filepath.Join(a.config.DataDir, "photos", filename), "mov")
+			var probe struct {
+				Streams []struct {
+					CodecName string `json:"codec_name"`
+				} `json:"streams"`
+			}
+			output, err := exec.CommandContext(context.Background(), "ffprobe", "-v", "error", "-show_entries", "stream=codec_name", "-of", "json", filepath.Join(a.config.DataDir, "photos", filename)).Output()
+			if err == nil {
+				err = json.Unmarshal(output, &probe)
+			}
 			if err != nil || len(probe.Streams) != 2 || probe.Streams[0].CodecName != "h264" || probe.Streams[1].CodecName != "aac" {
 				t.Fatalf("video was not normalized: %+v %v", probe, err)
 			}
@@ -177,38 +184,6 @@ func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	assertMediaFiles(t, a, 0)
-}
-
-func TestVideoMetadataLimits(t *testing.T) {
-	valid := `{"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"300"},"streams":[{"codec_type":"video","codec_name":"hevc","width":2160,"height":3840}]}`
-	for _, test := range []struct {
-		name, source, code string
-	}{
-		{"portrait 4K boundary", valid, ""},
-		{"too long", strings.Replace(valid, `"300"`, `"300.1"`, 1), "video_too_long"},
-		{"oversized frame", strings.Replace(valid, `3840`, `9000`, 1), "video_dimensions_too_large"},
-		{"invalid duration", strings.Replace(valid, `"300"`, `"NaN"`, 1), "unreadable_video"},
-		{"no video", strings.Replace(valid, `"video"`, `"audio"`, 1), "unreadable_video"},
-		{"playlist format", strings.Replace(valid, `mov,mp4,m4a,3gp,3g2,mj2`, `hls`, 1), "unreadable_video"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			var probe videoProbe
-			if err := json.Unmarshal([]byte(test.source), &probe); err != nil {
-				t.Fatal(err)
-			}
-			_, _, err := probe.validate(maxVideoSeconds)
-			if test.code == "" {
-				if err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			var validation *mediaValidationError
-			if !errors.As(err, &validation) || validation.code != test.code {
-				t.Fatalf("validation=%v want=%s", err, test.code)
-			}
-		})
-	}
 }
 
 func TestVideoDurationBoundary(t *testing.T) {

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getBirthdayConfig } from "@/lib/birthday-config";
+import { getBirthdayConfig } from "@/features/party/birthday-config";
 import { getI18n } from "@/lib/server-i18n";
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {

@@ -1,15 +1,14 @@
-import { SettingsPanel } from "@/components/settings";
-import { AdminPanel } from "@/components/admin";
-import { WelcomeSettings } from "@/components/media-categories-admin";
+import { SettingsPanel } from "@/features/settings/settings-panel";
+import { AdminPanel } from "@/features/settings/admin-panel";
+import { WelcomeSettings } from "@/features/settings/welcome-settings";
 import { PageHeading } from "@/components/ui";
-import { getParty, serverApi } from "@/lib/server-api";
-import {
-  guestsSchema,
-  eventsSchema,
-  adminWelcomeSchema,
-  profileSchema,
-  mediaCategoriesSchema,
-} from "@/lib/contracts";
+import { getParty } from "@/features/party/server";
+import { serverApi } from "@/lib/server-api";
+import { guestsSchema } from "@/features/guests/contracts";
+import { eventsSchema } from "@/features/programme/contracts";
+import { adminWelcomeSchema } from "@/features/welcome/contracts";
+import { profileSchema } from "@/features/profile/contracts";
+import { mediaCategoriesSchema } from "@/features/media/contracts";
 import { getI18n } from "@/lib/server-i18n";
 export async function generateMetadata() {
   return { title: (await getI18n()).t("page.settings") };

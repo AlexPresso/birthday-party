@@ -74,7 +74,7 @@ func finishCategoryUpload(t *testing.T, a *App, response *httptest.ResponseRecor
 	if err := a.db.QueryRow("SELECT p.id,p.category_id,p.mime FROM photos p JOIN upload_jobs j ON j.photo_id=p.id WHERE j.id=$1", job.id).Scan(&photo.ID, &photo.CategoryID, &photo.MIMEType); err != nil {
 		t.Fatal(err)
 	}
-	photo.urls()
+	photo.SetURLs()
 	return photo
 }
 

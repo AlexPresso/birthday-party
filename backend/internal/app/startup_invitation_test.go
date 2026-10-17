@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	guestidentity "birthday-party/backend/internal/identity"
 )
 
 func TestConcurrentStartupKeepsOneAdministrator(t *testing.T) {
@@ -46,7 +48,7 @@ func TestStartupAdminInvitationCreatesAdministrator(t *testing.T) {
 		t.Fatal("invitation does not use the configured public URL")
 	}
 	token := tokenFromURL(t, link)
-	if !validToken(token) {
+	if !guestidentity.ValidToken(token) {
 		t.Fatal("startup invitation has an invalid token")
 	}
 	var stored string
@@ -54,16 +56,16 @@ func TestStartupAdminInvitationCreatesAdministrator(t *testing.T) {
 	if err := a.db.QueryRow("SELECT token_hash,expires_at FROM invitations").Scan(&stored, &expires); err != nil {
 		t.Fatal(err)
 	}
-	if stored == token || stored != hashToken(token) {
+	if stored == token || stored != guestidentity.HashToken(token) {
 		t.Fatal("startup invitation token must only be stored hashed")
 	}
-	if expires != a.now().Add(invitationTTL).Unix() {
+	if expires != a.now().Add(guestidentity.InvitationTTL).Unix() {
 		t.Fatal("startup invitation does not use the standard expiry")
 	}
 	accepted := request(t, a, "POST", "/api/invitations/accept", map[string]string{"token": token}, nil)
 	status(t, accepted, http.StatusOK)
 	var result struct {
-		Guest Guest `json:"guest"`
+		Guest guestidentity.Guest `json:"guest"`
 	}
 	if err := json.Unmarshal(accepted.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
@@ -94,7 +96,7 @@ func TestStartupAdminInvitationPreservesIdentityAndSession(t *testing.T) {
 	accepted := request(t, a, "POST", "/api/invitations/accept", map[string]string{"token": tokenFromURL(t, second)}, nil)
 	status(t, accepted, http.StatusOK)
 	var result struct {
-		Guest Guest `json:"guest"`
+		Guest guestidentity.Guest `json:"guest"`
 	}
 	if err := json.Unmarshal(accepted.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
@@ -115,12 +117,12 @@ func TestStartupAdminInvitationPreservesIdentityAndSession(t *testing.T) {
 func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 	for _, test := range []struct {
 		name   string
-		guests []Guest
+		guests []guestidentity.Guest
 		wantID int64
 	}{
 		{
 			name: "oldest active administrator",
-			guests: []Guest{
+			guests: []guestidentity.Guest{
 				{ID: 1, Name: "Admin", Role: "guest", Active: true},
 				{ID: 2, Name: "Former host", Role: "admin", Active: false},
 				{ID: 3, Name: "Camille", Role: "admin", Active: true},
@@ -130,14 +132,14 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 		},
 		{
 			name: "guest named Admin is not promoted",
-			guests: []Guest{
+			guests: []guestidentity.Guest{
 				{ID: 1, Name: "Admin", Role: "guest", Active: true},
 			},
 			wantID: 2,
 		},
 		{
 			name: "revoked administrator is not reactivated",
-			guests: []Guest{
+			guests: []guestidentity.Guest{
 				{ID: 1, Name: "Admin", Role: "admin", Active: false},
 			},
 			wantID: 2,
@@ -155,14 +157,14 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 				t.Fatal(err)
 			}
 			var id int64
-			if err := a.db.QueryRow("SELECT guest_id FROM invitations WHERE token_hash=$1", hashToken(tokenFromURL(t, link))).Scan(&id); err != nil {
+			if err := a.db.QueryRow("SELECT guest_id FROM invitations WHERE token_hash=$1", guestidentity.HashToken(tokenFromURL(t, link))).Scan(&id); err != nil {
 				t.Fatal(err)
 			}
 			if id != test.wantID {
 				t.Fatalf("invitation guest ID=%d, want %d", id, test.wantID)
 			}
 			for _, original := range test.guests {
-				var stored Guest
+				var stored guestidentity.Guest
 				if err := a.db.QueryRow("SELECT id,name,role,active FROM guests WHERE id=$1", original.ID).Scan(&stored.ID, &stored.Name, &stored.Role, &stored.Active); err != nil {
 					t.Fatal(err)
 				}

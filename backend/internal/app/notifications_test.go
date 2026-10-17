@@ -16,6 +16,11 @@ import (
 	"testing"
 	"time"
 
+	pgnotifications "birthday-party/backend/internal/adapters/postgres/notifications"
+	push "birthday-party/backend/internal/adapters/webpush"
+	guestidentity "birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/notifications"
+
 	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
@@ -64,7 +69,7 @@ func TestNotificationsKeysAndSubscriptionIdentity(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &fields); err != nil || len(fields) != 1 || fields["publicKey"] != a.notificationKeys.Public {
 		t.Fatal("notification configuration must expose only the public key")
 	}
-	stored, err := loadNotificationKeys(t.Context(), a.db)
+	stored, err := pgnotifications.New(a.db, a.now).LoadKeys(t.Context(), push.GenerateKeys)
 	if err != nil || stored != a.notificationKeys {
 		t.Fatal("notification keys changed after initialization")
 	}
@@ -194,7 +199,7 @@ func TestNotificationsCoalesceEncryptAndPreserveNewerUpdates(t *testing.T) {
 		t.Fatal("unlock queued the wrong event")
 	}
 	calls := 0
-	a.notificationClient = notificationHTTPFunc(func(r *http.Request) (*http.Response, error) {
+	a.notificationSender.Client = notificationHTTPFunc(func(r *http.Request) (*http.Response, error) {
 		calls++
 		body, err := io.ReadAll(r.Body)
 		if err != nil || len(body) < 100 || bytes.Contains(body, []byte("Private authored")) || json.Valid(body) {
@@ -209,7 +214,7 @@ func TestNotificationsCoalesceEncryptAndPreserveNewerUpdates(t *testing.T) {
 		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader(""))}, nil
 	})
 	for range 2 {
-		processed, err := a.processNextNotification(t.Context())
+		processed, err := a.notifications.ProcessNext(t.Context())
 		if err != nil || !processed {
 			t.Fatalf("notification delivery failed: processed=%v err=%v", processed, err)
 		}
@@ -225,7 +230,7 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 			a := testApp(t)
 			host, visitor, state, input := queuedTestNotification(t, a)
 			calls := 0
-			a.notificationClient = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
+			a.notificationSender.Client = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
 				calls++
 				code := 201
 				switch scenario {
@@ -242,11 +247,11 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 			case "logout":
 				status(t, request(t, a, "POST", "/api/logout", nil, visitor), 204)
 			case "expired session":
-				if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", a.now().Unix(), hashToken(visitor.Value)); err != nil {
+				if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", a.now().Unix(), guestidentity.HashToken(visitor.Value)); err != nil {
 					t.Fatal(err)
 				}
 			case "inactive guest":
-				if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=(SELECT guest_id FROM sessions WHERE token_hash=$1)", hashToken(visitor.Value)); err != nil {
+				if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=(SELECT guest_id FROM sessions WHERE token_hash=$1)", guestidentity.HashToken(visitor.Value)); err != nil {
 					t.Fatal(err)
 				}
 			case "completed welcome":
@@ -256,7 +261,7 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 				state = changeWelcome(t, a, host, state.Revision, "open")
 				changeWelcome(t, a, host, state.Revision, "start")
 			case "expired message":
-				now := a.now().Add(notificationLifetime)
+				now := a.now().Add(notifications.Lifetime)
 				a.now = func() time.Time { return now }
 			}
 			iterations := 1
@@ -264,7 +269,7 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 				iterations = 5
 			}
 			for range iterations {
-				if _, err := a.processNextNotification(t.Context()); err != nil {
+				if _, err := a.notifications.ProcessNext(t.Context()); err != nil {
 					t.Fatal(err)
 				}
 				now := a.now().Add(time.Minute)
@@ -294,7 +299,7 @@ func TestNotificationWorkerStopsOnClose(t *testing.T) {
 	a := testApp(t)
 	queuedTestNotification(t, a)
 	started := make(chan struct{})
-	a.notificationClient = notificationHTTPFunc(func(r *http.Request) (*http.Response, error) {
+	a.notificationSender.Client = notificationHTTPFunc(func(r *http.Request) (*http.Response, error) {
 		close(started)
 		<-r.Context().Done()
 		return nil, r.Context().Err()
@@ -329,11 +334,11 @@ func TestNotificationsIncludeAdministratorsWhoOptIn(t *testing.T) {
 	state = changeWelcome(t, a, host, state.Revision, "open")
 	readGuestWelcome(t, a, host)
 	calls := 0
-	a.notificationClient = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
+	a.notificationSender.Client = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
 		calls++
 		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader(""))}, nil
 	})
-	if processed, err := a.processNextNotification(t.Context()); err != nil || !processed || calls != 1 {
+	if processed, err := a.notifications.ProcessNext(t.Context()); err != nil || !processed || calls != 1 {
 		t.Fatal("an opted-in administrator did not receive the welcome update")
 	}
 }
@@ -341,11 +346,11 @@ func TestNotificationsIncludeAdministratorsWhoOptIn(t *testing.T) {
 func TestNotificationDeliveryKeepsReboundSubscription(t *testing.T) {
 	a := testApp(t)
 	host, visitor, _, input := queuedTestNotification(t, a)
-	a.notificationClient = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
+	a.notificationSender.Client = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
 		status(t, request(t, a, "PUT", "/api/notifications/subscription", input, host), 200)
 		return &http.Response{StatusCode: 410, Body: io.NopCloser(strings.NewReader(""))}, nil
 	})
-	if processed, err := a.processNextNotification(t.Context()); err != nil || !processed {
+	if processed, err := a.notifications.ProcessNext(t.Context()); err != nil || !processed {
 		t.Fatalf("delivery did not complete: processed=%v err=%v", processed, err)
 	}
 	if notificationSubscribed(t, a, visitor, input.Endpoint) || !notificationSubscribed(t, a, host, input.Endpoint) {

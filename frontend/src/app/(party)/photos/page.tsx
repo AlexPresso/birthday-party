@@ -1,6 +1,11 @@
-import { PhotoGallery } from "@/components/photos";
-import { serverApi, getSession, getParty } from "@/lib/server-api";
-import { photosSchema, mediaCategoriesSchema } from "@/lib/contracts";
+import { PhotoGallery } from "@/features/media/gallery";
+import { serverApi } from "@/lib/server-api";
+import { getSession } from "@/features/guests/server";
+import { getParty } from "@/features/party/server";
+import {
+  photosSchema,
+  mediaCategoriesSchema,
+} from "@/features/media/contracts";
 import { notFound } from "next/navigation";
 import { getI18n } from "@/lib/server-i18n";
 import { ApiError } from "@/lib/api";

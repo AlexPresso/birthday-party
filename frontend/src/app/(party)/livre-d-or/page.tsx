@@ -1,7 +1,9 @@
-import { Guestbook } from "@/components/guestbook";
-import { serverApi, getSession, getParty } from "@/lib/server-api";
-import { entriesSchema } from "@/lib/contracts";
-import { getBirthdayConfig } from "@/lib/birthday-config";
+import { Guestbook } from "@/features/guestbook/guestbook";
+import { serverApi } from "@/lib/server-api";
+import { getSession } from "@/features/guests/server";
+import { getParty } from "@/features/party/server";
+import { entriesSchema } from "@/features/guestbook/contracts";
+import { getBirthdayConfig } from "@/features/party/birthday-config";
 import { getI18n } from "@/lib/server-i18n";
 export async function generateMetadata() {
   return { title: (await getI18n()).t("page.guestbook") };

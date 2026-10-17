@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	guestidentity "birthday-party/backend/internal/identity"
 )
 
 // Existing media tests exercise the eventual result; queue tests below also check acceptance.
@@ -468,7 +470,7 @@ func TestStartupRecoveryWaitsForAnUploadCommit(t *testing.T) {
 	if _, err = tx.Exec("SELECT pg_advisory_xact_lock(hashtext(current_schema()),73003)"); err != nil {
 		t.Fatal(err)
 	}
-	key, err := newToken()
+	key, err := guestidentity.NewToken()
 	if err != nil {
 		t.Fatal(err)
 	}
