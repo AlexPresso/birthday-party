@@ -28,7 +28,7 @@ import { WelcomeStepList } from "./welcome-step-list";
 import { WelcomeWidgetEditor, focusWidget } from "./welcome-widget-editor";
 import "./welcome-admin.css";
 
-import { stepLabel, type StepDraft } from "./editor-model";
+import { isInvalidTextWidget, stepLabel, type StepDraft } from "./editor-model";
 
 type Action = "start" | "next" | "open";
 
@@ -184,14 +184,7 @@ export function WelcomeAdmin({
     setNotice("");
     const invalidIndex = draft.findIndex(
       ({ widgets }) =>
-        widgets.length === 0 ||
-        widgets.some(
-          (widget) =>
-            (widget.type === "title" || widget.type === "text") &&
-            (!widget.text.trim() ||
-              Array.from(widget.text.trim()).length >
-                (widget.type === "title" ? 120 : 1000)),
-        ),
+        widgets.length === 0 || widgets.some(isInvalidTextWidget),
     );
     if (invalidIndex !== -1) {
       const invalid = draft[invalidIndex];
@@ -203,13 +196,7 @@ export function WelcomeAdmin({
         ),
       );
       setSelectedKey(invalid.key);
-      const invalidWidget = invalid.widgets.find(
-        (widget) =>
-          (widget.type === "title" || widget.type === "text") &&
-          (!widget.text.trim() ||
-            Array.from(widget.text.trim()).length >
-              (widget.type === "title" ? 120 : 1000)),
-      );
+      const invalidWidget = invalid.widgets.find(isInvalidTextWidget);
       requestAnimationFrame(() => {
         if (invalidWidget) focusWidget(invalidWidget.key);
         else

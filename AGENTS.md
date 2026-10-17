@@ -29,6 +29,10 @@ use, a personal visual identity, simple code, and responsive interactions.
 
 ## Project skills
 
+- Use the repository's [Code Simplifier](.agents/skills/code-simplifier/SKILL.md)
+  for requested cleanup and a focused readability review after implementation in
+  either stack. Limit that pass to the task's changes; preserve behavior and useful
+  architecture boundaries. Apply the stack-specific skills alongside it.
 - Use the repository's [Go Style Guide](.agents/skills/go-style-guide/SKILL.md)
   for Go implementation, reviews, refactors and architecture decisions. Apply the
   project-specific scope and simplicity rules in [backend/AGENTS.md](backend/AGENTS.md).

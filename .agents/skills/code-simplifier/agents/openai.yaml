@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Simplifier"
+  short_description: "Simplify Go and React code without changing behavior"
+  default_prompt: "Use $code-simplifier to improve readability in the current changes while preserving behavior."
