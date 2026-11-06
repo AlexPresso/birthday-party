@@ -8,8 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   api,
   errorMessage,
@@ -21,6 +19,11 @@ import { useI18n } from "@/lib/i18n-context";
 import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
 import { retryRealtime, subscribeRealtime } from "@/lib/realtime-browser";
 import { uploadProblem } from "./upload-validation";
+import { createUploadPreviews } from "./upload-previews";
+import {
+  restoreUploadDismissals,
+  storeUploadDismissals,
+} from "./upload-dismissals";
 import {
   uploadSchema,
   uploadsSchema,
@@ -58,8 +61,8 @@ type UploadContextValue = {
   retryTransfer: (id: string) => void;
   retryJob: (job: UploadJob) => void;
   canRetryJob: (job: UploadJob) => boolean;
+  previewUrl: (id: string) => string | undefined;
   dismiss: (id: string) => void;
-  clearFinished: (widgetIndex?: number) => void;
   forgetPhoto: (id: number) => void;
 };
 
@@ -94,6 +97,8 @@ export function UploadProvider({
   const refreshQueue = useRef<() => Promise<void>>(() => Promise.resolve());
   const requests = useRef(new Map<string, XMLHttpRequest>());
   const files = useRef(new Map<string, File>());
+  const [previews] = useState(createUploadPreviews);
+  const dismissed = useRef<string[]>([]);
   const mounted = useRef(true);
 
   function rememberCompleted(items: UploadJob[], replace = false) {
@@ -116,12 +121,16 @@ export function UploadProvider({
 
   useEffect(() => {
     mounted.current = true;
+    dismissed.current = restoreUploadDismissals();
     const active = requests.current;
+    const retryFiles = files.current;
     return () => {
       mounted.current = false;
       active.forEach((request) => request.abort());
+      retryFiles.clear();
+      previews.clear();
     };
-  }, []);
+  }, [previews]);
 
   const transmitting = transfers.some((item) => item.status !== "error");
   useEffect(() => {
@@ -248,6 +257,7 @@ export function UploadProvider({
           previous.filter((item) => !accepted.has(item.clientUploadId)),
         );
         setJobs(items);
+        setHidden(dismissed.current);
         rememberCompleted(items, true);
         setError(null);
         for (const job of data.items)
@@ -281,7 +291,10 @@ export function UploadProvider({
     const next = selected.slice(0, available).map((file): Transfer => {
       const problem = uploadProblem(file, limits);
       const clientUploadId = newUploadId();
-      if (!problem) files.current.set(clientUploadId, file);
+      if (!problem) {
+        files.current.set(clientUploadId, file);
+        previews.remember(clientUploadId, file);
+      }
       return {
         ...destination,
         clientUploadId,
@@ -303,16 +316,29 @@ export function UploadProvider({
     });
     // Keep at most one selection's worth of originals for processing retries.
     while (files.current.size > 20) {
-      files.current.delete(files.current.keys().next().value!);
+      const oldest = files.current.keys().next().value!;
+      files.current.delete(oldest);
+      previews.release(oldest);
     }
     setTransfers((items) => [...items, ...next]);
     return selected.length > available;
   }
 
   function dismiss(id: string) {
-    if (requests.current.has(id)) return;
-    setHidden((items) => [...items, id].slice(-200));
+    const terminal = jobs.some(
+      (job) =>
+        job.clientUploadId === id &&
+        (job.status === "ready" || job.status === "failed"),
+    );
+    if (requests.current.has(id) && !terminal) return;
+    dismissed.current = [
+      ...dismissed.current.filter((item) => item !== id),
+      id,
+    ].slice(-200);
+    storeUploadDismissals(dismissed.current);
+    setHidden(dismissed.current);
     files.current.delete(id);
+    previews.release(id);
     setTransfers((items) => items.filter((item) => item.clientUploadId !== id));
     setJobs((items) => items.filter((job) => job.clientUploadId !== id));
   }
@@ -331,6 +357,7 @@ export function UploadProvider({
     const clientUploadId = newUploadId();
     files.current.set(clientUploadId, file);
     dismiss(job.clientUploadId);
+    previews.remember(clientUploadId, file);
     setTransfers((items) => [
       ...items,
       {
@@ -345,24 +372,6 @@ export function UploadProvider({
       },
     ]);
   }
-  function clearFinished(widgetIndex?: number) {
-    transfers
-      .filter(
-        (item) =>
-          item.status === "error" &&
-          (widgetIndex === undefined ||
-            item.welcomeWidgetIndex === widgetIndex),
-      )
-      .forEach((item) => dismiss(item.clientUploadId));
-    jobs
-      .filter(
-        (job) =>
-          (job.status === "ready" || job.status === "failed") &&
-          (widgetIndex === undefined || job.welcomeWidgetIndex === widgetIndex),
-      )
-      .forEach((job) => dismiss(job.clientUploadId));
-  }
-
   return (
     <UploadContext
       value={{
@@ -379,8 +388,8 @@ export function UploadProvider({
         completed,
         canRetryJob: (job) =>
           job.status === "failed" && files.current.has(job.clientUploadId),
+        previewUrl: previews.get,
         dismiss,
-        clearFinished,
         jobs: jobs.filter((job) => !hidden.includes(job.clientUploadId)),
         forgetPhoto: (id) => {
           setCompleted((items) => items.filter((photo) => photo.id !== id));
@@ -403,24 +412,4 @@ export function useUploads() {
   const context = useContext(UploadContext);
   if (!context) throw new Error("UploadProvider is required.");
   return context;
-}
-
-export function UploadNotice() {
-  const pathname = usePathname();
-  const { transfers, jobs } = useUploads();
-  const { t } = useI18n();
-  const active =
-    transfers.some((item) => item.status !== "error") ||
-    jobs.some((job) => job.status === "queued" || job.status === "processing");
-  const failed =
-    transfers.some((item) => item.status === "error") ||
-    jobs.some((job) => job.status === "failed");
-  if (pathname === "/photos" || (!active && !failed)) return null;
-  return (
-    <p className="upload-notice panel" role="status">
-      <Link href="/photos">
-        {t(active ? "photos.background" : "photos.needsAttention")}
-      </Link>
-    </p>
-  );
 }

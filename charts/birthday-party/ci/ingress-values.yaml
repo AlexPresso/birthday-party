@@ -1,0 +1,13 @@
+publicUrl: https://party.example.com
+imageTag: sha-0123456789abcdef0123456789abcdef01234567
+imagePullSecrets:
+  - name: ghcr
+ingress:
+  enabled: true
+  className: traefik
+  host: party.example.com
+  annotations:
+    example.com/test-annotation: "true"
+  tls:
+    enabled: true
+    secretName: birthday-party-tls

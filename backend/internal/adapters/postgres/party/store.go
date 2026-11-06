@@ -4,13 +4,17 @@ package party
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"birthday-party/backend/internal/party"
 )
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db  *sql.DB
+	now func() time.Time
+}
 
-func New(db *sql.DB) *Store { return &Store{db: db} }
+func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: now} }
 
 var _ party.Repository = (*Store)(nil)
 

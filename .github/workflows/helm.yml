@@ -1,0 +1,72 @@
+name: Helm chart
+
+on:
+  pull_request:
+    paths:
+      - charts/birthday-party/**
+      - .github/workflows/helm.yml
+  push:
+    paths:
+      - charts/birthday-party/**
+      - .github/workflows/helm.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate ${{ matrix.configuration }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - configuration: defaults
+            values: charts/birthday-party/values.yaml
+          - configuration: external-database
+            values: charts/birthday-party/ci/external-database-values.yaml
+          - configuration: ingress
+            values: charts/birthday-party/ci/ingress-values.yaml
+          - configuration: existing-claims
+            values: charts/birthday-party/ci/existing-claims-values.yaml
+    env:
+      # Exercise the minimum Kubernetes version declared by the chart.
+      KUBERNETES_VERSION: 1.25.0
+      VALUES_FILE: ${{ matrix.values }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Helm and kubeconform
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p chart-tools
+          curl --fail --silent --show-error --location --retry 3 \
+            --output helm.tar.gz https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz
+          echo '0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b  helm.tar.gz' | sha256sum --check
+          tar -xzf helm.tar.gz -C chart-tools --strip-components=1 linux-amd64/helm
+          curl --fail --silent --show-error --location --retry 3 \
+            --output kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo '9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform.tar.gz' | sha256sum --check
+          tar -xzf kubeconform.tar.gz -C chart-tools kubeconform
+          echo "$RUNNER_TEMP/chart-tools" >> "$GITHUB_PATH"
+
+      - name: Lint chart
+        run: helm lint --strict --kube-version "$KUBERNETES_VERSION" --values "$VALUES_FILE" charts/birthday-party
+
+      - name: Render chart
+        run: |
+          helm template birthday-party charts/birthday-party \
+            --kube-version "$KUBERNETES_VERSION" --values "$VALUES_FILE" \
+            > "$RUNNER_TEMP/birthday-party.yaml"
+
+      - name: Validate Kubernetes resources
+        run: kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" "$RUNNER_TEMP/birthday-party.yaml"

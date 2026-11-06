@@ -28,7 +28,11 @@ func (a *App) listPhotos(w http.ResponseWriter, r *http.Request, guest identity.
 		items = items[:limit]
 		next = cursor(items[len(items)-1].ID)
 	}
-	respond(w, 200, map[string]any{"items": items, "nextCursor": next, "limits": map[string]int64{"imageBytes": a.config.MaxImageBytes, "videoBytes": a.config.MaxVideoBytes}})
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		return
+	}
+	respond(w, 200, map[string]any{"items": items, "nextCursor": next, "limits": limits})
 }
 
 func (a *App) servePhoto(w http.ResponseWriter, r *http.Request, guest identity.Guest) {

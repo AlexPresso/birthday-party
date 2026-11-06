@@ -1,3 +1,4 @@
+import { openSettingsSection } from "./settings-navigation";
 import {
   test,
   expect,
@@ -79,15 +80,7 @@ test.afterAll(async () => {
 });
 
 async function saveParty(page: Page) {
-  const response = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/admin/party") &&
-      response.request().method() === "PATCH",
-  );
-  await page
-    .getByRole("button", { name: "Enregistrer la fête", exact: true })
-    .click();
-  expect((await response).status()).toBe(200);
+  await page.locator(".admin-form input:focus").blur();
   await expect(
     page.getByText("Les infos de la fête sont enregistrées.", { exact: true }),
   ).toBeVisible();
@@ -97,12 +90,13 @@ async function returnToSettings(page: Page) {
   const navigation = page.getByRole("navigation");
   await navigation
     .getByRole("link", { name: "Programme", exact: true })
-    .click();
+    .press("Enter");
   await expect(page).toHaveURL(/\/programme$/);
   await navigation
     .getByRole("link", { name: "Paramètres", exact: true })
     .click();
   await expect(page).toHaveURL(/\/parametres$/);
+  await openSettingsSection(page, "party");
 }
 
 test("saved party fields remain visible after tab navigation and reload without focusing them", async ({
@@ -114,6 +108,7 @@ test("saved party fields remain visible after tab navigation and reload without 
     if (message.type() === "error") browserErrors.push(message.text());
   });
   await page.goto("/parametres");
+  await openSettingsSection(page, "party");
   await page
     .getByLabel("Nom de la fête", { exact: true })
     .fill("Birthday picnic");
@@ -153,6 +148,7 @@ test("saved party fields remain visible after tab navigation and reload without 
   await returnToSettings(page);
   await expectSavedFields();
   await page.reload();
+  await openSettingsSection(page, "party");
   await expectSavedFields();
   await page.screenshot({
     path: "test-results/party-settings-mobile.png",
@@ -178,6 +174,7 @@ test("saving other party fields preserves the exact instant even after focusing 
   page,
 }) => {
   await page.goto("/parametres");
+  await openSettingsSection(page, "party");
   await expect(page.getByLabel("Date de la fête", { exact: true })).toHaveValue(
     "2030-06-01T13:42",
   );
@@ -207,6 +204,7 @@ test("explicitly clearing the party date persists after navigation and reload", 
   page,
 }) => {
   await page.goto("/parametres");
+  await openSettingsSection(page, "party");
   const date = page.getByLabel("Date de la fête", { exact: true });
   await expect(date).toHaveValue("2030-06-01T13:42");
   await date.fill("");
@@ -218,5 +216,90 @@ test("explicitly clearing the party date persists after navigation and reload", 
   await returnToSettings(page);
   await expect(date).toHaveValue("");
   await page.reload();
+  await openSettingsSection(page, "party");
   await expect(date).toHaveValue("");
+});
+
+test("party autosave keeps newer edits while a request is pending and saves before going back", async ({
+  page,
+}) => {
+  const held = Promise.withResolvers<void>();
+  let requestHeld = false;
+  await page.route("**/api/admin/party", async (route) => {
+    if (route.request().method() !== "PATCH" || requestHeld)
+      return route.continue();
+    requestHeld = true;
+    const response = await route.fetch();
+    await held.promise;
+    await route.fulfill({ response });
+  });
+  try {
+    await page.goto("/parametres?section=party");
+    const title = page.getByLabel("Nom de la fête", { exact: true });
+    const location = page.getByLabel("Lieu", { exact: true });
+    await title.fill("First autosaved name");
+    await title.blur();
+    await expect.poll(() => requestHeld).toBe(true);
+    await expect(title).toBeEnabled();
+    await title.fill("Final autosaved name");
+    await location.fill("Final autosaved venue");
+    await page
+      .getByRole("button", { name: "Retour aux paramètres", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/parametres\?section=party$/);
+    await expect(title).toHaveValue("Final autosaved name");
+    held.resolve();
+    await expect(page).toHaveURL(/\/parametres$/);
+    await expect
+      .poll(async () => (await host.get("/api/party")).json())
+      .toMatchObject({
+        ...initialParty,
+        title: "Final autosaved name",
+        location: "Final autosaved venue",
+      });
+    await openSettingsSection(page, "party");
+    await expect(title).toHaveValue("Final autosaved name");
+    await expect(location).toHaveValue("Final autosaved venue");
+    await expect(
+      page.getByRole("button", { name: "Enregistrer la fête", exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    held.resolve();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});
+
+test("reverting a party field while its previous save is pending persists the restored value", async ({
+  page,
+}) => {
+  const held = Promise.withResolvers<void>();
+  let requestHeld = false;
+  await page.route("**/api/admin/party", async (route) => {
+    if (route.request().method() !== "PATCH" || requestHeld)
+      return route.continue();
+    requestHeld = true;
+    const response = await route.fetch();
+    await held.promise;
+    await route.fulfill({ response });
+  });
+  try {
+    await page.goto("/parametres?section=party");
+    const title = page.getByLabel("Nom de la fête", { exact: true });
+    await title.fill("Temporary party title");
+    await title.blur();
+    await expect.poll(() => requestHeld).toBe(true);
+    await expect
+      .poll(async () => (await (await host.get("/api/party")).json()).title)
+      .toBe("Temporary party title");
+    await title.fill(initialParty.title);
+    await title.blur();
+    held.resolve();
+    await expect
+      .poll(async () => (await host.get("/api/party")).json())
+      .toMatchObject(initialParty);
+    await expect(title).toHaveValue(initialParty.title);
+  } finally {
+    held.resolve();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 });

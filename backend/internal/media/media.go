@@ -56,9 +56,10 @@ func (p *Photo) SetURLs() {
 }
 
 type Category struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	IsPublic bool   `json:"isPublic"`
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	IsPublic     bool   `json:"isPublic"`
+	CoverPhotoID *int64 `json:"-"`
 }
 
 type Upload struct {

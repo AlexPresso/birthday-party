@@ -8,6 +8,12 @@ import { widgetMessages } from "./messages/widgets.ts";
 import { slideshowMessages } from "./messages/slideshow.ts";
 import { notificationMessages } from "./messages/notifications.ts";
 import { errorMessages } from "./messages/errors.ts";
+import { activityMessages } from "./messages/activities.ts";
+import { questionMessages } from "./messages/questions.ts";
+import { configurationMessages } from "./messages/configuration.ts";
+import { programmeDesignMessages } from "./messages/programme-design.ts";
+import { guestbookDesignMessages } from "./messages/guestbook-design.ts";
+import { settingsMessages } from "./messages/settings.ts";
 import type { Locale } from "./locale.ts";
 import type { Messages } from "./i18n.ts";
 
@@ -19,16 +25,24 @@ export function getMessages(locale: Locale): Messages {
       value,
     ]),
   );
-  return {
-    ...commonMessages[locale],
-    ...adminMessages[locale],
-    ...mediaMessages[locale],
-    ...welcomeMessages[locale],
-    ...profileMessages[locale],
-    ...categoryMessages[locale],
-    ...widgetMessages[locale],
-    ...slideshowMessages[locale],
-    ...notificationMessages[locale],
-    ...errors,
-  } as Messages;
+  // Avoid a Cartesian union of every catalog's locale-specific object type.
+  return Object.assign(
+    {},
+    commonMessages[locale],
+    adminMessages[locale],
+    mediaMessages[locale],
+    welcomeMessages[locale],
+    profileMessages[locale],
+    categoryMessages[locale],
+    widgetMessages[locale],
+    slideshowMessages[locale],
+    notificationMessages[locale],
+    activityMessages[locale],
+    questionMessages[locale],
+    configurationMessages[locale],
+    programmeDesignMessages[locale],
+    guestbookDesignMessages[locale],
+    settingsMessages[locale],
+    errors,
+  ) as Messages;
 }

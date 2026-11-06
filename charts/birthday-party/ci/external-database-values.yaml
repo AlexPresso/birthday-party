@@ -1,0 +1,8 @@
+postgresql:
+  enabled: false
+externalDatabase:
+  existingSecret: external-database
+  urlKey: connection-url
+backend:
+  persistence:
+    existingClaim: existing-media

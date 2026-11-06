@@ -1,0 +1,8 @@
+.programme-activity-link {
+  width: fit-content;
+  margin-top: 14px;
+}
+.programme-event > .programme-activity-link {
+  grid-column: 2;
+  margin-top: 0;
+}

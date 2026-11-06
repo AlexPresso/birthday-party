@@ -1,3 +1,4 @@
+import { openSettingsSection } from "./settings-navigation";
 import {
   test,
   expect,
@@ -115,7 +116,7 @@ test("private APIs and pages require an invitation; cross-origin changes are rej
   expect(denied.status()).toBe(403);
 });
 
-test("a guest can activate once, use the four tabs, upload a photo and sign the guestbook", async ({
+test("a guest can activate once, use the tabs and profile, upload a photo and sign the guestbook", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -142,7 +143,7 @@ test("a guest can activate once, use the four tabs, upload a photo and sign the 
   await page.goto(invitation.invitationUrl);
   await expect(page).toHaveURL(/\/photos$/);
 
-  for (const name of ["Médias", "Programme", "Livre d'or", "Paramètres"]) {
+  for (const name of ["Programme", "Médias", "Livre d'or"]) {
     await expect(
       page.getByRole("navigation").getByRole("link", { name, exact: true }),
     ).toBeVisible();
@@ -170,10 +171,12 @@ test("a guest can activate once, use the four tabs, upload a photo and sign the 
     name: /^Ouvrir la photo de Camille Test/,
   });
   await expect(photoTile).toBeVisible();
-  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(page.locator(".upload-queue")).toHaveCount(0);
   await page.screenshot({
     path: "test-results/photos-mobile.png",
     fullPage: true,
+    animations: "disabled",
+    style: "nextjs-portal { visibility: hidden; }",
     caret: "initial",
   });
   await photoTile.click();
@@ -205,16 +208,27 @@ test("a guest can activate once, use the four tabs, upload a photo and sign the 
   expect((await (await page.request.get("/api/session")).json()).guest.id).toBe(
     invitation.guest.id,
   );
+  await expect(page.getByLabel("Ton message", { exact: true })).toBeVisible();
   await page.screenshot({
     path: "test-results/guestbook-mobile.png",
     fullPage: true,
+    animations: "disabled",
+    style: "nextjs-portal { visibility: hidden; }",
     caret: "initial",
   });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.screenshot({
+    path: "test-results/guestbook-dark-mobile.png",
+    fullPage: true,
+    animations: "disabled",
+    style: "nextjs-portal { visibility: hidden; }",
+  });
+  await page.emulateMedia({ colorScheme: "light" });
 
   await page
     .getByRole("navigation")
     .getByRole("link", { name: "Programme", exact: true })
-    .click();
+    .press("Enter");
   await expect(
     page.getByRole("heading", { name: "Programme", exact: true }),
   ).toBeVisible();
@@ -224,11 +238,10 @@ test("a guest can activate once, use the four tabs, upload a photo and sign the 
     caret: "initial",
   });
   await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Paramètres", exact: true })
+    .getByRole("link", { name: "Profil: Camille Test", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Paramètres", exact: true }),
+    page.getByRole("heading", { name: "Profil", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Camille Test", exact: true }),
@@ -278,6 +291,9 @@ test("configured media limits appear in the gallery and block oversized files be
     { name: "over-image-limit.png", mimeType: "image/png", buffer: image },
     { name: "over-video-limit.mp4", mimeType: "video/mp4", buffer: video },
   ]);
+  await page
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   await expect(
     page.getByText("La photo dépasse 3 Mo. Choisis un fichier plus petit.", {
       exact: true,
@@ -296,7 +312,11 @@ test("configured media limits appear in the gallery and block oversized files be
     fullPage: true,
     caret: "initial",
   });
-  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  for (const name of ["over-image-limit.png", "over-video-limit.mp4"]) {
+    await page
+      .getByRole("button", { name: `Retirer ${name} de la liste`, exact: true })
+      .click();
+  }
   expect(uploads).toEqual([]);
 });
 
@@ -352,23 +372,26 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   await page
     .getByRole("navigation")
     .getByRole("link", { name: "Programme", exact: true })
-    .click();
+    .press("Enter");
   await expect(
     page.getByRole("heading", { name: "Programme", exact: true }),
   ).toBeVisible();
+  const queue = page.getByRole("region", {
+    name: "Envoi des médias",
+    exact: true,
+  });
+  await expect(queue).toContainText("Envoi en cours");
   await expect(
-    page.getByRole("link", { name: "Tes envois continuent. Voir les médias" }),
-  ).toBeVisible();
+    queue.getByRole("button", { name: "Détail des envois", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
   releaseTransfer();
   const response = await accepted;
   expect(response.status()).toBe(202);
   const acceptedJob = await response.json();
   expect(acceptedJob.clientUploadId).toBeTruthy();
-  await page
-    .getByRole("link", {
-      name: "Tes envois continuent. Voir les médias",
-      exact: true,
-    })
+  await expect(queue).toContainText("Préparation…");
+  await queue
+    .getByRole("button", { name: "Détail des envois", exact: true })
     .click();
   const row = page
     .locator(".upload-item")
@@ -386,6 +409,9 @@ test("media transfers survive tab changes and accepted jobs return after reload"
     caret: "initial",
   });
   await page.reload();
+  await queue
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   await expect(row).toContainText("Enregistrement…");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
@@ -398,6 +424,16 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   // The mocked completion becomes visible on an explicit resync, without polling.
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(row).toContainText("Ajouté", { timeout: 15_000 });
+  await expect(queue.getByRole("progressbar")).toHaveCount(0);
+  await queue
+    .getByRole("button", { name: "Masquer le détail", exact: true })
+    .click();
+  await page.keyboard.press("Tab");
+  await expect(queue).toHaveCount(0);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Médias", exact: true })
+    .click();
   await expect(
     page.getByRole("button", {
       name: /^Ouvrir la photo de Queue Navigation Test/,
@@ -406,6 +442,155 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   const ownJobs = await (await page.request.get("/api/uploads")).json();
   expect(ownJobs.items).toHaveLength(1);
   expect(ownJobs.items[0].id).toBe(acceptedJob.id);
+});
+
+test("compact upload notice waits for preparation, keeps new batches and errors, then dismisses success", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const invitation = await invite("Upload Notice Test");
+  await enter(page, invitation.invitationUrl);
+  await page.clock.install();
+  const image = await page.screenshot({ caret: "initial" });
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()];
+  let started = 0;
+  let preparing = true;
+  await page.route("**/api/photos", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const index = started++;
+    if (index === 2) return route.abort("failed");
+    if (index < gates.length) await gates[index].promise;
+    await route.fulfill({ response: await route.fetch() });
+  });
+  await page.route("**/api/uploads", async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        items: data.items.map((job: Record<string, unknown>) =>
+          preparing
+            ? { ...job, status: "processing", photo: null, errorCode: null }
+            : job,
+        ),
+      },
+    });
+  });
+  const queue = page.getByRole("region", {
+    name: "Envoi des médias",
+    exact: true,
+  });
+  const input = page.getByLabel("Ajouter des médias", { exact: true });
+  const details = queue.getByRole("button", {
+    name: "Détail des envois",
+    exact: true,
+  });
+  try {
+    const accepted = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/photos") &&
+        response.request().method() === "POST",
+    );
+    await input.setInputFiles({
+      name: "notice-first.png",
+      mimeType: "image/png",
+      buffer: image,
+    });
+    await expect.poll(() => started).toBe(1);
+    await expect(queue).toHaveAttribute("data-state", "sending");
+    await expect(details).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      queue.getByText("notice-first.png", { exact: true }),
+    ).toBeHidden();
+    await expect(queue.getByRole("progressbar")).toHaveCount(1);
+    await expect(queue.locator(".upload-progress-count")).toHaveText(
+      "0 / 1 fichier envoyé",
+    );
+    const bannerBounds = await queue.boundingBox();
+    const navigationBounds = await page.getByRole("navigation").boundingBox();
+    expect(bannerBounds!.x).toBeGreaterThanOrEqual(16);
+    expect(bannerBounds!.y + bannerBounds!.height).toBeLessThanOrEqual(
+      navigationBounds!.y - 8,
+    );
+    for (const theme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.screenshot({
+        path: `artifacts/upload-notice/${theme}-390.png`,
+        style:
+          "*, *::before, *::after { transition: none !important; animation: none !important; } nextjs-portal { visibility: hidden; }",
+      });
+    }
+    gates[0].resolve();
+    const firstJob = await (await accepted).json();
+    await expect(queue).toHaveAttribute("data-state", "preparing");
+    await expect(queue).toContainText("Préparation…");
+    await expect(queue.locator(".upload-progress-count")).toHaveText(
+      "1 / 1 fichier envoyé",
+    );
+    await page.clock.fastForward(3_000);
+    await expect(queue).toHaveAttribute("data-state", "preparing");
+    await expect(queue).not.toContainText("1 fichier ajouté");
+    await completedMedia(page.request, firstJob.id);
+    preparing = false;
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(queue).toHaveAttribute("data-state", "complete");
+    await expect(queue).toContainText("1 fichier ajouté");
+    await expect(queue.getByRole("progressbar")).toHaveCount(0);
+
+    // A second selection before dismissal must cancel the first success timer.
+    await input.setInputFiles({
+      name: "notice-second.png",
+      mimeType: "image/png",
+      buffer: image,
+    });
+    await expect.poll(() => started).toBe(2);
+    await expect(queue).toHaveAttribute("data-state", "sending");
+    await page.clock.fastForward(3_000);
+    await expect(queue).toBeVisible();
+    await expect(queue.locator(".upload-progress-count")).toHaveText(
+      "1 / 2 fichiers envoyés",
+    );
+    gates[1].resolve();
+    await expect(queue).toContainText("2 fichiers ajoutés");
+    await expect(queue.getByRole("progressbar")).toHaveCount(0);
+    await expect(queue).toHaveCount(0);
+    await page.reload();
+    await expect(queue).toHaveCount(0);
+
+    await input.setInputFiles({
+      name: "notice-retry.png",
+      mimeType: "image/png",
+      buffer: image,
+    });
+    await expect(queue).toHaveAttribute("data-state", "error");
+    await expect(queue).toContainText("1 fichier à réessayer");
+    await page.clock.fastForward(3_000);
+    await expect(queue).toBeVisible();
+    await details.press("Enter");
+    const closeDetails = queue.getByRole("button", {
+      name: "Masquer le détail",
+      exact: true,
+    });
+    await expect(closeDetails).toBeFocused();
+    await expect(
+      queue.getByText("notice-retry.png", { exact: true }),
+    ).toBeVisible();
+    await expect(queue).toContainText(
+      "L'envoi s'est interrompu. Vérifie ta connexion et réessaie.",
+    );
+    await closeDetails.press("Enter");
+    await expect(details).toBeFocused();
+    await queue.getByRole("button", { name: "Réessayer", exact: true }).click();
+    await page
+      .getByRole("heading", { level: 1, name: "Médias", exact: true })
+      .click();
+    await expect(queue).toContainText("1 fichier ajouté");
+    await expect.poll(() => started).toBe(4);
+    await expect(queue).toHaveCount(0);
+  } finally {
+    for (const gate of gates) gate.resolve();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 });
 
 test("one upload progress bar counts queued files and realtime receipts without duplicates", async ({
@@ -420,6 +605,22 @@ test("one upload progress bar counts queued files and realtime receipts without 
   );
   const firstResponse = Promise.withResolvers<void>();
   let started = 0;
+  // Keep preparation pending so this test observes receipt progress independently of completion dismissal.
+  await page.route("**/api/uploads", async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        items: data.items.map((job: Record<string, unknown>) => ({
+          ...job,
+          status: "processing",
+          photo: null,
+          errorCode: null,
+        })),
+      },
+    });
+  });
   await page.route("**/api/photos", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
     const index = started++;
@@ -452,6 +653,9 @@ test("one upload progress bar counts queued files and realtime receipts without 
     await expect(queue.getByRole("progressbar")).toHaveCount(1);
     await expect(bar).toHaveAttribute("max", "100");
     await expect(count).toHaveText("0 / 3 fichiers envoyés");
+    await queue
+      .getByRole("button", { name: "Détail des envois", exact: true })
+      .click();
     await expect(
       queue.locator(".upload-item").filter({ hasText: "aggregate-third.png" }),
     ).toContainText("En attente");
@@ -559,6 +763,9 @@ test("retrying a lost upload response reuses its receipt without duplicating med
     mimeType: "image/png",
     buffer: image,
   });
+  await page
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   await expect(
     page.getByText(
       "L'envoi s'est interrompu. Vérifie ta connexion et réessaie.",
@@ -578,10 +785,8 @@ test("retrying a lost upload response reuses its receipt without duplicating med
   await expect(
     page.locator(".upload-item").filter({ hasText: "lost-response.png" }),
   ).toContainText("Ajouté", { timeout: 15_000 });
-  await expect(queue.locator(".upload-progress-count")).toHaveText(
-    "1 / 1 fichier envoyé",
-  );
-  await expect(queue.getByRole("progressbar")).toHaveAttribute("value", "100");
+  await expect(queue).toContainText("1 fichier ajouté");
+  await expect(queue.getByRole("progressbar")).toHaveCount(0);
   await expect(queue.locator(".upload-item")).toHaveCount(1);
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
@@ -607,30 +812,63 @@ test("failed preparation uses a new receipt on retry and asks for the file after
     if (request.url().endsWith("/api/photos") && request.method() === "POST")
       keys.push(request.headers()["x-upload-id"]);
   });
-  await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
-    name: "incomplete-video.mp4",
-    mimeType: "video/mp4",
-    buffer: readFileSync("tests/fixtures/party-video.mp4").subarray(0, 32),
+  const firstResponse = Promise.withResolvers<void>();
+  await page.route("**/api/photos", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const first = route.request().headers()["x-upload-id"] === keys[0];
+    const response = await route.fetch();
+    expect(response.status()).toBe(202);
+    // Realtime can expose preparation failure before the original XHR returns.
+    if (first) await firstResponse.promise;
+    await route.fulfill({ response });
   });
-  const retry = page.getByRole("button", {
-    name: "Réessayer l'envoi de incomplete-video.mp4",
-  });
-  await expect(retry).toBeVisible();
-  await expect(page.locator(".upload-item")).not.toContainText("Ajouté");
-  await retry.click();
-  await expect.poll(() => keys.length).toBe(2);
-  expect(keys[1]).not.toBe(keys[0]);
-  await expect(retry).toBeVisible();
-  const jobs = await (await page.request.get("/api/uploads")).json();
-  expect(jobs.items).toHaveLength(2);
-  expect(
-    jobs.items.every((job: { status: string }) => job.status === "failed"),
-  ).toBe(true);
-  await page.reload();
-  await expect(
-    page.getByText("Choisis à nouveau ce fichier pour le renvoyer."),
-  ).toHaveCount(2);
-  await expect(retry).toHaveCount(0);
+  try {
+    await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
+      name: "incomplete-video.mp4",
+      mimeType: "video/mp4",
+      buffer: readFileSync("tests/fixtures/party-video.mp4").subarray(0, 32),
+    });
+    await page
+      .getByRole("button", { name: "Détail des envois", exact: true })
+      .click();
+    const retry = page.getByRole("button", {
+      name: "Réessayer l'envoi de incomplete-video.mp4",
+    });
+    await expect(retry).toBeVisible();
+    await expect(page.locator(".upload-item")).not.toContainText("Ajouté");
+    await retry.click();
+    await expect.poll(() => keys.length).toBe(2);
+    expect(keys[1]).not.toBe(keys[0]);
+    await expect(retry).toBeVisible();
+    await expect(page.locator(".upload-item")).toHaveCount(1);
+    const delayedResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/photos") &&
+        response.request().method() === "POST" &&
+        response.request().headers()["x-upload-id"] === keys[0],
+    );
+    firstResponse.resolve();
+    expect((await delayedResponse).status()).toBe(202);
+    await expect(page.locator(".upload-item")).toHaveCount(1);
+    await expect(retry).toHaveCount(1);
+    const jobs = await (await page.request.get("/api/uploads")).json();
+    expect(jobs.items).toHaveLength(2);
+    expect(
+      jobs.items.every((job: { status: string }) => job.status === "failed"),
+    ).toBe(true);
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Détail des envois", exact: true })
+      .click();
+    await expect(
+      page.getByText("Choisis à nouveau ce fichier pour le renvoyer."),
+    ).toHaveCount(1);
+    await expect(page.locator(".upload-item")).toHaveCount(1);
+    await expect(retry).toHaveCount(0);
+  } finally {
+    firstResponse.resolve();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 });
 
 test("a guest can upload, play, download and delete a video without loading originals in the gallery", async ({
@@ -669,7 +907,7 @@ test("a guest can upload, play, download and delete a video without loading orig
   await expect(tile).toBeVisible();
   await expect(tile.locator(".video-marker")).toBeVisible();
   expect(originals).toEqual([]);
-  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(page.locator(".upload-queue")).toHaveCount(0);
   await page.screenshot({
     path: "test-results/media-video-mobile.png",
     fullPage: true,
@@ -826,6 +1064,7 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
     caret: "initial",
   });
   page.once("dialog", (confirmation) => confirmation.accept());
+  await entry.locator(".entry-actions > summary").click();
   await entry
     .getByRole("button", { name: "Supprimer le message anonyme", exact: true })
     .click();
@@ -876,7 +1115,6 @@ test("scheduled secrets stay on the server and revocation protects media", async
     },
   });
   expect(unlocked.status()).toBe(200);
-  await page.getByRole("button", { name: "Actualiser le programme" }).click();
   await expect(
     page.getByText("CONFIDENTIEL-TITRE-TEST", { exact: true }),
   ).toBeVisible();
@@ -912,19 +1150,18 @@ test("the host can manage party details, named invitations and scheduled events"
   });
   const page = await context.newPage();
   await page.goto("/parametres");
+  await openSettingsSection(page, "party");
   await page
     .getByLabel("Nom de la fête", { exact: true })
     .fill("Les 30 ans — fête de test");
-  await page
-    .getByRole("button", { name: "Enregistrer la fête", exact: true })
-    .click();
+  await page.getByLabel("Nom de la fête", { exact: true }).blur();
   await expect(
     page.getByText("Les infos de la fête sont enregistrées.", { exact: true }),
   ).toBeVisible();
   expect((await (await admin.get("/api/party")).json()).title).toBe(
     "Les 30 ans — fête de test",
   );
-  await page.locator("summary").filter({ hasText: "Les invités" }).click();
+  await openSettingsSection(page, "guests");
   await page
     .getByLabel("Prénom de l’invité", { exact: true })
     .fill("Invité créé depuis les paramètres");
@@ -946,10 +1183,11 @@ test("the host can manage party details, named invitations and scheduled events"
     fullPage: true,
     caret: "initial",
   });
-  await page.locator("summary").filter({ hasText: "Le programme" }).click();
+  await openSettingsSection(page, "programme");
   await page
     .getByRole("button", { name: "Ajouter un événement", exact: true })
     .click();
+  await page.getByRole("button", { name: /^Événement/ }).click();
   await page
     .getByLabel("Titre de l’événement", { exact: true })
     .fill("Rendez-vous créé par l’hôte");
@@ -965,9 +1203,7 @@ test("the host can manage party details, named invitations and scheduled events"
   await page
     .getByLabel("Dévoiler les détails le", { exact: true })
     .fill("2030-06-01T18:00");
-  await page
-    .getByRole("button", { name: "Enregistrer l’événement", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Fermer", exact: true }).click();
   await expect(
     page.getByText("Rendez-vous créé par l’hôte", { exact: true }),
   ).toBeVisible();
@@ -978,10 +1214,20 @@ test("the host can manage party details, named invitations and scheduled events"
   expect(event.startsAt).toBe("2030-06-01T17:00:00Z");
   expect(event.unlockAt).toBe("2030-06-01T16:00:00Z");
   await page.setViewportSize({ width: 320, height: 740 });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBeTruthy();
+  await expect(async () => {
+    await expect(
+      page.getByRole("heading", { name: "Programme", exact: true, level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Rendez-vous créé par l’hôte", { exact: true }),
+    ).toBeVisible();
+    expect(
+      await page
+        .locator("html")
+        .evaluate(
+          (documentElement) => documentElement.scrollWidth <= window.innerWidth,
+        ),
+    ).toBeTruthy();
+  }).toPass();
   await context.close();
 });

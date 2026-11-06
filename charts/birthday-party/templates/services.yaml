@@ -1,0 +1,32 @@
+{{- $components := list "frontend" "backend" }}
+{{- if .Values.postgresql.enabled }}
+{{- $components = append $components "postgresql" }}
+{{- end }}
+{{- range $component := $components }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "birthday-party.fullname" $ }}-{{ $component }}
+  labels:
+    {{- include "birthday-party.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  type: ClusterIP
+  {{- if eq $component "postgresql" }}
+  clusterIP: None
+  {{- end }}
+  selector:
+    {{- include "birthday-party.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+  ports:
+    {{- if eq $component "postgresql" }}
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
+    {{- else }}
+    - name: http
+      port: {{ ternary 3000 8080 (eq $component "frontend") }}
+      targetPort: http
+    {{- end }}
+{{- end }}

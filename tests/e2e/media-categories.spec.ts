@@ -1,3 +1,4 @@
+import { openSettingsSection } from "./settings-navigation";
 import {
   test,
   expect,
@@ -368,6 +369,26 @@ test("several media widgets keep separate destinations and queues alongside a pr
   await expect(preview).toBeVisible();
   const previewURL = await preview.getAttribute("src");
 
+  const preparing = new Set([
+    "table-widget-private.png",
+    "table-widget-main.png",
+  ]);
+  await page.route("**/api/uploads", async (route) => {
+    const response = await route.fetch();
+    if (!response.ok()) return route.fulfill({ response });
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        items: data.items.map((job: { filename: string }) =>
+          preparing.has(job.filename)
+            ? { ...job, status: "processing", photo: null, errorCode: null }
+            : job,
+        ),
+      },
+    });
+  });
+
   const privateJob = await (async () => {
     let releaseUpload!: () => void;
     let held = false;
@@ -425,6 +446,11 @@ test("several media widgets keep separate destinations and queues alongside a pr
   });
   expect((await ready(page.request, privateJob.id)).photo).toBeNull();
   expect((await ready(page.request, mainJob.id)).photo).toBeNull();
+  for (const widget of [media.nth(0), media.nth(1)]) {
+    await widget
+      .getByRole("button", { name: "Détail des envois", exact: true })
+      .click();
+  }
   await expect(media.nth(0).locator(".upload-queue")).toContainText(
     privateJob.filename,
   );
@@ -458,6 +484,11 @@ test("several media widgets keep separate destinations and queues alongside a pr
     .click();
   expect((await saved).status()).toBe(200);
   await page.reload();
+  for (const widget of [media.nth(0), media.nth(1)]) {
+    await widget
+      .getByRole("button", { name: "Détail des envois", exact: true })
+      .click();
+  }
   await expect(media.nth(0).locator(".upload-queue")).toContainText(
     privateJob.filename,
   );
@@ -488,10 +519,17 @@ test("several media widgets keep separate destinations and queues alongside a pr
     path: "test-results/welcome-widgets-guest-desktop.png",
     fullPage: true,
   });
+  preparing.delete(privateJob.filename);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(media.nth(0).locator(".upload-queue")).toContainText(
+    "1 fichier ajouté",
+  );
+  await expect(media.nth(0).getByRole("progressbar")).toHaveCount(0);
   await media
     .nth(0)
-    .getByRole("button", { name: "Fermer", exact: true })
+    .getByRole("button", { name: "Masquer le détail", exact: true })
     .click();
+  await page.keyboard.press("Tab");
   await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,
@@ -510,12 +548,20 @@ test("several media widgets keep separate destinations and queues alongside a pr
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,
   );
+  preparing.delete(mainJob.filename);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await media
+    .nth(1)
+    .getByRole("button", { name: "Masquer le détail", exact: true })
+    .click();
+  await page.keyboard.press("Tab");
+  await expect(media.nth(1).locator(".upload-queue")).toHaveCount(0);
   expect((await page.request.get("/api/photos")).status()).toBe(423);
   await transition("open");
   await finishWelcome(page);
   const published = (await ready(page.request, mainJob.id)).photo!;
   await expect(
-    page.locator(`img[src="${published.thumbnailUrl}"]`),
+    page.locator(`.photo-tile img[src="${published.thumbnailUrl}"]`),
   ).toBeVisible();
   expect((await ready(page.request, privateJob.id)).photo).toBeNull();
 });
@@ -540,8 +586,13 @@ test("the host creates private and public categories and saves each welcome uplo
   await context.addCookies((await host.storageState()).cookies);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/parametres");
+  await openSettingsSection(page, "categories");
   await expect(
-    page.getByRole("heading", { name: "Catégories de médias", exact: true }),
+    page.getByRole("heading", {
+      name: "Catégories et visibilité",
+      exact: true,
+      level: 1,
+    }),
   ).toBeVisible();
   const categoryName = page.getByLabel("Nom de la catégorie", { exact: true });
   const visibility = page.getByRole("checkbox", {
@@ -604,6 +655,7 @@ test("the host creates private and public categories and saves each welcome uplo
       null,
     ),
   ];
+  await openSettingsSection(page, "welcome");
   for (const step of steps) {
     await page
       .getByRole("button", { name: "Ajouter une étape", exact: true })
@@ -634,17 +686,21 @@ test("the host creates private and public categories and saves each welcome uplo
           .mediaUpload.categoryId?.toString() ?? "",
       );
   }
-  const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/admin/welcome") &&
-      response.request().method() === "PUT",
+  await page.locator(".welcome-admin").evaluate(() => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+  });
+  await expect(page.locator(".welcome-admin")).not.toHaveAttribute(
+    "data-dirty",
+    "true",
   );
-  await page
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
-  expect((await saved).status()).toBe(200);
+  await expect(page.locator(".welcome-admin")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
   expect((await welcome()).steps).toEqual(steps);
   await page.reload();
+  await openSettingsSection(page, "welcome");
   for (const [index, step] of steps.entries()) {
     await page
       .getByRole("button", {
@@ -720,6 +776,9 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   expect(contextResponse.status()).toBe(200);
   expect((await contextResponse.json()).category).toEqual(category);
   const accepted = await upload(page, "table-portrait-private.png");
+  await page
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   expect(accepted.categoryId).toBe(category.id);
   expect(accepted.welcomeRevision).toBe(activeRevision);
   expect(accepted.welcomeWidgetIndex).toBe(2);
@@ -733,6 +792,9 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   );
   await page.reload();
   await expectStep(page, steps[1]);
+  await page
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   await expect(page.locator(".upload-queue")).toContainText(
     "table-portrait-private.png",
   );
@@ -810,6 +872,7 @@ test("a private welcome upload survives reload and stays inaccessible until the 
     const hostPage = await hostContext.newPage();
     hostPage.on("dialog", (dialog) => void dialog.accept());
     await hostPage.goto("/parametres");
+    await openSettingsSection(hostPage, "categories");
     const published = hostPage.waitForResponse(
       (response) =>
         response.url().endsWith(`/api/admin/media-categories/${category.id}`) &&
@@ -831,9 +894,12 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   await page.bringToFront();
   await page.reload();
   await page
-    .getByLabel("Catégorie", { exact: true })
-    .selectOption(`${category.id}`);
-  await expect(page.locator(`img[src="${photo.thumbnailUrl}"]`)).toBeVisible();
+    .getByRole("group", { name: "Catégorie", exact: true })
+    .getByRole("button", { name: category.name, exact: true })
+    .click();
+  await expect(
+    page.locator(`.photo-tile img[src="${photo.thumbnailUrl}"]`),
+  ).toBeVisible();
   expect((await page.request.get(photo.url)).status()).toBe(200);
   expect(
     (
@@ -894,19 +960,48 @@ test("welcome uploads keep their public or main destination and the gallery filt
   const named = (await ready(page.request, namedJob.id)).photo!;
   expect(main).toBeTruthy();
   expect(named).toBeTruthy();
-  const filter = page.getByLabel("Catégorie", { exact: true });
-  await expect(filter).toHaveValue("");
-  await expect(page.locator(`img[src="${main.thumbnailUrl}"]`)).toBeVisible();
-  await expect(page.locator(`img[src="${named.thumbnailUrl}"]`)).toHaveCount(0);
+  const filter = page.getByRole("group", { name: "Catégorie", exact: true });
+  const mainFilter = filter.getByRole("button", {
+    name: "Galerie",
+    exact: true,
+  });
+  await expect(mainFilter).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.locator(`.photo-tile img[src="${main.thumbnailUrl}"]`),
+  ).toBeVisible();
+  await expect(
+    page.locator(`.photo-tile img[src="${named.thumbnailUrl}"]`),
+  ).toHaveCount(0);
   const mainItems = await categoryPhotos(page.request, null);
   expect(mainItems.some((item) => item.id === main.id)).toBe(true);
   expect(mainItems.some((item) => item.id === named.id)).toBe(false);
 
-  await filter.selectOption(`${category.id}`);
-  await expect(page.locator(`img[src="${named.thumbnailUrl}"]`)).toBeVisible();
-  await expect(page.locator(`img[src="${main.thumbnailUrl}"]`)).toHaveCount(0);
+  await filter
+    .getByRole("button", { name: category.name, exact: true })
+    .click();
+  await expect(
+    page.locator(`.photo-tile img[src="${named.thumbnailUrl}"]`),
+  ).toBeVisible();
+  await expect(
+    page.locator(`.photo-tile img[src="${main.thumbnailUrl}"]`),
+  ).toHaveCount(0);
   const namedItems = await categoryPhotos(page.request, category.id);
   expect(namedItems.map((item) => item.id)).toEqual([named.id]);
+  await expect(page.locator(".media-feed .media-post-author")).toContainText(
+    "Alex Public Upload Test",
+  );
+  const grid = page.getByRole("button", { name: "Vue en grille", exact: true });
+  const feed = page.getByRole("button", { name: "Vue en fil", exact: true });
+  await grid.press("Enter");
+  await expect(grid).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".media-grid .photo-tile")).toHaveCount(1);
+  await page.locator(".media-grid .photo-tile").press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".media-grid .photo-tile")).toBeFocused();
+  await feed.press("Enter");
+  await expect(feed).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".media-feed .photo-tile")).toHaveCount(1);
   // Uploads chosen from the gallery retain the selected category as well.
   const galleryJob = await upload(page, "dance-gallery.png", "#6d8b69");
   expect(galleryJob.categoryId).toBe(category.id);
@@ -914,24 +1009,30 @@ test("welcome uploads keep their public or main destination and the gallery filt
   expect(galleryJob.welcomeWidgetIndex).toBeNull();
   const galleryPhoto = (await ready(page.request, galleryJob.id)).photo!;
   await expect(
-    page.locator(`img[src="${galleryPhoto.thumbnailUrl}"]`),
+    page.locator(`.photo-tile img[src="${galleryPhoto.thumbnailUrl}"]`),
   ).toBeVisible();
-  await filter.selectOption("");
-  await expect(page.locator(`img[src="${main.thumbnailUrl}"]`)).toBeVisible();
-  await expect(page.locator(`img[src="${named.thumbnailUrl}"]`)).toHaveCount(0);
+  await mainFilter.click();
   await expect(
-    page.locator(`img[src="${galleryPhoto.thumbnailUrl}"]`),
+    page.locator(`.photo-tile img[src="${main.thumbnailUrl}"]`),
+  ).toBeVisible();
+  await expect(
+    page.locator(`.photo-tile img[src="${named.thumbnailUrl}"]`),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(`.photo-tile img[src="${galleryPhoto.thumbnailUrl}"]`),
   ).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoOverflow(page);
-  const buttonBounds = await page.locator(".media-picker button").boundingBox();
-  const limitsBounds = await page
-    .locator(".media-picker .photo-privacy")
-    .boundingBox();
-  expect(buttonBounds).toBeTruthy();
-  expect(limitsBounds).toBeTruthy();
-  expect(limitsBounds!.y).toBeGreaterThanOrEqual(
-    buttonBounds!.y + buttonBounds!.height,
+  const addButton = page.getByRole("button", {
+    name: "Ajouter des médias",
+    exact: true,
+  });
+  await expect(addButton).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Médias", exact: true }),
+  ).toBeVisible();
+  await expect(addButton).toHaveAccessibleDescription(
+    /Photos : JPEG, PNG, WebP, [\d\s]+ Mo max\..*Vidéos : MP4, MOV, WebM, [\d\s]+ Mo et 5 minutes max\./,
   );
   await page.screenshot({
     path: "test-results/media-categories-gallery-mobile.png",

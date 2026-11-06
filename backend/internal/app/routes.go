@@ -11,6 +11,9 @@ import (
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
+	mux.HandleFunc("GET /api/config", a.getPublicConfiguration)
+	mux.HandleFunc("GET /api/admin/config", a.auth(true, a.getConfiguration))
+	mux.HandleFunc("PUT /api/admin/config", a.auth(true, a.updateConfiguration))
 	mux.HandleFunc("POST /api/invitations/preview", a.previewInvitation)
 	mux.HandleFunc("POST /api/invitations/accept", a.acceptInvitation)
 	mux.HandleFunc("GET /api/session", a.auth(false, func(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
@@ -44,6 +47,13 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/programme", a.auth(true, a.createEvent))
 	mux.HandleFunc("PUT /api/admin/programme/{id}", a.auth(true, a.updateEvent))
 	mux.HandleFunc("DELETE /api/admin/programme/{id}", a.auth(true, a.deleteEvent))
+	mux.HandleFunc("POST /api/admin/programme/{id}/vote/state", a.auth(true, a.transitionVote))
+	mux.HandleFunc("PUT /api/programme/{id}/vote", a.authContent(a.castVote))
+	mux.HandleFunc("GET /api/programme/{id}/questions", a.authContent(a.readQuestions))
+	mux.HandleFunc("POST /api/programme/{id}/questions", a.authContent(a.addQuestion))
+	mux.HandleFunc("PUT /api/programme/{id}/questions/upvote", a.authContent(a.upvoteQuestion))
+	mux.HandleFunc("POST /api/admin/programme/{id}/questions/state", a.auth(true, a.transitionQuestions))
+	mux.HandleFunc("PUT /api/admin/programme/{id}/questions/resolve", a.auth(true, a.resolveQuestion))
 	mux.HandleFunc("GET /api/guestbook", a.authContent(a.listEntries))
 	mux.HandleFunc("POST /api/guestbook", a.authContent(a.createEntry))
 	mux.HandleFunc("DELETE /api/guestbook/{id}", a.authContent(a.deleteEntry))

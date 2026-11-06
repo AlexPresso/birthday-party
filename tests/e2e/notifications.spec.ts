@@ -1,3 +1,4 @@
+import { openSettingsSection } from "./settings-navigation";
 import {
   test,
   expect,
@@ -275,6 +276,7 @@ test("the notification widget can be reordered and saved without settings", asyn
   await context.addCookies((await host.storageState()).cookies);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/parametres");
+  await openSettingsSection(page, "welcome");
   const editor = page.locator(".welcome-admin");
   await editor
     .getByRole("button", { name: "Ajouter une étape", exact: true })
@@ -300,15 +302,8 @@ test("the notification widget can be reordered and saved without settings", asyn
     "data-widget-type",
     "enable_notifications",
   );
-  const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/admin/welcome") &&
-      response.request().method() === "PUT",
-  );
-  await editor
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
-  expect((await saved).status()).toBe(200);
+  await expect(editor).not.toHaveAttribute("data-dirty", "true");
+  await expect(editor).toHaveAttribute("aria-busy", "false");
   expect((await state()).steps).toEqual([
     {
       widgets: [
@@ -409,18 +404,17 @@ test("an existing browser subscription is not silently assigned to another guest
     )
       saves++;
   });
-  await page.goto("/parametres");
+  await page.goto("/profil");
   const control = page.locator(".notification-control");
-  const enable = control.getByRole("button", {
-    name: "Activer les notifications",
+  const toggle = control.getByRole("switch", {
+    name: "Notifications",
     exact: true,
   });
-  await expect(enable).toBeEnabled();
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
   expect(saves).toBe(0);
-  await enable.click();
-  await expect(
-    control.getByText("Activées sur cet appareil.", { exact: true }),
-  ).toBeVisible();
+  await toggle.press("Space");
+  await expect(toggle).toBeChecked();
   expect(await status(page, fixture.endpoint)).toBe(true);
   page.once("dialog", (dialog) => dialog.accept());
   await page
@@ -430,14 +424,13 @@ test("an existing browser subscription is not silently assigned to another guest
   await expect(page.getByRole("navigation")).toHaveCount(0);
   expect((await page.request.get("/api/session")).status()).toBe(401);
   await invite(page, "Second Notification Guest");
-  await page.goto("/parametres");
-  await expect(enable).toBeEnabled();
+  await page.goto("/profil");
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
   expect(saves).toBe(1);
   expect(await status(page, fixture.endpoint)).toBe(false);
-  await enable.click();
-  await expect(
-    control.getByText("Activées sur cet appareil.", { exact: true }),
-  ).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
   expect(await status(page, fixture.endpoint)).toBe(true);
   expect((await pushState(page)).subscriptions).toBe(0);
   await control.scrollIntoViewIfNeeded();
@@ -454,10 +447,51 @@ test("an existing browser subscription is not silently assigned to another guest
   await page.screenshot({
     path: "artifacts/notifications/settings-desktop.png",
   });
-  await control
-    .getByRole("button", { name: "Désactiver sur cet appareil", exact: true })
-    .click();
-  await expect(enable).toBeEnabled();
+  await toggle.click();
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
+  expect(await status(page, fixture.endpoint)).toBe(false);
+});
+
+test("the profile switch stays off when notification registration fails and can retry", async ({
+  page,
+}) => {
+  const fixture = await mockPush(page);
+  await invite(page, "Profile Notification Retry Guest");
+  await page.goto("/profil");
+  const control = page.locator(".notification-control");
+  const toggle = control.getByRole("switch", {
+    name: "Notifications",
+    exact: true,
+  });
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
+  expect((await pushState(page)).prompts).toBe(0);
+
+  await page.route("**/api/notifications/subscription", async (route) => {
+    if (route.request().method() !== "PUT") return route.continue();
+    await route.fulfill({
+      status: 503,
+      json: {
+        code: "internal_error",
+        error: "Unable to save the subscription.",
+      },
+    });
+  });
+  await toggle.click();
+  await expect(control.getByRole("alert")).toBeVisible();
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
+  expect(await status(page, fixture.endpoint)).toBe(false);
+  expect((await pushState(page)).gestures).toEqual([true]);
+
+  await page.unroute("**/api/notifications/subscription");
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  expect(await status(page, fixture.endpoint)).toBe(true);
+  await toggle.click();
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
   expect(await status(page, fixture.endpoint)).toBe(false);
 });
 

@@ -184,6 +184,10 @@ func TestGuestWelcomeProgressMigrationPreservesActiveStepsAndUploadTokens(t *tes
 	files := migrationFiles(t)
 	delete(files, "migrations/0008_guest_welcome_progress.sql")
 	delete(files, "migrations/0009_notifications.sql")
+	delete(files, "migrations/0010_programme_activities.sql")
+	delete(files, "migrations/0011_programme_activity_events.sql")
+	delete(files, "migrations/0012_product_configuration.sql")
+	delete(files, "migrations/0013_question_activities.sql")
 	if err := applyMigrations(t.Context(), db, files); err != nil {
 		t.Fatal(err)
 	}

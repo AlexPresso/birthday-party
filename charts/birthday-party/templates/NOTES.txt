@@ -1,0 +1,18 @@
+Birthday Party is configured for {{ .Values.publicUrl }}.
+
+{{- if not .Values.ingress.enabled }}
+
+For the default localhost URL:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "birthday-party.fullname" . }}-frontend 3000:3000
+{{- end }}
+
+{{- if .Values.backend.printAdminInvitation }}
+
+Retrieve the single-use administrator invitation from the backend startup log:
+  kubectl --namespace {{ .Release.Namespace }} logs deployment/{{ include "birthday-party.fullname" . }}-backend
+{{- end }}
+
+Keep the backend at one replica. Upgrades briefly interrupt access while it restarts.
+Back up PostgreSQL and the media volume together with the backend stopped.
+Chart-created PVCs are retained after uninstall; delete them only when their data is no longer needed.
+See charts/birthday-party/README.md for credentials, Ingress limits and upgrades.

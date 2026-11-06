@@ -25,7 +25,7 @@
   overflow: hidden;
 }
 .media-slideshow::backdrop {
-  background: #0b080df0;
+  background: var(--overlay);
 }
 .slideshow-layout {
   display: flex;
@@ -69,7 +69,8 @@
   min-width: 0;
   place-items: center;
   position: relative;
-  background: #0e0b10;
+  background: var(--media-background);
+  color: var(--media-text);
 }
 .slideshow-media {
   display: block;
@@ -89,6 +90,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
+  color: var(--text);
   text-align: center;
   pointer-events: none;
 }

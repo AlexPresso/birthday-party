@@ -179,7 +179,7 @@ func stagedMedia(t *testing.T, data []byte, kind, format string) (*Files, media.
 	if err := os.WriteFile(filepath.Join(root, "uploads", job.Key+".input"), data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	return New(root, 15<<20, 100<<20), job
+	return New(root), job
 }
 
 func assertFileBytes(t *testing.T, path string, want []byte) {

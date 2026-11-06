@@ -1,0 +1,60 @@
+.configuration-editor,
+.configuration-fields,
+.configuration-copy-group {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.configuration-upload-fields,
+.configuration-copy-fields {
+  display: grid;
+  gap: 24px;
+}
+
+.configuration-editor .fine-print {
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+
+.configuration-upload-fields > .fine-print {
+  margin: 0;
+}
+
+.configuration-scope {
+  margin-bottom: 24px;
+}
+
+.configuration-copy-content {
+  margin-top: 14px;
+}
+
+.configuration-editor select {
+  width: 100%;
+  min-height: 47px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--input-background);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.configuration-editor select:hover {
+  border-color: var(--border-strong);
+}
+
+.configuration-copy-content .fine-print {
+  margin: 8px 0 0;
+}
+
+.configuration-save {
+  min-height: 24px;
+  margin-top: 12px;
+}
+
+.configuration-save > .success-notice:not(:empty) {
+  margin-top: 10px;
+}

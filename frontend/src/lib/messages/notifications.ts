@@ -3,6 +3,7 @@ const en = {
   "notifications.widgetHint":
     "Guests can choose to receive notifications on this device. No settings needed.",
   "notifications.title": "Notifications",
+  "notifications.device": "On this device",
   "notifications.enable": "Enable notifications",
   "notifications.disable": "Turn off on this device",
   "notifications.enabled": "Enabled on this device.",
@@ -37,6 +38,7 @@ const fr: NotificationMessages = {
   "notifications.widgetHint":
     "Les invités peuvent choisir de recevoir des notifications sur cet appareil. Aucun réglage nécessaire.",
   "notifications.title": "Notifications",
+  "notifications.device": "Sur cet appareil",
   "notifications.enable": "Activer les notifications",
   "notifications.disable": "Désactiver sur cet appareil",
   "notifications.enabled": "Activées sur cet appareil.",
@@ -70,6 +72,7 @@ const de: NotificationMessages = {
   "notifications.widgetHint":
     "Gäste können Benachrichtigungen auf diesem Gerät aktivieren. Keine Einstellungen nötig.",
   "notifications.title": "Benachrichtigungen",
+  "notifications.device": "Auf diesem Gerät",
   "notifications.enable": "Benachrichtigungen aktivieren",
   "notifications.disable": "Auf diesem Gerät deaktivieren",
   "notifications.enabled": "Auf diesem Gerät aktiviert.",
@@ -104,6 +107,7 @@ const it: NotificationMessages = {
   "notifications.widgetHint":
     "Gli invitati possono scegliere di ricevere notifiche su questo dispositivo. Non servono impostazioni.",
   "notifications.title": "Notifiche",
+  "notifications.device": "Su questo dispositivo",
   "notifications.enable": "Attiva le notifiche",
   "notifications.disable": "Disattiva su questo dispositivo",
   "notifications.enabled": "Attive su questo dispositivo.",
@@ -136,6 +140,7 @@ const es: NotificationMessages = {
   "notifications.widgetHint":
     "Los invitados pueden elegir recibir notificaciones en este dispositivo. No necesita ajustes.",
   "notifications.title": "Notificaciones",
+  "notifications.device": "En este dispositivo",
   "notifications.enable": "Activar las notificaciones",
   "notifications.disable": "Desactivar en este dispositivo",
   "notifications.enabled": "Activadas en este dispositivo.",

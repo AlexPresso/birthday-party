@@ -1,3 +1,4 @@
+import { openSettingsSection } from "./settings-navigation";
 import {
   test,
   expect,
@@ -26,7 +27,7 @@ const languages = [
     welcome: "Bienvenue !",
     invalidInvitation:
       "Ce lien est invalide ou a expiré. Demande un nouveau lien à l’organisateur.",
-    tabs: ["Programme", "Médias", "Livre d'or", "Paramètres"],
+    tabs: ["Programme", "Médias", "Livre d'or"],
     mediaInput: "Ajouter des médias",
     uploadError:
       "Choisis une photo JPEG, PNG ou WebP, ou une vidéo MP4, MOV ou WebM. Convertis d’abord les fichiers HEIC en JPEG.",
@@ -37,6 +38,7 @@ const languages = [
     anonymous: "Publier anonymement",
     publish: "Publier le message",
     settings: "Paramètres",
+    profile: "Profil",
     signOut: "Se déconnecter",
     logout:
       "Te déconnecter de cet appareil ? Il te faudra un nouveau lien de l’organisateur pour revenir.",
@@ -48,7 +50,7 @@ const languages = [
     welcome: "Welcome!",
     invalidInvitation:
       "This link is invalid or has expired. Ask the host for a new invitation.",
-    tabs: ["Schedule", "Media", "Guestbook", "Settings"],
+    tabs: ["Schedule", "Media", "Guestbook"],
     mediaInput: "Add media",
     uploadError:
       "Choose a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video. Convert HEIC files to JPEG first.",
@@ -59,6 +61,7 @@ const languages = [
     anonymous: "Post anonymously",
     publish: "Post message",
     settings: "Settings",
+    profile: "Profile",
     signOut: "Sign out",
     logout:
       "Sign out of this device? You’ll need a new link from the host to get back in.",
@@ -70,7 +73,7 @@ const languages = [
     welcome: "Willkommen!",
     invalidInvitation:
       "Dieser Link ist ungültig oder abgelaufen. Bitte den Gastgeber um eine neue Einladung.",
-    tabs: ["Programm", "Medien", "Gästebuch", "Einstellungen"],
+    tabs: ["Programm", "Medien", "Gästebuch"],
     mediaInput: "Medien hinzufügen",
     uploadError:
       "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM. Wandle HEIC-Dateien zuerst in JPEG um.",
@@ -81,6 +84,7 @@ const languages = [
     anonymous: "Anonym veröffentlichen",
     publish: "Nachricht veröffentlichen",
     settings: "Einstellungen",
+    profile: "Profil",
     signOut: "Abmelden",
     logout:
       "Von diesem Gerät abmelden? Du brauchst danach einen neuen Link vom Gastgeber, um dich wieder anzumelden.",
@@ -92,7 +96,7 @@ const languages = [
     welcome: "Benvenuto!",
     invalidInvitation:
       "Questo link non è valido o è scaduto. Chiedi un nuovo invito a chi organizza.",
-    tabs: ["Programma", "Media", "Dediche", "Impostazioni"],
+    tabs: ["Programma", "Media", "Dediche"],
     mediaInput: "Aggiungi foto e video",
     uploadError:
       "Scegli una foto JPEG, PNG o WebP, oppure un video MP4, MOV o WebM. Converti prima i file HEIC in JPEG.",
@@ -103,6 +107,7 @@ const languages = [
     anonymous: "Pubblica in forma anonima",
     publish: "Pubblica il messaggio",
     settings: "Impostazioni",
+    profile: "Profilo",
     signOut: "Esci",
     logout:
       "Uscire da questo dispositivo? Per rientrare ti servirà un nuovo link dell’organizzatore.",
@@ -114,7 +119,7 @@ const languages = [
     welcome: "¡Te damos la bienvenida!",
     invalidInvitation:
       "Este enlace no es válido o ha caducado. Pide una nueva invitación a quien organiza.",
-    tabs: ["Programa", "Multimedia", "Dedicatorias", "Ajustes"],
+    tabs: ["Programa", "Multimedia", "Dedicatorias"],
     mediaInput: "Añadir fotos y vídeos",
     uploadError:
       "Elige una foto JPEG, PNG o WebP, o un vídeo MP4, MOV o WebM. Convierte primero los archivos HEIC a JPEG.",
@@ -125,6 +130,7 @@ const languages = [
     anonymous: "Publicar de forma anónima",
     publish: "Publicar mensaje",
     settings: "Ajustes",
+    profile: "Perfil",
     signOut: "Cerrar sesión",
     logout:
       "¿Cerrar sesión en este dispositivo? Necesitarás un nuevo enlace del organizador para volver.",
@@ -253,7 +259,7 @@ for (const language of languages) {
       ).toBeTruthy();
     });
 
-    test("translates the four tabs, upload errors, programme and settings while preserving guest content", async ({
+    test("translates the tabs, upload errors, programme and profile while preserving guest content", async ({
       page,
     }) => {
       const errors: string[] = [];
@@ -263,7 +269,17 @@ for (const language of languages) {
       await signIn(page, invitation.invitationUrl);
       await page.goto("/photos");
       const navigation = page.getByRole("navigation");
-      await expect(navigation.getByRole("link")).toHaveText([...language.tabs]);
+      const labels = [...language.tabs, `${language.profile}: ${name}`];
+      await expect(navigation.getByRole("link")).toHaveCount(labels.length);
+      for (const [index, label] of labels.entries()) {
+        await expect(navigation.getByRole("link").nth(index)).toHaveAttribute(
+          "aria-label",
+          label,
+        );
+      }
+      await expect(
+        page.getByRole("link", { name: language.settings, exact: true }),
+      ).toHaveCount(0);
       await expect(page.locator("html")).toHaveAttribute("lang", language.lang);
       const fileChooser = page.waitForEvent("filechooser");
       await page.locator("button.upload-button").click();
@@ -306,7 +322,7 @@ for (const language of languages) {
 
       await navigation
         .getByRole("link", { name: language.tabs[0], exact: true })
-        .click();
+        .press("Enter");
       const surprise = page.locator("article").filter({
         has: page.getByRole("heading", {
           name: language.surprise,
@@ -335,9 +351,7 @@ for (const language of languages) {
       await page.route("**/api/programme", (route) =>
         route.fulfill({ json: { items: [] } }),
       );
-      await page
-        .getByRole("button", { name: language.refresh, exact: true })
-        .click();
+      await page.goto("/programme");
       await expect(
         page.getByRole("heading", {
           name: language.emptyProgramme,
@@ -363,11 +377,15 @@ for (const language of languages) {
       await expect(entry.getByText(message, { exact: true })).toBeVisible();
       await expect(entry.getByText(name, { exact: true })).toBeVisible();
 
-      await navigation
-        .getByRole("link", { name: language.tabs[3], exact: true })
+      await page
+        .getByRole("link", {
+          name: `${language.profile}: ${name}`,
+          exact: true,
+        })
         .click();
+      await expect(page).toHaveURL(/\/profil$/);
       await expect(
-        page.getByRole("heading", { name: language.settings, exact: true }),
+        page.getByRole("heading", { name: language.profile, exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("heading", { name, exact: true }),
@@ -423,9 +441,10 @@ test("translates host forms and confirmation dialogs in German", async ({
   try {
     const page = await context.newPage();
     await page.goto("/parametres");
-    await expect(
-      page.getByRole("heading", { name: "Feier planen", exact: true }),
-    ).toBeVisible();
+    await openSettingsSection(page, "party");
+    await expect(page.locator(".settings-back:visible")).toHaveAccessibleName(
+      "Zurück zu den Einstellungen",
+    );
     await expect(
       page.getByLabel("Name der Feier", { exact: true }),
     ).toBeVisible();
@@ -441,10 +460,7 @@ test("translates host forms and confirmation dialogs in German", async ({
         .filter({ hasText: "Gib eine gültige Zeitzone ein" }),
     ).toHaveText("Gib eine gültige Zeitzone ein, zum Beispiel Europe/Zurich.");
 
-    await page
-      .locator("summary")
-      .filter({ hasText: /^Gäste$/ })
-      .click();
+    await openSettingsSection(page, "guests");
     await expect(
       page.getByLabel("Vorname des Gastes", { exact: true }),
     ).toBeVisible();
@@ -468,10 +484,11 @@ test("translates host forms and confirmation dialogs in German", async ({
       ).active,
     ).toBe(true);
 
-    await page.locator("summary").filter({ hasText: "Programm" }).click();
+    await openSettingsSection(page, "programme");
     await page
       .getByRole("button", { name: "Programmpunkt hinzufügen", exact: true })
       .click();
+    await page.getByRole("button", { name: /^Programmpunkt Ein Name/ }).click();
     await expect(
       page.getByLabel("Titel des Programmpunkts", { exact: true }),
     ).toBeVisible();

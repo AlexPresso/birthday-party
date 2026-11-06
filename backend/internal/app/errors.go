@@ -1,6 +1,16 @@
 package app
 
 var errorMessages = map[string]string{
+	"invalid_question":                  "Write a question of 1 to 1000 characters.",
+	"questions_closed":                  "Questions and upvotes are closed.",
+	"question_limit_reached":            "This activity has reached its limit of 200 questions.",
+	"no_jokers_left":                    "Both jokers have already been used.",
+	"invalid_configuration":             "Choose an age from 1 to 150 and upload limits from 1 to 1024 MiB. Invitation titles allow 200 characters and descriptions 2000.",
+	"invalid_activity":                  "Add a question of up to 240 characters and choose 2 to 200 different candidates.",
+	"activity_conflict":                 "This activity changed or this action is no longer available. Refresh and try again.",
+	"vote_closed":                       "Voting is closed.",
+	"invalid_vote_candidate":            "Choose an available candidate.",
+	"self_vote_forbidden":               "You cannot vote for yourself in this activity.",
 	"invalid_notification_subscription": "Notifications couldn't be set up. Try again.",
 	"notification_subscription_limit":   "You've reached the notification device limit. Turn notifications off on another device first.",
 	"invalid_media_category":            "Choose a category with a name of 1 to 80 characters and a visibility setting.",

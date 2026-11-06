@@ -8,15 +8,15 @@ import (
 	"birthday-party/backend/internal/programme"
 )
 
-func (a *App) listProgramme(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
-	a.events(w, r, false)
+func (a *App) listProgramme(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+	a.events(w, r, guest, false)
 }
-func (a *App) listAdminProgramme(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
-	a.events(w, r, true)
+func (a *App) listAdminProgramme(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+	a.events(w, r, guest, true)
 }
 
-func (a *App) events(w http.ResponseWriter, r *http.Request, private bool) {
-	items, err := a.programme.List(r.Context(), a.now, private)
+func (a *App) events(w http.ResponseWriter, r *http.Request, guest identity.Guest, private bool) {
+	items, err := a.programme.List(r.Context(), a.now, guest.ID, private)
 	if err != nil {
 		internal(w, err)
 		return
@@ -24,21 +24,21 @@ func (a *App) events(w http.ResponseWriter, r *http.Request, private bool) {
 	respond(w, 200, map[string]any{"items": items})
 }
 
-func (a *App) createEvent(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) createEvent(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
 	var input programme.Input
 	if !decode(w, r, &input) {
 		return
 	}
-	event, err := a.programme.Create(r.Context(), input)
+	event, err := a.programme.Create(r.Context(), programmeActor(r, guest), input)
 	if err != nil {
-		failProgramme(w, err)
+		failVote(w, err)
 		return
 	}
 	a.programmeChanged()
 	respond(w, 201, event.View(a.now(), true))
 }
 
-func (a *App) updateEvent(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) updateEvent(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
@@ -47,22 +47,22 @@ func (a *App) updateEvent(w http.ResponseWriter, r *http.Request, _ identity.Gue
 	if !decode(w, r, &input) {
 		return
 	}
-	event, err := a.programme.Update(r.Context(), id, input)
+	event, err := a.programme.Update(r.Context(), programmeActor(r, guest), id, input)
 	if err != nil {
-		failProgramme(w, err)
+		failVote(w, err)
 		return
 	}
 	a.programmeChanged()
 	respond(w, 200, event.View(a.now(), true))
 }
 
-func (a *App) deleteEvent(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) deleteEvent(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
-	if err := a.programme.Delete(r.Context(), id); err != nil {
-		failProgramme(w, err)
+	if err := a.programme.Delete(r.Context(), programmeActor(r, guest), id); err != nil {
+		failVote(w, err)
 		return
 	}
 	a.programmeChanged()

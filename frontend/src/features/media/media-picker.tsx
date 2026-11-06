@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { ImagePlus, Images } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { ImagePlus, Images, Plus } from "lucide-react";
 import type { UploadLimits } from "./contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { useUploads, type UploadDestination } from "./upload-provider";
@@ -12,25 +12,40 @@ export function MediaPicker({
   limits,
   destination,
   children,
+  compact = false,
 }: {
   limits: UploadLimits;
   destination: UploadDestination;
   children?: ReactNode;
+  compact?: boolean;
 }) {
   const { t, locale } = useI18n();
   const uploads = useUploads();
   const input = useRef<HTMLInputElement>(null);
+  const guidanceId = useId();
   const [error, setError] = useState<string | null>(null);
   const numbers = new Intl.NumberFormat(locale);
   return (
-    <div className="media-picker">
+    <div className={`media-picker${compact ? " media-picker-compact" : ""}`}>
       <button
         className="button primary upload-button"
         type="button"
         onClick={() => input.current?.click()}
+        aria-describedby={guidanceId}
       >
-        <ImagePlus size={20} aria-hidden="true" />
-        {t("photos.add")}
+        {compact ? (
+          <Plus size={18} aria-hidden="true" />
+        ) : (
+          <ImagePlus size={20} aria-hidden="true" />
+        )}
+        {compact ? (
+          <>
+            <span aria-hidden="true">{t("photos.addShort")}</span>
+            <span className="visually-hidden">{t("photos.add")}</span>
+          </>
+        ) : (
+          t("photos.add")
+        )}
       </button>
       <input
         ref={input}
@@ -39,9 +54,10 @@ export function MediaPicker({
         multiple
         accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
         aria-label={t("photos.add")}
+        aria-describedby={guidanceId}
         tabIndex={-1}
         onChange={(event) => {
-          if (event.target.files) {
+          if (event.target.files?.length) {
             setError(
               uploads.addFiles(
                 Array.from(event.target.files),
@@ -55,14 +71,19 @@ export function MediaPicker({
           }
         }}
       />
-      {children}
-      <p className="photo-privacy">
-        <Images size={15} aria-hidden="true" />
-        {t("photos.privacy", {
-          imageSize: numbers.format(limits.imageBytes / (1024 * 1024)),
-          videoSize: numbers.format(limits.videoBytes / (1024 * 1024)),
-        })}
-      </p>
+      <div
+        id={guidanceId}
+        className={compact ? "visually-hidden" : "media-picker-guidance"}
+      >
+        {children}
+        <p className="photo-privacy">
+          <Images size={15} aria-hidden="true" />
+          {t("photos.privacy", {
+            imageSize: numbers.format(limits.imageBytes / (1024 * 1024)),
+            videoSize: numbers.format(limits.videoBytes / (1024 * 1024)),
+          })}
+        </p>
+      </div>
       <ErrorNotice message={error} />
     </div>
   );

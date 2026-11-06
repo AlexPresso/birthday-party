@@ -1,3 +1,4 @@
+import { openSettingsSection } from "./settings-navigation";
 import {
   test,
   expect,
@@ -270,6 +271,9 @@ test("guests navigate unlocked steps independently and keep their position acros
   await page.goto("/programme");
   await expect(page).toHaveURL(/\/attente$/);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expect(page.getByRole("navigation")).toHaveCount(0);
   expect((await (await page.request.get("/api/session")).json()).guest.id).toBe(
     invitation.guest.id,
@@ -282,6 +286,9 @@ test("guests navigate unlocked steps independently and keep their position acros
   ).toHaveCount(0);
   expect(progressRequests).toEqual([]);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expectStep(page, steps[0]);
   expect(await (await page.request.get("/api/welcome")).json()).toEqual({
     open: false,
@@ -366,12 +373,18 @@ test("guests navigate unlocked steps independently and keep their position acros
       (await (await page.request.get("/api/welcome")).json()).progressRevision,
     ).toBe(firstProgress);
     await page.reload();
+    if (new URL(page.url()).pathname === "/parametres") {
+      await openSettingsSection(page, "welcome");
+    }
     await expectStep(page, steps[0]);
     await guestNext(page);
     await expectStep(page, steps[1]);
     await guestPrevious(page);
     await expectStep(page, steps[0]);
     await page.reload();
+    if (new URL(page.url()).pathname === "/parametres") {
+      await openSettingsSection(page, "welcome");
+    }
     await expectStep(page, steps[0]);
     await guestNext(page);
     await expectStep(page, steps[1]);
@@ -385,7 +398,7 @@ test("guests navigate unlocked steps independently and keep their position acros
     await expectStep(page, steps[1]);
     await finishWelcome(page);
     const navigation = page.getByRole("navigation");
-    for (const name of ["Médias", "Programme", "Livre d'or", "Paramètres"]) {
+    for (const name of ["Programme", "Médias", "Livre d'or"]) {
       await expect(
         navigation.getByRole("link", { name, exact: true }),
       ).toBeVisible();
@@ -443,6 +456,9 @@ test("required late arrivals complete every step before entering an already open
   await guestPrevious(page);
   await expectStep(page, steps[0]);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expectStep(page, steps[0]);
   await guestNext(page);
   await expectStep(page, steps[1]);
@@ -476,6 +492,9 @@ test("required late arrivals complete every step before entering an already open
   await finishWelcome(page);
   expect((await page.request.get("/api/photos")).status()).toBe(200);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expect(page).toHaveURL(/\/photos$/);
   await page.goto("/attente");
   await expect(page).toHaveURL(/\/photos$/);
@@ -518,7 +537,12 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
   await context.addCookies((await host.storageState()).cookies);
   page.on("dialog", (dialog) => void dialog.accept());
   await page.goto("/parametres");
-  const summary = page.getByText("Accueil des invités", { exact: true });
+  await openSettingsSection(page, "welcome");
+  const summary = page.getByRole("heading", {
+    name: "Accueil des invités",
+    exact: true,
+    level: 1,
+  });
   await expect(summary).toBeVisible();
   const title = () => page.getByLabel("Titre du widget 1", { exact: true });
   const action = page.getByRole("button", {
@@ -537,8 +561,7 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
     exact: true,
   });
   const start = page.getByRole("button", {
-    name: "Activer l’écran d’attente",
-    exact: true,
+    name: /^(Activer l’écran d’attente|Relancer l’accueil)$/,
   });
 
   await add.click();
@@ -555,7 +578,7 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
     "Take one envelope for your table and keep it closed.",
   );
   await action.click();
-  await expect(start).toBeDisabled();
+  await expect(start).toBeEnabled();
 
   await page
     .getByRole("button", { name: "Monter l’étape 2", exact: true })
@@ -566,15 +589,7 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
   await expect(title()).toHaveValue("Read the table card");
   await expect(action).toBeEnabled();
   await title().fill("Find your team on the table card");
-  const savedResponse = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/admin/welcome") &&
-      response.request().method() === "PUT",
-  );
-  await page
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
-  expect((await savedResponse).status()).toBe(200);
+  await saveEditor(page);
   expect((await adminState()).steps).toEqual([
     step(
       "Collect your envelope at the entrance",
@@ -595,10 +610,14 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
       new URL(response.url()).pathname === "/api/admin/welcome/required" &&
       response.request().method() === "PATCH",
   );
-  await required.check();
+  await required.click();
   expect((await requiredSaved).status()).toBe(200);
+  await expect(required).toBeChecked();
   expect((await adminState()).required).toBe(true);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expect(required).toBeChecked();
   await expect(summary).toBeVisible();
   await selectStep(1);
@@ -638,7 +657,7 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
       ? "Relancer l’accueil"
       : "Activer l’écran d’attente",
   );
-  await expect(page).toHaveURL(/\/parametres$/);
+  await expect(page).toHaveURL(/\/parametres\?section=welcome$/);
   await expect(page.getByRole("navigation")).toBeVisible();
   expect(await adminState()).toMatchObject({ open: false, currentStep: 0 });
   await pressTransition("Débloquer la première étape");
@@ -712,6 +731,7 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
   await transition("start");
   await context.addCookies((await host.storageState()).cookies);
   await page.goto("/parametres");
+  await openSettingsSection(page, "welcome");
   const title = page.getByLabel("Titre du widget 1", { exact: true });
   const draftTitle = "Unpublished changes from this browser";
   await title.fill(draftTitle);
@@ -723,9 +743,7 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
       response.url().endsWith("/api/admin/welcome") &&
       response.request().method() === "PUT",
   );
-  await page
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
+  await title.blur();
   const response = await rejectedSave;
   expect(response.status()).toBe(409);
   expect(await response.json()).toMatchObject({ code: "welcome_conflict" });
@@ -752,7 +770,7 @@ test("the host keeps a conflicting draft until deliberately discarding it and ca
     name: "Débloquer l’étape suivante",
     exact: true,
   });
-  await expect(next).toBeDisabled();
+  await expect(next).toBeEnabled();
   await expect(
     page.getByRole("button", { name: "Ouvrir l’application", exact: true }),
   ).toBeEnabled();
@@ -797,6 +815,7 @@ test("the host saves a conflicting draft after an unlock and edits again after o
   await transition("start");
   await context.addCookies((await host.storageState()).cookies);
   await page.goto("/parametres");
+  await openSettingsSection(page, "welcome");
   const title = page.getByLabel("Titre du widget 1", { exact: true });
   const draftTitle = "Keep this unsaved title after the unlock";
   await title.fill(draftTitle);
@@ -806,9 +825,7 @@ test("the host saves a conflicting draft after an unlock and edits again after o
       new URL(response.url()).pathname === "/api/admin/welcome" &&
       response.request().method() === "PUT",
   );
-  await page
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
+  await title.blur();
   expect((await rejectedSave).status()).toBe(409);
   await page
     .getByRole("button", { name: "Actualiser l’état", exact: true })
@@ -830,7 +847,7 @@ test("the host saves a conflicting draft after an unlock and edits again after o
   await expect(title).toBeEnabled();
   const openTitle = "Instructions updated after opening the app";
   await title.fill(openTitle);
-  await expect(restart).toBeDisabled();
+  await expect(restart).toBeEnabled();
   await saveEditor(page);
   expect(await adminState()).toMatchObject({ open: true, currentStep: 2 });
   expect(titleOf((await adminState()).steps[0])).toBe(openTitle);
@@ -842,16 +859,86 @@ const editorSteps: WelcomeStep[] = [
   step("Collect your envelope", "Take one envelope for your table.", null),
 ];
 
+test("welcome autosave preserves newer text and reordered steps before changing the required switch", async ({
+  page,
+  context,
+}) => {
+  const original = editorSteps.slice(0, 2);
+  await saveSteps(original);
+  await context.addCookies((await host.storageState()).cookies);
+  await page.goto("/parametres?section=welcome");
+  const title = page.getByLabel("Titre du widget 1", { exact: true });
+  const editor = page.locator(".welcome-admin");
+  let releaseResponse!: () => void;
+  const heldResponse = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let markAccepted!: () => void;
+  const accepted = new Promise<void>((resolve) => {
+    markAccepted = resolve;
+  });
+  const requests: { revision: number; steps: WelcomeStep[] }[] = [];
+  await page.route("**/api/admin/welcome", async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.continue();
+      return;
+    }
+    requests.push(route.request().postDataJSON());
+    const response = await route.fetch();
+    if (requests.length === 1) {
+      markAccepted();
+      await heldResponse;
+    }
+    await route.fulfill({ response });
+  });
+  try {
+    await title.fill("First autosaved title");
+    await title.blur();
+    await accepted;
+    await expect(editor).toHaveAttribute("aria-busy", "true");
+    await expect(title).toBeEnabled();
+    const latestTitle = "Newer title typed during the pending save";
+    await title.fill(latestTitle);
+    await page
+      .getByRole("button", { name: "Descendre l’étape 1", exact: true })
+      .click();
+    await expect(title).toHaveValue(latestTitle);
+    const requiredSaved = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/admin/welcome/required" &&
+        response.request().method() === "PATCH",
+    );
+    await page.getByLabel("Obligatoire", { exact: true }).click();
+    releaseResponse();
+    expect((await requiredSaved).status()).toBe(200);
+    await saveEditor(page);
+    expect((await adminState()).steps).toEqual([
+      original[1],
+      step(latestTitle, bodyOf(original[0])),
+    ]);
+    expect((await adminState()).required).toBe(true);
+    expect(requests).toHaveLength(2);
+    expect(requests[1].revision).toBeGreaterThan(requests[0].revision);
+    await expect(title).toHaveValue(latestTitle);
+  } finally {
+    releaseResponse();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});
+
 async function saveEditor(page: Page) {
-  const response = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/admin/welcome") &&
-      response.request().method() === "PUT",
-  );
-  await page
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
-  expect((await response).status()).toBe(200);
+  const editor = page.locator(".welcome-admin");
+  await editor.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+  });
+  const retry = editor.getByRole("button", { name: "Réessayer", exact: true });
+  if (await retry.isVisible()) await retry.click();
+  await expect(editor).not.toHaveAttribute("data-dirty", "true");
+  await expect(editor).toHaveAttribute("aria-busy", "false");
+  await expect(
+    editor.getByRole("button", { name: "Enregistrer les étapes", exact: true }),
+  ).toHaveCount(0);
 }
 
 async function addTextWidgets(page: Page, title: string, body: string) {
@@ -872,6 +959,7 @@ test("the host drags widgets into a step, reorders them and retains their conten
   await context.addCookies((await host.storageState()).cookies);
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto("/parametres");
+  await openSettingsSection(page, "welcome");
   const editor = page.locator(".welcome-admin");
   await editor
     .getByRole("button", { name: "Ajouter une étape", exact: true })
@@ -985,6 +1073,9 @@ test("the host drags widgets into a step, reorders them and retains their conten
   await saveEditor(page);
   expect((await adminState()).steps).toEqual(expected);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expect(widgets).toHaveCount(4);
   await expect(
     page.getByLabel("Titre du widget 2", { exact: true }),
@@ -996,9 +1087,8 @@ test("the host drags widgets into a step, reorders them and retains their conten
     .getByRole("button", { name: "Ajouter le widget Titre", exact: true })
     .press("Enter");
   const invalidTitle = page.getByLabel("Titre du widget 5", { exact: true });
-  await editor
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
-    .click();
+  await invalidTitle.focus();
+  await invalidTitle.blur();
   await expect(invalidTitle).toBeFocused();
   expect((await adminState()).steps).toEqual(expected);
   await editor
@@ -1034,6 +1124,7 @@ test("dragging a selected welcome step preserves its draft and action settings t
   await context.addCookies((await host.storageState()).cookies);
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto("/parametres");
+  await openSettingsSection(page, "welcome");
   const editor = page.locator(".welcome-admin");
   const list = editor.locator(".welcome-step-list");
   const rows = list.locator("li");
@@ -1110,6 +1201,9 @@ test("dragging a selected welcome step preserves its draft and action settings t
     editorSteps[2],
   ]);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expect(rows).toContainText([
     editedTitle,
     titleOf(editorSteps[0]),
@@ -1138,8 +1232,8 @@ test("dragging a selected welcome step preserves its draft and action settings t
   await editor
     .getByRole("button", { name: "Modifier l’étape 1", exact: true })
     .click();
-  await editor
-    .getByRole("button", { name: "Enregistrer les étapes", exact: true })
+  await page
+    .getByRole("button", { name: "Retour aux paramètres", exact: true })
     .click();
   await expect(
     editor.getByRole("button", {
@@ -1195,6 +1289,7 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
   try {
     const page = await context.newPage();
     await page.goto("/parametres");
+    await openSettingsSection(page, "welcome");
     const editor = page.locator(".welcome-admin");
     const list = editor.locator(".welcome-step-list");
     const rows = list.locator("li");
@@ -1310,6 +1405,9 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
       step(titleOf(editorSteps[2]), draftBody, "profile_photo"),
     ]);
     await page.reload();
+    if (new URL(page.url()).pathname === "/parametres") {
+      await openSettingsSection(page, "welcome");
+    }
     await expect(rows).toContainText([
       titleOf(editorSteps[1]),
       titleOf(editorSteps[0]),
@@ -1390,6 +1488,9 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
     await transition("start");
     await transition("next");
     await page.reload();
+    if (new URL(page.url()).pathname === "/parametres") {
+      await openSettingsSection(page, "welcome");
+    }
     await expect(
       editor.getByRole("button", { name: "Déplacer l’étape 1", exact: true }),
     ).toBeEnabled();
@@ -1412,6 +1513,9 @@ test("the welcome editor supports touch dragging, escape cancellation and keyboa
       step(titleOf(editorSteps[2]), draftBody, "profile_photo"),
     ]);
     await page.reload();
+    if (new URL(page.url()).pathname === "/parametres") {
+      await openSettingsSection(page, "welcome");
+    }
     await expect(title).toHaveValue(updatedTitle);
     await expect(title).toBeEnabled();
     await expect(photoAction).toBeDisabled();
@@ -1437,6 +1541,7 @@ test("dragging through twelve welcome steps scrolls the list and preserves the m
   await context.addCookies((await host.storageState()).cookies);
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto("/parametres");
+  await openSettingsSection(page, "welcome");
   const editor = page.locator(".welcome-admin");
   const list = editor.locator(".welcome-step-list");
   const rows = list.locator("li");
@@ -1494,6 +1599,9 @@ test("dragging through twelve welcome steps scrolls the list and preserves the m
   await saveEditor(page);
   expect((await adminState()).steps).toEqual(ordered);
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expect(rows).toContainText(ordered.map((step) => titleOf(step)));
   await page.setViewportSize({ width: 390, height: 844 });
   // Confirm hydration before sending low-level pointer events after a full reload.
@@ -1771,6 +1879,9 @@ test("a welcome profile action becomes available only for its step and keeps the
     expect((await page.request.get(path)).status()).toBe(423);
   }
   await page.reload();
+  if (new URL(page.url()).pathname === "/parametres") {
+    await openSettingsSection(page, "welcome");
+  }
   await expectStep(page, steps[1]);
   await expect(widget.locator(".avatar img")).toHaveAttribute("src", avatarURL);
   await expect(widget.locator(".avatar img")).toHaveJSProperty(
@@ -1811,7 +1922,7 @@ test("a welcome profile action becomes available only for its step and keeps the
   expect((await host.get(avatarURL)).status()).toBe(200);
   await transition("open");
   await finishWelcome(page);
-  await expect(page.locator(".app-header .avatar img")).toHaveAttribute(
+  await expect(page.locator(".navigation-profile .avatar img")).toHaveAttribute(
     "src",
     avatarURL,
   );

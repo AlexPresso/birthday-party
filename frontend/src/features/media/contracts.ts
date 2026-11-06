@@ -9,6 +9,11 @@ export const mediaCategorySchema = z.object({
     .min(1)
     .refine((value) => Array.from(value).length <= 80),
   isPublic: z.boolean(),
+  coverThumbnailUrl: z
+    .string()
+    .regex(/^\/api\/photos\/[1-9]\d*\/image\?size=thumb$/)
+    .nullable()
+    .optional(),
 });
 
 export const mediaCategoriesSchema = z.object({

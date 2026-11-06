@@ -12,7 +12,7 @@ import (
 	"unicode"
 )
 
-func (f *Files) Receive(reader *multipart.Reader) (media.Received, error) {
+func (f *Files) Receive(reader *multipart.Reader, maxImageBytes, maxVideoBytes int64) (media.Received, error) {
 	var upload media.Received
 	part, err := reader.NextPart()
 	if err != nil || part.FormName() != "file" || part.FileName() == "" {
@@ -49,9 +49,9 @@ func (f *Files) Receive(reader *multipart.Reader) (media.Received, error) {
 	}
 	upload.Format = detectVideoFormat(header)
 	upload.Kind = "image"
-	limit, tooLarge := f.maxImageBytes, "photo_too_large"
+	limit, tooLarge := maxImageBytes, "photo_too_large"
 	if upload.Format != "" {
-		upload.Kind, limit, tooLarge = "video", f.maxVideoBytes, "video_too_large"
+		upload.Kind, limit, tooLarge = "video", maxVideoBytes, "video_too_large"
 	}
 	upload.Size, err = io.Copy(input, io.LimitReader(io.MultiReader(bytes.NewReader(header), part), limit+1))
 	if upload.Size > limit {

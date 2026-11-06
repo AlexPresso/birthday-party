@@ -5,16 +5,14 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUp,
-  ChevronDown,
   DoorOpen,
-  ListOrdered,
   Plus,
   RefreshCw,
-  Save,
   Trash2,
   X,
 } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
+import { useAutosave } from "@/lib/autosave";
 import {
   adminWelcomeSchema,
   type AdminWelcome,
@@ -41,6 +39,8 @@ export function WelcomeAdmin({
 }) {
   const { t, locale } = useI18n();
   const [state, setState] = useState(initial);
+  const currentState = useRef(initial);
+  const command = useRef(false);
   const [draft, setDraft] = useState<StepDraft[]>(() =>
     initial.steps.map((step, key) => ({
       key,
@@ -58,7 +58,7 @@ export function WelcomeAdmin({
   );
   const [reorderNotice, setReorderNotice] = useState("");
   const [busy, setBusy] = useState<
-    Action | "save" | "reload" | "discard" | "required" | null
+    Action | "reload" | "discard" | "required" | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export function WelcomeAdmin({
       switch (widget.type) {
         case "title":
         case "text":
-          return { type: widget.type, text: widget.text };
+          return { type: widget.type, text: widget.text.trim() };
         case "profile_photo":
         case "enable_notifications":
           return { type: widget.type };
@@ -79,11 +79,28 @@ export function WelcomeAdmin({
     }),
   }));
   const dirty = JSON.stringify(steps) !== JSON.stringify(state.steps);
+  const invalidIndex = draft.findIndex(
+    ({ widgets }) => widgets.length === 0 || widgets.some(isInvalidTextWidget),
+  );
   const mutationDisabled = !!busy || conflict;
   const selectedIndex = draft.findIndex((step) => step.key === selectedKey);
   const selected = draft[selectedIndex];
   const hasNext = state.currentStep < state.steps.length;
   const number = (value: number) => new Intl.NumberFormat(locale).format(value);
+  const { flush, saving, onBlur } = useAutosave({ save });
+  const structure = JSON.stringify(
+    draft.map((step) => ({
+      key: step.key,
+      widgets: step.widgets.map(({ key, type }) => ({ key, type })),
+    })),
+  );
+  const previousStructure = useRef(structure);
+
+  useEffect(() => {
+    if (previousStructure.current === structure) return;
+    previousStructure.current = structure;
+    if (dirty && invalidIndex === -1 && !conflict) void flush();
+  }, [structure, dirty, invalidIndex, conflict, flush]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -107,6 +124,11 @@ export function WelcomeAdmin({
     setDraft(replacement);
     if (!replacement.some((step) => step.key === selectedKey))
       setSelectedKey(replacement[0]?.key ?? null);
+  }
+
+  function acceptState(updated: AdminWelcome) {
+    currentState.current = updated;
+    setState(updated);
   }
 
   function fail(cause: unknown) {
@@ -173,16 +195,13 @@ export function WelcomeAdmin({
     setValidationError(null);
   }
 
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    if (mutationDisabled || !dirty) return;
+  async function save() {
+    if (JSON.stringify(steps) === JSON.stringify(currentState.current.steps))
+      return true;
+    if (conflict) return false;
     setError(null);
     setValidationError(null);
     setNotice("");
-    const invalidIndex = draft.findIndex(
-      ({ widgets }) =>
-        widgets.length === 0 || widgets.some(isInvalidTextWidget),
-    );
     if (invalidIndex !== -1) {
       const invalid = draft[invalidIndex];
       setValidationError(
@@ -201,27 +220,27 @@ export function WelcomeAdmin({
             .querySelector<HTMLButtonElement>(".welcome-widget-add")
             ?.focus();
       });
-      return;
+      return false;
     }
-    setBusy("save");
     try {
       const updated = await api("/admin/welcome", adminWelcomeSchema, {
         method: "PUT",
-        body: { revision: state.revision, steps },
+        body: { revision: currentState.current.revision, steps },
       });
-      setState(updated);
-      replaceDraft(updated);
+      // New text and reordering may arrive while this snapshot is being saved.
+      // Retain the keyed draft; the next flush saves any newer changes.
+      acceptState(updated);
       setConflict(false);
       setNotice(t("adminWelcome.saved"));
+      return true;
     } catch (cause) {
       fail(cause);
-    } finally {
-      setBusy(null);
+      return false;
     }
   }
 
   async function transition(action: Action) {
-    if (busy || conflict || (dirty && action !== "open")) return;
+    if (command.current || conflict) return;
     if (
       action !== "next" &&
       !window.confirm(
@@ -233,58 +252,64 @@ export function WelcomeAdmin({
       )
     )
       return;
+    command.current = true;
     setBusy(action);
     setError(null);
     setNotice("");
     try {
+      if (!(await flush())) return;
       const updated = await api(
         "/admin/welcome/transition",
         adminWelcomeSchema,
         {
           method: "POST",
-          body: { revision: state.revision, action },
+          body: { revision: currentState.current.revision, action },
         },
       );
-      setState(updated);
-      if (!dirty) replaceDraft(updated);
+      acceptState(updated);
     } catch (cause) {
       fail(cause);
     } finally {
+      command.current = false;
       setBusy(null);
     }
   }
 
   async function updateRequired(required: boolean) {
-    if (busy || conflict) return;
+    if (command.current || conflict) return;
+    command.current = true;
     setBusy("required");
     setError(null);
     setNotice("");
     try {
+      if (!(await flush())) return;
       const updated = await api("/admin/welcome/required", adminWelcomeSchema, {
         method: "PATCH",
-        body: { revision: state.revision, required },
+        body: { revision: currentState.current.revision, required },
       });
-      setState(updated);
+      acceptState(updated);
     } catch (cause) {
       fail(cause);
     } finally {
+      command.current = false;
       setBusy(null);
     }
   }
 
   async function reload(discardChanges = false) {
-    if (busy) return;
+    if (command.current || saving) return;
     if (
       discardChanges &&
       !window.confirm(t("adminWelcome.discardConfirmation"))
     )
       return;
+    command.current = true;
     setBusy(discardChanges ? "discard" : "reload");
     setError(null);
     setNotice("");
     try {
       const updated = await api("/admin/welcome", adminWelcomeSchema);
-      setState(updated);
+      acceptState(updated);
       if (!dirty || discardChanges) replaceDraft(updated);
       setConflict(false);
       setNotice(
@@ -299,17 +324,18 @@ export function WelcomeAdmin({
     } catch (cause) {
       fail(cause);
     } finally {
+      command.current = false;
       setBusy(null);
     }
   }
 
   return (
-    <details className="admin-accordion panel welcome-admin" open>
-      <summary>
-        <ListOrdered size={21} aria-hidden="true" />
-        <span>{t("adminWelcome.title")}</span>
-        <ChevronDown size={18} aria-hidden="true" />
-      </summary>
+    <section
+      className="welcome-admin"
+      aria-label={t("adminWelcome.title")}
+      aria-busy={!!busy || saving}
+      data-dirty={dirty || undefined}
+    >
       <div className="admin-form">
         <p className="muted welcome-admin-intro">{t("adminWelcome.intro")}</p>
         <div className="welcome-control">
@@ -341,7 +367,7 @@ export function WelcomeAdmin({
               <button
                 type="button"
                 className="button primary"
-                disabled={!!busy || dirty || conflict}
+                disabled={!!busy || conflict}
                 onClick={() => transition("start")}
               >
                 {busy === "start"
@@ -358,7 +384,7 @@ export function WelcomeAdmin({
                   <button
                     type="button"
                     className="button primary"
-                    disabled={!!busy || dirty || conflict}
+                    disabled={!!busy || conflict}
                     onClick={() => transition("next")}
                   >
                     <ArrowRight size={17} aria-hidden="true" />
@@ -385,11 +411,6 @@ export function WelcomeAdmin({
               </>
             )}
           </div>
-          {dirty && (
-            <p className="fine-print welcome-unsaved">
-              {t("adminWelcome.unsaved")}
-            </p>
-          )}
         </div>
 
         <div className="welcome-required" aria-busy={busy === "required"}>
@@ -414,42 +435,23 @@ export function WelcomeAdmin({
           )}
         </div>
 
-        <ErrorNotice message={error ?? validationError} />
-        {(conflict || dirty) && (
-          <div className="form-actions">
-            {conflict && (
-              <button
-                type="button"
-                className="button secondary"
-                disabled={!!busy}
-                onClick={() => reload()}
-              >
-                <RefreshCw size={17} aria-hidden="true" />
-                {busy === "reload"
-                  ? t("adminWelcome.reloading")
-                  : t("adminWelcome.reload")}
-              </button>
-            )}
-            {dirty && (
-              <button
-                type="button"
-                className="text-button"
-                disabled={!!busy}
-                onClick={() => reload(true)}
-              >
-                <X size={17} aria-hidden="true" />
-                {busy === "discard"
-                  ? t("adminWelcome.reloading")
-                  : t("adminWelcome.discard")}
-              </button>
-            )}
-          </div>
-        )}
-        <p className="success-notice welcome-admin-notice" role="status">
-          {notice}
+        <p className="welcome-admin-notice" role="status">
+          {saving
+            ? t("adminWelcome.saving")
+            : dirty && notice === t("adminWelcome.saved")
+              ? ""
+              : notice}
         </p>
 
-        <form onSubmit={save} noValidate className="welcome-editor">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void flush();
+          }}
+          onBlur={onBlur}
+          noValidate
+          className="welcome-editor"
+        >
           <div className="welcome-editor-heading">
             <div>
               <h3>{t("adminWelcome.stepsTitle")}</h3>
@@ -570,16 +572,53 @@ export function WelcomeAdmin({
               <Plus size={17} aria-hidden="true" />
               {t("adminWelcome.add")}
             </button>
-            <button
-              className="button primary"
-              disabled={mutationDisabled || !dirty}
-            >
-              <Save size={17} aria-hidden="true" />
-              {t(busy === "save" ? "adminWelcome.saving" : "adminWelcome.save")}
-            </button>
           </div>
         </form>
+        <ErrorNotice message={error ?? validationError} />
+        {(conflict || dirty) && (
+          <div className="form-actions">
+            {conflict && (
+              <button
+                type="button"
+                className="button secondary"
+                disabled={!!busy || saving}
+                onClick={() => reload()}
+              >
+                <RefreshCw size={17} aria-hidden="true" />
+                {busy === "reload"
+                  ? t("adminWelcome.reloading")
+                  : t("adminWelcome.reload")}
+              </button>
+            )}
+            {dirty && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={!!busy || saving}
+                onClick={() => reload(true)}
+              >
+                <X size={17} aria-hidden="true" />
+                {busy === "discard"
+                  ? t("adminWelcome.reloading")
+                  : t("adminWelcome.discard")}
+              </button>
+            )}
+            {dirty &&
+              !conflict &&
+              (error || notice === t("adminWelcome.draftKept")) && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={!!busy || saving}
+                  onClick={() => void flush()}
+                >
+                  <RefreshCw size={17} aria-hidden="true" />
+                  {t("common.retry")}
+                </button>
+              )}
+          </div>
+        )}
       </div>
-    </details>
+    </section>
   );
 }

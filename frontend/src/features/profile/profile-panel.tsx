@@ -6,11 +6,11 @@ import { useI18n } from "@/lib/i18n-context";
 import type { Guest } from "@/features/guests/contracts";
 import { ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
-import { ProfilePhotoEditor } from "@/features/profile/profile-photo-editor";
+import { ProfilePhotoEditor } from "./profile-photo-editor";
 import { NotificationControl } from "@/features/notifications/notification-control";
-import "./settings.css";
+import "./profile-panel.css";
 
-export function SettingsPanel({
+export function ProfilePanel({
   guest,
   imageBytes,
 }: {
@@ -40,8 +40,8 @@ export function SettingsPanel({
     }
   }
   return (
-    <section className="settings-profile panel">
-      <header className="settings-identity">
+    <section className="profile-panel">
+      <header className="profile-identity">
         <Avatar name={guest.name} avatarUrl={photo.url} className="large" />
         <div>
           <h2>{guest.name}</h2>
@@ -49,19 +49,19 @@ export function SettingsPanel({
             {guest.role === "admin" ? t("settings.host") : t("settings.guest")}
           </span>
         </div>
-        <p className="muted">{t("settings.attribution")}</p>
       </header>
-      <div className="settings-controls">
+      <div className="profile-controls">
         <ProfilePhotoEditor
           avatarUrl={photo.url}
           imageBytes={imageBytes}
+          variant="profile"
+          afterEditor={<NotificationControl compact />}
           onSaved={(updated) =>
             setPhoto((current) => ({ ...current, url: updated.avatarUrl }))
           }
         />
-        <NotificationControl />
       </div>
-      <footer className="settings-account">
+      <footer className="profile-account">
         <button className="text-button" disabled={busy} onClick={logout}>
           <LogOut size={17} />
           {busy ? t("settings.signingOut") : t("settings.signOut")}

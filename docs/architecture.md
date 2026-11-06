@@ -22,6 +22,19 @@ route code. Features do not import route modules. Keep imports explicit rather
 than exporting every module through a barrel file; server-only code must stay
 out of client dependency graphs.
 
+The bottom navigation's Profile route composes personal photo, notifications and logout.
+Settings composes administrator controls and redirects guests before reading
+admin data. Its grouped index opens subpages through the native history API at
+`/parametres?section=…`. Mount editors on their first visit and retain them inert
+when inactive to preserve drafts. The party feature owns the persistent birthday
+configuration and its invitation and upload-limit editors, with age inside party
+details. Shared autosave coordination serializes field-blur and navigation saves;
+settings waits for successful saves before returning to its index. Feature editors
+own validation, errors and preservation of edits made while a request runs. Settings
+queues configuration patches and merges each into the latest accepted configuration
+before sending the full API update, preserving other sections. Public configuration contains only age and invitation copy; private
+party details remain behind full app access.
+
 The party layout owns the upload provider so transfers survive tab navigation.
 Realtime consumers share one browser connection and refresh through authorized
 HTTP requests. Keep these lifetimes when moving or composing components.
@@ -53,7 +66,7 @@ SQL drivers, HTTP handlers, image libraries or FFmpeg:
 | --------------- | ------------------------------------------------------------------------- |
 | `access`        | Session, role and current welcome capability decisions                    |
 | `identity`      | Guest validation, invitations, tokens and session policy                  |
-| `programme`     | Event validation and scheduled reveal rules                               |
+| `programme`     | Typed events, scheduled reveals, votes and question rounds                |
 | `guestbook`     | Message validation, anonymous attribution and deletion rules              |
 | `welcome`       | Widget validation, host transitions and guest navigation                  |
 | `profile`       | Profile photo operations and current-widget access                        |
@@ -110,6 +123,28 @@ Adapter tests cover processing and transport behavior. HTTP/database integration
 tests in `app` exercise the composed access rules, transactions, concurrency and
 public API. Run the import-boundary checks alongside behavior tests so future
 changes keep dependencies pointing toward the core.
+
+Programme activities are individual typed events with stable IDs. A vote's
+configuration and event metadata are saved atomically. Its internal vote extension
+retains the candidate and ballot records; one event has at most one extension.
+The vote event separates host configuration and state transitions
+from guest ballots. Its PostgreSQL adapter coordinates authorization, event
+availability, vote closure and ballot replacement atomically. Public views expose
+only the viewer's choice and revealed aggregate results. Reuse the programme
+invalidation topic and existing avatar component; adding a new activity means
+adding its explicit type, rules, adapter behavior and UI, not a plugin runtime.
+Activities may expose a dedicated `/programme/[id]` page. The App Router selects
+the explicit activity type; its presentation and interactions stay in the
+programme feature. Question rounds use this page, with a link from the agenda
+and settings. Server reads remain authenticated and uncached, and the shared
+party layout preserves navigation, uploads and the realtime connection.
+
+Question rounds use the same programme authorization and invalidation flow.
+Their adapter locks the round before accepting questions, upvotes or host
+resolutions, keeping the shared two-joker budget atomic. Author and voter IDs
+remain private; public responses contain ranked questions and the viewer's own
+upvote. Host resolutions advance the configuration revision; guest participation
+preserves it. Event edits retain the round and its accepted questions.
 
 ## Adding or changing a feature
 

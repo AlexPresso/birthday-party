@@ -1,0 +1,7 @@
+fullnameOverride: existing-party
+backend:
+  persistence:
+    existingClaim: existing-media
+postgresql:
+  persistence:
+    existingClaim: existing-database

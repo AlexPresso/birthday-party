@@ -1,0 +1,40 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := required "ingress.host is required when ingress.enabled=true" .Values.ingress.host }}
+{{- if ne (regexReplaceAll ":[0-9]+$" (urlParse .Values.publicUrl).host "") $host }}
+{{- fail "ingress.host must match the hostname in publicUrl" }}
+{{- end }}
+{{- if and .Values.ingress.tls.enabled (not (hasPrefix "https://" .Values.publicUrl)) }}
+{{- fail "publicUrl must use HTTPS when ingress.tls.enabled=true" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "birthday-party.fullname" . }}
+  labels:
+    {{- include "birthday-party.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ required "ingress.tls.secretName is required when ingress.tls.enabled=true" .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "birthday-party.fullname" . }}-frontend
+                port:
+                  name: http
+{{- end }}

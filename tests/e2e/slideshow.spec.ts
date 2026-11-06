@@ -88,11 +88,18 @@ function launchButton(page: Page) {
   return page.getByRole("button", { name: "Lancer le diaporama", exact: true });
 }
 
+async function startSlideshow(page: Page) {
+  if (!(await launchButton(page).isVisible())) {
+    await page.locator(".media-post-menu > summary").first().click();
+  }
+  await launchButton(page).click();
+}
+
 async function launch(page: Page, categoryId: number | null = album.id) {
   await page.goto(
     categoryId === null ? "/photos" : `/photos?categoryId=${categoryId}`,
   );
-  await launchButton(page).click();
+  await startSlideshow(page);
   await expect(slideshow(page)).toBeVisible();
 }
 
@@ -282,9 +289,12 @@ test("a slideshow stays in its current category when paging and looping", async 
   await expect(slideshow(page)).toHaveCount(0);
   await expect(launchButton(page)).toBeFocused();
 
-  await page.getByLabel("Catégorie", { exact: true }).selectOption("");
+  await page
+    .getByRole("group", { name: "Catégorie", exact: true })
+    .getByRole("button", { name: "Galerie", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/photos$/);
-  await launchButton(page).click();
+  await startSlideshow(page);
   await pause(page);
   await expectPhoto(page, mainPhotos[0]);
   await next(page);
@@ -297,7 +307,7 @@ test("images advance automatically, pause for manual navigation, and fit phone a
 }) => {
   await page.goto(`/photos?categoryId=${album.id}`);
   await page.clock.install();
-  await launchButton(page).click();
+  await startSlideshow(page);
   await expectPhoto(page, albumPhotos[0]);
   await page.clock.fastForward(5_100);
   await expectPhoto(page, albumPhotos[1]);
@@ -377,12 +387,16 @@ test("empty categories have no slideshow and private categories remain host-only
   context,
 }) => {
   await page.goto(`/photos?categoryId=${emptyAlbum.id}`);
-  await expect(page.getByLabel("Catégorie", { exact: true })).toHaveValue(
-    String(emptyAlbum.id),
-  );
+  const categories = page.getByRole("group", {
+    name: "Catégorie",
+    exact: true,
+  });
+  await expect(
+    categories.getByRole("button", { name: emptyAlbum.name, exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(launchButton(page)).toHaveCount(0);
   await expect(
-    page.getByRole("option", { name: privateAlbum.name, exact: true }),
+    categories.getByRole("button", { name: privateAlbum.name, exact: true }),
   ).toHaveCount(0);
   expect(
     (await guest.get(`/api/photos?categoryId=${privateAlbum.id}`)).status(),
@@ -533,7 +547,7 @@ test("a slideshow starts with a video, pauses playback, and advances when it end
   await expect(
     page.locator(".photo-tile").first().locator(".video-marker"),
   ).toBeVisible();
-  await launchButton(page).click();
+  await startSlideshow(page);
   const video = slideshow(page).locator("video");
   await expect(video).toBeVisible();
   await expect

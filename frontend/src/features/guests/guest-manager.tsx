@@ -9,16 +9,17 @@ import { ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 
 export function GuestManager({
-  initial,
+  guests,
+  onGuestChange,
   currentGuest,
   timezone,
 }: {
-  initial: Guest[];
+  guests: Guest[];
+  onGuestChange: (guest: Guest) => void;
   currentGuest: Guest;
   timezone: string;
 }) {
   const { locale, t } = useI18n();
-  const [guests, setGuests] = useState(initial);
   const activeGuestCount = guests.filter((guest) => guest.active).length;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function GuestManager({
         method: "POST",
         body: { name: name.trim() },
       });
-      setGuests((items) => [...items, data.guest]);
+      onGuestChange(data.guest);
       setInvitation({ ...data, name: data.guest.name });
       setName("");
     } catch (err) {
@@ -59,11 +60,7 @@ export function GuestManager({
         { method: "POST", body: {} },
       );
       setInvitation({ ...data, name: guest.name });
-      setGuests((items) =>
-        items.map((item) =>
-          item.id === guest.id ? { ...item, active: true } : item,
-        ),
-      );
+      onGuestChange({ ...guest, active: true });
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
@@ -77,11 +74,7 @@ export function GuestManager({
     setError(null);
     try {
       await remove(`/admin/guests/${guest.id}`);
-      setGuests((items) =>
-        items.map((item) =>
-          item.id === guest.id ? { ...item, active: false } : item,
-        ),
-      );
+      onGuestChange({ ...guest, active: false });
       setInvitation(null);
     } catch (err) {
       setError(errorMessage(err, t));

@@ -1,4 +1,17 @@
 const en = {
+  invalid_question: "Write a question of 1 to 1000 characters.",
+  questions_closed: "Questions and upvotes are closed.",
+  question_limit_reached:
+    "This activity has reached its limit of 200 questions.",
+  no_jokers_left: "Both jokers have already been used.",
+  invalid_activity:
+    "Add a question of up to 240 characters and choose 2 to 200 different candidates.",
+  activity_conflict:
+    "This activity changed or this action is no longer available. Refresh and try again.",
+  vote_closed: "Voting is closed.",
+  invalid_vote_candidate: "Choose an available candidate.",
+  self_vote_forbidden: "You cannot vote for yourself in this activity.",
+
   invalid_notification_subscription:
     "Notifications couldn't be set up. Try again.",
   notification_subscription_limit:
@@ -28,6 +41,8 @@ const en = {
   not_found: "This item could not be found.",
   invalid_party:
     "The title can contain up to 120 characters and the location up to 240.",
+  invalid_configuration:
+    "Choose an age from 1 to 150 and upload limits from 1 to 1024 MiB. Invitation titles allow 200 characters and descriptions 2000.",
   invalid_timezone: "Choose a time zone such as Europe/Zurich.",
   unknown_timezone: "This time zone was not found. Try Europe/Zurich.",
   invalid_date: "Choose the date and time again, then save.",
@@ -90,6 +105,21 @@ export type ErrorCode = keyof typeof en;
 export const errorMessages = {
   en,
   fr: {
+    invalid_question: "Écris une question de 1 à 1 000 caractères.",
+    questions_closed: "L’envoi des questions et les votes sont fermés.",
+    question_limit_reached:
+      "Cette activité a atteint sa limite de 200 questions.",
+    no_jokers_left: "Les deux jokers ont déjà été utilisés.",
+    invalid_activity:
+      "Écris une question de 240 caractères maximum et choisis de 2 à 200 personnes différentes.",
+    activity_conflict: "Cette activité a changé. Vérifie son état et réessaie.",
+    vote_closed:
+      "Le vote est fermé. Ton dernier choix enregistré est conservé.",
+    invalid_vote_candidate:
+      "Cette personne ne peut plus recevoir de votes. Choisis quelqu’un d’autre.",
+    self_vote_forbidden:
+      "Tu ne peux pas voter pour toi-même dans cette activité.",
+
     invalid_notification_subscription:
       "Les notifications n’ont pas pu être configurées. Réessaie.",
     notification_subscription_limit:
@@ -121,6 +151,8 @@ export const errorMessages = {
     not_found: "Cet élément est introuvable.",
     invalid_party:
       "Le titre peut contenir jusqu’à 120 caractères et le lieu jusqu’à 240.",
+    invalid_configuration:
+      "Choisis un âge de 1 à 150 et des limites de 1 à 1024 Mio. Les titres acceptent 200 caractères et les descriptions 2000.",
     invalid_timezone: "Choisis un fuseau horaire, par exemple Europe/Zurich.",
     unknown_timezone: "Ce fuseau horaire est inconnu. Essaie Europe/Zurich.",
     invalid_date: "Choisis à nouveau la date et l’heure, puis enregistre.",
@@ -186,6 +218,22 @@ export const errorMessages = {
       "Cette vidéo dépasse {size} Mo. Choisis un fichier plus petit.",
   },
   de: {
+    invalid_question: "Schreib eine Frage mit 1 bis 1000 Zeichen.",
+    questions_closed: "Neue Fragen und Stimmen sind geschlossen.",
+    question_limit_reached:
+      "Diese Aktivität hat das Limit von 200 Fragen erreicht.",
+    no_jokers_left: "Beide Joker wurden schon verwendet.",
+    invalid_activity:
+      "Schreibe eine Frage mit höchstens 240 Zeichen und wähle 2 bis 200 verschiedene Personen.",
+    activity_conflict:
+      "Diese Aktivität wurde geändert. Prüfe ihren Stand und versuche es erneut.",
+    vote_closed:
+      "Die Abstimmung ist geschlossen. Deine letzte gespeicherte Wahl bleibt erhalten.",
+    invalid_vote_candidate:
+      "Diese Person kann keine Stimmen mehr erhalten. Wähle jemand anderen.",
+    self_vote_forbidden:
+      "Bei dieser Aktivität kannst du nicht für dich selbst stimmen.",
+
     invalid_notification_subscription:
       "Benachrichtigungen konnten nicht eingerichtet werden. Versuch es erneut.",
     notification_subscription_limit:
@@ -218,6 +266,8 @@ export const errorMessages = {
     not_found: "Dieser Eintrag wurde nicht gefunden.",
     invalid_party:
       "Der Titel darf höchstens 120 Zeichen enthalten, der Ort höchstens 240.",
+    invalid_configuration:
+      "Wähle ein Alter von 1 bis 150 und Dateilimits von 1 bis 1024 MiB. Titel erlauben 200 Zeichen, Beschreibungen 2000.",
     invalid_timezone: "Wähle eine Zeitzone, zum Beispiel Europe/Zurich.",
     unknown_timezone:
       "Diese Zeitzone wurde nicht gefunden. Versuch es mit Europe/Zurich.",
@@ -286,6 +336,20 @@ export const errorMessages = {
       "Dieses Video ist größer als {size} MB. Wähle eine kleinere Datei.",
   },
   it: {
+    invalid_question: "Scrivi una domanda da 1 a 1000 caratteri.",
+    questions_closed: "L’invio di domande e i voti sono chiusi.",
+    question_limit_reached:
+      "Questa attività ha raggiunto il limite di 200 domande.",
+    no_jokers_left: "Hai già usato entrambi i jolly.",
+    invalid_activity:
+      "Scrivi una domanda di massimo 240 caratteri e scegli da 2 a 200 persone diverse.",
+    activity_conflict:
+      "Questa attività è cambiata. Controlla il suo stato e riprova.",
+    vote_closed: "La votazione è chiusa. L’ultima scelta salvata è conservata.",
+    invalid_vote_candidate:
+      "Questa persona non può più ricevere voti. Scegli qualcun altro.",
+    self_vote_forbidden: "Non puoi votare per te stesso in questa attività.",
+
     invalid_notification_subscription:
       "Non è stato possibile configurare le notifiche. Riprova.",
     notification_subscription_limit:
@@ -316,6 +380,8 @@ export const errorMessages = {
     not_found: "Questo elemento non è stato trovato.",
     invalid_party:
       "Il titolo può contenere fino a 120 caratteri e il luogo fino a 240.",
+    invalid_configuration:
+      "Scegli un’età da 1 a 150 e limiti da 1 a 1024 MiB. I titoli accettano 200 caratteri e le descrizioni 2000.",
     invalid_timezone: "Scegli un fuso orario, per esempio Europe/Zurich.",
     unknown_timezone:
       "Questo fuso orario non è stato trovato. Prova Europe/Zurich.",
@@ -379,6 +445,21 @@ export const errorMessages = {
       "Questo video supera i {size} MB. Scegli un file più piccolo.",
   },
   es: {
+    invalid_question: "Escribe una pregunta de 1 a 1000 caracteres.",
+    questions_closed: "El envío de preguntas y los votos están cerrados.",
+    question_limit_reached:
+      "Esta actividad ha alcanzado el límite de 200 preguntas.",
+    no_jokers_left: "Ya se han usado los dos comodines.",
+    invalid_activity:
+      "Escribe una pregunta de hasta 240 caracteres y elige de 2 a 200 personas distintas.",
+    activity_conflict:
+      "Esta actividad ha cambiado. Comprueba su estado e inténtalo de nuevo.",
+    vote_closed:
+      "La votación está cerrada. Tu última elección guardada se conserva.",
+    invalid_vote_candidate:
+      "Esta persona ya no puede recibir votos. Elige a otra.",
+    self_vote_forbidden: "No puedes votar por ti mismo en esta actividad.",
+
     invalid_notification_subscription:
       "No se han podido configurar las notificaciones. Inténtalo de nuevo.",
     notification_subscription_limit:
@@ -411,6 +492,8 @@ export const errorMessages = {
     not_found: "No se ha encontrado este elemento.",
     invalid_party:
       "El título puede tener hasta 120 caracteres y el lugar hasta 240.",
+    invalid_configuration:
+      "Elige una edad de 1 a 150 y límites de 1 a 1024 MiB. Los títulos admiten 200 caracteres y las descripciones 2000.",
     invalid_timezone: "Elige una zona horaria, por ejemplo Europe/Zurich.",
     unknown_timezone:
       "No se ha encontrado esta zona horaria. Prueba con Europe/Zurich.",

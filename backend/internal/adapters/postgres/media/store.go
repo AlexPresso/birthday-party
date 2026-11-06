@@ -73,7 +73,15 @@ func (s *Store) DeletePhoto(ctx context.Context, guest identity.Guest, id int64)
 }
 
 func (s *Store) Categories(ctx context.Context, admin bool) ([]media.Category, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id,name,is_public FROM media_categories WHERE is_public OR $1 ORDER BY id LIMIT 100", admin)
+	// Photos are inserted atomically with ready publication, independently of
+	// upload history retention. The category paging index bounds each cover lookup.
+	rows, err := s.db.QueryContext(ctx, `SELECT c.id,c.name,c.is_public,cover.id
+ FROM media_categories c
+ LEFT JOIN LATERAL (
+   SELECT p.id FROM photos p WHERE p.category_id=c.id AND p.thumbnail<>''
+   ORDER BY p.id DESC LIMIT 1
+ ) cover ON true
+ WHERE c.is_public OR $1 ORDER BY c.id LIMIT 100`, admin)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +89,7 @@ func (s *Store) Categories(ctx context.Context, admin bool) ([]media.Category, e
 	items := []media.Category{}
 	for rows.Next() {
 		var item media.Category
-		if err := rows.Scan(&item.ID, &item.Name, &item.IsPublic); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.IsPublic, &item.CoverPhotoID); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
