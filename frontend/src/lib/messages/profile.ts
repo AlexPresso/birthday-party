@@ -1,5 +1,8 @@
 const en = {
   "profile.photo": "Profile photo",
+  "profile.myPhoto": "My photo",
+  "profile.empty": "No photo",
+  "profile.removeAction": "Remove",
   "profile.formats": "JPEG, PNG or WebP, up to {size} MB.",
   "profile.choose": "Choose a photo",
   "profile.change": "Change photo",
@@ -18,6 +21,9 @@ type ProfileMessages = Record<keyof typeof en, string>;
 
 const fr: ProfileMessages = {
   "profile.photo": "Photo de profil",
+  "profile.myPhoto": "Ma photo",
+  "profile.empty": "Aucune photo",
+  "profile.removeAction": "Supprimer",
   "profile.formats": "JPEG, PNG ou WebP, jusqu’à {size} Mo.",
   "profile.choose": "Choisir une photo",
   "profile.change": "Changer de photo",
@@ -34,6 +40,9 @@ const fr: ProfileMessages = {
 
 const de: ProfileMessages = {
   "profile.photo": "Profilfoto",
+  "profile.myPhoto": "Mein Foto",
+  "profile.empty": "Kein Foto",
+  "profile.removeAction": "Entfernen",
   "profile.formats": "JPEG, PNG oder WebP, bis zu {size} MB.",
   "profile.choose": "Foto auswählen",
   "profile.change": "Foto ändern",
@@ -50,6 +59,9 @@ const de: ProfileMessages = {
 
 const it: ProfileMessages = {
   "profile.photo": "Foto del profilo",
+  "profile.myPhoto": "La mia foto",
+  "profile.empty": "Nessuna foto",
+  "profile.removeAction": "Rimuovi",
   "profile.formats": "JPEG, PNG o WebP, fino a {size} MB.",
   "profile.choose": "Scegli una foto",
   "profile.change": "Cambia foto",
@@ -66,6 +78,9 @@ const it: ProfileMessages = {
 
 const es: ProfileMessages = {
   "profile.photo": "Foto de perfil",
+  "profile.myPhoto": "Mi foto",
+  "profile.empty": "Sin foto",
+  "profile.removeAction": "Eliminar",
   "profile.formats": "JPEG, PNG o WebP, hasta {size} MB.",
   "profile.choose": "Elegir una foto",
   "profile.change": "Cambiar foto",

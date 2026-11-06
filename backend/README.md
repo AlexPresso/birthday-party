@@ -73,13 +73,20 @@ See [.env.example](.env.example). Defaults are:
 | `DATA_DIR`               | `./data`                    | Private media, thumbnails and durable pending inputs                                       |
 | `COOKIE_SECURE`          | Determined by `PUBLIC_URL`  | HTTPS requires `true`; local HTTP uses `false`                                             |
 | `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup                                   |
-| `MAX_IMAGE_SIZE_MB`      | `15`                        | Maximum uploaded image size in MiB, integer 1–1024                                         |
-| `MAX_VIDEO_SIZE_MB`      | `100`                       | Maximum uploaded video size in MiB, integer 1–1024                                         |
+| `MAX_IMAGE_SIZE_MB`      | `15`                        | Initial image upload limit in MiB, integer 1–1024, imported once                            |
+| `MAX_VIDEO_SIZE_MB`      | `100`                       | Initial video upload limit in MiB, integer 1–1024, imported once                            |
+| `BIRTHDAY_AGE`           | `30`                        | Initial birthday age, integer 1–150, imported once                                         |
+| `INVITATION_TITLE`, `INVITATION_DESCRIPTION` | Localized defaults | Initial public invitation text; optional `_EN`, `_FR`, `_DE`, `_IT`, `_ES` overrides |
 
-Missing or empty upload limits use their defaults. Invalid values stop startup.
+On initial import, missing or empty upload limits use their defaults and invalid
+values stop startup. Once settings are saved, legacy environment values are ignored.
 One MiB is 1,048,576 bytes. The gallery API returns the effective limits so the
-frontend validates against the server settings. Compose applies changes from
-the root `.env` when containers are recreated, without rebuilding images.
+frontend validates against the server settings. Existing root environment values
+are imported once into PostgreSQL. Administrators then edit age, invitation copy
+and upload limits in Settings; changes apply on subsequent requests without
+restarting. A null invitation text inherits and an empty string hides the text.
+Public `/api/config` contains only age and invitation copy; admin reads and
+writes use `/api/admin/config`. Network, storage and secrets remain in the environment.
 
 With `PRINT_ADMIN_INVITATION=true`, each server start prints
 `Administrator invitation: <url>` after binding its listening socket. The oldest
@@ -148,7 +155,7 @@ HTTP request logs never include these tokens.
   welcome invalidates the previous context; already accepted jobs keep processing.
 - The `enable_notifications` widget has no settings and appears at most once per
   step. It lets guests subscribe their browser to Web Push during that selected
-  step; full-access guests and administrators can also subscribe from settings.
+  step; full-access guests and administrators can also subscribe from Profile.
   Configuration, own status and removal require a session but no full-app access.
   Permission is checked again before saving, and each guest has at most 10 devices.
   Migration 0009 stores VAPID keys, session-bound subscriptions and a durable
@@ -178,8 +185,8 @@ HTTP request logs never include these tokens.
   JPEG (at most 128 KiB) in PostgreSQL; the original is discarded. Replacements
   are atomic, and versioned image URLs require current session and welcome access.
   Anonymous guestbook posts never expose a profile photo or other author details.
-- Image uploads allow JPEG, PNG and WebP, at most `MAX_IMAGE_SIZE_MB` MiB
-  (15 by default) and 40 megapixels. Files stream into a private spool with
+- Image uploads allow JPEG, PNG and WebP, up to the saved image size limit
+  (15 MiB by default) and 40 megapixels. Files stream into a private spool with
   server-generated storage names. A 202 response confirms a persistent job;
   two background workers prepare media independently of browser requests.
 - The queue allows 100 active jobs per guest, 1000 overall and 10 GiB of pending

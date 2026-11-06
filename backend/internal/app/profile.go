@@ -37,14 +37,18 @@ func failProfile(w http.ResponseWriter, err error) {
 	fail(w, status, string(rejected))
 }
 
-func (a *App) getProfile(w http.ResponseWriter, _ *http.Request, guest identity.Guest) {
-	a.respondProfile(w, guest)
+func (a *App) getProfile(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		return
+	}
+	a.respondProfile(w, guest, limits.ImageBytes)
 }
 
-func (a *App) respondProfile(w http.ResponseWriter, guest identity.Guest) {
+func (a *App) respondProfile(w http.ResponseWriter, guest identity.Guest, imageBytes int64) {
 	respond(w, http.StatusOK, map[string]any{
 		"guest":  guest,
-		"limits": map[string]int64{"imageBytes": a.config.MaxImageBytes},
+		"limits": map[string]int64{"imageBytes": imageBytes},
 	})
 }
 
@@ -59,8 +63,12 @@ func (a *App) updateAvatar(w http.ResponseWriter, r *http.Request, guest identit
 		fail(w, http.StatusTooManyRequests, "profile_photo_busy")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, a.config.MaxImageBytes+(64<<10))
-	data, err := a.receiveAvatar(r)
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limits.ImageBytes+(64<<10))
+	data, err := a.receiveAvatar(r, limits.ImageBytes)
 	if err != nil {
 		failProfile(w, err)
 		return
@@ -71,20 +79,24 @@ func (a *App) updateAvatar(w http.ResponseWriter, r *http.Request, guest identit
 		failProfile(w, err)
 		return
 	}
-	a.respondProfile(w, updated)
+	a.respondProfile(w, updated, limits.ImageBytes)
 }
 
 func (a *App) deleteAvatar(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		return
+	}
 	cookie, _ := r.Cookie(cookieName)
 	updated, err := a.profile.Save(r.Context(), guest.ID, identity.HashToken(cookie.Value), nil)
 	if err != nil {
 		failProfile(w, err)
 		return
 	}
-	a.respondProfile(w, updated)
+	a.respondProfile(w, updated, limits.ImageBytes)
 }
 
-func (a *App) receiveAvatar(r *http.Request) ([]byte, error) {
+func (a *App) receiveAvatar(r *http.Request, maxImageBytes int64) ([]byte, error) {
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return nil, profile.Error("profile_photo_required")
@@ -101,8 +113,8 @@ func (a *App) receiveAvatar(r *http.Request) ([]byte, error) {
 		input.Close()
 		os.Remove(input.Name())
 	}()
-	count, err := io.Copy(input, io.LimitReader(part, a.config.MaxImageBytes+1))
-	if count > a.config.MaxImageBytes {
+	count, err := io.Copy(input, io.LimitReader(part, maxImageBytes+1))
+	if count > maxImageBytes {
 		return nil, profile.Error("photo_too_large")
 	}
 	if err != nil {

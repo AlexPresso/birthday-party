@@ -9,6 +9,10 @@ import {
   Download,
   Play,
   Presentation,
+  Grid2X2,
+  List,
+  LockKeyhole,
+  MoreHorizontal,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api, errorMessage, remove } from "@/lib/api";
@@ -22,11 +26,11 @@ import {
 import { formatDate } from "@/lib/dates";
 import { type Guest } from "@/features/guests/contracts";
 import { PageHeading, EmptyState, ErrorNotice } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
 import { useUploads } from "./upload-provider";
-import { UploadQueue } from "./upload-queue";
 import { MediaPicker } from "./media-picker";
 import { MediaSlideshow } from "./media-slideshow";
-import "./media-categories.css";
+import "./gallery.css";
 
 export function PhotoGallery({
   initial,
@@ -67,8 +71,13 @@ export function PhotoGallery({
   const [selected, setSelected] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [slideshow, setSlideshow] = useState<PhotoPage | null>(null);
+  const [view, setView] = useState<"feed" | "grid">("feed");
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const filters = [
+    { id: null, name: t("photos.gallery"), isPublic: true },
+    ...categories,
+  ];
 
   useEffect(() => {
     if (selected !== null && !dialog.current?.open) dialog.current?.showModal();
@@ -123,69 +132,88 @@ export function PhotoGallery({
   }
 
   return (
-    <>
-      <PageHeading
-        title={t("photos.title")}
-        description={t("photos.description")}
-      />
-      <div className="gallery-controls">
-        {categories.length > 0 && (
-          <label htmlFor="media-category-filter">
-            {t("categories.filter")}
-          </label>
-        )}
-        <div className="gallery-controls-row">
-          {categories.length > 0 && (
-            <div className="media-category-filter">
-              <select
-                id="media-category-filter"
-                value={categoryId ?? ""}
-                disabled={filterPending}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  startFilter(() =>
-                    router.push(
-                      value
-                        ? "/photos?categoryId=" + encodeURIComponent(value)
-                        : "/photos",
-                      { scroll: false },
-                    ),
-                  );
-                }}
-              >
-                <option value="">{t("categories.main")}</option>
-                {categories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.isPublic
-                      ? item.name
-                      : t("categories.privateOption", { name: item.name })}
-                  </option>
-                ))}
-              </select>
-              {filterPending && (
-                <span className="fine-print" role="status">
-                  {t("photos.loading")}
-                </span>
-              )}
-            </div>
+    <div className="media-gallery">
+      <PageHeading title={t("photos.title")}>
+        <MediaPicker
+          compact
+          limits={initial.limits}
+          destination={{
+            categoryId,
+            welcomeRevision: null,
+            welcomeWidgetIndex: null,
+          }}
+        >
+          {category && (
+            <p className="fine-print media-destination">
+              {t("categories.destination", { name: categoryName })}
+            </p>
           )}
-          <MediaPicker
-            limits={initial.limits}
-            destination={{
-              categoryId,
-              welcomeRevision: null,
-              welcomeWidgetIndex: null,
-            }}
-          >
-            {category && (
-              <p className="fine-print">
-                {t("categories.destination", { name: categoryName })}
-              </p>
-            )}
-          </MediaPicker>
-        </div>
+        </MediaPicker>
+      </PageHeading>
+      <div
+        className="media-category-strip"
+        role="group"
+        aria-label={t("categories.filter")}
+        aria-busy={filterPending}
+      >
+        {filters.map((item) => {
+          const active = item.id === categoryId;
+          const label = item.isPublic
+            ? item.name
+            : t("categories.privateOption", { name: item.name });
+          const cover = item.id === null ? null : item.coverThumbnailUrl;
+          const thumbnail = active ? (photos[0]?.thumbnailUrl ?? cover) : cover;
+          return (
+            <button
+              type="button"
+              className="media-category-option"
+              key={item.id ?? "main"}
+              aria-label={label}
+              aria-pressed={active}
+              disabled={filterPending}
+              onClick={() => {
+                if (active) return;
+                startFilter(() =>
+                  router.push(
+                    item.id === null
+                      ? "/photos"
+                      : `/photos?categoryId=${item.id}`,
+                    { scroll: false },
+                  ),
+                );
+              }}
+            >
+              <span
+                className="media-category-portrait"
+                aria-hidden="true"
+                style={
+                  thumbnail
+                    ? { backgroundImage: `url(${thumbnail})` }
+                    : undefined
+                }
+              >
+                {!thumbnail &&
+                  (item.id === null ? (
+                    <Images size={26} strokeWidth={1.5} />
+                  ) : (
+                    item.name.charAt(0).toLocaleUpperCase(locale)
+                  ))}
+                {!item.isPublic && (
+                  <span className="media-category-private">
+                    <LockKeyhole size={13} />
+                  </span>
+                )}
+              </span>
+              <span className="media-category-name">{label}</span>
+            </button>
+          );
+        })}
       </div>
-      <UploadQueue />
+      {filterPending && (
+        <p className="fine-print" role="status">
+          {t("photos.loading")}
+        </p>
+      )}
       <ErrorNotice message={selected === null ? error : null} />
       {photos.length === 0 ? (
         <EmptyState
@@ -204,8 +232,10 @@ export function PhotoGallery({
         <section aria-label={t("photos.all")}>
           <div className="section-row gallery-heading">
             <div>
-              <h2>{category ? categoryName : t("photos.allHeading")}</h2>
-              <span className="fine-print">
+              <h2 className="visually-hidden">
+                {category ? categoryName : t("photos.allHeading")}
+              </h2>
+              <span className="visually-hidden">
                 {t(
                   plurals.select(photos.length) === "one"
                     ? "photos.countOne"
@@ -216,54 +246,145 @@ export function PhotoGallery({
                 )}
               </span>
             </div>
-            <button
-              type="button"
-              className="button secondary slideshow-launch"
-              disabled={filterPending}
-              onClick={() =>
-                setSlideshow({
-                  items: photos,
-                  nextCursor: cursor,
-                  limits: initial.limits,
-                })
-              }
-            >
-              <Presentation size={18} aria-hidden="true" />
-              {t("slideshow.start")}
-            </button>
-          </div>
-          <div className="photo-grid">
-            {photos.map((photo) => (
-              <button
-                className="photo-tile"
-                key={photo.id}
-                onClick={() => setSelected(photo.id)}
-                aria-label={t(
-                  photo.kind === "video" ? "photos.openVideo" : "photos.open",
-                  {
-                    name: photo.author.name,
-                    date: formatDate(photo.createdAt, timezone, true, locale),
-                  },
-                )}
+            <div className="media-view-actions">
+              <div
+                className="media-view-switch"
+                role="group"
+                aria-label={t("photos.view")}
               >
-                <img
-                  src={photo.thumbnailUrl}
-                  alt={t(
-                    photo.kind === "video" ? "photos.videoAlt" : "photos.alt",
-                    { name: photo.author.name },
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t("photos.gridView")}
+                  title={t("photos.gridView")}
+                  aria-pressed={view === "grid"}
+                  onClick={() => setView("grid")}
+                >
+                  <Grid2X2 size={22} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t("photos.feedView")}
+                  title={t("photos.feedView")}
+                  aria-pressed={view === "feed"}
+                  onClick={() => setView("feed")}
+                >
+                  <List size={22} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className={`media-collection media-${view}`}>
+            {photos.map((photo) => (
+              <article
+                className="media-post"
+                key={photo.id}
+                id={`media-${photo.id}`}
+              >
+                <header className="media-post-author">
+                  <Avatar
+                    name={photo.author.name}
+                    avatarUrl={photo.author.avatarUrl}
+                  />
+                  <div>
+                    <strong>{photo.author.name}</strong>
+                    <time dateTime={photo.createdAt}>
+                      {formatDate(photo.createdAt, timezone, true, locale)}
+                    </time>
+                  </div>
+                  <details className="media-post-menu" name="media-actions">
+                    <summary
+                      className="icon-button"
+                      aria-label={t("photos.options")}
+                      title={t("photos.options")}
+                    >
+                      <MoreHorizontal size={22} aria-hidden="true" />
+                    </summary>
+                    <div className="media-post-menu-items">
+                      <button
+                        type="button"
+                        onClick={() => setSelected(photo.id)}
+                      >
+                        <Images size={17} aria-hidden="true" />
+                        {t("photos.details")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={filterPending}
+                        onClick={() =>
+                          setSlideshow({
+                            items: photos,
+                            nextCursor: cursor,
+                            limits: initial.limits,
+                          })
+                        }
+                      >
+                        <Presentation size={17} aria-hidden="true" />
+                        {t("slideshow.start")}
+                      </button>
+                      <a href={`${photo.url}?download=1`} download>
+                        <Download size={17} aria-hidden="true" />
+                        {t("photos.download")}
+                      </a>
+                      {(guest.id === photo.author.id ||
+                        guest.role === "admin") && (
+                        <button
+                          type="button"
+                          className="danger"
+                          disabled={deleting}
+                          onClick={() => deletePhoto(photo)}
+                        >
+                          <Trash2 size={17} aria-hidden="true" />
+                          {t("photos.delete")}
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                </header>
+                <button
+                  className="photo-tile"
+                  type="button"
+                  onClick={() => setSelected(photo.id)}
+                  aria-label={t(
+                    photo.kind === "video" ? "photos.openVideo" : "photos.open",
+                    {
+                      name: photo.author.name,
+                      date: formatDate(photo.createdAt, timezone, true, locale),
+                    },
                   )}
-                  width={photo.width}
-                  height={photo.height}
-                  loading="lazy"
-                  decoding="async"
-                />
-                {photo.kind === "video" && (
-                  <span className="video-marker" aria-hidden="true">
-                    <Play size={20} fill="currentColor" />
-                  </span>
-                )}
-                <span className="photo-author">{photo.author.name}</span>
-              </button>
+                >
+                  <img
+                    src={photo.thumbnailUrl}
+                    alt={t(
+                      photo.kind === "video" ? "photos.videoAlt" : "photos.alt",
+                      { name: photo.author.name },
+                    )}
+                    width={photo.width}
+                    height={photo.height}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {photo.kind === "video" && (
+                    <span className="video-marker" aria-hidden="true">
+                      <Play size={20} fill="currentColor" />
+                    </span>
+                  )}
+                </button>
+                <footer className="media-post-actions">
+                  <a
+                    className="icon-button"
+                    href={`${photo.url}?download=1`}
+                    download
+                    aria-label={t("photos.downloadFrom", {
+                      name: photo.author.name,
+                    })}
+                    title={t("photos.download")}
+                  >
+                    <Download size={18} aria-hidden="true" />
+                  </a>
+                </footer>
+              </article>
             ))}
           </div>
           {cursor && (
@@ -357,10 +478,6 @@ export function PhotoGallery({
                 >
                   <ChevronLeft />
                 </button>
-                <span className="fine-print">
-                  {numbers.format(currentIndex + 1)} /{" "}
-                  {numbers.format(photos.length)}
-                </span>
                 <button
                   className="icon-button"
                   disabled={currentIndex === photos.length - 1}
@@ -395,6 +512,6 @@ export function PhotoGallery({
           </div>
         )}
       </dialog>
-    </>
+    </div>
   );
 }

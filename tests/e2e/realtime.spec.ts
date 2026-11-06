@@ -268,6 +268,10 @@ test("welcome and media widgets share one socket and refresh only after changes"
     .first()
     .getByLabel("Ajouter des médias", { exact: true })
     .setInputFiles(await imageFile(page));
+  await widgets
+    .first()
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   const upload = await accepted;
   expect(upload.status()).toBe(202);
   const job = await upload.json();
@@ -288,6 +292,10 @@ test("welcome and media widgets share one socket and refresh only after changes"
     },
   });
   expect(externalUpload.status()).toBe(202);
+  await widgets
+    .nth(1)
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   await expect(widgets.nth(1).locator(".upload-status.done")).toBeVisible();
   await expect(
     widgets.nth(1).getByText("realtime-other-device.png", { exact: true }),
@@ -340,7 +348,7 @@ test("programme edits and scheduled unlocks arrive without minute polling or sec
   await page
     .getByRole("navigation")
     .getByRole("link", { name: "Programme", exact: true })
-    .click();
+    .press("Enter");
   await expect(
     page.getByRole("heading", { name: "Programme", exact: true }),
   ).toBeVisible();
@@ -391,10 +399,7 @@ test("programme edits and scheduled unlocks arrive without minute polling or sec
   ).toBeGreaterThanOrEqual(3);
   expect(network.readyCount()).toBe(1);
   expectPrivateFrames(network.frames);
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Paramètres", exact: true })
-    .click();
+  await page.getByRole("link", { name: /^Profil:/ }).click();
   page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "Se déconnecter", exact: true })
@@ -451,6 +456,9 @@ test("queue reads retry explicitly and socket receipts recover a lost upload res
     ...(await imageFile(page)),
     name: "realtime-recovered.png",
   });
+  await page
+    .getByRole("button", { name: "Détail des envois", exact: true })
+    .click();
   const rows = page
     .locator(".upload-item")
     .filter({ hasText: "realtime-recovered.png" });

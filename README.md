@@ -92,15 +92,28 @@ pause, passer au média précédent ou suivant, et utiliser le plein écran si t
 navigateur le permet. Le diaporama reprend au début après le dernier média.
 Ferme-le avec la croix ou la touche Échap.
 
+## Sans filtre
+
+Dans **Paramètres → Programme → Ajouter un événement**, choisis **Sans filtre**.
+Règle son nom et son horaire, puis ouvre les questions depuis **Voir les questions**.
+Les invités posent leurs questions anonymement, même les plus osées, et votent
+pour celles qu’ils veulent entendre. Un second appui retire leur vote.
+
+Les questions en attente remontent selon leurs votes. Tu réponds honnêtement à
+l’oral, puis cliques sur **Marquer comme répondu**. Tu disposes de **deux jokers
+pour toute l’activité** pour passer des questions. Le compteur est partagé entre
+tous les invités ; un joker utilisé ne peut pas être annulé. Fermer les questions
+arrête les nouveaux envois et les votes, tout en te laissant répondre aux questions
+restantes. Chaque activité accepte jusqu’à 200 questions de 1 000 caractères.
+
 ## Photo de profil
 
-Dans **Paramètres**, chaque invité peut choisir une photo de profil, vérifier
-l’aperçu, puis l’enregistrer. Il peut ensuite la remplacer ou la supprimer.
+Dans **Profil**, choisir une photo lance son envoi et remplace automatiquement
+la photo de profil. Il est ensuite possible de la remplacer ou de la supprimer.
 La photo apparaît dans l’en-tête et à côté de ses messages signés. Les messages
 anonymes gardent leur icône neutre.
 
-Les formats JPEG, PNG et WebP sont acceptés, avec la limite `MAX_IMAGE_SIZE_MB`
-déjà configurée. Le serveur recadre la photo au centre et conserve une petite
+Les formats JPEG, PNG et WebP sont acceptés, avec la limite photo définie dans **Paramètres → Limites d’envoi**. Le serveur recadre la photo au centre et conserve une petite
 version JPEG dans PostgreSQL ; l’original est supprimé. Ces photos restent
 privées et sont incluses dans la sauvegarde de la base.
 
@@ -132,8 +145,13 @@ Quand l’invité change lui-même d’étape, les transferts que le serveur n�
 encore acceptés s’arrêtent ; les envois déjà acceptés continuent leur préparation.
 Dans les médias comme dans chaque widget, une seule barre suit l’ensemble des
 envois, avec le nombre de fichiers reçus sur le total. Les fichiers en attente
-comptent dans ce total. La liste garde le statut de chaque fichier et permet de
-réessayer un envoi en échec ; une vidéo reçue peut encore être en préparation.
+comptent dans ce total. Dans l’application, un bandeau compact suit les envois
+au-dessus de la navigation. Un appui ouvre le statut de chaque fichier et permet
+de réessayer un envoi en échec ; une vidéo reçue peut encore être en préparation.
+Quand tous les fichiers sont prêts, la confirmation disparaît après deux secondes.
+Elle reste visible pendant la consultation des détails ; les erreurs restent
+affichées. Chaque média de la galerie est présenté individuellement, sans compteur
+« 1/3 » ni bande de miniatures sous une publication.
 
 **Activer l’écran d’attente** place tous les invités sur un écran séparé, y compris
 ceux déjà connectés. Ton accès administrateur reste disponible. Clique sur
@@ -173,7 +191,7 @@ Ajoute le widget **Activer les notifications** à une étape. L’invité choisi
 les activer, puis accepte la demande du navigateur. Il reçoit une notification
 quand tu débloques une étape ou ouvres l’application. La notification ouvre sa
 position actuelle, sans le faire avancer. Il peut aussi gérer les notifications
-de cet appareil depuis **Paramètres**. Refuser n’empêche pas de poursuivre l’accueil.
+de cet appareil depuis **Profil**. Refuser n’empêche pas de poursuivre l’accueil.
 
 Sur téléphone, l’application doit être servie en **HTTPS**. Sur iPhone et iPad,
 ajoute-la à l’écran d’accueil puis ouvre-la depuis son icône avant d’activer les
@@ -196,7 +214,7 @@ Aucune nouvelle variable d’environnement n’est nécessaire.
 
 ## Catégories de médias
 
-Dans **Paramètres → Catégories de médias**, crée une catégorie et choisis sa visibilité :
+Dans **Paramètres → Catégories et visibilité**, crée une catégorie et choisis sa visibilité :
 
 - **Privée** : seuls les administrateurs peuvent consulter ses fichiers, même
   lorsqu’un invité les a envoyés pendant l’accueil.
@@ -210,85 +228,60 @@ avec un nom de 80 caractères maximum. Leur nom reste dans la langue où tu l’
 
 ## Personnaliser l’anniversaire
 
-Copier `.env.example` vers `.env` à la racine si ce fichier n’existe pas encore,
-puis modifier ces variables dans ce fichier commun :
+Le bouton **Paramètres** est réservé aux administrateurs. Les réglages sont
+regroupés sous **La fête**, **Invités et accès** et **Photos et vidéos**.
+Chaque ligne ouvre une sous-page qui glisse de droite à gauche, avec une flèche
+de retour dans le sens inverse. Les champs se sauvegardent quand tu les quittes
+ou reviens au menu. En cas d’erreur, la page et ta saisie restent visibles.
+L’âge se règle dans **Infos de la fête**, avec l’icône gâteau, et **Accueil des
+invités** se trouve sous **La fête**. **Profil**, accessible à tous par la photo
+ronde en bas à droite, regroupe la photo, les notifications et la déconnexion.
 
-```dotenv
-BIRTHDAY_AGE=30
-# Optional copy for each language; omit to use translated defaults.
-# INVITATION_TITLE_FR="On fête mes 30 ans !"
-# INVITATION_TITLE_EN="Come celebrate my 30th birthday!"
-# INVITATION_DESCRIPTION_FR="Les photos, le programme et vos petits mots sont ici."
-# INVITATION_DESCRIPTION_EN="Find the photos, programme and your messages here."
-```
+L’âge accepte un entier de 1 à 150 et apparaît sur l’invitation, dans l’en-tête
+et dans le livre d’or. Les textes de l’invitation sont publics. Pour le titre
+et la description, choisir le texte par défaut, masquer le texte ou fournir un
+texte personnalisé. Des variantes peuvent être enregistrées en français,
+anglais, allemand, italien et espagnol. La priorité est : texte de la langue,
+texte commun, puis texte traduit par défaut. Masquer une variante la cache même
+si un texte commun existe. Les contenus personnalisés ne sont pas traduits
+automatiquement. Le titre accepte 200 caractères et la description 2 000.
 
-- `BIRTHDAY_AGE` règle l’âge affiché sur la page de connexion, dans l’en-tête et
-  dans le livre d’or. Un entier de 1 à 150 est accepté ; sinon, la valeur reste 30.
-- `INVITATION_TITLE` remplace le titre de la page de connexion et de l’onglet du
-  navigateur pour toutes les langues. Sans personnalisation, le titre suit l’âge
-  et la langue, par exemple « Les 40 ans » en français. Une valeur vide masque le
-  titre sur la page ; l’onglet utilise alors « Anniversaire » dans la langue choisie.
-- `INVITATION_DESCRIPTION` remplace le paragraphe d’introduction et la description
-  de la page pour toutes les langues. Les retours à la ligne sont conservés dans
-  l’introduction ; le HTML est affiché comme du texte.
-- Ajouter le suffixe `_FR`, `_EN`, `_DE`, `_IT` ou `_ES` à l’une de ces variables
-  permet de fournir un texte pour cette langue. La priorité est : valeur de la
-  langue, valeur commune, puis texte traduit par défaut. Une valeur explicitement
-  vide masque le texte, y compris si une valeur commune existe. Supprimer ou
-  commenter une variable permet de passer au niveau suivant.
+Le nom de la fête reste modifiable séparément dans les paramètres. S’il est
+vide, l’en-tête utilise le titre d’invitation ou le titre traduit par défaut.
+La date, le lieu et le fuseau horaire se règlent indépendamment.
 
-Entourer les textes de guillemets dans `.env`. Le nom de la fête enregistré dans
-**paramètres** reste modifiable séparément ; ces variables ne remplacent pas cette
-valeur. Sur une nouvelle installation, ce nom est vide et l’en-tête utilise le
-titre d’invitation configuré ou traduit par défaut. Les noms de fête déjà
-enregistrés sont conservés. Le nom est facultatif : le laisser vide ou l’effacer
-dans **paramètres** permet de garder ce titre automatique, même en modifiant la
-date, le lieu ou le fuseau horaire.
+Les modifications sont enregistrées dans PostgreSQL et prennent effet sur les
+prochaines lectures, sans redémarrage ni reconstruction. Lors du premier
+démarrage de cette version, les valeurs existantes de `BIRTHDAY_AGE`,
+`INVITATION_TITLE`, `INVITATION_DESCRIPTION`, leurs variantes par langue et les
+limites de fichiers sont importées depuis le `.env` racine. Une variable absente
+conserve le texte par défaut ; une valeur explicitement vide le masque. Les
+démarrages suivants préservent la configuration enregistrée dans l’application.
 
-Après une modification, lancer simplement cette commande depuis la racine :
-
-```powershell
-docker compose up
-```
-
-Compose lit automatiquement le `.env` à la racine et recrée les conteneurs dont
-la configuration a changé. Ajouter `-d` pour laisser l’application tourner en
-arrière-plan. Ces valeurs sont lues à l’exécution : aucune reconstruction de
-l’image n’est nécessaire pour les changer. `docker compose restart` seul ne
-recharge pas la configuration.
-
-Compose ignore `frontend/.env` et `frontend/.env.local`. Les variables déjà
-définies dans le terminal sont prioritaires sur le `.env` racine. L’adresse
-interne de l’API, le port d’écoute 3000, l’adresse d’écoute et le mode production
-du conteneur restent fixés dans Compose ; `PORT` règle uniquement le port exposé
-sur la machine hôte.
-
-En local, `npm run dev` charge également le `.env` racine ; relancer la commande
-après une modification. `frontend/.env.example` sert uniquement à lancer Next.js
-indépendamment, sans le script racine.
+Le `.env` racine et Compose gardent les réglages techniques : connexion à la
+base, URL publique, cookies, ports et stockage. Compose ignore `frontend/.env`
+et `frontend/.env.local`. Le script `npm run dev` charge également le `.env`
+racine ; les variables du terminal sont prioritaires. `frontend/.env.example`
+sert uniquement à lancer Next.js indépendamment.
 
 ## Limites des fichiers
 
-Dans le `.env` à la racine, ces variables définissent le poids maximal par fichier :
+Dans **Paramètres → Limites d’envoi**, régler les poids maximaux des photos et
+vidéos en Mio (1 Mio = 1 048 576 octets), avec des entiers de 1 à 1024.
+Les valeurs par défaut sont 15 Mio pour les photos et 100 Mio pour les vidéos.
+La limite photo s’applique aussi aux photos de profil.
 
-```dotenv
-MAX_IMAGE_SIZE_MB=15
-MAX_VIDEO_SIZE_MB=100
-```
+Go applique les limites enregistrées aux nouveaux envois. Les fichiers déjà
+acceptés continuent leur traitement si une limite diminue. Recharger les pages
+Médias ou Profil pour actualiser les indications et la sélection des fichiers.
+Le proxy Next autorise jusqu’à 1024 Mio plus le formulaire pour permettre une
+augmentation immédiate, sans redémarrage. Un reverse proxy externe doit aussi
+accepter les limites choisies.
 
-Les valeurs sont des entiers de 1 à 1024, en Mio (1 Mio = 1 048 576 octets).
-Une variable absente ou vide utilise respectivement 15 et 100. Une valeur
-invalide empêche le démarrage avec un message d’erreur explicite.
-
-Après modification, lancer `docker compose up -d`. Le serveur, les limites
-affichées et le proxy prennent les nouvelles valeurs sans reconstruire les images.
-Recharger la page Médias pour actualiser les indications et la sélection des fichiers.
-Avec `npm run dev`, relancer la commande après modification du `.env`.
-
-La durée maximale des vidéos reste de 5 minutes ; les limites de résolution
-restent de 40 mégapixels pour les images et de 4K pour les vidéos. Le poids réglé
-concerne le fichier envoyé, conservé sans modification. Seule une vignette JPEG
-supplémentaire est créée.
+`MAX_IMAGE_SIZE_MB` et `MAX_VIDEO_SIZE_MB` dans le `.env` servent uniquement à
+l’import initial. La durée maximale des vidéos reste de 5 minutes, les images
+sont limitées à 40 mégapixels et les vidéos à la 4K. Les vidéos sont conservées
+sans modification ; seule une vignette JPEG supplémentaire est créée.
 
 ## Langue de l’interface
 
@@ -300,16 +293,17 @@ préférée n’est disponible, l’application utilise l’anglais.
 
 La traduction s’applique dès le premier affichage aux onglets, formulaires,
 messages d’erreur, confirmations, textes d’aide et libellés d’accessibilité.
-Les quatre onglets gardent leur ordre et leurs adresses. Les dates suivent la
+Les onglets gardent leur ordre et leurs adresses ; Paramètres est réservé aux
+administrateurs. Le bouton Profil reste accessible à tous. Les dates suivent la
 langue de l’utilisateur, avec le fuseau horaire de la fête ; les champs de saisie
 de dates de l’organisateur utilisent celui de son appareil.
 
 Les prénoms, messages du livre d’or, titres et descriptions saisis par les invités
 ou l’organisateur restent tels qu’ils ont été écrits. Ils ne sont pas envoyés à un
 service de traduction. Pour personnaliser la connexion dans plusieurs langues,
-utiliser les variables avec suffixe décrites ci-dessus. Une ancienne valeur
-commune française dans `.env` reste affichée telle quelle : la commenter permet
-de retrouver les traductions par défaut.
+utiliser le sélecteur **Texte à modifier** dans **Paramètres → Page d’invitation**. Une ancienne
+valeur commune française importée reste affichée telle quelle : choisir
+**Par défaut** permet de retrouver les traductions de l’application.
 
 ## Créer l'accès organisateur
 
@@ -375,7 +369,7 @@ L'application n'envoie aucun e-mail ni message WhatsApp.
 - Les photos et vidéos sont protégées par la même connexion que l'application.
   Les formats acceptés sont JPEG, PNG et WebP, jusqu'à 40 mégapixels.
   Les vidéos acceptées sont MP4, MOV et WebM, jusqu’à 5 minutes et 4K.
-  Les poids maximaux viennent du `.env` : 15 Mio par image et 100 Mio par vidéo
+  Les poids maximaux se règlent dans **Paramètres → Limites d’envoi** : 15 Mio par image et 100 Mio par vidéo
   par défaut.
   Le fichier vidéo d’origine est conservé sans modification pour la lecture et
   le téléchargement : résolution, fréquence d’images, audio et qualité restent
@@ -456,6 +450,19 @@ jour de `eslint-config-next` et relancer l'audit.
 
 ## Exécuter avec Docker
 
+Les [workflows GitHub Actions](.github/workflows) construisent les deux images et
+les publient dans GHCR depuis la branche par défaut, les tags `v*` ou un lancement
+manuel. Les pull requests vérifient la construction sans publication. Les images
+publiées prennent en charge `linux/amd64` et `linux/arm64` ; leurs noms sont
+`ghcr.io/alexpresso/birthday-party-backend` et
+`ghcr.io/alexpresso/birthday-party-frontend`. Utiliser le même tag `sha-<SHA complet>`
+pour déployer une révision précise des deux composants.
+
+Pour Kubernetes, la [chart Helm](charts/birthday-party/README.md) fournit les
+services, PostgreSQL intégré ou externe, les volumes persistants et l'Ingress
+HTTPS configurable. Son guide décrit les Secrets à créer et la commande
+`helm upgrade --install`.
+
 La configuration Compose fournit les deux applications et PostgreSQL 18.
 Le volume `postgres-data` conserve les enregistrements et la file d'attente ;
 `party-data` conserve les photos, vidéos, vignettes et fichiers en attente.
@@ -490,6 +497,20 @@ conteneurs. Conserver le backend sur le réseau privé et le volume de données 
 un stockage persistant. Les invitations générées utilisent `PUBLIC_URL` :
 `localhost` ne permet pas aux invités de se connecter depuis leur téléphone.
 
+Les activités sont des événements du programme. Depuis **Programme → Gérer le
+programme → Ajouter un événement**, choisir un événement classique ou un vote
+pour une personne. Pour un vote, définir la question, les candidats et les horaires
+dans le même formulaire, puis ouvrir le vote quand tout est prêt.
+Les invités choisissent un portrait et confirment leur choix. Ils peuvent le
+modifier jusqu’à la fermeture. L’organisateur voit le nombre de votes reçus,
+ferme le vote, puis révèle les résultats quand il le souhaite. Les choix
+individuels restent privés dans l’interface, y compris pour les administrateurs.
+La liste des candidats et l’autorisation de voter pour soi-même se règlent avant
+l’ouverture ; la question reste modifiable. Les votes sont conservés lors des
+modifications du texte et des horaires de l’événement. Les anciennes activités
+imbriquées sont converties automatiquement en événements, en conservant les votes
+déjà enregistrés.
+
 L’accueil, la file d’envoi des médias et le programme se mettent à jour par une
 connexion WebSocket partagée, sans requêtes périodiques du navigateur. Le serveur
 signale les changements et les déblocages programmés ; l’écran recharge alors les
@@ -508,8 +529,8 @@ avec au moins 64 Kio pour le formulaire, et un délai de 10 minutes pour
 l’envoi des fichiers. La préparation des vidéos continue en arrière-plan après
 la réponse 202. Le proxy ne doit pas mettre en
 cache les pages privées, les API ni les médias authentifiés. La destination du
-proxy Next est fixée pendant la compilation via `API_INTERNAL_URL` ; reconstruire
-le frontend si cette adresse interne change.
+proxy Next est configurée au démarrage via `API_INTERNAL_URL` ; redémarrer le
+frontend avec la nouvelle valeur si cette adresse interne change.
 
 Les migrations SQL et la procédure de sauvegarde sont décrites dans
 [docs/database.md](docs/database.md). Sauvegarder ensemble PostgreSQL et les médias,

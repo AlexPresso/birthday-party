@@ -25,6 +25,8 @@ import { widgetMessages } from "../src/lib/messages/widgets.ts";
 import { slideshowMessages } from "../src/lib/messages/slideshow.ts";
 import { notificationMessages } from "../src/lib/messages/notifications.ts";
 import { errorMessages } from "../src/lib/messages/errors.ts";
+import { activityMessages } from "../src/lib/messages/activities.ts";
+import { questionMessages } from "../src/lib/messages/questions.ts";
 
 test("locale negotiation follows language preferences and region variants", () => {
   const cases = [
@@ -68,6 +70,8 @@ test("all catalogs contain the same nonempty keys and interpolation parameters",
     widgetMessages,
     slideshowMessages,
     notificationMessages,
+    activityMessages,
+    questionMessages,
     errorMessages,
   ]) {
     const expected = family.en as Record<string, string>;
@@ -287,65 +291,95 @@ test("date labels use the selected language and party timezone without zone suff
   assert.match(previousDay, /17:30$/);
 });
 
-test("birthday defaults follow the selected language and validate the age", () => {
+const birthdayConfiguration = {
+  age: 30,
+  invitation: {
+    title: null,
+    description: null,
+    locales: {
+      en: { title: null, description: null },
+      fr: { title: null, description: null },
+      de: { title: null, description: null },
+      it: { title: null, description: null },
+      es: { title: null, description: null },
+    },
+  },
+};
+
+test("birthday defaults follow the selected language and saved age", () => {
   for (const locale of locales) {
     const t = createTranslator(getMessages(locale));
-    const defaults = birthdayCopy({}, locale, t);
+    const defaults = birthdayCopy(birthdayConfiguration, locale, t);
     assert.equal(defaults.age, 30);
     assert.equal(defaults.title, t("birthday.title", { age: 30 }));
     assert.equal(defaults.description, t("birthday.description"));
-    const configured = birthdayCopy({ BIRTHDAY_AGE: "42" }, locale, t);
+    const configured = birthdayCopy(
+      { ...birthdayConfiguration, age: 42 },
+      locale,
+      t,
+    );
     assert.equal(configured.age, 42);
     assert.equal(configured.title, t("birthday.title", { age: 42 }));
-    for (const age of ["", "0", "-1", "151", "30.5", "many", "Infinity"]) {
-      assert.equal(birthdayCopy({ BIRTHDAY_AGE: age }, locale, t).age, 30, age);
-    }
-    for (const age of ["1", "150"]) {
+    for (const age of [1, 150]) {
       assert.equal(
-        birthdayCopy({ BIRTHDAY_AGE: age }, locale, t).age,
-        Number(age),
+        birthdayCopy({ ...birthdayConfiguration, age }, locale, t).age,
         age,
+        String(age),
       );
     }
     assert.equal(
-      birthdayCopy({ BIRTHDAY_AGE: "1" }, locale, t).title,
+      birthdayCopy({ ...birthdayConfiguration, age: 1 }, locale, t).title,
       t("birthday.titleOne", { age: 1 }),
     );
   }
 });
 
 test("localized invitation overrides take priority and preserve explicitly empty text", () => {
-  const environment = {
-    INVITATION_TITLE: "  Alex’s birthday  ",
-    INVITATION_DESCRIPTION: "  See you on Saturday.  ",
-    INVITATION_TITLE_DE: "  Alex feiert Geburtstag  ",
-    INVITATION_DESCRIPTION_DE: "  Bis Samstag.  ",
-    INVITATION_TITLE_FR: "   ",
-    INVITATION_DESCRIPTION_FR: "",
+  const configuration = {
+    ...birthdayConfiguration,
+    invitation: {
+      title: "  Alex’s birthday  ",
+      description: "  See you on Saturday.  ",
+      locales: {
+        ...birthdayConfiguration.invitation.locales,
+        de: {
+          title: "  Alex feiert Geburtstag  ",
+          description: "  Bis Samstag.  ",
+        },
+        fr: { title: "   ", description: "" },
+      },
+    },
   };
   const german = birthdayCopy(
-    environment,
+    configuration,
     "de",
     createTranslator(getMessages("de")),
   );
   assert.equal(german.title, "Alex feiert Geburtstag");
   assert.equal(german.description, "Bis Samstag.");
   const italian = birthdayCopy(
-    environment,
+    configuration,
     "it",
     createTranslator(getMessages("it")),
   );
   assert.equal(italian.title, "Alex’s birthday");
   assert.equal(italian.description, "See you on Saturday.");
   const french = birthdayCopy(
-    environment,
+    configuration,
     "fr",
     createTranslator(getMessages("fr")),
   );
   assert.equal(french.title, "");
   assert.equal(french.description, "");
   const english = birthdayCopy(
-    { INVITATION_TITLE: "", INVITATION_DESCRIPTION: " " },
+    {
+      ...birthdayConfiguration,
+      invitation: {
+        ...birthdayConfiguration.invitation,
+        title: "",
+        description: " ",
+      },
+    },
     "en",
     createTranslator(getMessages("en")),
   );

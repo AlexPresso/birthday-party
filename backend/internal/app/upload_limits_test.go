@@ -55,9 +55,9 @@ func TestUploadLimitsFromEnvironment(t *testing.T) {
 				t.Setenv("MAX_IMAGE_SIZE_MB", "")
 				t.Setenv("MAX_VIDEO_SIZE_MB", "")
 				t.Setenv(key, value)
-				_, err := ConfigFromEnv()
-				if err == nil || err.Error() != key+" must be an integer between 1 and 1024" {
-					t.Fatalf("invalid limit was not rejected clearly: %v", err)
+				config, err := ConfigFromEnv()
+				if err != nil || config.initialConfigurationError == nil || config.initialConfigurationError.Error() != key+" must be an integer between 1 and 1024" {
+					t.Fatalf("invalid seed limit was not recorded clearly: error=%v seed=%v", err, config.initialConfigurationError)
 				}
 			})
 		}
@@ -141,23 +141,21 @@ func uploadStream(t *testing.T, a *App, cookie *http.Cookie, data io.Reader) *ht
 
 func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
 	a := testApp(t)
-	a.config.MaxImageBytes, a.config.MaxVideoBytes = 16<<20, 1<<20
-	refreshTestMediaFiles(a)
+	setTestUploadLimits(t, a, 16, 1)
 	host, _ := admin(t, a)
 	data := pngBytes(t)
 	padded := func(size int64) io.Reader {
 		return io.MultiReader(bytes.NewReader(data), io.LimitReader(zeroReader{}, size-int64(len(data))))
 	}
 	// PNG decoding permits trailing data, giving a large valid fixture without costly pixels.
-	status(t, uploadStream(t, a, host, padded(a.config.MaxImageBytes)), 201)
-	response := uploadStream(t, a, host, padded(a.config.MaxImageBytes+1))
+	status(t, uploadStream(t, a, host, padded(16<<20)), 201)
+	response := uploadStream(t, a, host, padded((16<<20)+1))
 	status(t, response, 413)
 	if !strings.Contains(response.Body.String(), `"code":"photo_too_large"`) {
 		t.Fatal(response.Body.String())
 	}
 	assertMediaFiles(t, a, 2)
-	a.config.MaxImageBytes = 1 << 20
-	refreshTestMediaFiles(a)
+	setTestUploadLimits(t, a, 1, 1)
 	status(t, uploadStream(t, a, host, padded((1<<20)+1)), 413)
 	assertMediaFiles(t, a, 2)
 }
@@ -165,8 +163,7 @@ func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
 func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
-	a.config.MaxImageBytes, a.config.MaxVideoBytes = 1<<20, 101<<20
-	refreshTestMediaFiles(a)
+	setTestUploadLimits(t, a, 1, 101)
 	host, _ := admin(t, a)
 	padded := func(size int64) io.Reader {
 		freeBox := make([]byte, 8)
@@ -175,15 +172,14 @@ func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
 		return io.MultiReader(bytes.NewReader(data), bytes.NewReader(freeBox), io.LimitReader(zeroReader{}, size-int64(len(data))-8))
 	}
 	// A valid MP4 free box enlarges the input while preserving the short encoded clip.
-	status(t, uploadStream(t, a, host, padded(a.config.MaxVideoBytes)), 201)
-	response := uploadStream(t, a, host, padded(a.config.MaxVideoBytes+1))
+	status(t, uploadStream(t, a, host, padded(101<<20)), 201)
+	response := uploadStream(t, a, host, padded((101<<20)+1))
 	status(t, response, 413)
 	if !strings.Contains(response.Body.String(), `"code":"video_too_large"`) {
 		t.Fatal(response.Body.String())
 	}
 	assertMediaFiles(t, a, 2)
-	a.config.MaxVideoBytes = 1 << 20
-	refreshTestMediaFiles(a)
+	setTestUploadLimits(t, a, 1, 1)
 	status(t, uploadStream(t, a, host, padded((1<<20)+1)), 413)
 	assertMediaFiles(t, a, 2)
 }
@@ -194,8 +190,7 @@ func TestConfiguredVideoLimitPreservesInputWithoutTranscoding(t *testing.T) {
 		t.Fatalf("input fixture must fit the configured 1 MiB limit: %d bytes", len(data))
 	}
 	a := testApp(t)
-	a.config.MaxVideoBytes = 1 << 20
-	refreshTestMediaFiles(a)
+	setTestUploadLimits(t, a, 15, 1)
 	host, _ := admin(t, a)
 	response := upload(t, a, host, data)
 	status(t, response, 201)

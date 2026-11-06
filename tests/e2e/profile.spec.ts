@@ -69,7 +69,7 @@ async function enterGuest(page: Page, name: string) {
     data: { token: invitationToken(invitation.invitationUrl) },
   });
   expect(accepted.status()).toBe(200);
-  await page.goto("/parametres");
+  await page.goto("/profil");
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   return invitation.guest;
 }
@@ -100,15 +100,13 @@ async function profileImage(page: Page, color = "#60917e") {
   };
 }
 
-async function savePhoto(page: Page) {
+async function savePhoto(page: Page, trigger: () => Promise<void>) {
   const response = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/profile/avatar") &&
       response.request().method() === "PUT",
   );
-  await page
-    .getByRole("button", { name: "Enregistrer la photo", exact: true })
-    .click();
+  await trigger();
   const saved = await response;
   expect(saved.status()).toBe(200);
   const profile = (await saved.json()) as {
@@ -117,56 +115,78 @@ async function savePhoto(page: Page) {
   await expect(
     page.getByText("Photo de profil enregistrée.", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".app-header .avatar img")).toHaveAttribute(
+  await expect(page.locator(".navigation-profile .avatar img")).toHaveAttribute(
     "src",
     profile.guest.avatarUrl,
   );
   return profile.guest.avatarUrl;
 }
 
-test("guests preview, save, replace and remove their profile photo across tab changes and reloads", async ({
+test("choosing a profile photo uploads it immediately and persists replacements across navigation and reloads", async ({
   page,
 }) => {
   const browserErrors: string[] = [];
   page.on("pageerror", (error) => browserErrors.push(error.message));
   await enterGuest(page, "Camille Profile Test");
-  const card = page.locator(".settings-profile");
+  const card = page.locator(".profile-panel");
   const input = card.locator('input[type="file"]');
-  const headerAvatar = page.locator(".app-header .avatar");
+  const navigationAvatar = page.locator(".navigation-profile .avatar");
   const preview = card.getByRole("img", {
     name: "Aperçu de ta photo de profil",
     exact: true,
   });
   await expect(input).toHaveAttribute("aria-label", "Photo de profil");
   await expect(input).toBeHidden();
-  await expect(headerAvatar).toHaveText("C");
+  await expect(navigationAvatar).toHaveText("C");
   const image = await profileImage(page);
   const chooser = page.waitForEvent("filechooser");
   await card
     .getByRole("button", { name: "Choisir une photo", exact: true })
     .press("Enter");
-  await (await chooser).setFiles(image);
-  await expect(preview).toBeVisible();
-  await expect(headerAvatar.locator("img")).toHaveCount(0);
-  expect(
-    (await (await page.request.get("/api/profile")).json()).guest.avatarUrl,
-  ).toBeNull();
-
-  await page.screenshot({
-    path: "test-results/profile-preview-mobile.png",
-    fullPage: true,
+  let releaseUpload!: () => void;
+  const uploadGate = new Promise<void>((resolve) => {
+    releaseUpload = resolve;
   });
-  const firstURL = await savePhoto(page);
+  await page.route("**/api/profile/avatar", async (route) => {
+    if (route.request().method() === "PUT") await uploadGate;
+    await route.continue();
+  });
+  const fileChooser = await chooser;
+  const saving = savePhoto(page, () => fileChooser.setFiles(image));
+  try {
+    await expect(
+      card.getByRole("button", { name: "Enregistrement…", exact: true }),
+    ).toBeDisabled();
+    await expect(input).toBeDisabled();
+    await expect(preview).toHaveCount(0);
+    await expect(
+      card.getByText("Ta photo sera recadrée autour du centre."),
+    ).toHaveCount(0);
+    await expect(
+      card.getByRole("button", { name: "Enregistrer la photo", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      card.getByRole("button", { name: "Annuler", exact: true }),
+    ).toHaveCount(0);
+    await expect(navigationAvatar.locator("img")).toHaveCount(0);
+    expect(
+      (await (await page.request.get("/api/profile")).json()).guest.avatarUrl,
+    ).toBeNull();
+  } finally {
+    releaseUpload();
+  }
+  const firstURL = await saving;
+  await page.unroute("**/api/profile/avatar");
   await expect(preview).toHaveCount(0);
   await expect(card.locator(".avatar img")).toHaveAttribute("src", firstURL);
   const storedImage = await page.request.get(firstURL);
   expect(storedImage.status()).toBe(200);
   expect(storedImage.headers()["content-type"]).toBe("image/jpeg");
-  await expect(headerAvatar.locator("img")).toHaveJSProperty(
+  await expect(navigationAvatar.locator("img")).toHaveJSProperty(
     "naturalWidth",
     256,
   );
-  await expect(headerAvatar.locator("img")).toHaveJSProperty(
+  await expect(navigationAvatar.locator("img")).toHaveJSProperty(
     "naturalHeight",
     256,
   );
@@ -174,11 +194,14 @@ test("guests preview, save, replace and remove their profile photo across tab ch
   const navigation = page.getByRole("navigation");
   await navigation
     .getByRole("link", { name: "Programme", exact: true })
-    .click();
+    .press("Enter");
   await expect(page).toHaveURL(/\/programme$/);
-  await expect(headerAvatar.locator("img")).toHaveAttribute("src", firstURL);
-  await navigation
-    .getByRole("link", { name: "Paramètres", exact: true })
+  await expect(navigationAvatar.locator("img")).toHaveAttribute(
+    "src",
+    firstURL,
+  );
+  await page
+    .getByRole("link", { name: "Profil: Camille Profile Test", exact: true })
     .click();
   await expect(card.locator(".avatar img")).toHaveAttribute("src", firstURL);
   await page.reload();
@@ -203,16 +226,17 @@ test("guests preview, save, replace and remove their profile photo across tab ch
   await card
     .getByRole("button", { name: "Changer de photo", exact: true })
     .click();
-  await (
-    await replacementChooser
-  ).setFiles(await profileImage(page, "#a26679"));
-  await expect(preview).toBeVisible();
-  await card.getByRole("button", { name: "Annuler", exact: true }).click();
-  await expect(preview).toHaveCount(0);
-  await expect(card.locator(".avatar img")).toHaveAttribute("src", firstURL);
-  await input.setInputFiles(await profileImage(page, "#a26679"));
-  const replacementURL = await savePhoto(page);
+  const replacementPicker = await replacementChooser;
+  const replacementImage = await profileImage(page, "#a26679");
+  const replacementURL = await savePhoto(page, () =>
+    replacementPicker.setFiles(replacementImage),
+  );
   expect(replacementURL).not.toBe(firstURL);
+  await expect(preview).toHaveCount(0);
+  await expect(card.locator(".avatar img")).toHaveAttribute(
+    "src",
+    replacementURL,
+  );
 
   await card
     .getByRole("button", { name: "Supprimer la photo", exact: true })
@@ -220,8 +244,8 @@ test("guests preview, save, replace and remove their profile photo across tab ch
   await expect(
     card.getByText("Photo de profil supprimée.", { exact: true }),
   ).toBeVisible();
-  await expect(headerAvatar.locator("img")).toHaveCount(0);
-  await expect(headerAvatar).toHaveText("C");
+  await expect(navigationAvatar.locator("img")).toHaveCount(0);
+  await expect(navigationAvatar).toHaveText("C");
   await expect(card.locator(".avatar")).toHaveText("C");
   await page.reload();
   await expect(card.locator(".avatar")).toHaveText("C");
@@ -229,14 +253,22 @@ test("guests preview, save, replace and remove their profile photo across tab ch
   expect(browserErrors).toEqual([]);
 });
 
-test("a failed profile photo save retains the current avatar and selected preview for retry", async ({
+test("a failed automatic profile upload retains the current avatar and selected file for retry", async ({
   page,
 }) => {
   await enterGuest(page, "Alex Profile Retry Test");
-  const card = page.locator(".settings-profile");
+  const card = page.locator(".profile-panel");
   const input = card.locator('input[type="file"]');
-  await input.setInputFiles(await profileImage(page));
-  const firstURL = await savePhoto(page);
+  const image = await profileImage(page);
+  const firstURL = await savePhoto(page, () => input.setInputFiles(image));
+  let uploadRequests = 0;
+  page.on("request", (request) => {
+    if (
+      request.url().endsWith("/api/profile/avatar") &&
+      request.method() === "PUT"
+    )
+      uploadRequests++;
+  });
 
   await input.setInputFiles({
     name: "profile.txt",
@@ -244,21 +276,18 @@ test("a failed profile photo save retains the current avatar and selected previe
     buffer: Buffer.from("This is not an image."),
   });
   await expect(card.getByRole("alert")).toBeVisible();
-  await expect(page.locator(".app-header .avatar img")).toHaveAttribute(
+  await expect(page.locator(".navigation-profile .avatar img")).toHaveAttribute(
     "src",
     firstURL,
   );
   expect(
     (await (await page.request.get("/api/profile")).json()).guest.avatarUrl,
   ).toBe(firstURL);
+  expect(uploadRequests).toBe(0);
+  await expect(
+    card.getByRole("button", { name: "Réessayer", exact: true }),
+  ).toHaveCount(0);
 
-  await input.setInputFiles(await profileImage(page, "#8a6ca5"));
-  const preview = card.getByRole("img", {
-    name: "Aperçu de ta photo de profil",
-    exact: true,
-  });
-  await expect(preview).toBeVisible();
-  const previewURL = await preview.getAttribute("src");
   await page.route("**/api/profile/avatar", async (route) => {
     if (route.request().method() !== "PUT") return route.continue();
     await route.fulfill({
@@ -269,12 +298,15 @@ test("a failed profile photo save retains the current avatar and selected previe
       },
     });
   });
-  await card
-    .getByRole("button", { name: "Enregistrer la photo", exact: true })
-    .click();
+  const replacementImage = await profileImage(page, "#8a6ca5");
+  await input.setInputFiles(replacementImage);
   await expect(card.getByRole("alert")).toBeVisible();
-  await expect(preview).toHaveAttribute("src", previewURL!);
-  await expect(page.locator(".app-header .avatar img")).toHaveAttribute(
+  await expect(
+    card.getByRole("button", { name: "Réessayer", exact: true }),
+  ).toBeVisible();
+  expect(uploadRequests).toBe(1);
+  await expect(card.locator(".avatar img")).toHaveAttribute("src", firstURL);
+  await expect(page.locator(".navigation-profile .avatar img")).toHaveAttribute(
     "src",
     firstURL,
   );
@@ -282,18 +314,30 @@ test("a failed profile photo save retains the current avatar and selected previe
     (await (await page.request.get("/api/profile")).json()).guest.avatarUrl,
   ).toBe(firstURL);
   await page.unroute("**/api/profile/avatar");
-  expect(await savePhoto(page)).not.toBe(firstURL);
-  await expect(preview).toHaveCount(0);
+  const retryURL = await savePhoto(page, () =>
+    card.getByRole("button", { name: "Réessayer", exact: true }).click(),
+  );
+  expect(retryURL).not.toBe(firstURL);
+  expect(uploadRequests).toBe(2);
+  await expect(card.getByRole("alert")).toHaveCount(0);
+  await expect(
+    card.getByRole("button", { name: "Réessayer", exact: true }),
+  ).toHaveCount(0);
+  const repeatedURL = await savePhoto(page, () =>
+    input.setInputFiles(replacementImage),
+  );
+  expect(repeatedURL).not.toBe(retryURL);
+  expect(uploadRequests).toBe(3);
 });
 
 test("profile photos appear on named guestbook posts while anonymous posts keep a neutral identity", async ({
   page,
 }) => {
   const guest = await enterGuest(page, "Morgan Profile Guestbook Test");
-  await page
-    .locator('.settings-profile input[type="file"]')
-    .setInputFiles(await profileImage(page));
-  const avatarURL = await savePhoto(page);
+  const image = await profileImage(page);
+  const avatarURL = await savePhoto(page, () =>
+    page.locator('.profile-panel input[type="file"]').setInputFiles(image),
+  );
   const namedBody = "A named message with a profile photo.";
   const anonymousBody = "An anonymous message without a profile photo.";
   for (const [body, anonymous] of [

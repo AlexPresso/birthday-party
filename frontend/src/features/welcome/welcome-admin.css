@@ -95,6 +95,8 @@
 .welcome-admin-notice {
   min-height: 1.6em;
   margin: 14px 0 0;
+  color: var(--success);
+  font-size: 13px;
 }
 
 .welcome-admin form {

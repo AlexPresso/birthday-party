@@ -63,6 +63,9 @@ func TestInputNormalizesTimesAndBoundsAuthoredContent(t *testing.T) {
 		want  error
 	}{
 		{"empty title", Input{Title: "  "}, ErrInvalidEvent},
+		{"unknown type", Input{Title: "Dinner", Type: "unknown"}, ErrInvalidEvent},
+		{"vote without settings", Input{Title: "Vote", Type: "vote"}, ErrInvalidEvent},
+		{"ordinary event with vote settings", Input{Title: "Dinner", Type: "event", Vote: &VoteInput{}}, ErrInvalidEvent},
 		{"long title", Input{Title: strings.Repeat("é", 161)}, ErrInvalidEvent},
 		{"long description", Input{Title: "Concert", Description: strings.Repeat("a", 4001)}, ErrInvalidEvent},
 		{"long teaser", Input{Title: "Concert", Teaser: strings.Repeat("a", 161)}, ErrInvalidEvent},

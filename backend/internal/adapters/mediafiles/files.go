@@ -9,14 +9,9 @@ import (
 	"birthday-party/backend/internal/media"
 )
 
-type Files struct {
-	root                         string
-	maxImageBytes, maxVideoBytes int64
-}
+type Files struct{ root string }
 
-func New(root string, maxImageBytes, maxVideoBytes int64) *Files {
-	return &Files{root: root, maxImageBytes: maxImageBytes, maxVideoBytes: maxVideoBytes}
-}
+func New(root string) *Files { return &Files{root: root} }
 
 func (f *Files) StageInput(input media.Received, key string) error {
 	return os.Rename(input.Path, filepath.Join(f.root, "uploads", key+".input"))

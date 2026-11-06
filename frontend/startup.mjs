@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { uploadProxyBodyLimit } from "./runtime/upload-limits.ts";
+import { configureApiProxy } from "./runtime/api-proxy.ts";
 
 performance.mark("next-start");
 
@@ -9,6 +10,10 @@ try {
   process.env.NODE_ENV = "production";
   const dir = fileURLToPath(new URL(".", import.meta.url));
   process.chdir(dir);
+  process.env.API_INTERNAL_URL = configureApiProxy(
+    new URL(".next/routes-manifest.json", import.meta.url),
+    process.env.API_INTERNAL_URL,
+  );
   const { config } = JSON.parse(
     readFileSync(
       new URL(".next/required-server-files.json", import.meta.url),
@@ -16,8 +21,8 @@ try {
     ),
   );
 
-  // Next 16.4's generated server freezes this config at build time. Use its
-  // startup API with the same manifest so upload limits can change at runtime.
+  // Match the bounded proxy ceiling used in development; Go enforces the
+  // host's current upload limits from PostgreSQL on every request.
   config.experimental.proxyClientMaxBodySize = uploadProxyBodyLimit();
   process.env.__NEXT_PRIVATE_STANDALONE_CONFIG = JSON.stringify(config);
 

@@ -11,7 +11,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:runtime": "node --test tests/runtime-proxy-smoke.mjs"
   },
   "dependencies": {
     "next": "16.4.0",

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	push "birthday-party/backend/internal/adapters/webpush"
+	"birthday-party/backend/internal/party"
 )
 
 const (
@@ -18,20 +19,24 @@ const (
 )
 
 // Config controls the HTTP service, PostgreSQL connection and private media storage.
-// Zero upload limits use the defaults in Open; DatabaseURL must be supplied.
+// Product configuration and upload limits seed PostgreSQL once. Zero upload
+// limits use the defaults in Open; DatabaseURL must be supplied.
 type Config struct {
-	ListenAddr           string
-	PublicURL            string
-	DataDir              string
-	DatabaseURL          string
-	CookieSecure         bool
-	PrintAdminInvitation bool
-	MaxImageBytes        int64
-	MaxVideoBytes        int64
-	VAPIDSubject         string
+	ListenAddr                string
+	PublicURL                 string
+	DataDir                   string
+	DatabaseURL               string
+	CookieSecure              bool
+	PrintAdminInvitation      bool
+	MaxImageBytes             int64
+	MaxVideoBytes             int64
+	VAPIDSubject              string
+	ProductConfiguration      party.Configuration
+	initialConfigurationError error
 }
 
 // ConfigFromEnv reads and validates process environment variables without loading files.
+// Product seed errors are deferred until Open knows whether import is needed.
 func ConfigFromEnv() (Config, error) {
 	c := Config{ListenAddr: env("LISTEN_ADDR", "127.0.0.1:8080"), PublicURL: strings.TrimRight(env("PUBLIC_URL", "http://localhost:3000"), "/"), DataDir: env("DATA_DIR", "./data"), DatabaseURL: os.Getenv("DATABASE_URL")}
 	if c.DatabaseURL == "" {
@@ -58,15 +63,41 @@ func ConfigFromEnv() (Config, error) {
 		}
 	}
 	if c.MaxImageBytes, err = uploadLimitFromEnv("MAX_IMAGE_SIZE_MB", defaultMaxImageBytes); err != nil {
-		return c, err
+		c.initialConfigurationError = err
 	}
 	if c.MaxVideoBytes, err = uploadLimitFromEnv("MAX_VIDEO_SIZE_MB", defaultMaxVideoBytes); err != nil {
-		return c, err
+		if c.initialConfigurationError == nil {
+			c.initialConfigurationError = err
+		}
 	}
 	if c.VAPIDSubject, err = push.Subject(os.Getenv("VAPID_SUBJECT"), c.PublicURL); err != nil {
 		return c, err
 	}
+	c.ProductConfiguration = productConfigurationFromEnv()
 	return c, nil
+}
+
+func productConfigurationFromEnv() party.Configuration {
+	configuration := party.DefaultConfiguration()
+	if age, err := strconv.Atoi(strings.TrimSpace(os.Getenv("BIRTHDAY_AGE"))); err == nil && age >= 1 && age <= 150 {
+		configuration.Age = age
+	}
+	readText := func(suffix string) party.InvitationText {
+		read := func(name string) *string {
+			value, exists := os.LookupEnv(name + suffix)
+			if !exists {
+				return nil
+			}
+			value = strings.TrimSpace(value)
+			return &value
+		}
+		return party.InvitationText{Title: read("INVITATION_TITLE"), Description: read("INVITATION_DESCRIPTION")}
+	}
+	configuration.Invitation.InvitationText = readText("")
+	for locale := range configuration.Invitation.Locales {
+		configuration.Invitation.Locales[locale] = readText("_" + strings.ToUpper(locale))
+	}
+	return configuration
 }
 
 func uploadLimitFromEnv(name string, fallback int64) (int64, error) {

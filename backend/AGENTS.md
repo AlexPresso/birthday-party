@@ -132,6 +132,36 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - Make unlock boundary behavior explicit and test immediately before, at, and after the boundary.
   Pass a clock or time value into time-sensitive logic when useful for deterministic tests.
 
+## Programme activities
+
+Keep typed event rules and ports in `programme`, with persistence in its
+PostgreSQL adapter. Activities are individual programme events of type `event`
+or `vote`, plus `questions` for anonymous questions and upvotes. Save event metadata and vote settings in one transaction; never create
+an empty event first and attach a vote in a second request. Stable event and vote
+identities preserve ballots across metadata and schedule edits. Keep the event's
+type fixed after creation. A numbered migration promotes former nested activities
+to events while retaining their configuration and ballots. The vote tables remain
+an internal extension with at most one vote per event. Add future types explicitly.
+
+Voting requires full app access and an available vote event. Recheck guest,
+session, welcome state and candidate eligibility within the ballot transaction,
+and serialize ballot replacement against closure. A host revision protects
+configuration and transitions without changing on guest votes. Freeze candidates
+and self-vote settings after opening. Keep candidate totals absent until revealed,
+including from admin responses; admin participation counts may be visible earlier.
+Never return other guests' voter IDs or individual choices. Omit draft vote events
+from guest lists and return no vote details for locked events. List events in
+bounded batches and publish the existing programme invalidation only after commit.
+
+Question rounds have draft/open/closed state and exactly two shared jokers. Store
+author and voter IDs privately; return only question text/status, counts and the
+viewer's own upvote. Reuse programme authorization locks and lock the round before
+submitting, voting or resolving. Bound rounds to 200 questions of 1,000 characters.
+Only admins can transition or mark oral answers/jokers; resolutions are terminal,
+increment the host revision, and cannot reset the spent joker count. Guests can
+submit/upvote only while open and unlocked with full app access. Publish programme
+invalidations after commit. Metadata edits preserve all round state and content.
+
 ## Realtime connections
 
 Serve authenticated WebSockets at `/api/realtime`, including during welcome.
@@ -181,9 +211,12 @@ transient failures have bounded retries. Keep private content out of push payloa
 - Generate safe storage identifiers; never use user-provided filenames as filesystem paths.
   Keep originals private and make access to stored media follow the same resource permissions.
 - Handle failed or cancelled uploads so incomplete files do not appear as successful contributions.
-- Upload sizes come from MAX_IMAGE_SIZE_MB/MAX_VIDEO_SIZE_MB (15/100 MiB by
-  default, integers 1–1024). Expose effective byte limits in the gallery API;
-  inspect contents to choose the limit and bound the request by their maximum.
+- Upload sizes come from saved administrator configuration (15/100 MiB by
+  default, integers 1–1024). Import MAX_IMAGE_SIZE_MB/MAX_VIDEO_SIZE_MB once.
+  Read a snapshot per incoming request without mutating shared configuration.
+  Expose current byte limits in the gallery and profile APIs; inspect contents
+  to choose the limit and bound the request by their maximum. Previously accepted
+  jobs retain their eligibility when limits decrease.
 - Video inputs are MP4/MOV/WebM up to the configured size, 5 minutes and 4K. FFmpeg and
   ffprobe are runtime dependencies (included in Compose). Restrict demuxers and
   protocols, bound dimensions, threads, execution time and temporary output.
@@ -238,6 +271,12 @@ transient failures have bounded retries. Keep private content out of push payloa
   Only author/admin can delete visible media. Admin-only settings
   manage guests, event content and party details. Re-invitation preserves identity.
 - Event timezone defaults explicitly to `Europe/Zurich` and is host-editable.
+- The party feature owns persistent birthday age, invitation copy and upload
+  limits. Import existing environment values once; later starts preserve saved
+  values. `/api/config` exposes only age and invitation copy; `/api/admin/config`
+  requires administrator access for reads and writes. Keep private party details
+  in their existing authenticated endpoint. Preserve null (inherit) versus empty
+  (hide) invitation strings and explicit overrides for all five supported languages.
 - Use private `DATA_DIR` persistence, never a frontend public directory. Full
   behavior, bounds and environment variables are in [README.md](README.md).
 - Development: `go run ./cmd/server serve`.

@@ -6,7 +6,7 @@ UTC strings; optional timestamps are `null`. Errors contain a stable machine-rea
 `code` and an English fallback `error`: `{ "code": "...", "error": "..." }`.
 The frontend translates error codes into the viewer's language; the backend does
 not negotiate locale. Names and other authored content are returned unchanged.
-No automatic public signup. All routes except health and invitation preview/accept
+No automatic public signup. All routes except health, public configuration and invitation preview/accept
 require a valid server-side session and an active guest. Admin routes require the
 admin role. State-changing requests send `X-Requested-With: birthday-party`.
 
@@ -66,6 +66,38 @@ Connections and pending signals are bounded: at most 8 sockets per session and
 shutdown closes sockets and waits for their handlers. This uses the existing
 single Go process; durable upload and push-notification workers remain server-side.
 
+## Application configuration
+
+`InvitationCopy = { title: string | null, description: string | null }`
+
+`PublicConfiguration = { age: number, invitation: InvitationCopy & { locales: { en: InvitationCopy, fr: InvitationCopy, de: InvitationCopy, it: InvitationCopy, es: InvitationCopy } } }`
+
+`Configuration = PublicConfiguration & { imageSizeMB: number, videoSizeMB: number }`
+
+- `GET /api/config` -> `PublicConfiguration` (200), available without a session.
+  This contains only birthday age and public invitation text. Private party
+  details, upload settings, guests and deployment secrets are excluded.
+- `GET /api/admin/config` -> `Configuration` (200), administrators only.
+- `PUT /api/admin/config` with a complete `Configuration` -> saved `Configuration`
+  (200). Rechecks active administrator and session inside the save transaction.
+  Missing fields or unsupported structure return 400 `invalid_body`;
+  out-of-range values return 400 `invalid_configuration`.
+
+Age is an integer from 1 to 150. Upload sizes are integer MiB from 1 to 1024,
+defaulting to 15 for images and 100 for videos. Titles accept up to 200 Unicode
+codepoints and descriptions up to 2000. All five locale objects are required.
+New saves enforce these text lengths; imported legacy text is preserved even
+when longer. Text is trimmed; null inherits the shared copy or translated default, while an
+empty string hides the text. A locale override wins over shared copy.
+
+Migration `0012_product_configuration.sql` adds persistent configuration.
+Startup imports existing age, invitation copy and upload-limit environment
+values only when no configuration is saved. Later starts preserve saved values.
+Changes apply on subsequent reads without restart. An incoming upload uses a
+single limits snapshot; lowering a limit does not cancel previously accepted jobs.
+Configuration responses use `no-store`. The frontend proxy permits 1024 MiB plus
+64 KiB for multipart overhead; Go enforces the current saved file limits.
+
 ## Profile photos
 
 `Profile = { guest: Guest, limits: { imageBytes: number } }`
@@ -79,7 +111,7 @@ single Go process; durable upload and push-notification workers remain server-si
   During a `profile_photo` welcome step, guests may also read their own avatar.
   A missing photo or obsolete version returns 404. HEAD is also authenticated.
 
-Images accept JPEG, PNG and WebP, with the same `MAX_IMAGE_SIZE_MB` and
+Images accept JPEG, PNG and WebP, with the same saved image size limit and
 40-megapixel input limits as the gallery. Go inspects the file, applies EXIF
 orientation, crops the center to a 256×256 square and encodes a JPEG without
 original metadata. Originals are discarded. One profile image is processed at a
@@ -244,7 +276,7 @@ Invitation acceptance, session checks, logout and welcome status remain availabl
 Already accepted uploads can finish privately; guests cannot read their media until
 the guest finishes and the destination is public. A read authorized before closure may finish.
 
-The guest page is `/attente`, outside the four-tab layout. Guest browsers refresh
+The guest page is `/attente`, outside the party layout. Guest browsers refresh
 welcome status on WebSocket signals, connection readiness and return to the page.
 A failed check keeps the current step visible and offers retry. Finishing
 sends that guest to `/photos`; starting a new run discards cached private routes
@@ -327,7 +359,7 @@ may contain up to 120 characters and remains in the host's original language.
 ## Media
 
 `Author = { id, name, avatarUrl: string | null }`
-`MediaCategory = { id, name, isPublic: boolean }`
+`MediaCategory = { id, name, isPublic: boolean, coverThumbnailUrl?: string | null }`
 `Photo = { id, categoryId: number | null, author: Author, kind: "image" | "video", mimeType, width, height, createdAt, url, thumbnailUrl }`
 
 The route and type names retain `photos` for compatibility; the collection
@@ -338,6 +370,11 @@ support is preserved, while the picker offers MP4, MOV and WebM.
 
 - `GET /api/media-categories` -> `{ items: MediaCategory[] }`, ordered by ID.
   Guests receive public categories; administrators receive all categories.
+  Each item includes `coverThumbnailUrl`: the newest published photo/video
+  thumbnail in that category, or `null` when none exists. Covers use authenticated
+  `/api/photos/{id}/image?size=thumb` URLs with the same session, welcome and
+  category permissions as gallery media. Pending uploads are never covers.
+  Upload contexts and category save responses omit this optional field.
 - `POST /api/admin/media-categories { name, isPublic }` -> `MediaCategory` (201).
 - `PUT /api/admin/media-categories/{id} { name, isPublic }` -> `MediaCategory` (200).
   Both fields are required. Trimmed names contain 1–80 Unicode characters and
@@ -377,8 +414,8 @@ and jobs, keeping them in the main gallery and preserving welcome state unchange
 
 Images accept JPEG, PNG and WebP, up to 40 megapixels decoded.
 Videos accept MP4, MOV and WebM, up to 5 minutes and 4K input.
-`limits` contains the effective per-file input sizes in bytes, from
-`MAX_IMAGE_SIZE_MB` (default 15 MiB) and `MAX_VIDEO_SIZE_MB` (default 100 MiB).
+`limits` contains the effective per-file input sizes in bytes from saved admin
+configuration (default 15 MiB for images and 100 MiB for videos).
 Both accept whole MiB from 1 to 1024. The browser uses these values for selection
 validation and displayed limits. Go validates file content and enforces its
 corresponding limit independently of client headers.
@@ -416,18 +453,146 @@ are removed, and revoked guests' jobs cannot publish media.
 
 ## Programme
 
-`Event = { id, title, description, teaser, startsAt: string | null, unlockAt: string | null, locked: boolean }`
+Activities are programme events themselves. An event has a type and optional
+settings for that type; there is no nested activity collection.
+
+`Event = { id, type: "event" | "vote" | "questions", revision, title, description, teaser, startsAt: string | null, unlockAt: string | null, locked: boolean, vote: Vote | null, questions: QuestionSummary | null }`
 
 - `GET /api/programme` -> `{ items: Event[] }`.
-- `GET /api/admin/programme` -> `{ items: Event[] }`, including unreleased content.
-- `POST /api/admin/programme { title, description, teaser, startsAt, unlockAt }` -> `Event` (201).
-- `PUT /api/admin/programme/{id}` same body -> `Event`.
-- `DELETE /api/admin/programme/{id}` -> 204.
+- `GET /api/admin/programme` -> `{ items: Event[] }`, including drafts and locked content.
+- `POST /api/admin/programme { type, title, description, teaser, startsAt, unlockAt, vote? }` -> `Event` (201).
+- `PUT /api/admin/programme/{id}` accepts the same body plus `revision` for interactive events -> `Event`.
+- `DELETE /api/admin/programme/{id}` -> 204, including its votes, questions and upvotes.
 
-For guests, a locked event returns the public teaser as `title`, or an empty title
-when no teaser is set, and an empty `description`. The frontend supplies a localized
-surprise placeholder for an empty title. Private content must not reach the client.
-An event unlocks when server time is at or after `unlockAt`. Null means available.
+A missing type creates an ordinary `event`; omitting type on update preserves
+its existing type. Types cannot change after creation. Ordinary events have
+`vote: null` and `revision: 1`. Creating a vote requires
+`vote: { question, candidateIds, allowSelfVote }`. Event metadata, vote settings
+and candidates are saved in one transaction. Invalid settings leave no partial
+event. Creation is limited to 200 programme events across all types. Reads can
+retain up to 2,400 existing records produced by the legacy activity migration.
+
+For guests, a locked published event returns the public teaser as `title`, or an
+empty title when no teaser is set, an empty `description`, `vote: null` and `questions: null`.
+The frontend supplies a localized surprise placeholder for an empty title.
+An event unlocks when server time is at or after `unlockAt`; null means available.
+Draft interactive events are omitted entirely from the guest programme, including their
+metadata. The visibility decision uses one instant for the complete response.
+
+### Question events (No Filter)
+
+Create with `type: "questions"` and ordinary event metadata; no additional settings
+are required. This creates a draft round atomically. Questions are anonymous to
+all viewers, including administrators. The database retains the submitting guest
+for access/accounting, but no author name, ID, avatar or voter list is returned.
+
+```typescript
+type QuestionSummary = {
+  status: "draft" | "open" | "closed";
+  jokersUsed: number; // 0 to 2, shared by the whole activity
+  questionCount: number; // 0 to 200
+};
+type QuestionRound = QuestionSummary & {
+  revision: number;
+  items: {
+    id: number;
+    body: string;
+    status: "pending" | "answered" | "joker";
+    votes: number;
+    upvoted: boolean; // Only the current viewer's vote
+  }[];
+};
+```
+
+- `GET /api/programme/{id}/questions` -> `QuestionRound`.
+- `POST /api/programme/{id}/questions { body }` -> `QuestionRound` (201).
+- `PUT /api/programme/{id}/questions/upvote { questionId, upvoted }` -> `QuestionRound`.
+- `POST /api/admin/programme/{id}/questions/state { status, revision }` -> `QuestionRound`.
+- `PUT /api/admin/programme/{id}/questions/resolve { questionId, status, revision }` -> `QuestionRound`.
+
+Questions contain 1–1,000 Unicode characters after trimming; each activity accepts
+at most 200. Guests need full app access, an unlocked event and an open round to
+submit or vote. Each guest may upvote any pending question once, including their
+own; setting `upvoted` is idempotent and false removes it. Counts are visible
+immediately. Pending questions come first, ordered by descending votes, then ID.
+
+Host transitions are `draft` -> `open` -> `closed`. Closing stops submissions and
+votes but still allows answers. The host answers orally and marks a pending
+question `answered`, or spends a joker to mark it `joker`. These are terminal
+states. The whole activity has exactly two jokers, enforced under transaction
+locks and a database constraint. Concurrent actions cannot overspend. Host edits,
+transitions and resolutions increment the revision; submissions and upvotes do
+not. Metadata edits preserve all questions, votes and spent jokers.
+
+Reads and mutations recheck current session, guest and welcome access in their
+transaction. Locked/draft rounds return 404 to guests. Successful mutations emit
+the shared programme invalidation after commit. Errors include `invalid_question`
+(400), `questions_closed`, `question_limit_reached`, `no_jokers_left` and
+`activity_conflict` (409). Private content never travels in WebSocket messages.
+
+### Vote events
+
+Add future event types explicitly with their own validation, authorization,
+settings editor and renderer. The first interactive type is `vote`:
+
+```typescript
+type Vote = {
+  question: string;
+  status: "draft" | "open" | "closed" | "revealed";
+  allowSelfVote: boolean;
+  candidates: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    active: boolean;
+  }[];
+  myCandidateId: number | null;
+  canVote: boolean;
+  participationCount: number | null;
+  results: { candidateId: number; votes: number }[] | null;
+};
+```
+
+- `POST /api/admin/programme/{id}/vote/state { status, revision }` -> `Event`.
+- `PUT /api/programme/{id}/vote { candidateId }` -> `Event` for the signed-in voter.
+
+Questions contain 1-240 characters after trimming. Select 2-200 distinct active
+guests as candidates. Voting for oneself defaults to disabled. Candidate selection
+and the self-vote setting can change only while the vote is a draft; the question
+and event metadata remain editable. Transitions are `draft` -> `open` -> `closed`
+-> `revealed`. Closing and revealing are separate actions. The current revision
+is required for every edit to an existing vote event, including metadata-only
+updates with an omitted type or vote. Omitting vote on such an update preserves
+its settings. Host edits and transitions increment the revision; guest votes do
+not. Stale edits fail without changing metadata, settings or ballots.
+
+Each guest has one stored choice per vote event and can replace it while voting
+is open. The server derives the voter from the current session and atomically
+checks access, event availability, vote state and candidate eligibility before
+saving. Returning to the page restores the recorded choice. Revoked candidates
+remain in the saved list and historical results with `active: false`, but cannot
+receive new votes. Candidate portraits use authenticated profile photo URLs.
+
+Only the admin endpoint exposes participation counts before revelation. Results
+remain `null` for everyone, including administrators, until the host reveals them.
+Responses never contain other voters' identities or individual choices;
+`myCandidateId` is only the viewer's own choice. PostgreSQL retains voter IDs to
+enforce uniqueness and allow replacing a vote.
+
+Changes publish the shared `programme` invalidation after commit. Clients refresh
+through authorized HTTP requests without polling. These events require full app
+access and do not grant access during the welcome sequence.
+
+Migration `0011_programme_activity_events.sql` turns each legacy nested activity
+into an event. The first activity retains its parent event ID; additional ones
+receive copies of its authored metadata and schedule. Existing settings, status,
+candidate order, revisions and ballots survive. Ordinary events remain unchanged.
+A database constraint prevents multiple activity records belonging to one event.
+The former nested activity and ordering routes are removed.
+
+Vote errors retain the codes `invalid_activity`, `activity_conflict`,
+`vote_closed`, `invalid_vote_candidate` and `self_vote_forbidden`, alongside
+existing event, access and not-found errors.
 
 ## Guestbook
 

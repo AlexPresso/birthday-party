@@ -8,11 +8,24 @@ import (
 	"strconv"
 )
 
+type mediaCategoryResponse struct {
+	media.Category
+	CoverThumbnailURL *string `json:"coverThumbnailUrl"`
+}
+
 func (a *App) listMediaCategories(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
-	items, err := a.media.Categories(r.Context(), guest.Role == "admin")
+	categories, err := a.media.Categories(r.Context(), guest.Role == "admin")
 	if err != nil {
 		failUpload(w, err)
 		return
+	}
+	items := make([]mediaCategoryResponse, len(categories))
+	for i, category := range categories {
+		items[i].Category = category
+		if category.CoverPhotoID != nil {
+			thumbnail := "/api/photos/" + strconv.FormatInt(*category.CoverPhotoID, 10) + "/image?size=thumb"
+			items[i].CoverThumbnailURL = &thumbnail
+		}
 	}
 	respond(w, 200, map[string]any{"items": items})
 }

@@ -1,0 +1,28 @@
+{{- $volumes := dict "media" .Values.backend.persistence }}
+{{- if .Values.postgresql.enabled }}
+{{- $_ := set $volumes "postgresql" .Values.postgresql.persistence }}
+{{- end }}
+{{- range $name, $volume := $volumes }}
+{{- if not $volume.existingClaim }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "birthday-party.fullname" $ }}-{{ $name }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "birthday-party.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml $volume.accessModes | nindent 4 }}
+  {{- if eq $volume.storageClass "-" }}
+  storageClassName: ""
+  {{- else if $volume.storageClass }}
+  storageClassName: {{ $volume.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $volume.size }}
+{{- end }}
+{{- end }}

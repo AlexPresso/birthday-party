@@ -68,13 +68,17 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, guest identity
 	case <-r.Context().Done():
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, max(a.config.MaxImageBytes, a.config.MaxVideoBytes)+(64<<10))
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, max(limits.ImageBytes, limits.VideoBytes)+(64<<10))
 	reader, err := r.MultipartReader()
 	if err != nil {
 		fail(w, 400, "photo_required")
 		return
 	}
-	input, err := a.mediaFiles.Receive(reader)
+	input, err := a.mediaFiles.Receive(reader, limits.ImageBytes, limits.VideoBytes)
 	if err != nil {
 		failUpload(w, err)
 		return

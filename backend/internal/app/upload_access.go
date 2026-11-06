@@ -25,7 +25,11 @@ func (a *App) getWelcomeUploadContext(w http.ResponseWriter, r *http.Request, gu
 		failUpload(w, err)
 		return
 	}
-	respond(w, 200, map[string]any{"revision": result.Revision, "widgetIndex": result.WidgetIndex, "category": result.Category, "limits": map[string]int64{"imageBytes": a.config.MaxImageBytes, "videoBytes": a.config.MaxVideoBytes}})
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		return
+	}
+	respond(w, 200, map[string]any{"revision": result.Revision, "widgetIndex": result.WidgetIndex, "category": result.Category, "limits": limits})
 }
 
 func parseUploadDestination(r *http.Request) (media.Destination, error) {

@@ -35,7 +35,8 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   responsibility: `guests`, `profile`, `party`, `media`, `programme`, `guestbook`,
   `welcome`, `notifications` and `settings`. Add files within the owning feature
   before adding another directory or generic abstraction.
-- `settings` composes host and guest controls from the other features. Guest
+- `settings` composes host controls from the other features. `/profil` composes
+  personal photo, notification and account controls independently. Guest
   administration belongs to `guests`, party details to `party`, event editing to
   `programme`, and category editing to `media`.
 - `welcome` composes the profile, media and notification controls. Those features
@@ -62,6 +63,13 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
 
 ## Responsiveness and resource use
 
+- At 960px, center the party shell at 90% of the viewport width without a fixed
+  maximum, and use the desktop media,
+  guestbook, profile and featured-vote layouts. Settings use a persistent vertical
+  sidebar and one editor filling the remaining width. Use CSS breakpoints so
+  resizing preserves forms, uploads and ballots. Desktop navigation remains a
+  centered bottom dock; position upload banners above it. Verify 320px phones,
+  tablets, laptops and wide monitors in both themes; see `../docs/design.md`.
 - Avoid unnecessary sequential requests. Keep client bundles small and use CSS
   for straightforward transitions; add animation libraries only for a real need.
 - Use thumbnails and appropriately sized images in galleries. Load full-size
@@ -70,7 +78,7 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   Preserve a guest's selection when retrying is possible.
 - Choose caching and refresh behavior explicitly for guest-specific data and
   scheduled reveals. Prevent shared caches from exposing protected content.
-- Keep default Link prefetching for the four tabs so Next can prepare shared
+- Keep default Link prefetching for navigation links so Next can prepare shared
   route information. Keep private page fetches uncached; full-page prefetch
   or longer router cache lifetimes need an explicit freshness strategy. Show
   pending feedback when a transition must wait, and measure production builds
@@ -97,12 +105,18 @@ Run these commands from `frontend/`:
 - `npm run format`: format tracked source and guidance with Prettier.
 - `npm run format:check`: verify formatting without changing files.
 - `npm test`: Node tests for API boundary validation and upload constraints.
+- `npm run test:runtime`: after a production build, verify the container startup's
+  runtime backend selection for HTTP, WebSocket and server rendering.
 
 Start the Go service too. `API_INTERNAL_URL` defaults to
 `http://127.0.0.1:8080`; `.env.example` documents it. Browser requests always use
-the same-origin `/api` proxy. Production rewrites are resolved during the build:
-set the intended internal API URL for both build and runtime. Root scripts manage
-the full stack and browser tests; see `../README.md`.
+the same-origin `/api` proxy. The container's `startup.mjs` updates the compiled
+API rewrite from the runtime `API_INTERNAL_URL` before Next starts, including
+WebSocket forwarding. Use an HTTP(S) origin without credentials or a path.
+The image can be reused with different backend service names without rebuilding;
+keep `.next/routes-manifest.json` writable by the container user. Plain `npm start`
+uses the build's rewrite destination. Root scripts manage the full stack and
+browser tests; see `../README.md`.
 
 Use the repository-root `.env` for shared configuration. Docker Compose reads
 it automatically and forwards the declared variables to each service; it does
@@ -111,11 +125,11 @@ changing values; Compose recreates affected containers without rebuilding the
 image. Container API, port, host and production-mode settings remain explicit
 in Compose. The root development script also loads the root `.env`; local
 frontend env files are only needed when launching Next.js independently.
-For invitation copy, missing environment variables use defaults; explicitly
-empty values hide their text. Preserve that distinction in Compose and Next.js.
-Locale-specific `INVITATION_TITLE_FR/EN/DE/IT/ES` and
-`INVITATION_DESCRIPTION_FR/EN/DE/IT/ES` take precedence over their unsuffixed
-variables, which take precedence over localized defaults. Read them at runtime.
+Go imports legacy birthday age, invitation copy and upload limits from the root
+environment once. They then live in PostgreSQL and are edited in admin settings.
+Read age and invitation copy from `/api/config` without cross-request caching.
+Locale-specific text takes precedence over shared text and localized defaults.
+Null inherits and an empty string hides the text; preserve both in the editor.
 
 ## Languages
 
@@ -175,7 +189,7 @@ mutation for this transition. Hide Start while waiting and show Next only when
 next/previous and enters explicitly with finish. The public `open` field describes
 that guest's effective access, so redirect to `/photos` only when it becomes true. A global Required
 switch makes late arrivals follow the full sequence even after host opening.
-Administrators retain the four tabs and unlock steps in settings. Save the switch
+Administrators retain full navigation and unlock steps in settings. Save the switch
 separately without losing step drafts. Preserve drafts on conflicts. Allow editing
 and reordering steps during every phase, including after opening access. Live
 edits retain guests' numeric positions unless removed trailing steps require
@@ -216,7 +230,7 @@ filters uncategorized media or one accessible category; keep pagination, complet
 uploads and retries tied to that destination. Public means signed-in guests,
 private means administrators. Preserve category names as authored content.
 
-The `enable_notifications` widget and settings share the browser notification
+The `enable_notifications` widget and Profile share the browser notification
 control. Ask permission only from an explicit click and retain that user gesture;
 never prompt on mount or block guest navigation when permission is declined.
 Show enabled only after permission, a browser push subscription and server
@@ -225,11 +239,12 @@ network failures and iOS Home Screen installation with translated guidance.
 Use `/sw.js` only for push display and same-origin notification clicks. It must
 not cache authenticated pages or API responses. Keep subscriptions tied to the
 current session; an existing browser subscription must not silently bind another
-guest identity. Allow retry after failed registration and disabling in settings.
+guest identity. Allow retry after failed registration and disabling in Profile.
 
 Profile settings accept JPEG/PNG/WebP photos using `/api/profile` image limits.
-Show a centered preview before saving, preserve the selection after failed saves,
-and release local object URLs. Refresh the server-rendered header after changes.
+Upload immediately on Profile; the welcome widget keeps its centered preview
+before saving. Preserve the file after failed uploads and release local object
+URLs. Refresh the server-rendered navigation after changes.
 Use the shared Avatar component with native authenticated images and initial
 fallbacks. Avatar URLs are versioned, same-origin API paths; anonymous guestbook
 posts keep their neutral icon and never receive an avatar URL.
@@ -247,8 +262,17 @@ Each displayed queue has one combined progress bar and a localized sent/total
 file counter. Count a file as sent only after server acceptance, including jobs
 still being prepared. Include local waiting files in the total and deduplicate
 transfers/jobs by upload ID. Keep individual status, errors, retries and removal
-controls without per-file progress bars. Welcome widgets aggregate only their
-own uploads.
+controls in expandable details without per-file progress bars. Show one compact
+floating queue above the navigation throughout party tabs; welcome widgets keep
+their own inline queues. Use a bounded cache of local image object URLs for
+previews, release them on dismissal/eviction/unmount, and fetch remote thumbnails
+only from authorized ready-job responses. When all items are ready, show success
+for two seconds then fade away; keep expanded details open, preserve keyboard
+focus and cancel dismissal
+when the batch changes. Never automatically hide failures. Persist only a bounded
+list of dismissed upload UUIDs in session storage to avoid replay after reload.
+Each gallery post is an independent medium: omit per-item sequence counters and
+the gallery filmstrip. The explicit slideshow retains its sequence controls.
 Each image must satisfy the backend's JPEG/PNG/WebP and pixel limits. Videos
 accept MP4/MOV/WebM up to 5 minutes and 4K input; Go preserves uploaded bytes
 and generates JPEG thumbnails without re-encoding or downscaling the video.
@@ -266,19 +290,78 @@ Loop after the last page. Provide pause, previous/next, close and optional nativ
 fullscreen controls. Pause playback while the document is hidden, abort pending
 requests on close and restore focus to the launch button. File or page failures
 pause the slideshow and offer a retry instead of silently skipping content.
-The gallery API includes limits.imageBytes/videoBytes from the root environment
-(MAX_IMAGE_SIZE_MB/MAX_VIDEO_SIZE_MB, defaults 15/100 MiB, range 1–1024).
+The gallery API includes limits.imageBytes/videoBytes from saved admin settings
+(defaults 15/100 MiB, range 1–1024).
 Use those values for browser validation and translated size labels.
-The Next proxy permits the larger configured limit plus 64 KiB and a 10-minute
-timeout. next.config.ts and the standalone startup.mjs share the runtime parser;
-Compose changes must apply on recreation without rebuilding the image.
+The Next proxy permits 1024 MiB plus 64 KiB and a 10-minute timeout, allowing
+settings increases without restart. Go enforces current limits per request.
+next.config.ts and the standalone startup.mjs share this bounded ceiling.
 
-The chosen theme is dark plum. Keep these four tabs and their order: `Programme`,
-`Médias`, `Livre d'or`, `Paramètres` in French. Capitalize labels in the
-selected language while keeping routes unchanged. Host controls live inside
-settings. Empty states must never invent guest contributions or events.
+The cream and dark plum themes follow `prefers-color-scheme`. Keep bottom icons
+in this order: `Programme`, `Médias`, `Livre d'or`, administrator-only `Paramètres`,
+then the round profile photo at the far right. Hide visible navigation text but
+keep translated accessible names and tooltips. The profile icon opens `/profil`
+for all participants with app access. Guests visiting
+`/parametres` redirect to `/profil` before admin data is fetched. Capitalize
+translated labels and keep existing routes. Host controls live in settings.
+Question activities use the existing programme editor and shared realtime topic.
+Question activities open their own module page at `/programme/[id]` from the
+agenda or settings; keep explicit activity-type routing in the App Router and
+the UI inside the programme feature. Read only authorized, unlocked activities.
+Guests send anonymous text and toggle one upvote per pending question. Show
+server-sorted questions in pending/answered/joker tabs and the two-joker counter.
+Host controls open/close submissions, mark answers and confirm spending a joker.
+Use a right-hand composer on desktop and a modal bottom sheet on mobile, keeping
+drafts on dismissal, resize, failures and realtime updates. Restore focus after
+closing the sheet and resolving a question. Remove inaccessible activity content
+when an event is deleted or relocked. Retain the Programme navigation highlight.
+Never add polling or infer the authoritative joker budget from local state.
+On Profile, selecting a photo immediately uploads it and updates the saved avatar.
+Do not show a separate preview, crop explanation or Save button there. Disable
+photo actions during the request, keep the current avatar on failure and allow
+retrying the selected file. The welcome widget retains its explicit preview and
+save step. Keep file-format guidance accessible and display validation errors.
+Group admin settings into Party, Guests and access, and Photos and videos.
+Open each editor as a sliding subpage at `/parametres?section=…`, with a back
+arrow and native browser history on mobile. At 960px, retain the grouped menu
+as a sidebar, highlight the selected link, show party details by default and
+switch the right-hand editor without sliding or a back button. Subscribe only to
+the breakpoint, keep one instance of each visited editor, and flush the outgoing
+editor before switching; failed saves retain the editor and draft. Preserve visited editor drafts when returning
+to the list, keep inactive pages inert, restore keyboard focus, and skip motion
+when reduced motion is requested. Each configuration editor saves only its own
+fields merged into the latest saved configuration; serialize those saves.
+Age belongs inside party details, whose menu icon is a birthday cake. Put the
+welcome sequence in the Party group. Editable settings save on field blur and
+before returning to the menu, with no Save buttons. Keep the editor open on
+validation or save failure, preserve edits made during a request, and serialize
+queued writes using the latest accepted revision. Keep creation/deletion and
+vote/welcome transitions explicit. Slide pages fully right-to-left on entry and
+left-to-right on return; reduced motion skips the animation.
+Empty states must never invent guest contributions or events.
 Scheduled timestamps are submitted as UTC; host date inputs identify their
 browser timezone, and guest dates use the party's explicit timezone.
+
+Activities are individual programme events. Keep their contracts, editor controls
+and guest renderers in the programme feature; use stable event IDs and explicit
+`event`, `vote` and `questions` branches with their own settings and behavior.
+Choose the type when adding an event and save its metadata and type-specific
+settings together. Do not add a nested activities list or a second save step.
+The Programme administration shortcut opens the matching settings section.
+Use the existing programme subscription for activity state and participation
+updates. Preserve host drafts and unsent guest selections on unrelated refreshes;
+restore the recorded vote after navigation. Do not fetch the admin guest list
+from guest voting screens. Render only candidate names, authenticated avatars and
+the viewer's own choice returned by the programme API.
+
+The vote activity uses a searchable portrait grid and an explicit confirmation
+button. Keep names visible, use initials when no photo exists, and convey
+selection with a check plus color. Support keyboard selection and comfortable
+touch targets. Show results only when the backend returns them after revelation;
+candidate totals and individual voter identities must not be inferred from hidden
+UI data. Host settings support adding, scheduling, configuring and deleting each
+event, with separate open, close and reveal actions for votes. Candidate selection and
+self-voting are editable only in draft; question corrections remain available.
 
 The anonymous guestbook checkbox starts unchecked. Anonymous entries have a
 null author for every viewer; display the translated anonymous label and use

@@ -52,7 +52,11 @@ function permissionState(subscribed: boolean): "enabled" | "off" | "denied" {
     : "off";
 }
 
-export function NotificationControl() {
+export function NotificationControl({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
   const { t, locale } = useI18n();
   const heading = useId();
   const [state, setState] = useState<State>("off");
@@ -236,23 +240,55 @@ export function NotificationControl() {
     setError(null);
     setAttempt((current) => current + 1);
   };
+  const canToggle = state === "off" || state === "enabled";
+  const status = busy
+    ? t(`notifications.${busy}`)
+    : compact && canToggle
+      ? t("notifications.device")
+      : t(`notifications.${state}`);
   return (
     <section
-      className="notification-control"
+      className={`notification-control${compact ? " notification-control-compact" : ""}`}
       aria-labelledby={heading}
       aria-busy={busy !== null}
     >
-      <h3 id={heading}>
-        <Bell size={19} aria-hidden="true" />
-        {t("notifications.title")}
-      </h3>
-      <p
-        className={`notification-status ${state === "enabled" ? "success-notice" : "muted"}`}
-        role="status"
-      >
-        {!busy && state === "enabled" && <Check size={17} aria-hidden="true" />}
-        {busy ? t(`notifications.${busy}`) : t(`notifications.${state}`)}
-      </p>
+      <div className="notification-summary">
+        {compact && <Bell size={25} strokeWidth={1.6} aria-hidden="true" />}
+        <div className="notification-copy">
+          <h3 id={heading}>
+            {!compact && <Bell size={19} aria-hidden="true" />}
+            {t("notifications.title")}
+          </h3>
+          <p
+            id={`${heading}-status`}
+            className={`notification-status ${!compact && state === "enabled" ? "success-notice" : "muted"}`}
+            role="status"
+          >
+            {!compact && !busy && state === "enabled" && (
+              <Check size={17} aria-hidden="true" />
+            )}
+            {status}
+          </p>
+        </div>
+        {compact && (
+          <button
+            type="button"
+            role="switch"
+            className="notification-switch"
+            aria-labelledby={heading}
+            aria-describedby={`${heading}-status`}
+            aria-checked={state === "enabled"}
+            disabled={busy !== null || !canToggle}
+            onClick={() =>
+              state === "enabled" ? void disable() : void enable()
+            }
+          >
+            <span className="notification-switch-track" aria-hidden="true">
+              <span className="notification-switch-thumb" />
+            </span>
+          </button>
+        )}
+      </div>
       {state === "install" && (
         <p className="fine-print">{t("notifications.installHint")}</p>
       )}
@@ -261,7 +297,7 @@ export function NotificationControl() {
       )}
       <ErrorNotice message={error} />
       <div className="notification-actions">
-        {state === "enabled" ? (
+        {!compact && state === "enabled" ? (
           <button
             type="button"
             className="button secondary"
@@ -271,7 +307,7 @@ export function NotificationControl() {
             <BellOff size={17} aria-hidden="true" />
             {t("notifications.disable")}
           </button>
-        ) : state === "off" ? (
+        ) : !compact && state === "off" ? (
           <button
             type="button"
             className="button primary"

@@ -1,26 +1,23 @@
 import type { Locale } from "@/lib/locale";
 import type { Translator } from "@/lib/i18n";
+import type { PublicConfiguration } from "./contracts";
 
 export function birthdayCopy(
-  environment: Record<string, string | undefined>,
+  configuration: PublicConfiguration,
   locale: Locale,
   t: Translator,
 ) {
-  const configuredAge = Number(environment.BIRTHDAY_AGE);
-  const age =
-    Number.isInteger(configuredAge) &&
-    configuredAge >= 1 &&
-    configuredAge <= 150
-      ? configuredAge
-      : 30;
-  const custom = (name: string) =>
-    environment[`${name}_${locale.toUpperCase()}`]?.trim() ??
-    environment[name]?.trim();
+  const { age, invitation } = configuration;
+  const localized = invitation.locales[locale];
   return {
     age,
     title:
-      custom("INVITATION_TITLE") ??
+      localized.title?.trim() ??
+      invitation.title?.trim() ??
       t(age === 1 ? "birthday.titleOne" : "birthday.title", { age }),
-    description: custom("INVITATION_DESCRIPTION") ?? t("birthday.description"),
+    description:
+      localized.description?.trim() ??
+      invitation.description?.trim() ??
+      t("birthday.description"),
   };
 }

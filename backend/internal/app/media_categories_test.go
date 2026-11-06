@@ -208,6 +208,76 @@ func TestMediaCategoryFiltersAndPrivacyApplyToEveryResource(t *testing.T) {
 	status(t, request(t, a, "DELETE", "/api/photos/"+strconv.FormatInt(second.ID, 10), nil, visitor), 204)
 }
 
+func TestMediaCategoryCoversUsePublishedMediaAndCurrentVisibility(t *testing.T) {
+	a := testApp(t)
+	host, _ := admin(t, a)
+	visitor, _, _ := guest(t, a, host, "Category viewer")
+	public := createTestCategory(t, a, host, "Shared", true)
+	private := createTestCategory(t, a, host, "Private", false)
+	empty := createTestCategory(t, a, host, "Waiting for photos", true)
+	first := finishCategoryUpload(t, a, performMediaUpload(a, mediaUploadRequest(t, visitor, &public.ID, nil, "")))
+	latest := finishCategoryUpload(t, a, performMediaUpload(a, mediaUploadRequest(t, visitor, &public.ID, nil, "")))
+	secret := finishCategoryUpload(t, a, performMediaUpload(a, mediaUploadRequest(t, host, &private.ID, nil, "")))
+	// Accepted and processing uploads have no published thumbnail yet.
+	status(t, performMediaUpload(a, mediaUploadRequest(t, visitor, &public.ID, nil, "")), 202)
+	status(t, performMediaUpload(a, mediaUploadRequest(t, visitor, &empty.ID, nil, "")), 202)
+	if _, err := a.claimUpload(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	assertCovers := func(cookie *http.Cookie, expected map[int64]string) {
+		t.Helper()
+		response := request(t, a, "GET", "/api/media-categories", nil, cookie)
+		status(t, response, 200)
+		var list struct {
+			Items []mediaCategoryResponse `json:"items"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &list); err != nil {
+			t.Fatal(err)
+		}
+		if len(list.Items) != len(expected) || strings.Count(response.Body.String(), `"coverThumbnailUrl":`) != len(expected) {
+			t.Fatalf("unexpected category cover response: %s", response.Body.String())
+		}
+		for _, item := range list.Items {
+			want, exists := expected[item.ID]
+			if !exists || (item.CoverThumbnailURL == nil) != (want == "") || item.CoverThumbnailURL != nil && *item.CoverThumbnailURL != want {
+				t.Fatalf("unexpected cover for category %d: %s", item.ID, response.Body.String())
+			}
+		}
+		if strings.Contains(response.Body.String(), "CoverPhotoID") || strings.Contains(response.Body.String(), "filename") {
+			t.Fatal("category cover exposed an internal storage field")
+		}
+	}
+	assertCovers(visitor, map[int64]string{public.ID: latest.ThumbnailURL, empty.ID: ""})
+	assertCovers(host, map[int64]string{public.ID: latest.ThumbnailURL, private.ID: secret.ThumbnailURL, empty.ID: ""})
+	status(t, request(t, a, "GET", latest.ThumbnailURL, nil, visitor), 200)
+	status(t, request(t, a, "GET", secret.ThumbnailURL, nil, host), 200)
+	assertWelcomeError(t, request(t, a, "GET", secret.ThumbnailURL, nil, visitor), 404, "photo_not_found")
+	status(t, request(t, a, "GET", latest.ThumbnailURL, nil, nil), 401)
+	// Ready job history expires separately from its published media.
+	if _, err := a.db.Exec("DELETE FROM upload_jobs WHERE status='ready'"); err != nil {
+		t.Fatal(err)
+	}
+	assertCovers(visitor, map[int64]string{public.ID: latest.ThumbnailURL, empty.ID: ""})
+	status(t, request(t, a, "DELETE", "/api/photos/"+strconv.FormatInt(latest.ID, 10), nil, visitor), 204)
+	assertCovers(visitor, map[int64]string{public.ID: first.ThumbnailURL, empty.ID: ""})
+	status(t, request(t, a, "PUT", "/api/admin/media-categories/"+strconv.FormatInt(public.ID, 10), map[string]any{"name": public.Name, "isPublic": false}, host), 200)
+	assertCovers(visitor, map[int64]string{empty.ID: ""})
+	for _, method := range []string{"GET", "HEAD"} {
+		assertWelcomeError(t, request(t, a, method, first.ThumbnailURL, nil, visitor), 404, "photo_not_found")
+	}
+	status(t, request(t, a, "PUT", "/api/admin/media-categories/"+strconv.FormatInt(private.ID, 10), map[string]any{"name": private.Name, "isPublic": true}, host), 200)
+	assertCovers(visitor, map[int64]string{private.ID: secret.ThumbnailURL, empty.ID: ""})
+	status(t, request(t, a, "GET", secret.ThumbnailURL, nil, visitor), 200)
+	state := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("Welcome", "")}}, host))
+	changeWelcome(t, a, host, state.Revision, "start")
+	assertWelcomeError(t, request(t, a, "GET", "/api/media-categories", nil, visitor), 423, "welcome_required")
+	assertWelcomeError(t, request(t, a, "GET", secret.ThumbnailURL, nil, visitor), 423, "welcome_required")
+	assertCovers(host, map[int64]string{public.ID: first.ThumbnailURL, private.ID: secret.ThumbnailURL, empty.ID: ""})
+	status(t, request(t, a, "POST", "/api/logout", nil, visitor), 204)
+	status(t, request(t, a, "GET", "/api/media-categories", nil, visitor), 401)
+	status(t, request(t, a, "GET", secret.ThumbnailURL, nil, visitor), 401)
+}
+
 func TestMediaCategoryPrivacyAndSessionRecheckedAfterReception(t *testing.T) {
 	for _, ending := range []string{"private", "logout", "revoke"} {
 		t.Run(ending, func(t *testing.T) {

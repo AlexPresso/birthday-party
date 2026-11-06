@@ -19,25 +19,45 @@ var (
 
 // Event contains the fields visible to its requested audience.
 type Event struct {
-	ID          int64   `json:"id"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Teaser      string  `json:"teaser"`
-	StartsAt    *string `json:"startsAt"`
-	UnlockAt    *string `json:"unlockAt"`
-	Locked      bool    `json:"locked"`
+	ID          int64            `json:"id"`
+	Type        string           `json:"type"`
+	Revision    int64            `json:"revision"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	Teaser      string           `json:"teaser"`
+	StartsAt    *string          `json:"startsAt"`
+	UnlockAt    *string          `json:"unlockAt"`
+	Locked      bool             `json:"locked"`
+	Vote        *Vote            `json:"vote"`
+	Questions   *QuestionSummary `json:"questions"`
 }
 
 // Input is the host-authored event content before normalization and validation.
 type Input struct {
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Teaser      string  `json:"teaser"`
-	StartsAt    *string `json:"startsAt"`
-	UnlockAt    *string `json:"unlockAt"`
+	Type        string     `json:"type"`
+	Revision    int64      `json:"revision"`
+	Vote        *VoteInput `json:"vote"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Teaser      string     `json:"teaser"`
+	StartsAt    *string    `json:"startsAt"`
+	UnlockAt    *string    `json:"unlockAt"`
 }
 
 func (input Input) normalize() (Input, error) {
+	if input.Type != "" && input.Type != "event" && input.Type != "vote" && input.Type != "questions" {
+		return input, ErrInvalidEvent
+	}
+	if (input.Type == "event" || input.Type == "questions") && input.Vote != nil || input.Type == "vote" && input.Vote == nil {
+		return input, ErrInvalidEvent
+	}
+	if input.Vote != nil {
+		vote, err := input.Vote.normalize()
+		if err != nil {
+			return input, err
+		}
+		input.Vote = &vote
+	}
 	input.Title = strings.TrimSpace(input.Title)
 	input.Description = strings.TrimSpace(input.Description)
 	input.Teaser = strings.TrimSpace(input.Teaser)
@@ -58,10 +78,6 @@ func (input Input) normalize() (Input, error) {
 	return input, nil
 }
 
-func (input Input) event(id int64) Event {
-	return Event{ID: id, Title: input.Title, Description: input.Description, Teaser: input.Teaser, StartsAt: input.StartsAt, UnlockAt: input.UnlockAt}
-}
-
 // View hides unrevealed content from guests. Invalid stored timestamps fail closed.
 func (event Event) View(now time.Time, private bool) Event {
 	if event.UnlockAt != nil {
@@ -71,20 +87,29 @@ func (event Event) View(now time.Time, private bool) Event {
 	if event.Locked && !private {
 		event.Title = event.Teaser
 		event.Description = ""
+		event.Vote = nil
+		event.Questions = nil
 	}
 	return event
 }
 
-// Repository stores authored events without applying audience-specific reveal rules.
+// Repository returns audience views from one snapshot and owns complete writes,
+// including current authorization and persistence of each event's vote settings.
 type Repository interface {
-	List(context.Context, int) ([]Event, error)
+	List(context.Context, int, int64, bool, time.Time) ([]Event, error)
 	UnlockTimes(context.Context, int) ([]string, error)
-	Create(context.Context, Input, int) (int64, error)
-	Update(context.Context, int64, Input) error
-	Delete(context.Context, int64) error
+	Create(context.Context, Actor, Input, int) (Event, error)
+	Update(context.Context, Actor, int64, Input) (Event, error)
+	Delete(context.Context, Actor, int64) error
+	TransitionVote(context.Context, Actor, int64, string, int64) (Event, error)
+	CastVote(context.Context, Actor, int64, int64) (Event, error)
 }
 
 const eventLimit = 200
+
+// Migration can split each of the former 12 nested activities into an event.
+// Keep those existing records readable while retaining the creation limit.
+const readLimit = eventLimit * 12
 
 // Service validates event changes and controls when authored content becomes visible.
 type Service struct{ repository Repository }
@@ -93,15 +118,11 @@ type Service struct{ repository Repository }
 func New(repository Repository) *Service { return &Service{repository: repository} }
 
 // List orders the bounded programme by start time and applies reveal rules.
-func (s *Service) List(ctx context.Context, clock func() time.Time, private bool) ([]Event, error) {
-	records, err := s.repository.List(ctx, eventLimit)
+func (s *Service) List(ctx context.Context, clock func() time.Time, guestID int64, private bool) ([]Event, error) {
+	now := clock()
+	items, err := s.repository.List(ctx, readLimit, guestID, private, now)
 	if err != nil {
 		return nil, err
-	}
-	now := clock()
-	items := make([]Event, 0, len(records))
-	for _, event := range records {
-		items = append(items, event.View(now, private))
 	}
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].StartsAt == nil {
@@ -121,38 +142,34 @@ func (s *Service) List(ctx context.Context, clock func() time.Time, private bool
 }
 
 // Create validates an event and enforces the collection limit transactionally.
-func (s *Service) Create(ctx context.Context, input Input) (Event, error) {
+func (s *Service) Create(ctx context.Context, actor Actor, input Input) (Event, error) {
+	if input.Type == "" {
+		input.Type = "event"
+	}
 	input, err := input.normalize()
 	if err != nil {
 		return Event{}, err
 	}
-	id, err := s.repository.Create(ctx, input, eventLimit)
-	if err != nil {
-		return Event{}, err
-	}
-	return input.event(id), nil
+	return s.repository.Create(ctx, actor, input, eventLimit)
 }
 
 // Update replaces the host-authored fields of an existing event.
-func (s *Service) Update(ctx context.Context, id int64, input Input) (Event, error) {
+func (s *Service) Update(ctx context.Context, actor Actor, id int64, input Input) (Event, error) {
 	input, err := input.normalize()
 	if err != nil {
 		return Event{}, err
 	}
-	if err := s.repository.Update(ctx, id, input); err != nil {
-		return Event{}, err
-	}
-	return input.event(id), nil
+	return s.repository.Update(ctx, actor, id, input)
 }
 
 // Delete removes an event, returning ErrNotFound when it is absent.
-func (s *Service) Delete(ctx context.Context, id int64) error {
-	return s.repository.Delete(ctx, id)
+func (s *Service) Delete(ctx context.Context, actor Actor, id int64) error {
+	return s.repository.Delete(ctx, actor, id)
 }
 
 // NextUnlock ignores malformed legacy times, matching View's fail-closed rule.
 func (s *Service) NextUnlock(ctx context.Context, now time.Time) (time.Time, error) {
-	times, err := s.repository.UnlockTimes(ctx, eventLimit)
+	times, err := s.repository.UnlockTimes(ctx, readLimit)
 	if err != nil {
 		return time.Time{}, err
 	}

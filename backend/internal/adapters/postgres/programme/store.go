@@ -4,34 +4,32 @@ package programme
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"birthday-party/backend/internal/programme"
 )
 
 // Store uses the application's database pool; its caller owns pool lifetime.
-type Store struct{ db *sql.DB }
+type Store struct {
+	db  *sql.DB
+	now func() time.Time
+}
 
 var _ programme.Repository = (*Store)(nil)
 
-// New uses an initialized database without starting background work.
-func New(db *sql.DB) *Store { return &Store{db: db} }
+func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: now} }
 
-// List returns bounded authored events for the service's audience and timing rules.
-func (s *Store) List(ctx context.Context, limit int) ([]programme.Event, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id,title,description,teaser,starts_at,unlock_at FROM events LIMIT $1", limit)
+func (s *Store) List(ctx context.Context, limit int, guestID int64, admin bool, now time.Time) ([]programme.Event, error) {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	items := []programme.Event{}
-	for rows.Next() {
-		var event programme.Event
-		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.Teaser, &event.StartsAt, &event.UnlockAt); err != nil {
-			return nil, err
-		}
-		items = append(items, event)
+	defer tx.Rollback()
+	items, err := readEvents(ctx, tx, 0, limit, guestID, admin, now)
+	if err != nil {
+		return nil, err
 	}
-	return items, rows.Err()
+	return items, tx.Commit()
 }
 
 // UnlockTimes loads only the bounded timestamps needed by the scheduler.
@@ -52,53 +50,90 @@ func (s *Store) UnlockTimes(ctx context.Context, limit int) ([]string, error) {
 	return times, rows.Err()
 }
 
-// Create checks the capacity and inserts an event under the same table lock.
-func (s *Store) Create(ctx context.Context, input programme.Input, limit int) (int64, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
+// Create commits the event, its settings and candidates together.
+func (s *Store) Create(ctx context.Context, actor programme.Actor, input programme.Input, limit int) (programme.Event, error) {
+	tx, err := s.begin(ctx, actor, 0, true, inputCandidates(input))
 	if err != nil {
-		return 0, err
+		return programme.Event{}, err
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, "LOCK TABLE events IN SHARE ROW EXCLUSIVE MODE"); err != nil {
-		return 0, err
+		return programme.Event{}, err
 	}
 	var count int
 	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM events").Scan(&count); err != nil {
-		return 0, err
+		return programme.Event{}, err
 	}
 	if count >= limit {
-		return 0, programme.ErrLimitReached
+		return programme.Event{}, programme.ErrLimitReached
 	}
 	var id int64
 	err = tx.QueryRowContext(ctx, "INSERT INTO events(title,description,teaser,starts_at,unlock_at) VALUES($1,$2,$3,$4,$5) RETURNING id", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt).Scan(&id)
 	if err != nil {
-		return 0, err
+		return programme.Event{}, err
 	}
-	return id, tx.Commit()
+	if input.Vote != nil {
+		if err := createVote(ctx, tx, id, *input.Vote); err != nil {
+			return programme.Event{}, err
+		}
+	}
+	if input.Type == "questions" {
+		_, err := tx.ExecContext(ctx, `WITH activity AS (
+ INSERT INTO programme_activities(event_id,position,type) VALUES($1,0,'questions') RETURNING id)
+ INSERT INTO programme_question_rounds(activity_id) SELECT id FROM activity`, id)
+		if err != nil {
+			return programme.Event{}, err
+		}
+	}
+	return s.finish(ctx, tx, actor, id, true)
 }
 
-// Update replaces the authored fields of an existing event.
-func (s *Store) Update(ctx context.Context, id int64, input programme.Input) error {
-	result, err := s.db.ExecContext(ctx, "UPDATE events SET title=$1,description=$2,teaser=$3,starts_at=$4,unlock_at=$5 WHERE id=$6", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt, id)
-	return changed(result, err)
+func (s *Store) Update(ctx context.Context, actor programme.Actor, id int64, input programme.Input) (programme.Event, error) {
+	tx, err := s.begin(ctx, actor, id, true, inputCandidates(input))
+	if err != nil {
+		return programme.Event{}, err
+	}
+	defer tx.Rollback()
+	event, err := readEvent(ctx, tx, id, actor.GuestID, true, s.now())
+	if err != nil {
+		return programme.Event{}, err
+	}
+	if err := event.CheckEdit(input); err != nil {
+		return programme.Event{}, err
+	}
+	if input.Vote != nil {
+		if err := updateVote(ctx, tx, event, *input.Vote); err != nil {
+			return programme.Event{}, err
+		}
+	}
+	_, err = tx.ExecContext(ctx, "UPDATE events SET title=$1,description=$2,teaser=$3,starts_at=$4,unlock_at=$5 WHERE id=$6", input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt, id)
+	if err != nil {
+		return programme.Event{}, err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE programme_activities SET revision=revision+1 WHERE event_id=$1", id); err != nil {
+		return programme.Event{}, err
+	}
+	return s.finish(ctx, tx, actor, id, true)
 }
 
-// Delete removes an existing event.
-func (s *Store) Delete(ctx context.Context, id int64) error {
-	result, err := s.db.ExecContext(ctx, "DELETE FROM events WHERE id=$1", id)
-	return changed(result, err)
+func inputCandidates(input programme.Input) []int64 {
+	if input.Vote == nil {
+		return nil
+	}
+	return input.Vote.CandidateIDs
 }
 
-func changed(result sql.Result, err error) error {
+func (s *Store) Delete(ctx context.Context, actor programme.Actor, id int64) error {
+	tx, err := s.begin(ctx, actor, id, true, nil)
 	if err != nil {
 		return err
 	}
-	count, err := result.RowsAffected()
-	if err != nil {
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "DELETE FROM events WHERE id=$1", id); err != nil {
 		return err
 	}
-	if count == 0 {
-		return programme.ErrNotFound
+	if err := s.checkExpiry(ctx, tx, actor); err != nil {
+		return err
 	}
-	return nil
+	return tx.Commit()
 }

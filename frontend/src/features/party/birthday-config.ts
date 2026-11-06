@@ -1,11 +1,14 @@
 import "server-only";
-import { connection } from "next/server";
+import { cache } from "react";
 import { getI18n } from "@/lib/server-i18n";
+import { serverApi } from "@/lib/server-api";
+import { publicConfigurationSchema } from "./contracts";
 import { birthdayCopy } from "./birthday-copy";
 
-export async function getBirthdayConfig() {
-  // Read at request time so the same Docker image accepts new environment values.
-  await connection();
-  const { locale, t } = await getI18n();
-  return birthdayCopy(process.env, locale, t);
-}
+export const getBirthdayConfig = cache(async () => {
+  const [configuration, { locale, t }] = await Promise.all([
+    serverApi("/config", publicConfigurationSchema),
+    getI18n(),
+  ]);
+  return birthdayCopy(configuration, locale, t);
+});

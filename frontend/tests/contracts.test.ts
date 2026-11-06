@@ -310,6 +310,30 @@ test("categories require explicit visibility and bounded names and collections",
   );
 });
 
+test("category covers accept only authenticated thumbnail URLs", () => {
+  const category = { id: 1, name: "Shared", isPublic: true };
+  for (const coverThumbnailUrl of [
+    undefined,
+    null,
+    "/api/photos/42/image?size=thumb",
+  ]) {
+    const input = { ...category, coverThumbnailUrl };
+    assert.deepEqual(mediaCategorySchema.parse(input), input);
+  }
+  for (const coverThumbnailUrl of [
+    "https://outside.example/photo.jpg",
+    "//outside.example/photo.jpg",
+    "/api/photos/42/image",
+    "/api/photos/0/image?size=thumb",
+    "/api/photos/42/image?size=thumb&token=secret",
+  ]) {
+    assert.equal(
+      mediaCategorySchema.safeParse({ ...category, coverThumbnailUrl }).success,
+      false,
+    );
+  }
+});
+
 test("welcome upload context identifies the current destination and effective limits", () => {
   const context = {
     revision: 6,
@@ -663,6 +687,9 @@ test("API contract rejects ambiguous dates and unrecognized privileges", () => {
           startsAt: "2026-10-14T18:00:00",
           unlockAt: null,
           locked: false,
+          type: "event",
+          revision: 1,
+          vote: null,
         },
       ],
     }).success,

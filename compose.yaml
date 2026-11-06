@@ -33,6 +33,21 @@ services:
       PRINT_ADMIN_INVITATION: ${PRINT_ADMIN_INVITATION:-true}
       MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-15}
       MAX_VIDEO_SIZE_MB: ${MAX_VIDEO_SIZE_MB:-100}
+      # Import existing product settings once; later edits live in admin settings.
+      BIRTHDAY_AGE: ${BIRTHDAY_AGE:-30}
+      # Preserve missing (default copy) and empty (hidden copy) values.
+      INVITATION_TITLE:
+      INVITATION_DESCRIPTION:
+      INVITATION_TITLE_EN:
+      INVITATION_TITLE_FR:
+      INVITATION_TITLE_DE:
+      INVITATION_TITLE_IT:
+      INVITATION_TITLE_ES:
+      INVITATION_DESCRIPTION_EN:
+      INVITATION_DESCRIPTION_FR:
+      INVITATION_DESCRIPTION_DE:
+      INVITATION_DESCRIPTION_IT:
+      INVITATION_DESCRIPTION_ES:
       LISTEN_ADDR: 0.0.0.0:8080
       DATA_DIR: /data
     volumes:
@@ -55,26 +70,7 @@ services:
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
-      args:
-        API_INTERNAL_URL: http://backend:8080
     environment:
-      # Compose reads these values from the repository-root .env automatically.
-      BIRTHDAY_AGE: ${BIRTHDAY_AGE:-30}
-      MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-15}
-      MAX_VIDEO_SIZE_MB: ${MAX_VIDEO_SIZE_MB:-100}
-      # Preserve the difference between missing variables and explicit empty values.
-      INVITATION_TITLE:
-      INVITATION_DESCRIPTION:
-      INVITATION_TITLE_EN:
-      INVITATION_TITLE_FR:
-      INVITATION_TITLE_DE:
-      INVITATION_TITLE_IT:
-      INVITATION_TITLE_ES:
-      INVITATION_DESCRIPTION_EN:
-      INVITATION_DESCRIPTION_FR:
-      INVITATION_DESCRIPTION_DE:
-      INVITATION_DESCRIPTION_IT:
-      INVITATION_DESCRIPTION_ES:
       # Keep container networking independent from local development settings.
       API_INTERNAL_URL: http://backend:8080
       PORT: "3000"

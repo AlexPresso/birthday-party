@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { getParty } from "@/features/party/server";
 import { getSession } from "@/features/guests/server";
 import { getBirthdayConfig } from "@/features/party/birthday-config";
 import { Navigation } from "@/components/navigation";
 import { getI18n } from "@/lib/server-i18n";
-import { UploadProvider, UploadNotice } from "@/features/media/upload-provider";
+import { UploadProvider } from "@/features/media/upload-provider";
+import { UploadQueue } from "@/features/media/upload-queue";
 import { GuestAccessMonitor } from "@/features/welcome/guest-access-monitor";
-import { Avatar } from "@/components/avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +14,7 @@ export default async function PartyLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [{ guest }, party, { age, title }, { t }] = await Promise.all([
+  const [{ guest }, party, { age, title }, { locale, t }] = await Promise.all([
     getSession(),
     getParty(),
     getBirthdayConfig(),
@@ -33,24 +32,26 @@ export default async function PartyLayout({
             {age}
           </span>
           <div>
-            <strong>{party.title || title || t("birthday.fallback")}</strong>
+            <strong>
+              {party.title ||
+                title ||
+                t(age === 1 ? "birthday.titleOne" : "birthday.title", {
+                  age: new Intl.NumberFormat(locale).format(age),
+                })}
+            </strong>
           </div>
         </div>
-        <Link
-          className="guest-chip"
-          href="/parametres"
-          aria-label={`${t("nav.settings")}: ${guest.name}`}
-        >
-          <Avatar name={guest.name} avatarUrl={guest.avatarUrl} />
-          <span>{guest.name}</span>
-        </Link>
       </header>
       <UploadProvider>
         <main id="content" className="main-content">
-          <UploadNotice />
           {children}
         </main>
-        <Navigation />
+        <UploadQueue />
+        <Navigation
+          isAdmin={guest.role === "admin"}
+          guestName={guest.name}
+          avatarUrl={guest.avatarUrl}
+        />
       </UploadProvider>
     </div>
   );

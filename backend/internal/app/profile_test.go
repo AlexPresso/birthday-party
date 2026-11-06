@@ -211,7 +211,7 @@ func TestProfilePhotoAuthorsAndAnonymousPrivacy(t *testing.T) {
 
 func TestProfilePhotoValidationKeepsExistingImage(t *testing.T) {
 	a := testApp(t)
-	a.config.MaxImageBytes = 1 << 20
+	setTestUploadLimits(t, a, 1, 100)
 	host, _ := admin(t, a)
 	initial := profileGuest(t, uploadAvatar(t, a, host, pngBytes(t)))
 	oversized := append([]byte(nil), pngBytes(t)...)

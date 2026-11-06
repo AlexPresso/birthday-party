@@ -7,8 +7,10 @@ new decision; do not revisit the rejected directions without a reason.
 
 - A friendly app for a 30th birthday party.
 - A Next.js frontend with a Go backend.
-- Four tabs, in order: `Programme`, `Médias`, `Livre d'or`, `Paramètres` in French,
-  with translated labels and unchanged routes in the other supported languages.
+- Bottom navigation in order: `Programme`, `Médias`, `Livre d'or`, then
+  `Paramètres` only for administrators, and `Profil` last for everyone with app
+  access. Show only icons and the circular profile photo; translate accessible
+  names and tooltips in the supported languages.
 - Events and other content that become available later.
 - A guestbook with named messages and an optional anonymous posting checkbox.
 - Invite-only access through personal activation links and pre-created profiles.
@@ -16,19 +18,32 @@ new decision; do not revisit the rejected directions without a reason.
 - Interface language follows the phone/browser's preferred supported language:
   French, English, German, Italian or Spanish, with English as the fallback.
 
-## Selected direction: dark plum
+## Selected direction: cream and dark plum
 
-The user selected the final **G / Prune sombre / 4 onglets** mockup, inspired by
-the practical organization of PlanIt's event app. See [the approved mockup](design-reference.png).
+The user approved a photo-led interface with familiar social-app navigation,
+an icon-only bottom bar and a compact agenda. See the approved
+[light mockup](design-reference-light.png) and
+[dark mockup](design-reference-dark.png). These replace the earlier four-tab
+reference and timeline layout. The approved screens are the visual authority:
+replace the previous component layouts instead of layering cosmetic changes on
+top of them. Match their hierarchy, compact rows, photo proportions and spacing.
+The later settings revision replaces its accordion list with the grouped,
+sliding subpages described below while retaining these themes.
 Use `gpt-taste` to translate its layout and hierarchy into an accessible interface.
 The reference is a visual concept; its photographs and messages are illustrative,
 not actual event content and must not be seeded into the production application.
 
-Use a near-black plum background (`#151218`), slightly lighter surfaces (`#231D29`),
-fine plum borders (`#3B3043`), light text (`#F3EEF5`), readable secondary text
-(`#BEB1C5`), and mauve accents (`#C5A2D7`). Primary buttons use dark text on mauve.
-Use a crisp humanist sans-serif and medium-weight headings, compact readable
-sections, modest rounded corners, and consistent outline icons.
+Follow the device's light or dark preference. The light theme uses warm cream
+(`#FAF8F6`), aubergine text (`#2F1033`), muted plum actions (`#744C6C`) and soft
+lilac selections (`#F1E7F7`). The dark theme uses a near-black plum background
+(`#131016`), slightly lighter surfaces (`#211B28`),
+fine plum borders (`#3B3043`), light text (`#F6EEF9`), readable secondary text
+(`#C5B1CE`), and mauve accents (`#C28BD4`). Primary buttons use dark text on mauve.
+Use the locally bundled Inter variable font, bold page titles, compact readable
+sections, modest rounded corners and consistent outline icons. Primary buttons
+have the reference's subtle plum or mauve shading. Keep font files and their
+license under `frontend/public/fonts/`; do not request fonts from guests' browsers
+through an external service.
 
 The birthday identity comes from the actual participants and content. The earlier
 scrapbook, photobooth, garden, illustrated-pop and anthracite proposals were not
@@ -38,19 +53,105 @@ Do not invent party details, guest contributions, dates, or activity counts.
 ## Layout and visual language
 
 - Design for guests using phones, then adapt deliberately for larger screens.
+- On PC, center the party shell at 90% width without a fixed pixel cap, with
+  wider internal gutters on tablets and PCs. Above
+  960px, media feeds use two columns and the compact gallery uses four; the
+  guestbook places its composer beside a single reading column. Profile identity
+  and controls sit side by side. An open featured vote sits beside the agenda,
+  preserving event order and ballot state. Settings use a persistent vertical
+  sidebar and an editor to its right above 960px, following Instagram's desktop
+  settings layout. Settings editors fill the remaining width and the welcome builder
+  uses its existing columns. Keep the icon navigation in a
+  centered bottom dock on desktop, with the upload banner above it. Phones retain
+  the approved single-column layouts and edge-to-edge bottom navigation. Use CSS
+  breakpoints without duplicating mounted controls or requests.
 - Keep headings and content aligned to a shared page gutter. Center empty states
   and the waiting greeting; align forms, messages and authored step content for
   reading. Use quiet borders to separate content rather than enclosing every row.
-- Keep mobile navigation labels readable, including longer translations. Use
-  44px or larger touch targets and let action groups wrap without clipping.
-- Group the media filter and upload controls, with a full-width upload button on
-  phones. Use two gallery columns on phones and three on larger screens. Keep
-  file limits secondary but readable, and let programme entries share a timeline.
-- Group settings into identity, photo, notifications and account controls. Place
-  photo and notification controls side by side only when there is enough room.
-- Keep the four confirmed tabs in the same order, including translated labels.
-  Use a fixed bottom navigation
-  on phones and a comfortable equivalent on larger screens.
+- Use 44px or larger touch targets, accessible translated names and visible focus.
+  The bottom bar has calendar, images and open-book icons, an administrator-only
+  settings gear, then the circular avatar at the far right. Use an initial when
+  no photo is available. Do not repeat the profile link in the header. Center
+  the bottom bar at a comfortable width on larger screens.
+- Place Add beside the heading, with circular category covers below it. Load
+  covers through the authorized category response. Use initials for empty
+  categories. The feed shows an author row, an edge-to-edge square preview, a
+  download action for each independent media item. Do not add per-item sequence
+  counters or a thumbnail strip that suggests a grouped carousel. Keep grid/feed controls flat.
+  Put existing file actions in the author's overflow menu. Keep upload limits
+  in the accessible Add description and validation, without a technical paragraph
+  above the feed. Follow the approved [upload component](upload-reference.png):
+  a compact banner with a 40px preview, a single thin progress bar and a sent/total
+  count. Float it 12px above the bottom navigation, with 20px side gutters,
+  throughout the party tabs. Keep welcome widget queues inline and independent.
+  An explicit click expands file details, errors and retry/removal controls.
+  Keep sending and server preparation distinct. Only when every file is ready,
+  show a checkmark and the added count, then dismiss after two seconds with a
+  short fade. Keep expanded details open until the guest closes them, and pause
+  dismissal while a control has keyboard focus; cancel
+  pending dismissal when another file arrives. Failures remain visible and
+  retryable. Persist bounded dismissed upload IDs in session storage so completed
+  banners do not reappear after reload. Respect reduced motion and never fetch
+  private media merely to decorate a queue.
+- Put the first available open vote in a compact accent card with its real
+  question, candidate avatars and a Vote action. Keep the ballot behind a
+  disclosure, retaining selections while it is collapsed. Present the remaining
+  programme as agenda rows with a time column and fine dividers. Show only the
+  authorized teaser and unlock information for locked events.
+- Question activities ("Sans filtre") have their own page at `/programme/[id]`,
+  linked from the agenda and programme settings. Follow the approved
+  [activity mockup](questions-reference.png): a Programme back link, large title,
+  short rules and two ticket icons with the server's remaining joker count.
+  Use tabs for pending, answered and skipped questions, keep the server's vote
+  ordering and highlight the first pending question in soft lilac. Upvote buttons
+  show their count and selected state. On PC, use the 90% shell with the list on
+  the left and an anonymous composer on the right. On mobile, a primary action
+  opens the composer in a bottom sheet; preserve its draft on dismissal, resize
+  and failures. Support Escape, focus restoration and reduced motion.
+  Host controls mark oral answers, confirm spending a joker, and open or close
+  submissions. Closing stops new questions and votes, while remaining questions
+  can still be answered. Questions may be daring, answers are honest, and there
+  are exactly two jokers for the activity. Mockup questions are illustrative only.
+- Center a large circular profile photo and name, followed by an outlined photo
+  button. Below a divider, show a compact Notifications row with a real switch,
+  then a separate photo removal row and red logout. A switch is enabled only
+  after browser permission and server registration succeed; preserve unsupported
+  and denied guidance. Choosing a photo starts its upload immediately; update
+  the avatar after the server accepts it. Do not show a separate preview,
+  crop explanation or Save button on Profile. Keep format guidance accessible
+  and show it with validation errors. Preserve the saved avatar on upload
+  failure and offer a retry for the selected file.
+- The guestbook has a plain message field, anonymous checkbox and Publish button.
+  Hide redundant signature and visibility paragraphs from the default visual
+  layout while retaining accessible guidance. Entries use a single reading
+  column with dividers and overflow actions. Anonymous entries have a filled
+  neutral avatar and no identifying author data.
+- Settings groups navigation rows under Party, Guests and access, and Photos
+  and videos. Party contains details including age, programme and the welcome
+  sequence; guest settings contain profiles and invitation links and invitation-page copy;
+  media settings contain category visibility and upload limits. On desktop, keep
+  these groups in a quiet left sidebar with a highlighted active row and a fine
+  vertical divider. Open party details by default; show one editor on the right.
+  Switching sections saves the outgoing editor and preserves drafts and browser
+  history. A save failure keeps the current editor visible. Do not slide the
+  desktop sidebar or show a back-to-menu button there. On mobile, each row opens
+  its own page with a full horizontal slide from right to left and a back arrow.
+  Returning slides from left to right. Use
+  `/parametres?section=…` for direct links and browser history. Keep visited
+  editors mounted so returning to the list preserves drafts, and restore focus
+  to the originating row. Respect reduced motion and keep inactive pages inert.
+  Save editable settings when a field loses focus and before returning to the
+  menu, without Save buttons. Keep pending edits and errors visible, and remain
+  on the editor if validation or saving fails. Changes made during a request
+  must remain intact and be saved by the next queued request. Each configuration
+  page saves its own fields while preserving the other saved configuration
+  values; serialize those writes. Creation, deletion and vote/welcome transitions
+  remain explicit actions. The party-details row uses the birthday cake icon.
+  Invitation languages use one scope selector with retained drafts.
+  Match the reference's compact rows, with an icon, label, saved value on the
+  right when relevant, and a chevron. Keep longer descriptions accessible without
+  adding a second visible line to every row. Show actual saved age and upload
+  limits in the list; preserve the three groups and sliding subpages.
 - Media is the first destination after authentication when full access is open.
   During the host-led welcome, guests see a separate waiting screen without tabs.
   Use a personalized welcome heading while waiting, then show the current
@@ -78,7 +179,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
   media upload and enabling notifications. Render them in the host's chosen order.
   Titles and text may
   repeat or be omitted; preserve authored wording. A profile-photo widget reuses
-  the preview, save, replace and remove controls from settings. Keep feedback
+  the photo editor with an explicit preview and save step. Keep feedback
   and selections across unchanged updates; changing steps removes the widgets.
   The host controls unlocks regardless of widget completion; after entering
   step one automatically, guests choose when to advance.
@@ -111,7 +212,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
   Show enabled only after the browser and server agree; offer retry after failures.
   Declining never prevents continuing the welcome. Explain how to restore denied
   permission and, on iPhone/iPad, how to add the app to the Home Screen.
-  Reuse the control in settings so guests can enable or disable notifications later.
+  Reuse the control in Profile so guests can enable or disable notifications later.
   Notifications contain generic translated copy and open the guest's current
   welcome position; they must not move the guest to another step.
 - Use the same readable sans-serif family for headings and body content.
@@ -152,6 +253,22 @@ Do not invent party details, guest contributions, dates, or activity counts.
 
 ## Events and timed reveals
 
+- Activities are individual events in the programme. From Add event, hosts choose
+  an ordinary event or a vote, then complete one form containing the schedule and
+  the settings for that type. Keep opening, closing and revealing a vote directly
+  on its event controls. The Programme management shortcut opens the matching
+  settings section. Preserve drafts and event identity when refreshing or editing.
+- The first activity is voting for a guest. Show the question followed by a
+  searchable portrait grid, with a name beneath each photo and initial fallbacks.
+  Center portraits and names within consistent touch targets. Use a check and a
+  mauve outline to mark the selected candidate, then require an explicit vote
+  action. Show the saved choice and allow changing it until closure; retain an
+  unsent selection after a connection failure or unrelated refresh.
+- Hosts choose candidates and whether self-voting is allowed while preparing the
+  draft. Opening, closing and revealing results are separate actions. Show
+  participation counts to the host without revealing individual choices. Guests
+  see aggregate candidate counts only after revelation, including ties and a
+  clear empty result when nobody voted. Keep the existing navigation order.
 - Distinguish upcoming, available, and completed experiences with text as well as color.
 - An upcoming reveal can offer a hint when the host wants one; do not expose
   content that is intended to remain hidden.
@@ -166,7 +283,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
 ## Identity, guestbook and settings
 
 - The invitation badge pairs the configured age with a small cake icon with candles.
-- The app header shows the configured age and guest profile without decorative stars.
+- The app header shows the configured age and party name.
 - An invitation opens a personal welcome and an explicit `Entrer` action.
   Activation is a deliberate action; link previews must not consume invitations.
 - Explain invalid, expired and already used invitations, with a clear route back
@@ -176,13 +293,18 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Place an unchecked anonymous posting checkbox beside the message composer.
   When selected, explain that the name will not appear. Anonymous messages show
   a neutral avatar and translated anonymous label, including to the host.
-- Settings shows the guest identity and logout, without an About section.
-  Guests can choose a profile photo, check a circular center-cropped preview,
-  save it, replace it or remove it. Use initials when no photo is set. Show
-  the saved photo in the header, named guestbook posts and the host's guest list;
+- Profile shows the guest identity and logout, without an About section.
+  Choosing a profile photo uploads and saves it immediately. Guests can replace
+  or remove it. Use initials when no photo is set. Show
+  the saved photo in the navigation, named guestbook posts and the host's guest list;
   anonymous posts always keep their neutral icon.
   Host-only controls manage guests, invitations, event details and the programme.
 - Keep administrative controls within settings so guest navigation stays simple.
+- Settings includes birthday age, invitation copy and photo/video size limits.
+  Use one scope selector for shared invitation text and language overrides,
+  preserving drafts between scopes. Distinguish default, hidden and custom text explicitly.
+  Save without restart and preserve drafts on errors. Invitation text is public;
+  do not imply that it is private guest content.
 
 ## Language and authored content
 
@@ -200,7 +322,7 @@ problem, the next step and any consequences.
 
 Names, guestbook messages, party titles, descriptions and teasers stay in their
 authors' language. Do not translate these automatically. The host can provide
-localized invitation copy through environment variables; a locale-specific value
+localized invitation copy through administrator settings; a locale-specific value
 takes precedence over a shared value, then the localized default. An explicitly
 empty value hides that text. Keep labels readable on narrow screens in every
 supported language, including longer German labels.

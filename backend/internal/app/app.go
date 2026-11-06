@@ -43,10 +43,12 @@ type App struct {
 	db                  *sql.DB
 	identity            *identity.Service
 	programme           *programme.Service
+	questions           *programme.QuestionService
 	guestbook           *guestbook.Service
 	welcome             *welcome.Service
 	profile             *profile.Service
 	party               *party.Service
+	configuration       *party.ConfigurationService
 	access              *access.Service
 	notifications       *notifications.Service
 	media               *media.Service
@@ -86,9 +88,11 @@ func Open(config Config) (*App, error) {
 	if config.MaxVideoBytes == 0 {
 		config.MaxVideoBytes = defaultMaxVideoBytes
 	}
-	if config.MaxImageBytes < 1<<20 || config.MaxImageBytes > maxConfiguredUploadBytes || config.MaxVideoBytes < 1<<20 || config.MaxVideoBytes > maxConfiguredUploadBytes {
-		return nil, errors.New("upload limits must be between 1 MiB and 1024 MiB")
+	if config.ProductConfiguration.Age == 0 {
+		config.ProductConfiguration = party.DefaultConfiguration()
 	}
+	config.ProductConfiguration.ImageSizeMB = int(config.MaxImageBytes >> 20)
+	config.ProductConfiguration.VideoSizeMB = int(config.MaxVideoBytes >> 20)
 	if err := os.MkdirAll(filepath.Join(config.DataDir, "photos"), 0700); err != nil {
 		return nil, err
 	}
@@ -107,9 +111,7 @@ func Open(config Config) (*App, error) {
 	a := &App{
 		db:                  db,
 		identity:            identity.New(pgidentity.New(db), config.PublicURL),
-		programme:           programme.New(pgprogramme.New(db)),
 		guestbook:           guestbook.New(pgguestbook.New(db)),
-		party:               party.New(pgparty.New(db)),
 		access:              access.New(pgaccess.New(db)),
 		config:              config,
 		now:                 time.Now,
@@ -120,9 +122,27 @@ func Open(config Config) (*App, error) {
 		programmeReschedule: make(chan struct{}, 1),
 	}
 	clock := func() time.Time { return a.now() }
+	partyStore := pgparty.New(db, clock)
+	if err := partyStore.InitializeConfiguration(ctx, func() (party.Configuration, error) {
+		if config.initialConfigurationError != nil {
+			return party.Configuration{}, config.initialConfigurationError
+		}
+		if config.MaxImageBytes < 1<<20 || config.MaxImageBytes > maxConfiguredUploadBytes || config.MaxVideoBytes < 1<<20 || config.MaxVideoBytes > maxConfiguredUploadBytes {
+			return party.Configuration{}, errors.New("upload limits must be between 1 MiB and 1024 MiB")
+		}
+		return party.NormalizeInitialConfiguration(config.ProductConfiguration)
+	}); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("initialize product configuration: %w", err)
+	}
+	a.party = party.New(partyStore)
+	a.configuration = party.NewConfiguration(partyStore)
+	programmeStore := pgprogramme.New(db, clock)
+	a.programme = programme.New(programmeStore)
+	a.questions = programme.NewQuestions(programmeStore)
 	a.profile = profile.New(pgprofile.New(db, clock), avatar.New())
 	a.mediaStore = pgmedia.New(db, clock)
-	a.mediaFiles = mediafiles.New(config.DataDir, config.MaxImageBytes, config.MaxVideoBytes)
+	a.mediaFiles = mediafiles.New(config.DataDir)
 	a.media = media.New(a.mediaStore, a.mediaFiles, clock, func(id int64) { a.realtime.notify(id, realtimeUploads) }, log.Printf)
 	notificationStore := pgnotifications.New(db, clock)
 	keys, err := notificationStore.LoadKeys(ctx, push.GenerateKeys)

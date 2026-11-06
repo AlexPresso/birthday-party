@@ -1,14 +1,12 @@
 package app
 
 import (
-	"birthday-party/backend/internal/adapters/mediafiles"
 	pgmedia "birthday-party/backend/internal/adapters/postgres/media"
 	"birthday-party/backend/internal/media"
 	"context"
 	"database/sql"
 	"errors"
-	"log"
-	"time"
+	"testing"
 )
 
 // Integration fixtures keep their compact names while exercising the service ports.
@@ -44,7 +42,9 @@ func newUploadID() (string, error)                          { return media.NewUp
 func sameOptionalID(a, b *int64) bool                       { return media.SameOptionalID(a, b) }
 func releaseWorkerConnection(conn *sql.Conn) error          { return pgmedia.ReleaseWorkerConnection(conn) }
 
-func refreshTestMediaFiles(a *App) {
-	a.mediaFiles = mediafiles.New(a.config.DataDir, a.config.MaxImageBytes, a.config.MaxVideoBytes)
-	a.media = media.New(a.mediaStore, a.mediaFiles, func() time.Time { return a.now() }, func(id int64) { a.realtime.notify(id, realtimeUploads) }, log.Printf)
+func setTestUploadLimits(t *testing.T, a *App, imageMB, videoMB int) {
+	t.Helper()
+	if _, err := a.db.ExecContext(t.Context(), "UPDATE product_configuration SET image_size_mb=$1,video_size_mb=$2 WHERE id=1", imageMB, videoMB); err != nil {
+		t.Fatal(err)
+	}
 }

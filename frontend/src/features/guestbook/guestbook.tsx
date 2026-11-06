@@ -1,9 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
 import {
-  BookOpen,
   PenLine,
-  Send,
+  MoreHorizontal,
+  Copy,
+  Check,
   Trash2,
   Heart,
   UserRound,
@@ -15,6 +16,7 @@ import { formatDate } from "@/lib/dates";
 import { type Guest } from "@/features/guests/contracts";
 import { PageHeading, ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
+import "./guestbook.css";
 
 export function Guestbook({
   initial,
@@ -39,11 +41,17 @@ export function Guestbook({
   const [error, setError] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [copiedEntryId, setCopiedEntryId] = useState<number | null>(null);
   const text = useRef<HTMLTextAreaElement>(null);
 
   async function publish(event: React.FormEvent) {
     event.preventDefault();
-    if (!body.trim() || sending) return;
+    if (sending) return;
+    if (!body.trim()) {
+      setPublishError(t("guestbookDesign.emptyMessage"));
+      text.current?.focus();
+      return;
+    }
     setSending(true);
     setPublishError(null);
     setNotice(null);
@@ -98,53 +106,58 @@ export function Guestbook({
     }
   }
 
+  async function copyEntry(id: number, message: string) {
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopiedEntryId(id);
+    } catch {
+      setError(t("guestbookDesign.copyFailed"));
+    }
+  }
+
   return (
-    <>
+    <div className="guestbook-page">
       <PageHeading
-        title={t("guestbook.title")}
+        title={t("page.guestbook")}
         description={t(
           new Intl.PluralRules(locale).select(age) === "one"
             ? "guestbook.descriptionOne"
-            : "guestbook.descriptionOther",
+            : "guestbookDesign.description",
           { age: numbers.format(age) },
         )}
       />
       <div className="guestbook-layout">
-        <section className="guestbook-compose panel">
-          <div className="compose-title">
-            <div className="small-emblem">
-              <BookOpen size={26} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 id="guestbook-compose-title">
-                {t("guestbook.composeTitle")}
-              </h2>
-              <p className="muted">{t("guestbook.composeDescription")}</p>
-            </div>
-          </div>
+        <section className="guestbook-compose">
+          <h2 id="guestbook-compose-title" className="visually-hidden">
+            {t("guestbook.composeTitle")}
+          </h2>
           <form onSubmit={publish} aria-labelledby="guestbook-compose-title">
-            <label htmlFor="guestbook-message">{t("guestbook.message")}</label>
+            <label className="visually-hidden" htmlFor="guestbook-message">
+              {t("guestbook.message")}
+            </label>
             <textarea
               id="guestbook-message"
               ref={text}
               rows={5}
               maxLength={2000}
               value={body}
-              onChange={(event) => setBody(event.target.value)}
-              placeholder={t("guestbook.placeholder")}
+              onChange={(event) => {
+                setBody(event.target.value);
+                setPublishError(null);
+              }}
+              placeholder={t("guestbookDesign.placeholder")}
+              aria-describedby="guestbook-visibility"
               required
               disabled={sending}
             />
-            <div className="compose-footer">
-              <span className="fine-print">
-                {numbers.format(body.length)} / {numbers.format(2000)}
-              </span>
-              <span className="fine-print">
-                {anonymous
-                  ? t("guestbook.signedAnonymously")
-                  : t("guestbook.signed", { name: guest.name })}
-              </span>
-            </div>
+            {body.length > 1800 && (
+              <div className="compose-footer">
+                <span className="fine-print">
+                  {numbers.format(body.length)} / {numbers.format(2000)}
+                </span>
+              </div>
+            )}
             <label className="checkbox-field">
               <input
                 type="checkbox"
@@ -157,12 +170,19 @@ export function Guestbook({
             <ErrorNotice message={publishError} />
             <button
               className="button primary wide"
-              disabled={sending || !body.trim()}
+              disabled={sending}
+              aria-label={t(
+                sending ? "guestbook.publishing" : "guestbook.publish",
+              )}
             >
-              <Send size={18} />
-              {t(sending ? "guestbook.publishing" : "guestbook.publish")}
+              {t(sending ? "guestbook.publishing" : "guestbookDesign.publish")}
             </button>
-            <p className="fine-print">{t("guestbook.visibility")}</p>
+            <p className="visually-hidden" id="guestbook-visibility">
+              {t("guestbook.visibility")}{" "}
+              {anonymous
+                ? t("guestbook.signedAnonymously")
+                : t("guestbook.signed", { name: guest.name })}
+            </p>
           </form>
           <p className="success-notice" role="status">
             {notice}
@@ -188,7 +208,7 @@ export function Guestbook({
             </div>
           ) : (
             entries.map((entry) => (
-              <article key={entry.id} className="guestbook-entry panel">
+              <article key={entry.id} className="guestbook-entry">
                 <header>
                   {entry.author ? (
                     <Avatar
@@ -196,8 +216,15 @@ export function Guestbook({
                       avatarUrl={entry.author.avatarUrl}
                     />
                   ) : (
-                    <span className="avatar" aria-hidden="true">
-                      <UserRound size={20} />
+                    <span
+                      className="avatar anonymous-avatar"
+                      aria-hidden="true"
+                    >
+                      <UserRound
+                        size={36}
+                        strokeWidth={1}
+                        fill="currentColor"
+                      />
                     </span>
                   )}
                   <div>
@@ -208,20 +235,63 @@ export function Guestbook({
                       {formatDate(entry.createdAt, timezone, true, locale)}
                     </p>
                   </div>
-                  {entry.canDelete && (
-                    <button
-                      className="icon-button danger"
-                      onClick={() => deleteEntry(entry.id)}
-                      disabled={removing === entry.id}
-                      aria-label={
-                        entry.author
-                          ? t("guestbook.delete", { name: entry.author.name })
-                          : t("guestbook.deleteAnonymous")
+                  <details
+                    className="entry-actions"
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget))
+                        event.currentTarget.open = false;
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.currentTarget.open = false;
+                        event.currentTarget.querySelector("summary")?.focus();
                       }
+                    }}
+                  >
+                    <summary
+                      className="icon-button"
+                      aria-label={t("guestbookDesign.actions")}
                     >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                      <MoreHorizontal size={22} aria-hidden="true" />
+                    </summary>
+                    <div className="entry-menu">
+                      <button
+                        type="button"
+                        onClick={() => copyEntry(entry.id, entry.body)}
+                        aria-live="polite"
+                      >
+                        {copiedEntryId === entry.id ? (
+                          <Check size={16} />
+                        ) : (
+                          <Copy size={16} />
+                        )}
+                        {t(
+                          copiedEntryId === entry.id
+                            ? "guestbookDesign.copied"
+                            : "guestbookDesign.copy",
+                        )}
+                      </button>
+                      {entry.canDelete && (
+                        <button
+                          className="entry-delete"
+                          onClick={() => deleteEntry(entry.id)}
+                          disabled={removing === entry.id}
+                          aria-label={
+                            entry.author
+                              ? t("guestbook.delete", {
+                                  name: entry.author.name,
+                                })
+                              : t("guestbook.deleteAnonymous")
+                          }
+                        >
+                          <Trash2 size={16} />
+                          {entry.author
+                            ? t("guestbook.delete", { name: entry.author.name })
+                            : t("guestbook.deleteAnonymous")}
+                        </button>
+                      )}
+                    </div>
+                  </details>
                 </header>
                 <p className="entry-body">{entry.body}</p>
               </article>
@@ -238,6 +308,6 @@ export function Guestbook({
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }

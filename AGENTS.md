@@ -50,7 +50,7 @@ use, a personal visual identity, simple code, and responsive interactions.
 - Write conversational copy with clear actions and useful information. Use
   consistent `tu` in French and a similarly informal tone in other languages.
   Avoid generic slogans, sentimental clichés and forced slang. Preserve product
-  facts, accessibility, and the meaning and order of the four navigation labels.
+  facts, accessibility, and the meaning and order of the navigation labels.
 - Keep each skill's supporting files and license in the repository so contributors
   can use them without a separate global installation.
 
@@ -102,12 +102,15 @@ use, a personal visual identity, simple code, and responsive interactions.
 
 ## Selected implementation
 
-- The approved design is dark plum with the tabs `Programme`, `Médias`,
-  `Livre d'or`, `Paramètres` in French. Capitalize translated labels while preserving their
-  order and routes; see `docs/design.md` and its reference image.
+- The approved design has cream and dark plum themes following the device's
+  preference. Bottom navigation shows icons only: `Programme`, `Médias`,
+  `Livre d'or`, administrator-only `Paramètres`, then the circular `Profil` photo
+  at the far right. `/profil` opens for every participant with app access;
+  guests visiting `/parametres` redirect there. Preserve translated accessible
+  names and routes; see `docs/design.md` and its reference images.
 - Guest profiles are prepared by the host. Individual, single-use invitation
   links activate a persistent session. A replacement link keeps the same identity.
-- Guests can choose, replace or remove their own profile photo from settings.
+- Guests can choose, replace or remove their own profile photo from Profile.
   Store normalized 256×256 JPEG avatars (at most 128 KiB) in PostgreSQL for atomic
   replacement. Versioned avatar URLs require an active session and full app access,
   except a guest's own avatar during a current `profile_photo` welcome action.
@@ -145,7 +148,7 @@ use, a personal visual identity, simple code, and responsive interactions.
 - The notification widget asks permission only after an explicit guest click.
   Persist Web Push subscriptions with their guest, session and browser language;
   permission alone does not mean delivery is enabled. Guests can manage their
-  current browser subscription in settings. Keep VAPID keys in PostgreSQL and
+  current browser subscription in Profile. Keep VAPID keys in PostgreSQL and
   send bounded, generic welcome notifications through a durable outbox. Do not
   include guest names, authored instructions, media or invitation/session tokens
   in push payloads. Logout, expiry and revocation stop further delivery.
@@ -167,6 +170,36 @@ use, a personal visual identity, simple code, and responsive interactions.
   intact; SQLite is used only for this legacy import.
 - The frontend proxies same-origin `/api/*` to Go. The public API contract is in
   `docs/api.md`; keep frontend validators and backend responses aligned.
+- Activities are programme events themselves, with stable event IDs and an
+  explicit type: `event` for ordinary entries and `vote` for voting. A vote has
+  a question, 2–200 selected active candidates
+  with their profile photos, and an optional self-vote setting (off by default).
+  Hosts choose the event type in settings and save its schedule and settings
+  together, then open, close and reveal
+  each vote separately. Freeze candidates and the self-vote rule after opening;
+  allow question corrections. One choice per guest is replaceable while open.
+  Keep ballots across event edits and schedule changes; remove them with the event.
+  Migrate existing nested activities into individual events without losing
+  authored content, schedules, candidates, status or ballots. Each event has at
+  most one vote extension. Keep its type fixed after creation.
+  Omit draft vote events from guest lists and hide vote details in locked events.
+  Never expose other guests' choices; administrators see participation counts,
+  but all candidate totals stay hidden until revelation. Enforce current access,
+  event availability, eligibility and vote state atomically in PostgreSQL.
+  Use the existing programme WebSocket topic. Programme activities require full
+  app access; they do not grant access during the welcome sequence. Add future
+  activity types explicitly with validation, authorization and matching UI.
+- Question activities use type `questions` ("Sans filtre") and have their
+  own `/programme/[id]` activity page, linked from the
+  programme and settings, with desktop and mobile layouts. Guests submit
+  anonymous questions and upvote any pending question once, with an undo toggle.
+  Keep author and voter identities out of all responses, including admin views.
+  Limit each activity to 200 questions of 1,000 characters. Hosts open and close
+  submissions/voting, mark oral answers, or spend one of exactly two shared
+  jokers. Answered and skipped questions are terminal; serialize resolutions
+  and enforce the joker budget in PostgreSQL. Preserve questions, upvotes and
+  spent jokers across event edits. Require full app access and event availability,
+  hide drafts/locked details, and use the shared programme invalidation topic.
 - Use one shared, authenticated `/api/realtime` WebSocket per browser tab for
   welcome, upload queue and programme updates. Send scoped invalidation signals
   after database commits; fetch current data through the authorized HTTP APIs.
@@ -188,15 +221,19 @@ use, a personal visual identity, simple code, and responsive interactions.
   errors and retry controls; separate welcome widgets retain their own queues.
 - Guestbook posts can be anonymous. Keep their owner ID private in PostgreSQL for
   deletion permissions; never send their identity to guests or administrators.
-- Shared runtime configuration belongs in the repository-root `.env`.
-  `docker compose up` must apply it directly; do not load frontend env files in
-  Compose or require a rebuild for birthday age and invitation copy changes.
-- MAX_IMAGE_SIZE_MB and MAX_VIDEO_SIZE_MB configure upload sizes (15/100 MiB
-  defaults). The API exposes effective limits to the gallery; the standalone
-  frontend applies its proxy cap at startup. Compose changes need no rebuild.
-- Invitation copy resolves a locale-specific variable (such as
-  `INVITATION_TITLE_FR`) before its global variable and then its localized default.
-  An explicitly empty value hides the text. Keep this distinction at every layer.
+- Birthday age, invitation copy and image/video upload limits live in PostgreSQL
+  and are editable in administrator settings without restarting. Import existing
+  `BIRTHDAY_AGE`, `INVITATION_*`, `MAX_IMAGE_SIZE_MB` and `MAX_VIDEO_SIZE_MB` values
+  from the repository-root `.env` once; saved values take precedence thereafter.
+  Keep deployment configuration in `.env`; Compose must not load frontend env files.
+- Upload limits default to 15/100 MiB and accept integers from 1 to 1024.
+  Go applies a settings snapshot to each incoming request; preserve already
+  accepted jobs when limits decrease. Expose effective limits in the media and
+  profile APIs. The Next proxy has a fixed 1024 MiB plus 64 KiB ceiling.
+- Invitation copy resolves the saved locale-specific text before the shared text
+  and localized default. A null value inherits; an explicitly empty value hides
+  the text. Preserve this distinction during environment import, editing and rendering.
+  Only age and invitation copy are public; configuration writes require an admin.
 - The event timezone defaults to `Europe/Zurich` and is editable by the host.
   Date, venue, actual guests and content are not seeded or invented.
   Format dates in the viewer's language while preserving the party's timezone.

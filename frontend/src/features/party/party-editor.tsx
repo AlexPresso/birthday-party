@@ -1,8 +1,8 @@
 "use client";
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Save } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { useAutosave } from "@/lib/autosave";
 import { useI18n } from "@/lib/i18n-context";
 import { localInput, utcInput } from "@/lib/dates";
 import { partySchema, type Party } from "./contracts";
@@ -19,6 +19,8 @@ export function PartyEditor({
 }) {
   const { locale, t } = useI18n();
   const router = useRouter();
+  const form = useRef<HTMLFormElement>(null);
+  const savedRequest = useRef(party);
   const [title, setTitle] = useState(party.title);
   const [location, setLocation] = useState(party.location);
   const [timezone, setTimezone] = useState(party.timezone);
@@ -32,38 +34,75 @@ export function PartyEditor({
   );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
+  const [savedDraft, setSavedDraft] = useState({
+    title: party.title,
+    location: party.location,
+    timezone: party.timezone,
+    dateDraft: null as string | null,
+  });
+  const dirty =
+    title !== savedDraft.title ||
+    location !== savedDraft.location ||
+    timezone !== savedDraft.timezone ||
+    dateDraft !== savedDraft.dateDraft;
+  const autosave = useAutosave({ save });
+
+  async function save() {
+    const submitted = { title, location, timezone, dateDraft };
     setError(null);
     setSaved(false);
     try {
+      const body = {
+        title: title.trim(),
+        location: location.trim(),
+        timezone: timezone.trim(),
+        date: dateDraft === null ? party.date : utcInput(dateDraft),
+      };
+      if (
+        body.title === savedRequest.current.title &&
+        body.location === savedRequest.current.location &&
+        body.timezone === savedRequest.current.timezone &&
+        body.date === savedRequest.current.date
+      ) {
+        setSavedDraft(submitted);
+        setSaved(true);
+        return true;
+      }
+      if (!form.current?.reportValidity()) return false;
       new Intl.DateTimeFormat(locale, { timeZone: timezone });
       const updated = await api("/admin/party", partySchema, {
         method: "PATCH",
-        body: {
-          title: title.trim(),
-          location: location.trim(),
-          timezone: timezone.trim(),
-          date: dateDraft === null ? party.date : utcInput(dateDraft),
-        },
+        body,
       });
+      savedRequest.current = body;
       onSave(updated);
+      setSavedDraft(submitted);
       setSaved(true);
       router.refresh();
+      return true;
     } catch (err) {
       setError(
         err instanceof RangeError
           ? t("admin.invalidTimezone")
           : errorMessage(err, t),
       );
-    } finally {
-      setBusy(false);
+      return false;
     }
   }
   return (
-    <form className="admin-form" onSubmit={save}>
+    <form
+      ref={form}
+      className="admin-form"
+      onBlur={autosave.onBlur}
+      onChange={() => {
+        setError(null);
+        setSaved(false);
+      }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void autosave.flush();
+      }}
+    >
       <div className="form-grid">
         <div>
           <label htmlFor="party-title">{t("admin.partyTitle")}</label>
@@ -116,12 +155,12 @@ export function PartyEditor({
       </div>
       <ErrorNotice message={error} />
       <div className="form-actions">
-        <button className="button primary" disabled={busy}>
-          <Save size={17} />
-          {busy ? t("admin.saving") : t("admin.saveParty")}
-        </button>
         <span className="success-notice" role="status">
-          {saved ? t("admin.partySaved") : ""}
+          {autosave.saving
+            ? t("admin.saving")
+            : saved && !dirty
+              ? t("admin.partySaved")
+              : ""}
         </span>
       </div>
     </form>

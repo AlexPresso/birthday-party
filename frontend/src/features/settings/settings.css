@@ -1,105 +1,230 @@
-.settings-profile {
+.settings-page {
+  position: relative;
+  width: 100%;
+  margin-inline: auto;
+  /* Contain only the moving screens, without clipping the editors at rest. */
+  overflow-x: clip;
+}
+.settings-screen {
   min-width: 0;
+  background: var(--background);
 }
-
-.settings-identity {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+.settings-screen[data-leaving] {
+  position: absolute;
+  inset: 0 0 auto;
+  pointer-events: none;
+}
+.settings-index-heading {
+  margin-bottom: 26px;
+}
+.settings-index-heading h1 {
+  margin: 0;
+}
+.settings-section {
+  margin: 0 0 28px;
+}
+.settings-section > h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.settings-menu-group {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(120deg, var(--surface), var(--background));
+  overflow: clip;
+}
+.settings-menu-link {
+  display: flex;
   align-items: center;
-  gap: 12px 16px;
-  padding: 26px;
+  gap: 16px;
+  min-height: 56px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
 }
-
-.settings-identity h2 {
-  margin-bottom: 3px;
+.settings-menu-link:first-child {
+  border-top: 0;
+}
+.settings-menu-link > svg {
+  flex-shrink: 0;
+  stroke-width: 1.6;
+}
+.settings-menu-link > svg:last-child {
+  color: var(--muted);
+}
+.settings-menu-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
-
-.settings-identity .status-label {
-  font-size: 12px;
+.settings-menu-label > span {
+  display: block;
+  font-weight: 400;
 }
-
-.settings-identity > p {
-  grid-column: 1 / -1;
-  margin: 0;
-  max-width: 56ch;
-  font-size: 13px;
-  line-height: 1.65;
-}
-
-.settings-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  padding: 26px;
-  gap: 24px;
-  border-block: 1px solid var(--border);
-}
-
-.settings-controls > .profile-photo-editor,
-.settings-controls > .notification-control {
-  padding: 0;
-  border: 0;
-}
-
-.settings-controls > .notification-control {
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
-}
-
-.settings-account {
-  padding: 12px 26px;
-}
-
-.settings-account > .text-button {
+.settings-menu-value {
+  max-width: 42%;
   color: var(--muted);
-  text-align: left;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
-
-.settings-account > .text-button:hover {
+.settings-menu-value:empty {
+  display: none;
+}
+.settings-menu-link:focus-visible {
+  outline-offset: -3px;
+}
+@media (hover: hover) {
+  .settings-menu-link:hover {
+    background: var(--surface-muted);
+  }
+}
+.settings-subpage-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0 24px;
+  padding-block: 8px;
+  background: var(--background);
+}
+.settings-subpage-heading .settings-back {
+  flex-shrink: 0;
+  margin-left: -10px;
   color: var(--text);
 }
-
-.settings-admin > .settings-admin-heading {
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-}
-
-.settings-admin > .settings-admin-heading > .status-label {
-  white-space: normal;
-  font-size: 12px;
-}
-
-.settings-admin .admin-accordion > summary > span {
-  min-width: 0;
+.settings-subpage-heading [data-settings-title] {
+  margin: 0;
+  font-size: clamp(21px, 6vw, 26px);
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
-
-@media (min-width: 1100px) {
-  .settings-identity > p {
-    grid-column: 2;
-  }
-
-  .settings-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 32px;
-  }
-
-  .settings-controls > .notification-control {
-    padding-top: 0;
-    padding-left: 32px;
-    border-top: 0;
-    border-left: 1px solid var(--border);
+.settings-subpage-heading [data-settings-title]:focus {
+  outline: none;
+}
+.settings-editor {
+  min-width: 0;
+}
+.party-details-editor {
+  display: grid;
+  gap: 20px;
+}
+.party-details-editor > .admin-form {
+  padding: 0;
+}
+.settings-editor > .admin-form,
+.settings-editor > .welcome-admin > .admin-form {
+  padding: 0;
+}
+.settings-editor > .welcome-admin {
+  margin: 0;
+}
+.settings-editor > .media-categories-admin {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.settings-editor > .media-categories-admin > .section-row {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .settings-menu-link {
+    gap: 11px;
+    padding-inline: 12px;
   }
 }
 
-@media (max-width: 520px) {
-  .settings-identity,
-  .settings-controls {
-    padding: 20px;
+@media (min-width: 960px) {
+  .settings-page {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+    overflow: visible;
+    min-height: calc(100dvh - 244px);
   }
-
-  .settings-account {
-    padding: 10px 20px;
+  .settings-screen[data-settings-screen="index"] {
+    position: sticky;
+    top: 24px;
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0 24px 24px 0;
+    border-right: 1px solid var(--border);
+    max-height: calc(100dvh - 144px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .settings-screen:not([data-settings-screen="index"]) {
+    grid-column: 2;
+    grid-row: 1;
+    padding-top: 4px;
+  }
+  .settings-index-heading {
+    margin-bottom: 32px;
+  }
+  .settings-index-heading h1 {
+    font-size: 26px;
+  }
+  .settings-section {
+    margin-bottom: 26px;
+  }
+  .settings-section > h2 {
+    padding-inline: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .settings-menu-group {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .settings-menu-link {
+    gap: 12px;
+    padding: 14px 12px;
+    min-height: 56px;
+    border: 0;
+    border-radius: 10px;
+    margin-block: 4px;
+  }
+  .settings-menu-label {
+    font-size: 14px;
+  }
+  .settings-menu-link[aria-current="page"] {
+    background: var(--nav-active);
+    color: var(--accent-text);
+  }
+  .settings-menu-link[aria-current="page"] .settings-menu-label > span {
+    font-weight: 600;
+  }
+  .settings-menu-link > svg:last-child,
+  .settings-menu-value {
+    display: none;
+  }
+  .settings-subpage-heading {
+    position: static;
+    margin: 0 0 32px;
+    padding: 0;
+    min-height: 32px;
+  }
+  .settings-subpage-heading .settings-back {
+    display: none;
   }
 }

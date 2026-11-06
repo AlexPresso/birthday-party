@@ -1,13 +1,12 @@
-import { SettingsPanel } from "@/features/settings/settings-panel";
+import { redirect } from "next/navigation";
 import { AdminPanel } from "@/features/settings/admin-panel";
-import { WelcomeSettings } from "@/features/settings/welcome-settings";
-import { PageHeading } from "@/components/ui";
 import { getParty } from "@/features/party/server";
+import { configurationSchema } from "@/features/party/contracts";
+import { getSession } from "@/features/guests/server";
 import { serverApi } from "@/lib/server-api";
 import { guestsSchema } from "@/features/guests/contracts";
 import { eventsSchema } from "@/features/programme/contracts";
 import { adminWelcomeSchema } from "@/features/welcome/contracts";
-import { profileSchema } from "@/features/profile/contracts";
 import { mediaCategoriesSchema } from "@/features/media/contracts";
 import { getI18n } from "@/lib/server-i18n";
 export async function generateMetadata() {
@@ -15,38 +14,27 @@ export async function generateMetadata() {
 }
 
 export default async function SettingsPage() {
-  const { t } = await getI18n();
-  const [{ guest, limits }, party] = await Promise.all([
-    serverApi("/profile", profileSchema),
-    getParty(),
-  ]);
-  const admin =
-    guest.role === "admin"
-      ? await Promise.all([
-          serverApi("/admin/guests", guestsSchema),
-          serverApi("/admin/programme", eventsSchema),
-          serverApi("/admin/welcome", adminWelcomeSchema),
-          serverApi("/media-categories", mediaCategoriesSchema),
-        ])
-      : null;
+  const { guest } = await getSession();
+  if (guest.role !== "admin") redirect("/profil");
+
+  const [party, guests, events, welcome, categories, configuration] =
+    await Promise.all([
+      getParty(),
+      serverApi("/admin/guests", guestsSchema),
+      serverApi("/admin/programme", eventsSchema),
+      serverApi("/admin/welcome", adminWelcomeSchema),
+      serverApi("/media-categories", mediaCategoriesSchema),
+      serverApi("/admin/config", configurationSchema),
+    ]);
   return (
-    <>
-      <PageHeading title={t("page.settings")} />
-      <SettingsPanel guest={guest} imageBytes={limits.imageBytes} />
-      {admin && (
-        <WelcomeSettings
-          initial={admin[2]}
-          initialCategories={admin[3].items}
-        />
-      )}
-      {admin && (
-        <AdminPanel
-          guest={guest}
-          party={party}
-          guests={admin[0].items}
-          events={admin[1].items}
-        />
-      )}
-    </>
+    <AdminPanel
+      guest={guest}
+      party={party}
+      guests={guests.items}
+      events={events.items}
+      configuration={configuration}
+      welcome={welcome}
+      categories={categories.items}
+    />
   );
 }
