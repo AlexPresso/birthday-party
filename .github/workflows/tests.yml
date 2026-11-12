@@ -1,0 +1,155 @@
+name: Tests
+
+# Called by containers.yml so that images are published only after these jobs pass.
+# It inherits the caller's concurrency group; do not declare another one here.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # Keep in step with docker/backend.Dockerfile and backend/go.mod.
+  GO_VERSION: "1.27.2"
+  # Keep in step with docker/frontend.Dockerfile and the package.json engines.
+  NODE_VERSION: "24"
+
+jobs:
+  backend:
+    name: Go vet and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: birthday_test
+          POSTGRES_DB: birthday_test
+          # Throwaway credential for this job's private, disposable database.
+          POSTGRES_PASSWORD: birthday-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U birthday_test -d birthday_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      # Integration tests require a database whose name ends in _test.
+      DATABASE_URL: postgresql://birthday_test:birthday-ci-only@127.0.0.1:5432/birthday_test?sslmode=disable
+      TEST_DATABASE_URL: postgresql://birthday_test:birthday-ci-only@127.0.0.1:5432/birthday_test?sslmode=disable
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      # Video tests skip themselves without ffmpeg and ffprobe; install both.
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+  frontend:
+    name: Frontend lint, types and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check types
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm test
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      # The Go server probes uploaded videos and creates their thumbnails.
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+
+      # The suite drives Google Chrome (playwright.config.ts, channel "chrome"):
+      # the video fixture needs its H.264 and AAC decoders.
+      - name: Ensure Google Chrome is installed
+        run: test -x /opt/google/chrome/chrome || npx playwright install chrome
+
+      # scripts/e2e.mjs starts a disposable PostgreSQL container with Docker, then
+      # Playwright builds and starts the Go server and Next through scripts/dev.mjs.
+      - name: Run browser tests
+        run: npm run test:e2e -- --reporter=list,html
+
+      - name: Upload Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

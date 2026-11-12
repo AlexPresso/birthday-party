@@ -4,10 +4,18 @@ imagePullSecrets:
   - name: ghcr
 ingress:
   enabled: true
-  className: traefik
+  className: nginx
   host: party.example.com
   annotations:
-    example.com/test-annotation: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1025m
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
   tls:
     enabled: true
     secretName: birthday-party-tls
+networkPolicy:
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx

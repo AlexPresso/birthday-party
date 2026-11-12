@@ -1,12 +1,13 @@
 # Les 30 ans
 
 Application privée pour un anniversaire : photos et vidéos, programme avec surprises
-programmées, livre d'or et paramètres. L'interface utilise le thème
-prune sombre choisi dans [le brief](docs/design.md).
+programmées, livre d'or et paramètres. L'interface utilise un seul thème sombre
+à accent orange, « K · Neige », décrit dans [le brief](docs/design.md).
 
 Next.js et TypeScript affichent l'application. Un service Go gère les invitations,
 les sessions, les permissions, PostgreSQL et les médias sur disque. Le navigateur
-utilise uniquement l'origine du frontend ; Next transmet `/api/*` au serveur Go.
+utilise une seule origine. En local et avec Compose, Next transmet `/api/*` au
+serveur Go ; sur Kubernetes, l'Ingress envoie `/api` directement au backend.
 Le [contrat HTTP](docs/api.md) décrit les échanges.
 L'[organisation du code](docs/architecture.md) précise les responsabilités des
 features frontend, des packages Go et des modules partagés.
@@ -15,6 +16,11 @@ features frontend, des packages Go et des modules partagés.
 
 Les skills sont inclus dans `.agents/skills/`, avec leurs références et licences :
 
+- [Code Simplifier](.agents/skills/code-simplifier/SKILL.md), adapté de l'agent
+  `code-simplifier` d'[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)
+  (Apache-2.0), pour les nettoyages demandés et la relecture de lisibilité après
+  une implémentation. La provenance est conservée dans
+  [SOURCE.md](.agents/skills/code-simplifier/SOURCE.md).
 - [Go Style Guide](.agents/skills/go-style-guide/SKILL.md), issu de
   [madflojo/go-style-agent-skill](https://github.com/madflojo/go-style-agent-skill)
   (Apache-2.0), pour le code Go et l'évolution de l'architecture. Le commit source
@@ -40,7 +46,9 @@ conservées telles quelles, avec leurs ressources utiles et les crédits d'origi
 
 ## Démarrer en local
 
-Prérequis : Node.js 24+, npm, Go 1.26+, `ffmpeg` et `ffprobe` dans le `PATH`
+Prérequis : Node.js 24 ou plus récent (obligatoire : les scripts et les tests
+exécutent TypeScript directement), npm, Go 1.26+ (la CI et l'image utilisent
+Go 1.27.2), `ffmpeg` et `ffprobe` dans le `PATH`
 pour vérifier les vidéos et créer leurs vignettes JPEG. Docker fournit
 [FFmpeg](https://ffmpeg.org/download.html) automatiquement. Les tests vidéo
 utilisent aussi les encodeurs H.264/AAC et VP9/Opus pour créer leurs fichiers.
@@ -128,8 +136,7 @@ au clavier. Enregistre les étapes pour conserver tes modifications.
 
 Une étape peut contenir jusqu’à 12 widgets. Tu peux ajouter plusieurs titres,
 textes ou zones d’envoi, une photo de profil et un widget de notifications. Les textes restent dans la langue
-où tu les as écrits. Les anciennes étapes sont converties automatiquement : leur
-titre, leur texte et leur action deviennent des widgets dans le même ordre.
+où tu les as écrits.
 
 Le widget **Photo de profil** permet aux invités d’ajouter leur photo pendant
 l’accueil, avec un aperçu avant l’enregistrement. La photo reste liée au profil
@@ -274,9 +281,12 @@ La limite photo s’applique aussi aux photos de profil.
 Go applique les limites enregistrées aux nouveaux envois. Les fichiers déjà
 acceptés continuent leur traitement si une limite diminue. Recharger les pages
 Médias ou Profil pour actualiser les indications et la sélection des fichiers.
-Le proxy Next autorise jusqu’à 1024 Mio plus le formulaire pour permettre une
-augmentation immédiate, sans redémarrage. Un reverse proxy externe doit aussi
-accepter les limites choisies.
+En local et avec Compose, le proxy Next autorise jusqu’à 1024 Mio plus le
+formulaire pour permettre une augmentation immédiate, sans redémarrage. Sur
+Kubernetes, les envois vont directement de l’Ingress au backend : son contrôleur
+doit accepter les limites choisies, comme tout autre reverse proxy externe. Le
+[guide de la chart](charts/birthday-party/README.md#ingress-fichiers-et-websocket)
+donne les réglages.
 
 `MAX_IMAGE_SIZE_MB` et `MAX_VIDEO_SIZE_MB` dans le `.env` servent uniquement à
 l’import initial. La durée maximale des vidéos reste de 5 minutes, les images
@@ -400,7 +410,7 @@ npm run check
 # Frontend production build
 npm --prefix frontend run build
 
-# End-to-end browser tests (Chrome must be installed)
+# End-to-end browser tests (Chrome, ffmpeg and ffprobe must be installed)
 npm run test:e2e
 
 # Check frontend formatting
@@ -415,61 +425,50 @@ la base de test est supprimée après la commande, sans toucher aux données de 
 Voir aussi les
 instructions [frontend](frontend/AGENTS.md) et [backend](backend/AGENTS.md).
 
-Vérifications du 15 octobre 2026, après passage à PostgreSQL et ajout de la file
-persistante : analyse et tests Go avec PostgreSQL et FFmpeg, lint, types,
-19 tests frontend, 22 parcours Chrome et les deux images Docker réussis.
-Les tests couvrent aussi les migrations, l'import SQLite, la reprise après
-redémarrage, les envois simultanés, les doublons et la navigation pendant l'envoi.
-L'import réel a été comparé table par table à la sauvegarde SQLite avant le
-redémarrage de l'application ; la page servie par Docker a été vérifiée dans
-les cinq langues et avec le repli vers l'anglais.
+La CI GitHub Actions lance ces vérifications à chaque push et pull request :
+`go vet` et les tests Go avec PostgreSQL et FFmpeg, le lint, les types et les
+tests du frontend sur Node.js 24, puis les parcours Chrome. Les images ne sont
+publiées qu’après leur réussite. Si un parcours échoue, le rapport Playwright et
+les traces sont joints à l’exécution du workflow.
 
-Après réorganisation du code Go et correction des erreurs de traitement des médias,
-les tests backend passent aussi avec le détecteur de courses dans un conteneur Linux,
-PostgreSQL et FFmpeg : 146 tests et sous-tests réussis, aucun ignoré. Ils vérifient
-notamment les disques pleins, la conservation des originaux lors d'une panne,
-les délais des requêtes et la progression des autres envois pendant une reprise.
+Vérifications complémentaires, à lancer au besoin :
 
-Vérifications du 14 octobre 2026 : analyse et tests Go, lint, types, 18 tests
-frontend, 19 parcours Chrome, formatage et build production réussis. Les parcours
-couvrent invitations, photos et vidéos privées, livre d'or anonyme, révocation, déverrouillage et
-administration, ainsi que les cinq langues et le repli vers l’anglais ; les vues
-mobile et ordinateur ont été inspectées. Le détecteur
-de courses Go nécessite cgo et n'a pas pu être exécuté sur cette machine.
-Les tests vidéo utilisent FFmpeg sur Windows et dans Alpine 3.22, y compris
-la limite de cinq minutes et la lecture par plages d’octets.
-Les limites de poids personnalisées sont vérifiées côté navigateur et serveur.
-Un envoi de 106 Mio à travers le proxy de production a confirmé leur prise en
-compte avec les mêmes images Docker, sans reconstruction.
+```powershell
+# Go race detector: needs cgo, so run it on Linux with TEST_DATABASE_URL set
+go test -race ./...
 
-L'audit des dépendances de production npm et `govulncheck` ne signalent aucune
-vulnérabilité connue. L'audit npm complet signale une vulnérabilité de `braces`
-remontée par 5 dépendances de l'outillage ESLint, sans version corrigée disponible
-à cette date. Ces dépendances sont réservées au développement ; suivre la mise à
-jour de `eslint-config-next` et relancer l'audit.
+# Known vulnerabilities in production dependencies
+npm --prefix frontend audit --omit=dev
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+```
+
+Les commandes `go` se lancent depuis `backend/`. Sans `TEST_DATABASE_URL`, les
+tests Go qui utilisent PostgreSQL sont ignorés ; sans `ffmpeg` ni `ffprobe`, les
+tests vidéo le sont aussi.
 
 ## Exécuter avec Docker
 
 Les [workflows GitHub Actions](.github/workflows) construisent les deux images et
 les publient dans GHCR depuis la branche par défaut, les tags `v*` ou un lancement
-manuel. Les pull requests vérifient la construction sans publication. Les images
+manuel, une fois les tests réussis. Les pull requests vérifient la construction
+sans publication. Les images
 publiées prennent en charge `linux/amd64` et `linux/arm64` ; leurs noms sont
 `ghcr.io/alexpresso/birthday-party-backend` et
 `ghcr.io/alexpresso/birthday-party-frontend`. Utiliser le même tag `sha-<SHA complet>`
 pour déployer une révision précise des deux composants.
 
-Pour Kubernetes, la [chart Helm](charts/birthday-party/README.md) fournit les
-services, PostgreSQL intégré ou externe, les volumes persistants et l'Ingress
-HTTPS configurable. Son guide décrit les Secrets à créer et la commande
-`helm upgrade --install`.
+La mise en production se fait sur Kubernetes : la
+[chart Helm](charts/birthday-party/README.md) fournit les services, PostgreSQL
+intégré ou externe, les volumes persistants, les NetworkPolicy et l'Ingress HTTPS
+configurable, qui envoie `/api` directement au backend. Son guide décrit les
+Secrets à créer et la commande `helm upgrade --install`.
 
-La configuration Compose fournit les deux applications et PostgreSQL 18.
+La configuration Compose sert au développement local et aux essais sur une
+machine. Elle fournit les deux applications et PostgreSQL 18.
 Le volume `postgres-data` conserve les enregistrements et la file d'attente ;
 `party-data` conserve les photos, vidéos, vignettes et fichiers en attente.
 L'application reste accessible uniquement depuis la machine hôte sur le port 3000 ;
 Go et PostgreSQL n'ont aucun port public.
-Le démarrage Compose, l'ouverture de la page d'invitation dans Chrome et l'accès
-à l'API via le frontend ont été vérifiés le 14 octobre 2026.
 
 ```powershell
 docker compose up -d
@@ -490,11 +489,14 @@ raccordement au réseau, sans toucher au volume de données :
 docker compose up -d --no-deps --force-recreate frontend
 ```
 
-Cette configuration prépare l'exécution, sans publier le site. Pour le mettre en
-ligne, installer un reverse proxy HTTPS devant le frontend, définir
-`PUBLIC_URL=https://votre-domaine` et `COOKIE_SECURE=true`, puis recréer les
-conteneurs. Conserver le backend sur le réseau privé et le volume de données sur
-un stockage persistant. Les invitations générées utilisent `PUBLIC_URL` :
+Cette configuration ne publie pas le site ; pour le mettre en ligne, utiliser la
+chart Helm. Pour essayer Compose derrière un reverse proxy HTTPS, définir
+`PUBLIC_URL=https://votre-domaine` puis recréer les conteneurs : les cookies
+sécurisés s'activent automatiquement avec une URL `https`. Laisser
+`COOKIE_SECURE` non défini ; le backend refuse de démarrer avec
+`COOKIE_SECURE=false` et une URL `https`. Conserver le backend sur le réseau
+privé et le volume de données sur un stockage persistant. Les invitations
+générées utilisent `PUBLIC_URL` :
 `localhost` ne permet pas aux invités de se connecter depuis leur téléphone.
 
 Les activités sont des événements du programme. Depuis **Programme → Gérer le
@@ -507,9 +509,7 @@ ferme le vote, puis révèle les résultats quand il le souhaite. Les choix
 individuels restent privés dans l’interface, y compris pour les administrateurs.
 La liste des candidats et l’autorisation de voter pour soi-même se règlent avant
 l’ouverture ; la question reste modifiable. Les votes sont conservés lors des
-modifications du texte et des horaires de l’événement. Les anciennes activités
-imbriquées sont converties automatiquement en événements, en conservant les votes
-déjà enregistrés.
+modifications du texte et des horaires de l’événement.
 
 L’accueil, la file d’envoi des médias et le programme se mettent à jour par une
 connexion WebSocket partagée, sans requêtes périodiques du navigateur. Le serveur
@@ -517,8 +517,9 @@ signale les changements et les déblocages programmés ; l’écran recharge alo
 données concernées. Après une coupure, la connexion se rétablit et l’écran récupère
 l’état actuel. Les envois déjà acceptés continuent leur traitement sur le serveur.
 
-Le proxy Next transmet aussi `/api/realtime` au backend. Aucun port ni variable
-supplémentaire n’est nécessaire dans Compose. Le reverse proxy HTTPS doit laisser
+Avec Compose, le proxy Next transmet aussi `/api/realtime` au backend ; aucun
+port ni variable supplémentaire n’est nécessaire. Sur Kubernetes, l’Ingress envoie
+ce chemin directement au backend. Le reverse proxy HTTPS ou l’Ingress doit laisser
 passer les connexions WebSocket (`Upgrade` et `Connection`) sur ce chemin et les
 garder ouvertes, avec un délai d’inactivité supérieur à 30 secondes. `PUBLIC_URL`
 doit correspondre exactement à l’origine utilisée par les invités ; le serveur
@@ -536,8 +537,23 @@ Les migrations SQL et la procédure de sauvegarde sont décrites dans
 [docs/database.md](docs/database.md). Sauvegarder ensemble PostgreSQL et les médias,
 avec le backend arrêté pour conserver leur cohérence.
 
-Au premier démarrage de cette version, une ancienne base `birthday.sqlite` dans
-`party-data` est importée automatiquement vers une base PostgreSQL vide.
-Les invités, sessions, messages et références des médias sont conservés ; le fichier
-SQLite reste intact. Une base PostgreSQL déjà remplie sans trace d'import provoque
-un arrêt explicite pour éviter de mélanger deux jeux de données.
+Le schéma PostgreSQL est créé par une migration de base unique au premier
+démarrage ; les changements suivants s'ajoutent comme migrations numérotées.
+L'import automatique d'une ancienne base `birthday.sqlite` a été retiré.
+
+## Licence
+
+Birthday Party est distribué sous la licence GNU Affero General Public License,
+version 3 uniquement (`AGPL-3.0-only`) ; le texte complet se trouve dans
+[LICENSE](LICENSE). Si tu modifies l'application et la proposes en ligne, cette
+licence te demande de mettre ton code source modifié à disposition de ses
+utilisateurs.
+
+Les éléments tiers inclus gardent leur propre licence, fournie dans leur dossier :
+
+- les polices Unbounded et Figtree, sous SIL Open Font License 1.1
+  ([frontend/public/fonts](frontend/public/fonts)) ;
+- les icônes de l'application, dérivées de Lucide, sous licence ISC
+  ([frontend/public/icons/LICENSE.txt](frontend/public/icons/LICENSE.txt)) ;
+- les skills d'agents de `.agents/skills/`, sous licence Apache-2.0 ou MIT selon
+  le skill (fichier `LICENSE` de chaque dossier).

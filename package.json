@@ -1,6 +1,7 @@
 {
   "name": "birthday-party-workspace",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "backend": "node scripts/backend.mjs",

@@ -1,7 +1,8 @@
 # publicUrl is the browser-facing origin, without a path. HTTPS enables secure cookies.
 publicUrl: "http://localhost:3000"
-# imageTag selects the same published revision for both applications. Pin a sha-<full SHA> in production.
-imageTag: "latest"
+# imageTag selects the same published revision for both applications. Empty uses the
+# chart appVersion; set sha-<full commit SHA> to deploy one exact revision.
+imageTag: ""
 # imagePullSecrets lists existing registry secrets in the release namespace.
 imagePullSecrets: []
 nameOverride: ""
@@ -12,7 +13,10 @@ frontend:
     repository: ghcr.io/alexpresso/birthday-party-frontend
     # tag overrides imageTag for this component when nonempty.
     tag: ""
-    pullPolicy: Always
+    # Full version and sha-* tags never move. Use Always only with a moving tag such as latest.
+    pullPolicy: IfNotPresent
+  # The Next.js server idles around 70 MiB. The limit leaves room for rendering and
+  # for uploads sent through its /api proxy when no Ingress is used (port-forward).
   resources:
     requests:
       cpu: 100m
@@ -24,17 +28,25 @@ backend:
   image:
     repository: ghcr.io/alexpresso/birthday-party-backend
     tag: ""
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   # printAdminInvitation prints a single-use host link at startup, as in Compose.
   printAdminInvitation: true
   # vapidSubject optionally supplies a mailto: or HTTPS Web Push contact.
   vapidSubject: ""
+  # The Go server idles under 50 MiB. Two media workers each decode one photo of up
+  # to 40 megapixels (roughly 150 to 500 MiB each), and FFmpeg decodes one frame per
+  # video in a child process. Raise the limit before raising these bounds.
+  # No CPU limit is set: throttling would slow thumbnails without protecting the node.
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 250m
+      memory: 512Mi
     limits:
       memory: 2Gi
+  # goMemoryLimit sets GOMEMLIMIT, the soft heap limit that makes Go collect garbage
+  # before the container limit is reached. Keep it below resources.limits.memory to
+  # leave room for FFmpeg. Empty disables it.
+  goMemoryLimit: 1536MiB
   persistence:
     # existingClaim reuses a PVC instead of creating one. Media always needs persistence.
     existingClaim: ""
@@ -72,17 +84,50 @@ externalDatabase:
   # existingSecret supplies a complete PostgreSQL URL when postgresql.enabled=false.
   existingSecret: ""
   urlKey: DATABASE_URL
+  # port is the only extra destination port the NetworkPolicy opens for the backend.
+  port: 5432
 
 ingress:
   enabled: false
   className: ""
-  # host must match publicUrl. All paths reach Next, including /api and WebSockets.
+  # host must match publicUrl. /api (API, uploads and the /api/realtime WebSocket)
+  # goes straight to the backend Service; every other path goes to the frontend.
   host: ""
-  # annotations are controller-specific; configure upload size and timeouts before public use.
+  # annotations are controller-specific. Uploads need, on the /api route:
+  #   - a request body limit of at least 1024 MiB + 64 KiB (1025 MiB);
+  #   - upload and download timeouts of at least 600 seconds;
+  #   - no request buffering (stream the body to the backend);
+  #   - WebSocket upgrades, with an idle timeout above 30 seconds.
   annotations: {}
+  # ingress-nginx:
+  # annotations:
+  #   nginx.ingress.kubernetes.io/proxy-body-size: 1025m
+  #   nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+  #   nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  # Traefik streams request bodies, has no body limit and upgrades WebSockets by
+  # default; do not attach a buffering middleware. Its timeouts belong to the
+  # entry point (static configuration), not to this Ingress:
+  #   --entryPoints.websecure.transport.respondingTimeouts.readTimeout=600s
+  # annotations:
+  #   traefik.ingress.kubernetes.io/router.entrypoints: websecure
   tls:
     enabled: false
     secretName: ""
+
+networkPolicy:
+  # enabled restricts traffic to: allowed sources -> frontend and backend HTTP ports,
+  # frontend -> backend, backend -> PostgreSQL, DNS, and backend -> public internet
+  # on TCP 443 for Web Push. It needs a network plugin that enforces NetworkPolicy.
+  enabled: true
+  # ingressFrom lists the NetworkPolicy peers allowed to reach the two HTTP ports.
+  # Empty allows any source on these two ports only, which suits every Ingress
+  # controller and kubectl port-forward. Restrict it to the controller, for example:
+  # ingressFrom:
+  #   - namespaceSelector:
+  #       matchLabels:
+  #         kubernetes.io/metadata.name: ingress-nginx
+  ingressFrom: []
 
 # nodeSelector and tolerations apply to all three components.
 nodeSelector: {}
