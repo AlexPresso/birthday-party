@@ -193,7 +193,6 @@ test("admin configuration persists and updates invitation, header and upload lim
     await form.getByLabel("Âge", { exact: true }).fill("41");
     const ageSaved = { ...baseline, age: updated.age };
     await saveCurrentSection(ageSaved);
-    await expect(page.locator(".brand-mark")).toHaveText("41");
     await page.reload();
     await expect(form.getByLabel("Âge", { exact: true })).toHaveValue("41");
 
@@ -301,10 +300,10 @@ test("admin configuration persists and updates invitation, header and upload lim
       const invitationPage = await visitor.newPage();
       await invitationPage.goto("/invitation");
       await expect(
-        invitationPage.locator(".invitation-emblem > span"),
+        invitationPage.locator(".invitation-ring > span"),
       ).toHaveText("41");
       await expect(
-        invitationPage.locator(".invitation-card > .eyebrow"),
+        invitationPage.locator(".invitation-card > .brand strong"),
       ).toHaveText(updated.invitation.locales.fr.title!);
       await expect(invitationPage.locator(".invitation-intro")).toHaveCount(0);
     } finally {
@@ -526,17 +525,15 @@ test("localized invitation overrides preserve null fallbacks and explicit hidden
       try {
         const page = await context.newPage();
         await page.goto("/invitation");
-        await expect(page.locator(".invitation-emblem > span")).toHaveText(
-          "42",
-        );
+        await expect(page.locator(".invitation-ring > span")).toHaveText("42");
         if (title) {
-          await expect(page.locator(".invitation-card > .eyebrow")).toHaveText(
-            title,
-          );
+          await expect(
+            page.locator(".invitation-card > .brand strong"),
+          ).toHaveText(title);
         } else {
-          await expect(page.locator(".invitation-card > .eyebrow")).toHaveCount(
-            0,
-          );
+          await expect(
+            page.locator(".invitation-card > .brand strong"),
+          ).toHaveCount(0);
         }
         if (description) {
           await expect(page.locator(".invitation-intro")).toHaveText(
@@ -560,7 +557,7 @@ test("localized invitation overrides preserve null fallbacks and explicit hidden
       const defaults = { ...updated, invitation: fallbackInvitation() };
       await saveConfiguration(defaults);
       await page.goto("/invitation");
-      await expect(page.locator(".invitation-card > .eyebrow")).toHaveText(
+      await expect(page.locator(".invitation-card > .brand strong")).toHaveText(
         "Les 42 ans",
       );
       await expect(page.locator(".invitation-intro")).toBeVisible();
@@ -574,7 +571,9 @@ test("localized invitation overrides preserve null fallbacks and explicit hidden
       };
       await saveConfiguration(hidden);
       await page.reload();
-      await expect(page.locator(".invitation-card > .eyebrow")).toHaveCount(0);
+      await expect(
+        page.locator(".invitation-card > .brand strong"),
+      ).toHaveCount(0);
       await expect(page.locator(".invitation-intro")).toHaveCount(0);
       await expect(page.locator('meta[name="description"]')).toHaveCount(0);
     } finally {

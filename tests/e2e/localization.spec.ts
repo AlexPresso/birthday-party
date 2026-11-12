@@ -230,7 +230,9 @@ for (const language of languages) {
       await expect(
         page.getByRole("heading", { name: language.welcome, exact: true }),
       ).toBeVisible();
-      await expect(page.locator(".invitation-card > .eyebrow")).toHaveCount(0);
+      await expect(
+        page.locator(".invitation-card > .brand strong"),
+      ).toHaveCount(0);
       await expect(page.locator(".invitation-intro")).toHaveCount(0);
       await expect(page.locator('meta[name="description"]')).toHaveCount(0);
       if (language.lang === "fr") {

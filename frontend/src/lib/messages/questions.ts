@@ -22,7 +22,6 @@ const en = {
   "questions.jokerConfirm":
     "Use one joker to skip this question? This cannot be undone.",
   "questions.jokers": "{count} / 2 jokers left",
-  "questions.count": "{count} questions",
   "questions.loading": "Loading questions…",
   "questions.sent": "Your anonymous question has been sent.",
   "questions.jokerRule": "Two jokers for the whole activity.",
@@ -69,7 +68,6 @@ const fr: QuestionMessages = {
   "questions.jokerConfirm":
     "Utiliser un joker pour passer cette question ? Tu ne pourras pas l’annuler.",
   "questions.jokers": "{count} / 2 jokers restants",
-  "questions.count": "{count} questions",
   "questions.loading": "Chargement des questions…",
   "questions.sent": "Ta question anonyme a été envoyée.",
   "questions.jokerRule": "Deux jokers pour toute l’activité.",
@@ -114,7 +112,6 @@ const de: QuestionMessages = {
   "questions.jokerConfirm":
     "Einen Joker verwenden, um diese Frage zu überspringen? Das lässt sich nicht rückgängig machen.",
   "questions.jokers": "{count} / 2 Joker übrig",
-  "questions.count": "{count} Fragen",
   "questions.loading": "Fragen werden geladen…",
   "questions.sent": "Deine anonyme Frage wurde gesendet.",
   "questions.jokerRule": "Zwei Joker für die ganze Aktivität.",
@@ -159,7 +156,6 @@ const it: QuestionMessages = {
   "questions.jokerConfirm":
     "Usare un jolly per saltare questa domanda? Non potrai annullarlo.",
   "questions.jokers": "{count} / 2 jolly rimasti",
-  "questions.count": "{count} domande",
   "questions.loading": "Caricamento delle domande…",
   "questions.sent": "La tua domanda anonima è stata inviata.",
   "questions.jokerRule": "Due jolly per tutta l’attività.",
@@ -204,7 +200,6 @@ const es: QuestionMessages = {
   "questions.jokerConfirm":
     "¿Usar un comodín para saltarte esta pregunta? No podrás deshacerlo.",
   "questions.jokers": "{count} / 2 comodines restantes",
-  "questions.count": "{count} preguntas",
   "questions.loading": "Cargando preguntas…",
   "questions.sent": "Tu pregunta anónima se ha enviado.",
   "questions.jokerRule": "Dos comodines para toda la actividad.",

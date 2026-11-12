@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PageTransition } from "@/components/page-transition";
 import { AdminPanel } from "@/features/settings/admin-panel";
 import { getParty } from "@/features/party/server";
 import { configurationSchema } from "@/features/party/contracts";
@@ -27,14 +28,16 @@ export default async function SettingsPage() {
       serverApi("/admin/config", configurationSchema),
     ]);
   return (
-    <AdminPanel
-      guest={guest}
-      party={party}
-      guests={guests.items}
-      events={events.items}
-      configuration={configuration}
-      welcome={welcome}
-      categories={categories.items}
-    />
+    <PageTransition>
+      <AdminPanel
+        guest={guest}
+        party={party}
+        guests={guests.items}
+        events={events.items}
+        configuration={configuration}
+        welcome={welcome}
+        categories={categories.items}
+      />
+    </PageTransition>
   );
 }

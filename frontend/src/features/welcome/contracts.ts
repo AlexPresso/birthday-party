@@ -9,7 +9,7 @@ const widgetText = (limit: number) =>
       (value) => value.trim().length > 0 && Array.from(value).length <= limit,
     );
 
-export const welcomeWidgetSchema = z.discriminatedUnion("type", [
+const welcomeWidgetSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("title"), text: widgetText(120) }),
   z.strictObject({ type: z.literal("text"), text: widgetText(1000) }),
   z.strictObject({ type: z.literal("profile_photo") }),
@@ -31,7 +31,7 @@ const welcomeWidgets = z
         .length <= 1,
   );
 
-export const welcomeStepSchema = z.strictObject({ widgets: welcomeWidgets });
+const welcomeStepSchema = z.strictObject({ widgets: welcomeWidgets });
 
 export type WelcomeWidget = z.infer<typeof welcomeWidgetSchema>;
 

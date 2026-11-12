@@ -42,21 +42,47 @@ export function Navigation({
   const visibleTabs = tabs.filter(
     ({ href }) => href !== "/parametres" || isAdmin,
   );
+  const isCurrent = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
+  // The profile comes last, so it sits to the right of every tab.
+  const currentIndex =
+    pathname === "/profil"
+      ? visibleTabs.length
+      : visibleTabs.findIndex(({ href }) => isCurrent(href));
+  // Pages slide the way the dock reads: towards the tab that was pressed.
+  const direction = (index: number) =>
+    currentIndex < 0 || index === currentIndex
+      ? undefined
+      : [index > currentIndex ? "nav-forward" : "nav-back"];
   return (
-    <nav className="navigation" aria-label={t("nav.label")}>
-      {visibleTabs.map(({ href, label, Icon }) => (
+    <nav
+      className="navigation"
+      aria-label={t("nav.label")}
+      data-tabs={visibleTabs.length + 1}
+    >
+      {visibleTabs.map(({ href, label, Icon }, index) => (
         <Link
           key={href}
           href={href}
           aria-label={t(label)}
           title={t(label)}
-          aria-current={
-            pathname === href || pathname.startsWith(`${href}/`)
-              ? "page"
-              : undefined
-          }
+          aria-current={isCurrent(href) ? "page" : undefined}
+          transitionTypes={direction(index)}
         >
-          <Icon size={30} strokeWidth={1.7} aria-hidden="true" />
+          {/* One named pill, so it glides from the previous tab to this one. */}
+          {isCurrent(href) && (
+            <span className="navigation-indicator" aria-hidden="true" />
+          )}
+          <span
+            className="navigation-content"
+            style={{ viewTransitionName: `nav-tab-${index}` }}
+          >
+            <Icon size={24} strokeWidth={2} aria-hidden="true" />
+            {/* Shown by CSS for the current tab only; the link keeps its aria-label. */}
+            <span className="navigation-label" aria-hidden="true">
+              {t(label)}
+            </span>
+          </span>
           <NavigationPending />
         </Link>
       ))}
@@ -66,8 +92,14 @@ export function Navigation({
         aria-label={`${t("nav.profile")}: ${guestName}`}
         title={t("nav.profile")}
         aria-current={pathname === "/profil" ? "page" : undefined}
+        transitionTypes={direction(visibleTabs.length)}
       >
-        <Avatar name={guestName} avatarUrl={avatarUrl} />
+        <span
+          className="navigation-content"
+          style={{ viewTransitionName: "nav-tab-profile" }}
+        >
+          <Avatar name={guestName} avatarUrl={avatarUrl} />
+        </span>
         <NavigationPending />
       </Link>
     </nav>

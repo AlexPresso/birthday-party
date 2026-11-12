@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { PhotoGallery } from "@/features/media/gallery";
 import { serverApi } from "@/lib/server-api";
 import { getSession } from "@/features/guests/server";
@@ -43,13 +44,15 @@ export default async function PhotosPage({
     serverApi("/media-categories", mediaCategoriesSchema),
   ]);
   return (
-    <PhotoGallery
-      key={categoryId ?? "main"}
-      initial={initial}
-      guest={guest}
-      timezone={party.timezone}
-      categories={categories.items}
-      categoryId={categoryId}
-    />
+    <PageTransition>
+      <PhotoGallery
+        key={categoryId ?? "main"}
+        initial={initial}
+        guest={guest}
+        timezone={party.timezone}
+        categories={categories.items}
+        categoryId={categoryId}
+      />
+    </PageTransition>
   );
 }

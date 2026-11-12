@@ -545,7 +545,7 @@ test("icon navigation follows the system theme on phones and desktops", async ({
       await page.emulateMedia({ colorScheme });
       await expect(page.locator("body")).toHaveCSS(
         "background-color",
-        colorScheme === "light" ? "rgb(250, 248, 246)" : "rgb(19, 16, 22)",
+        "rgb(16, 15, 14)",
       );
       await expect(
         navigation.getByRole("link", { name: "Médias", exact: true }),

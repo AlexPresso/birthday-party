@@ -569,7 +569,7 @@ test("the manifest and icons support standalone installation without private off
     scope: "/",
     display: "standalone",
     lang: "de",
-    theme_color: "#151218",
+    theme_color: "#100f0e",
   });
   for (const icon of manifest.icons) {
     const image = await page.request.get(icon.src);

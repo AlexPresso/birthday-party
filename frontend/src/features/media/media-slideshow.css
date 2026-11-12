@@ -8,9 +8,6 @@
 .gallery-heading h2 {
   overflow-wrap: anywhere;
 }
-.slideshow-launch {
-  flex-shrink: 0;
-}
 .media-slideshow {
   width: min(1280px, calc(100vw - 32px));
   height: min(900px, calc(100dvh - 32px));

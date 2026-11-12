@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { PageHeading } from "@/components/ui";
 import { ProfilePanel } from "@/features/profile/profile-panel";
 import { profileSchema } from "@/features/profile/contracts";
@@ -14,9 +15,9 @@ export default async function ProfilePage() {
     serverApi("/profile", profileSchema),
   ]);
   return (
-    <>
+    <PageTransition>
       <PageHeading title={t("page.profile")} />
       <ProfilePanel guest={guest} imageBytes={limits.imageBytes} />
-    </>
+    </PageTransition>
   );
 }

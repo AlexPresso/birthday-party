@@ -14,15 +14,20 @@ export function PageHeading({
   eyebrow,
   title,
   description,
+  inHeader = false,
   children,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
+  /** Hide the title visually and lift its companions into the app header row. */
+  inHeader?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <header className="page-heading">
+    <header
+      className={`page-heading${inHeader ? " page-heading-in-header" : ""}`}
+    >
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>

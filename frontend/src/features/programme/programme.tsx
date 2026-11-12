@@ -235,9 +235,7 @@ function ProgrammeEvent({
             </>
           )}
         </div>
-        {!event.locked && event.questions && (
-          <ActivityLink event={event} />
-        )}
+        {!event.locked && event.questions && <ActivityLink event={event} />}
       </article>
     </li>
   );
@@ -311,6 +309,7 @@ export function Programme({
   return (
     <>
       <PageHeading
+        inHeader
         title={t("programme.title")}
         description={
           party.date

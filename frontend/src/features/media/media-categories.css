@@ -88,9 +88,6 @@
 .welcome-media-settings .fine-print {
   margin: 12px 0 0;
 }
-.welcome-action-card + .welcome-action-card {
-  margin-top: 10px;
-}
 @media (max-width: 600px) {
   .media-categories-admin {
     padding: 20px;
