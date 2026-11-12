@@ -29,12 +29,35 @@ spec:
         runAsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # startup.mjs rewrites the API destination in .next/routes-manifest.json at
+        # every start. Copy that file to a writable volume, mounted over the original
+        # below, so the root filesystem can stay read-only.
+        - name: routes-manifest
+          image: {{ include "birthday-party.image" (dict "image" .Values.frontend.image "root" .) | quote }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          command: [cp, /app/.next/routes-manifest.json, /runtime/routes-manifest.json]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: runtime
+              mountPath: /runtime
       containers:
         - name: frontend
-          image: {{ printf "%s:%s" .Values.frontend.image.repository (default .Values.imageTag .Values.frontend.image.tag) | quote }}
+          image: {{ include "birthday-party.image" (dict "image" .Values.frontend.image "root" .) | quote }}
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
@@ -54,7 +77,8 @@ spec:
               port: http
             periodSeconds: 5
             failureThreshold: 60
-          # Readiness checks both Next and its configured API proxy.
+          # Readiness checks Next and its route to the backend, which server rendering
+          # needs even though the Ingress sends browser /api requests to the backend.
           readinessProbe:
             httpGet:
               path: /api/health
@@ -67,6 +91,25 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            - name: runtime
+              mountPath: /app/.next/routes-manifest.json
+              subPath: routes-manifest.json
+            # Next writes its data and image caches here; the app currently uses neither.
+            - name: next-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: runtime
+          emptyDir:
+            sizeLimit: 1Mi
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -6,6 +6,12 @@ For the default localhost URL:
   kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "birthday-party.fullname" . }}-frontend 3000:3000
 {{- end }}
 
+{{- if .Values.ingress.enabled }}
+
+The Ingress sends /api to the backend and every other path to the frontend.
+Check its upload size, timeout and buffering settings before inviting guests.
+{{- end }}
+
 {{- if .Values.backend.printAdminInvitation }}
 
 Retrieve the single-use administrator invitation from the backend startup log:

@@ -2,9 +2,12 @@ apiVersion: v2
 name: birthday-party
 description: Private birthday app with a Next.js frontend, Go backend and PostgreSQL.
 type: application
-version: 0.1.0
-appVersion: latest
+version: 0.2.0
+# appVersion is the default image tag. Publish it by pushing the Git tag v<appVersion>.
+appVersion: "0.1.0"
 kubeVersion: ">=1.25.0-0"
 home: https://github.com/AlexPresso/birthday-party
 sources:
   - https://github.com/AlexPresso/birthday-party
+annotations:
+  artifacthub.io/license: AGPL-3.0-only

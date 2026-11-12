@@ -30,6 +30,16 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
+          # The API, uploads and the realtime WebSocket bypass the Next.js proxy,
+          # which would buffer each upload in memory. Same host: cookies and the
+          # Origin check against publicUrl are unchanged.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "birthday-party.fullname" . }}-backend
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:

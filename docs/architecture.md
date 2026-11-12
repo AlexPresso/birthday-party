@@ -4,6 +4,11 @@ The application has one Next.js frontend and one Go service. Go owns persistence
 authorization and business rules. Next.js renders pages and manages browser
 interactions. The public contract remains in [api.md](api.md).
 
+Browsers use one origin. In local development and Compose, Next.js proxies
+`/api/*` to Go. In production on Kubernetes, the Helm chart's Ingress routes
+`/api`, including uploads and the realtime WebSocket, straight to the Go Service;
+Next.js still calls Go server-side through `API_INTERNAL_URL`.
+
 ## Frontend
 
 `frontend/src/app` contains routes, layouts and server rendering entry points.
@@ -113,10 +118,11 @@ host transition and its durable notification outbox update commit together.
 Realtime invalidations are emitted only after a successful commit. No database
 or network operation is added to a pure rule to make that coordination work.
 
-Migration files remain in `backend/internal/app/migrations`. An organization
-change must preserve applied SQL bytes, names and checksums. Schema changes use
-new numbered migrations. Database bootstrap and the one-time SQLite import also
-remain in `app`; ordinary feature SQL belongs in PostgreSQL adapters.
+Migration files remain in `backend/internal/app/migrations`, starting from a
+single baseline schema. An organization change must preserve applied SQL bytes,
+names and checksums. Schema changes use new numbered migrations. Database
+bootstrap also remains in `app`; ordinary feature SQL belongs in PostgreSQL
+adapters.
 
 Core tests use in-memory ports for validation, policy and workflow failures.
 Adapter tests cover processing and transport behavior. HTTP/database integration

@@ -3,6 +3,7 @@ postgresql:
 externalDatabase:
   existingSecret: external-database
   urlKey: connection-url
+  port: 6432
 backend:
   persistence:
     existingClaim: existing-media

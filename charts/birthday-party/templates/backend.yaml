@@ -36,10 +36,11 @@ spec:
           type: RuntimeDefault
       containers:
         - name: backend
-          image: {{ printf "%s:%s" .Values.backend.image.repository (default .Values.imageTag .Values.backend.image.tag) | quote }}
+          image: {{ include "birthday-party.image" (dict "image" .Values.backend.image "root" .) | quote }}
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
@@ -56,6 +57,10 @@ spec:
               value: {{ .Values.backend.printAdminInvitation | quote }}
             {{- with .Values.backend.vapidSubject }}
             - name: VAPID_SUBJECT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.goMemoryLimit }}
+            - name: GOMEMLIMIT
               value: {{ . | quote }}
             {{- end }}
             {{- if .Values.postgresql.enabled }}
@@ -99,12 +104,19 @@ spec:
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           volumeMounts:
+            # Media, queued inputs and every temporary file live under DATA_DIR.
             - name: media
               mountPath: /data
+            # Nothing is known to write here; it keeps the default temp directory usable.
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: media
           persistentVolumeClaim:
             claimName: {{ default (printf "%s-media" (include "birthday-party.fullname" .)) .Values.backend.persistence.existingClaim }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

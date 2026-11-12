@@ -5,3 +5,5 @@ backend:
 postgresql:
   persistence:
     existingClaim: existing-database
+networkPolicy:
+  enabled: false

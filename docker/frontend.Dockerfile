@@ -1,4 +1,7 @@
-FROM node:24-alpine AS build
+# One exact Node.js and Alpine version for both stages; update it deliberately.
+ARG NODE_IMAGE=node:24.22.3-alpine3.24
+
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY frontend/package.json frontend/package-lock.json ./
@@ -7,7 +10,7 @@ COPY frontend/ ./
 RUN mkdir -p public && npm run build
 RUN npm run test:runtime
 
-FROM node:24-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 ENV API_INTERNAL_URL=http://backend:8080

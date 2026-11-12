@@ -1,4 +1,4 @@
-name: Container images
+name: Tests and container images
 
 on:
   pull_request:
@@ -15,6 +15,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  tests:
+    name: Tests
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+
   build:
     name: Check pull request images
     if: github.event_name == 'pull_request'
@@ -26,6 +32,8 @@ jobs:
 
   publish:
     name: Publish images
+    # Images are published only after the Go, frontend and browser tests pass.
+    needs: tests
     # Resolve the default branch from repository metadata, including on forks.
     if: >-
       github.event_name == 'workflow_dispatch' ||
