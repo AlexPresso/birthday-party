@@ -1,6 +1,6 @@
 export const locales = ["en", "fr", "de", "it", "es"] as const;
 export type Locale = (typeof locales)[number];
-export const defaultLocale: Locale = "en";
+const defaultLocale: Locale = "en";
 
 export function detectLocale(acceptLanguage: string | null): Locale {
   const preferences = (acceptLanguage ?? "")

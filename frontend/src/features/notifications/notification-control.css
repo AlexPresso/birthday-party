@@ -127,17 +127,6 @@
   transform: translateX(24px);
 }
 
-@media (prefers-color-scheme: dark) {
-  .notification-switch[aria-checked="true"] .notification-switch-track {
-    background: color-mix(in srgb, var(--accent) 55%, var(--accent-soft));
-    border-color: transparent;
-  }
-
-  .notification-switch-thumb {
-    background: color-mix(in srgb, var(--accent) 75%, white);
-  }
-}
-
 .welcome-widgets > .notification-control:last-child {
   border-bottom: 0;
   padding-bottom: 0;

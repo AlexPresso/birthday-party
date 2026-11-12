@@ -22,6 +22,7 @@ import { welcomeSchema, type Welcome, type WelcomeStep } from "./contracts";
 import { type Guest } from "@/features/guests/contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { useWelcome } from "./use-welcome";
+import { BrandMark } from "@/components/brand-mark";
 import { ErrorNotice } from "@/components/ui";
 import { WelcomeProfile } from "./welcome-profile";
 import { WelcomeMedia } from "./welcome-media";
@@ -32,12 +33,10 @@ import "./waiting-room.css";
 export function WaitingRoom({
   guest,
   initial,
-  age,
   title,
 }: {
   guest: Guest;
   initial: Welcome;
-  age: number;
   title: string;
 }) {
   const { t } = useI18n();
@@ -125,9 +124,7 @@ export function WaitingRoom({
     <main className="welcome-page">
       <header className="welcome-header">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            {age}
-          </span>
+          <BrandMark />
           {title && <strong>{title}</strong>}
         </div>
         <button

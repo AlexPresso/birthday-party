@@ -1,7 +1,7 @@
 .upload-overlay {
   position: fixed;
   inset-inline: 20px;
-  bottom: calc(85px + env(safe-area-inset-bottom));
+  bottom: calc(92px + env(safe-area-inset-bottom));
   z-index: 8;
   width: min(420px, calc(100% - 40px));
   margin-inline: auto;
@@ -13,7 +13,7 @@
 }
 @media (min-width: 761px) {
   .upload-overlay {
-    bottom: calc(105px + env(safe-area-inset-bottom));
+    bottom: calc(96px + env(safe-area-inset-bottom));
   }
 }
 .upload-inline {
@@ -32,9 +32,9 @@
 .upload-queue-details,
 .upload-overlay > .upload-error {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 6px 24px #25162b18;
+  box-shadow: var(--shadow);
 }
 
 .upload-banner {
@@ -204,12 +204,6 @@
   }
   to {
     opacity: 1;
-  }
-}
-@media (prefers-color-scheme: dark) {
-  .upload-banner,
-  .upload-queue-details {
-    box-shadow: 0 6px 24px #00000038;
   }
 }
 @media (prefers-reduced-motion: reduce) {

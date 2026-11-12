@@ -2,12 +2,15 @@
   position: relative;
   width: 100%;
   margin-inline: auto;
-  /* Contain only the moving screens, without clipping the editors at rest. */
-  overflow-x: clip;
+}
+/* Screens slide across the whole viewport; clip them at its edges. */
+@media (max-width: 959px) {
+  .app-shell:has(.settings-page) {
+    overflow-x: clip;
+  }
 }
 .settings-screen {
   min-width: 0;
-  background: var(--background);
 }
 .settings-screen[data-leaving] {
   position: absolute;
@@ -86,25 +89,27 @@
     background: var(--surface-muted);
   }
 }
-.settings-subpage-heading {
+/* Every settings title is plain text on the page; only the back button stays
+   pinned, as a round control with its own surface. */
+.settings-back {
   position: sticky;
-  top: 0;
+  top: calc(8px + env(safe-area-inset-top));
   z-index: 2;
+  float: left;
+  margin: 0 12px 0 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-subpage-heading {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: -4px 0 24px;
-  padding-block: 8px;
-  background: var(--background);
-}
-.settings-subpage-heading .settings-back {
-  flex-shrink: 0;
-  margin-left: -10px;
-  color: var(--text);
+  min-height: 44px;
+  margin: 0 0 24px;
 }
 .settings-subpage-heading [data-settings-title] {
   margin: 0;
-  font-size: clamp(21px, 6vw, 26px);
+  font-size: clamp(19px, 5.4vw, 24px);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -112,6 +117,7 @@
   outline: none;
 }
 .settings-editor {
+  clear: both;
   min-width: 0;
 }
 .party-details-editor {
@@ -208,8 +214,8 @@
     font-size: 14px;
   }
   .settings-menu-link[aria-current="page"] {
-    background: var(--nav-active);
-    color: var(--accent-text);
+    background: var(--surface-raised);
+    color: var(--text);
   }
   .settings-menu-link[aria-current="page"] .settings-menu-label > span {
     font-weight: 600;
@@ -219,12 +225,10 @@
     display: none;
   }
   .settings-subpage-heading {
-    position: static;
     margin: 0 0 32px;
-    padding: 0;
     min-height: 32px;
   }
-  .settings-subpage-heading .settings-back {
+  .settings-back {
     display: none;
   }
 }

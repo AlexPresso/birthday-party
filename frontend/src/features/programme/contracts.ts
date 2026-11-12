@@ -62,7 +62,7 @@ export const voteSchema = z
     }
   });
 
-export const questionSummarySchema = z.object({
+const questionSummarySchema = z.object({
   status: z.enum(["draft", "open", "closed"]),
   jokersUsed: z.number().int().min(0).max(2),
   questionCount: z.number().int().min(0).max(200),

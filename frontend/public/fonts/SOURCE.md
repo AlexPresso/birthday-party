@@ -1,11 +1,18 @@
-# Inter
+# Fonts
 
-Inter by Rasmus Andersson, distributed under the SIL Open Font License 1.1
-(see `OFL.txt`). The Latin and Latin Extended variable WOFF2 subsets cover
-weights 400–700 and the application's five supported languages. Fonts are
-served locally; browsers do not contact a font service.
+Fonts are served locally; browsers do not contact a font service. Both families
+are distributed under the SIL Open Font License 1.1.
 
-Downloaded from the Google Fonts CSS API (Inter v20):
-https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap
+- **Unbounded** (titles, times, the age) by The Unbounded Project Authors. See
+  `OFL-unbounded.txt`. Variable weight 200–900.
+- **Figtree** (text and controls) by The Figtree Project Authors. See
+  `OFL-figtree.txt`. Variable weight 300–900.
 
-License source: https://github.com/google/fonts/blob/main/ofl/inter/OFL.txt
+Each family ships its Latin and Latin Extended WOFF2 subsets, which cover the
+application's five supported languages and most guest names.
+
+The files come from the Fontsource packages
+`@fontsource-variable/unbounded` 5.3.0 and `@fontsource-variable/figtree` 5.3.0
+(`files/<family>-latin-wght-normal.woff2` and
+`files/<family>-latin-ext-wght-normal.woff2`), which repackage the Google Fonts
+releases. The license files are the packages' `LICENSE` files.

@@ -102,12 +102,17 @@ use, a personal visual identity, simple code, and responsive interactions.
 
 ## Selected implementation
 
-- The approved design has cream and dark plum themes following the device's
-  preference. Bottom navigation shows icons only: `Programme`, `Médias`,
-  `Livre d'or`, administrator-only `Paramètres`, then the circular `Profil` photo
-  at the far right. `/profil` opens for every participant with app access;
+- The approved design is a single dark theme ("K · Neige"): warm near-black
+  surfaces, one orange accent that always carries dark text when filled,
+  Unbounded titles, Figtree text and a light snowfall behind page headers. It
+  does not follow the device's light preference. The floating bottom dock keeps
+  this order: `Programme`, `Médias`, `Livre d'or`, administrator-only
+  `Paramètres`, then the circular `Profil` photo at the far right. Only the
+  current tab shows its label beside the icon, where the width allows it.
+  `/profil` opens for every participant with app access;
   guests visiting `/parametres` redirect there. Preserve translated accessible
-  names and routes; see `docs/design.md` and its reference images.
+  names and routes. Tab changes slide the page and glide the dock's pill; see
+  `docs/design.md`.
 - Guest profiles are prepared by the host. Individual, single-use invitation
   links activate a persistent session. A replacement link keeps the same identity.
 - Guests can choose, replace or remove their own profile photo from Profile.

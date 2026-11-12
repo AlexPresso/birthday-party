@@ -283,7 +283,7 @@ async function capture(page: Page, theme: "light" | "dark", route: string) {
   ).toBe(true);
   await expect(page.locator("body")).toHaveCSS(
     "background-color",
-    theme === "light" ? "rgb(250, 248, 246)" : "rgb(19, 16, 22)",
+    "rgb(16, 15, 14)",
   );
   const profile = page.locator(".navigation a").last();
   await expect(profile).toHaveAttribute("href", "/profil");

@@ -12,13 +12,11 @@ export async function generateMetadata() {
 }
 
 export default async function WaitingPage() {
-  const [{ guest }, welcome, { age, title }] = await Promise.all([
+  const [{ guest }, welcome, { title }] = await Promise.all([
     getSession(),
     getWelcome(),
     getBirthdayConfig(),
   ]);
   if (guest.role === "admin" || welcome.open) redirect("/photos");
-  return (
-    <WaitingRoom guest={guest} initial={welcome} age={age} title={title} />
-  );
+  return <WaitingRoom guest={guest} initial={welcome} title={title} />;
 }

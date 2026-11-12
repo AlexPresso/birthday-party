@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from "react";
 import {
   X,
   Trash2,
@@ -31,6 +37,13 @@ import { useUploads } from "./upload-provider";
 import { MediaPicker } from "./media-picker";
 import { MediaSlideshow } from "./media-slideshow";
 import "./gallery.css";
+
+// Mosaic rows are a tenth of a column wide: a square photo spans ten rows.
+// Extreme panoramas and tall crops are clamped so every tile stays tappable.
+function mosaicSpan(photo: Photo) {
+  const ratio = photo.width > 0 ? photo.height / photo.width : 1;
+  return Math.round(Math.min(1.45, Math.max(0.7, ratio)) * 10);
+}
 
 export function PhotoGallery({
   initial,
@@ -71,7 +84,7 @@ export function PhotoGallery({
   const [selected, setSelected] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [slideshow, setSlideshow] = useState<PhotoPage | null>(null);
-  const [view, setView] = useState<"feed" | "grid">("feed");
+  const [view, setView] = useState<"feed" | "grid">("grid");
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const filters = [
@@ -133,7 +146,7 @@ export function PhotoGallery({
 
   return (
     <div className="media-gallery">
-      <PageHeading title={t("photos.title")}>
+      <PageHeading inHeader title={t("photos.title")}>
         <MediaPicker
           compact
           limits={initial.limits}
@@ -281,6 +294,7 @@ export function PhotoGallery({
                 className="media-post"
                 key={photo.id}
                 id={`media-${photo.id}`}
+                style={{ "--span": mosaicSpan(photo) } as CSSProperties}
               >
                 <header className="media-post-author">
                   <Avatar

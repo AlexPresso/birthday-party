@@ -4,9 +4,10 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
 
 ## Design
 
-- Use the `gpt-taste` skill available in this Codex environment for substantial
-  interface design and visual changes. Follow `../docs/design.md` for this
-  product's identity, content, and interaction goals.
+- Follow `../docs/design.md` for this product's identity, content, and
+  interaction goals. Colors, radii and font families are tokens in
+  `src/app/tokens.css`; use them instead of literal values. The theme is dark
+  only, so do not add `prefers-color-scheme` branches.
 - Keep the design brief self-contained so contributors without the skill can
   follow the same direction. Do not embed machine-specific skill paths here.
 - Use semantic HTML, accessible names, visible focus, readable contrast, and
@@ -46,8 +47,9 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   schemas from `guests` and media destination schemas from `media` where needed.
   Shared scalar validation and date formatting belong in `lib/schema.ts` and
   `lib/dates.ts`. Keep transport validation at the API boundary.
-- `src/components/` contains reusable presentation such as Avatar, navigation and
-  UI notices. `src/lib/` contains shared HTTP, realtime, localization and browser
+- `src/components/` contains reusable presentation such as Avatar, navigation,
+  the snow backdrop, page transitions and UI notices. Wrap each party page in
+  `PageTransition`; dock links declare the slide direction with `transitionTypes`. `src/lib/` contains shared HTTP, realtime, localization and browser
   utilities. Neither directory imports routes or features; ESLint enforces this
   direction. Features also must not import routes.
 - Import concrete files directly, without feature-wide barrel exports. Keep
@@ -69,7 +71,7 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   sidebar and one editor filling the remaining width. Use CSS breakpoints so
   resizing preserves forms, uploads and ballots. Desktop navigation remains a
   centered bottom dock; position upload banners above it. Verify 320px phones,
-  tablets, laptops and wide monitors in both themes; see `../docs/design.md`.
+  tablets, laptops and wide monitors; see `../docs/design.md`.
 - Avoid unnecessary sequential requests. Keep client bundles small and use CSS
   for straightforward transitions; add animation libraries only for a real need.
 - Use thumbnails and appropriately sized images in galleries. Load full-size
@@ -158,6 +160,8 @@ entering a custom name.
 
 ## Sessions and interface behavior
 
+### Realtime
+
 Use one shared WebSocket connection per browser tab for `welcome`, `uploads` and
 `programme` invalidations. Validate the small message contract and refetch only
 the affected mounted resources through the existing API. Initial subscription,
@@ -168,12 +172,16 @@ heartbeats. Do not add recurring HTTP polling as a fallback. Session close code
 4401 requires a full navigation to the invitation page. Release the socket and
 listeners when the last consumer unmounts. Server timers signal programme unlocks.
 
+### Sessions
+
 The shared layout validates the backend session and forwards cookies on private
 server fetches with `cache: "no-store"`. The backend owns the HttpOnly cookie.
 Use a full navigation after logout or session expiry to discard the private
 client router cache. Never put invitation tokens in queries, logs, or storage.
 Invitation fragments are read only in the browser, previewed without consuming
 them, and removed after deliberate acceptance.
+
+### Welcome sequence
 
 The host-controlled welcome uses `/attente`, outside the party layout. API status
 423 means guests must return there; handle it in server fetches, client API calls
@@ -230,6 +238,8 @@ filters uncategorized media or one accessible category; keep pagination, complet
 uploads and retries tied to that destination. Public means signed-in guests,
 private means administrators. Preserve category names as authored content.
 
+### Notifications
+
 The `enable_notifications` widget and Profile share the browser notification
 control. Ask permission only from an explicit click and retain that user gesture;
 never prompt on mount or block guest navigation when permission is declined.
@@ -241,6 +251,8 @@ not cache authenticated pages or API responses. Keep subscriptions tied to the
 current session; an existing browser subscription must not silently bind another
 guest identity. Allow retry after failed registration and disabling in Profile.
 
+### Profile photos
+
 Profile settings accept JPEG/PNG/WebP photos using `/api/profile` image limits.
 Upload immediately on Profile; the welcome widget keeps its centered preview
 before saving. Preserve the file after failed uploads and release local object
@@ -248,6 +260,8 @@ URLs. Refresh the server-rendered navigation after changes.
 Use the shared Avatar component with native authenticated images and initial
 fallbacks. Avatar URLs are versioned, same-origin API paths; anonymous guestbook
 posts keep their neutral icon and never receive an avatar URL.
+
+### Media and uploads
 
 Authenticated media deliberately uses native images: the Go service already
 creates thumbnails, and Next image optimization would not forward guest cookies.
@@ -297,10 +311,13 @@ The Next proxy permits 1024 MiB plus 64 KiB and a 10-minute timeout, allowing
 settings increases without restart. Go enforces current limits per request.
 next.config.ts and the standalone startup.mjs share this bounded ceiling.
 
-The cream and dark plum themes follow `prefers-color-scheme`. Keep bottom icons
-in this order: `Programme`, `Médias`, `Livre d'or`, administrator-only `Paramètres`,
-then the round profile photo at the far right. Hide visible navigation text but
-keep translated accessible names and tooltips. The profile icon opens `/profil`
+### Navigation, questions and settings
+
+The app has one dark theme. Keep the floating dock's icons in this order:
+`Programme`, `Médias`, `Livre d'or`, administrator-only `Paramètres`, then the
+round profile photo at the far right. Show the label of the current tab only,
+and hide it when five tabs or a very narrow screen leave no room; always keep
+translated accessible names and tooltips. The profile icon opens `/profil`
 for all participants with app access. Guests visiting
 `/parametres` redirect to `/profil` before admin data is fetched. Capitalize
 translated labels and keep existing routes. Host controls live in settings.
@@ -342,6 +359,8 @@ Empty states must never invent guest contributions or events.
 Scheduled timestamps are submitted as UTC; host date inputs identify their
 browser timezone, and guest dates use the party's explicit timezone.
 
+### Programme activities
+
 Activities are individual programme events. Keep their contracts, editor controls
 and guest renderers in the programme feature; use stable event IDs and explicit
 `event`, `vote` and `questions` branches with their own settings and behavior.
@@ -363,10 +382,14 @@ UI data. Host settings support adding, scheduling, configuring and deleting each
 event, with separate open, close and reveal actions for votes. Candidate selection and
 self-voting are editable only in draft; question corrections remain available.
 
+### Guestbook
+
 The anonymous guestbook checkbox starts unchecked. Anonymous entries have a
 null author for every viewer; display the translated anonymous label and use
 the backend's canDelete flag to offer deletion without needing an author ID.
 Preserve the draft and checkbox state after submission errors.
+
+### Reviewing interface changes
 
 For UI changes, inspect the rendered result with realistic content at phone and
 desktop sizes. Check upload flows, focus, overflow, and relevant state changes.

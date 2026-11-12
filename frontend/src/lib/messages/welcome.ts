@@ -50,10 +50,8 @@ const en = {
   "adminWelcome.remove": "Remove step {number}",
   "adminWelcome.removeConfirmation":
     "Remove step {number}? Save your changes to confirm its removal.",
-  "adminWelcome.save": "Save steps",
   "adminWelcome.saving": "Saving…",
   "adminWelcome.saved": "Steps saved.",
-  "adminWelcome.unsaved": "Save your steps before continuing.",
   "adminWelcome.start": "Turn on the waiting screen",
   "adminWelcome.restart": "Restart the welcome",
   "adminWelcome.startConfirmation":
@@ -128,10 +126,8 @@ const fr: WelcomeMessages = {
   "adminWelcome.remove": "Supprimer l’étape {number}",
   "adminWelcome.removeConfirmation":
     "Supprimer l’étape {number} ? Enregistre tes modifications pour confirmer sa suppression.",
-  "adminWelcome.save": "Enregistrer les étapes",
   "adminWelcome.saving": "Enregistrement…",
   "adminWelcome.saved": "Les étapes sont enregistrées.",
-  "adminWelcome.unsaved": "Enregistre les étapes avant de continuer.",
   "adminWelcome.start": "Activer l’écran d’attente",
   "adminWelcome.restart": "Relancer l’accueil",
   "adminWelcome.startConfirmation":
@@ -205,10 +201,8 @@ const de: WelcomeMessages = {
   "adminWelcome.remove": "Schritt {number} entfernen",
   "adminWelcome.removeConfirmation":
     "Schritt {number} entfernen? Speichere deine Änderungen, um ihn zu entfernen.",
-  "adminWelcome.save": "Schritte speichern",
   "adminWelcome.saving": "Wird gespeichert…",
   "adminWelcome.saved": "Schritte gespeichert.",
-  "adminWelcome.unsaved": "Speichere deine Schritte, bevor du fortfährst.",
   "adminWelcome.start": "Wartebildschirm aktivieren",
   "adminWelcome.restart": "Begrüßung neu starten",
   "adminWelcome.startConfirmation":
@@ -284,10 +278,8 @@ const it: WelcomeMessages = {
   "adminWelcome.remove": "Rimuovi il passo {number}",
   "adminWelcome.removeConfirmation":
     "Rimuovere il passo {number}? Salva le modifiche per confermare la rimozione.",
-  "adminWelcome.save": "Salva i passi",
   "adminWelcome.saving": "Salvataggio…",
   "adminWelcome.saved": "Passi salvati.",
-  "adminWelcome.unsaved": "Salva i passi prima di continuare.",
   "adminWelcome.start": "Attiva la schermata d’attesa",
   "adminWelcome.restart": "Riavvia l’accoglienza",
   "adminWelcome.startConfirmation":
@@ -361,10 +353,8 @@ const es: WelcomeMessages = {
   "adminWelcome.remove": "Eliminar el paso {number}",
   "adminWelcome.removeConfirmation":
     "¿Eliminar el paso {number}? Guarda los cambios para confirmar que quieres eliminarlo.",
-  "adminWelcome.save": "Guardar los pasos",
   "adminWelcome.saving": "Guardando…",
   "adminWelcome.saved": "Pasos guardados.",
-  "adminWelcome.unsaved": "Guarda los pasos antes de continuar.",
   "adminWelcome.start": "Activar la pantalla de espera",
   "adminWelcome.restart": "Reiniciar la bienvenida",
   "adminWelcome.startConfirmation":

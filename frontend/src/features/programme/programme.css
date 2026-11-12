@@ -37,13 +37,42 @@
 }
 
 .programme-agenda-item .programme-event {
-  border-top: 1px solid var(--border);
+  margin-bottom: 10px;
+  padding: 16px 18px;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* A locked event keeps its place in the agenda as an outlined, empty card. */
+.programme-agenda-item .programme-event:has(.programme-event-locked) {
+  border: 1.5px dashed var(--border-strong);
+  background: transparent;
+  color: var(--muted);
 }
 
 .programme-agenda-heading {
-  margin: 0 0 14px;
-  font-size: 22px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 15px;
   line-height: 1.4;
+}
+
+/* On one column the cards follow the featured vote directly. */
+@media (max-width: 959px) {
+  .programme-agenda-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+.programme-admin-actions {
+  margin: 4px 0 16px;
 }
 
 .programme-time {
@@ -62,9 +91,15 @@
 }
 
 .programme-time strong {
-  color: var(--text);
-  font-size: 17px;
+  color: var(--highlight);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.4;
+}
+
+.programme-event:has(.programme-event-locked) .programme-time strong {
+  color: inherit;
 }
 
 .programme-event-content {
@@ -73,17 +108,17 @@
 
 .programme-event h2,
 .programme-vote-question {
-  margin: 0 0 4px;
-  font-size: 19px;
-  line-height: 1.4;
+  margin: 0 0 2px;
+  font-size: 17px;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
 .programme-event-description,
 .programme-event-note {
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.45;
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -100,21 +135,19 @@
 
 .programme-event-locked {
   position: relative;
-  margin-left: -14px;
-  padding-left: 62px;
+  padding-right: 40px;
 }
 
 .programme-lock {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 50%;
+  right: 0;
   display: grid;
   place-items: center;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  color: var(--muted);
 }
 
 .programme-event h2.programme-vote-title {
@@ -131,24 +164,35 @@
   display: block;
   padding: 20px;
   border: 1px solid var(--featured-border);
-  border-radius: 14px;
+  border-radius: var(--radius-large);
   background: var(--featured-background);
 }
 
 .programme-featured-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 12px;
-  color: var(--accent-text);
-  font-size: 17px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1.4;
+}
+
+.programme-featured-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .programme-featured h2:not(.programme-vote-title),
 .programme-featured .programme-vote-question {
-  font-size: clamp(24px, 7.7vw, 30px);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.025em;
+  font-family: var(--font-display);
+  font-size: clamp(19px, 5.6vw, 22px);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 .programme-vote-preview {
@@ -166,15 +210,55 @@
   box-shadow: 0 0 0 1px var(--border-strong);
 }
 
+/* Candidates wear a story-style ring. */
 .programme-featured .programme-vote-preview .avatar {
-  width: 80px;
-  height: 80px;
-  font-size: 29px;
+  width: 44px;
+  height: 44px;
+  font-size: 15px;
+  box-shadow:
+    0 0 0 3px var(--featured-background),
+    0 0 0 5px var(--accent);
 }
 
 .programme-featured .programme-vote-preview {
-  gap: 16px;
-  margin: 18px 0;
+  gap: 14px;
+  margin: 16px 0 0;
+  padding: 5px;
+}
+
+/* Candidates and the vote button share one row until the ballot opens. */
+.programme-featured .programme-event-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.programme-featured .programme-event-content > * {
+  grid-column: 1 / -1;
+}
+
+.programme-featured .programme-event-content > .programme-vote-preview {
+  grid-column: 1;
+}
+
+.programme-featured .programme-event-content > .programme-ballot {
+  grid-column: 2;
+}
+
+.programme-featured .programme-event-content > .programme-ballot[open],
+.programme-featured
+  .programme-event-content
+  > .programme-ballot:has(> summary[hidden]) {
+  grid-column: 1 / -1;
+}
+
+.programme-featured .programme-ballot > summary {
+  width: auto;
+  min-height: 48px;
+  padding-inline: 24px;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .programme-vote-preview > span:last-child:not(.avatar) {
@@ -195,11 +279,6 @@
 
 .programme-ballot > summary::-webkit-details-marker {
   display: none;
-}
-
-.programme-featured .programme-ballot > summary {
-  min-height: 50px;
-  font-size: 17px;
 }
 
 .programme-ballot > summary[hidden] {
@@ -252,9 +331,8 @@
     font-size: 19px;
   }
 
-  .programme-featured .programme-vote-preview .avatar {
-    width: clamp(58px, 20.5vw, 80px);
-    height: clamp(58px, 20.5vw, 80px);
+  .programme-featured .programme-vote-preview {
+    gap: 16px;
   }
 }
 
@@ -264,18 +342,8 @@
     gap: 12px;
   }
 
-  .programme-event-locked {
-    margin-left: 0;
-    padding-left: 48px;
-  }
-
-  .programme-lock {
-    width: 36px;
-    height: 36px;
-  }
-
   .programme-event h2 {
-    font-size: 17px;
+    font-size: 16px;
   }
 }
 

@@ -1,23 +1,47 @@
 @import url("./tokens.css");
 
 @font-face {
-  font-family: "Inter";
+  font-family: "Figtree";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 300 900;
   font-display: swap;
-  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  src: url("/fonts/figtree-latin-ext.woff2") format("woff2");
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
-    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "Inter";
+  font-family: "Figtree";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 300 900;
   font-display: swap;
-  src: url("/fonts/inter-latin.woff2") format("woff2");
+  src: url("/fonts/figtree-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Unbounded";
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("/fonts/unbounded-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Unbounded";
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("/fonts/unbounded-latin.woff2") format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
@@ -34,9 +58,9 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--text);
-  font-family: "Inter", "Segoe UI", sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 button,
@@ -139,9 +163,10 @@ p {
   margin-top: 0;
 }
 h1 {
-  font-size: clamp(28px, 8.2vw, 32px);
+  font-family: var(--font-display);
+  font-size: clamp(24px, 7.2vw, 28px);
   font-weight: 700;
-  letter-spacing: -0.7px;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   margin-bottom: 10px;
   overflow-wrap: anywhere;
@@ -149,13 +174,13 @@ h1 {
 h2 {
   font-size: 19px;
   line-height: 1.35;
-  letter-spacing: -0.35px;
-  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-weight: 700;
   margin-bottom: 12px;
 }
 h3 {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   margin-bottom: 10px;
 }
 p {
@@ -177,13 +202,11 @@ svg {
   color: var(--muted);
 }
 .eyebrow {
-  font-size: 11px;
-  line-height: 1.5;
-  font-weight: 650;
-  letter-spacing: 1.8px;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 .panel {
   background: var(--surface);
@@ -191,18 +214,18 @@ svg {
   border-radius: var(--radius);
 }
 .button {
-  min-height: 46px;
-  padding: 10px 18px;
+  min-height: 48px;
+  padding: 10px 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 700;
   border: 1px solid transparent;
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-pill);
   line-height: 1.5;
   transition:
     background 0.15s,
@@ -216,7 +239,7 @@ svg {
 .primary {
   background: var(--button-fill);
   color: var(--on-accent);
-  border-color: var(--accent);
+  border-color: transparent;
 }
 .primary:not(:disabled):hover {
   background: var(--accent-hover);
@@ -224,16 +247,16 @@ svg {
 }
 .secondary {
   background: transparent;
-  border-color: var(--accent);
+  border-color: var(--border-strong);
   color: var(--text);
 }
 .secondary:not(:disabled):hover {
   background: var(--surface-raised);
-  border-color: var(--accent);
+  border-color: var(--border-strong);
 }
 .text-button {
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   min-height: 44px;
   display: inline-flex;
   gap: 8px;
@@ -252,7 +275,7 @@ svg {
   align-items: center;
   justify-content: center;
   background: transparent;
-  border-radius: 9px;
+  border-radius: 50%;
   color: var(--muted);
   flex-shrink: 0;
 }
@@ -296,10 +319,10 @@ svg {
   top: 10px;
   left: 20px;
   background: var(--accent);
-  color: var(--background);
+  color: var(--on-accent);
   padding: 10px 16px;
   clip-path: inset(100%);
-  border-radius: 8px;
+  border-radius: var(--radius-pill);
 }
 .skip-link:focus {
   clip-path: none;
@@ -308,13 +331,28 @@ svg {
   min-height: 100dvh;
   margin: 0 auto;
   position: relative;
+  /* Keeps the decorative snow behind every page without re-layering content. */
+  isolation: isolate;
+}
+/*
+ * A warm glow in the top corner of every party page. It belongs to the page
+ * canvas so the 90% desktop shell does not cut it off.
+ */
+body:has(> .app-shell) {
+  background:
+    radial-gradient(
+      circle 300px at calc(100% - 30px) -20px,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent
+    ),
+    var(--background);
+  background-repeat: no-repeat;
 }
 .app-header {
   display: flex;
   align-items: center;
   min-height: 56px;
-  padding: 8px var(--page-gutter);
-  border-bottom: 1px solid var(--border);
+  padding: calc(12px + env(safe-area-inset-top)) var(--page-gutter) 4px;
 }
 .brand {
   display: flex;
@@ -323,24 +361,15 @@ svg {
   min-width: 0;
 }
 .brand-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 36px;
+  display: block;
   flex-shrink: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 32px;
-  font-style: italic;
-  color: var(--text);
-  font-weight: 400;
-  letter-spacing: -4px;
-  line-height: 1;
 }
 .brand strong {
-  font-size: 14px;
-  line-height: 1.5;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 .brand > div {
@@ -353,10 +382,10 @@ svg {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  color: var(--accent-text);
-  background: var(--accent-soft);
+  color: var(--text);
+  background: var(--surface-raised);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
   flex-shrink: 0;
 }
 .avatar.large {
@@ -373,73 +402,139 @@ svg {
 }
 .navigation {
   position: fixed;
-  bottom: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
-  width: min(720px, 100%);
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
+  width: min(420px, calc(100% - 48px));
+  min-height: 64px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   background: var(--nav-background);
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
 }
 .navigation a {
   position: relative;
-  flex: 0 1 72px;
+  flex: 0 0 auto;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 8px;
-  height: 56px;
-  min-width: 44px;
-  max-width: 72px;
-  border-radius: 15px;
+  gap: 8px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
   color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
   transition:
     background 0.15s,
     color 0.15s;
 }
 @media (hover: hover) {
-  .navigation a:hover {
+  .navigation a:not([aria-current="page"]):hover {
     background: var(--surface-raised);
-    color: var(--text);
   }
 }
 .navigation a[aria-current="page"] {
-  color: var(--accent-text);
+  padding: 0 18px 0 14px;
+  color: var(--on-accent);
+}
+/* The current tab's pill. It is its own layer so it can glide between tabs. */
+.navigation-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: var(--nav-active);
+  view-transition-name: nav-indicator;
+}
+.navigation-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: inherit;
+  view-transition-class: nav-tab;
+}
+/* Only the current tab spells out its name; the others keep their icon. */
+.navigation-label {
+  display: none;
+}
+.navigation a[aria-current="page"] .navigation-label {
+  display: inline;
+}
+.navigation .navigation-profile {
+  padding: 0;
 }
 .navigation-profile .avatar {
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--border-strong);
+  width: 36px;
+  height: 36px;
+  background: var(--border);
 }
 .navigation .navigation-profile[aria-current="page"] {
+  padding: 0;
   background: transparent;
 }
 .navigation-profile[aria-current="page"] .avatar {
-  outline: 4px solid var(--profile-ring);
+  outline: 2px solid var(--profile-ring);
   outline-offset: 3px;
 }
 .navigation-pending {
   position: absolute;
-  inset-inline: 12px;
-  bottom: 3px;
+  inset-inline: 14px;
+  bottom: 5px;
   height: 2px;
   border-radius: 2px;
-  background: var(--accent);
+  background: currentColor;
   opacity: 0;
 }
 .navigation-pending[data-pending] {
   opacity: 1;
 }
+/* Five tabs need a tighter dock to keep the current tab's label on phones. */
+@media (max-width: 420px) {
+  .navigation[data-tabs="5"] {
+    width: calc(100% - 32px);
+    gap: 2px;
+  }
+  .navigation[data-tabs="5"] a {
+    min-width: 44px;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 14px;
+  }
+  .navigation[data-tabs="5"] a[aria-current="page"] {
+    padding: 0 14px 0 12px;
+  }
+  .navigation[data-tabs="5"] .navigation-profile,
+  .navigation[data-tabs="5"] .navigation-profile[aria-current="page"] {
+    padding: 0;
+  }
+  .navigation[data-tabs="5"] .navigation-label {
+    overflow: hidden;
+    max-width: 92px;
+    text-overflow: ellipsis;
+  }
+}
+@media (max-width: 350px) {
+  .navigation {
+    width: calc(100% - 24px);
+  }
+  .navigation[data-tabs] a[aria-current="page"] {
+    padding: 0 12px;
+  }
+  .navigation[data-tabs] a[aria-current="page"] .navigation-label {
+    display: none;
+  }
+}
 .main-content {
-  padding: 18px var(--page-gutter) calc(100px + env(safe-area-inset-bottom));
+  padding: 14px var(--page-gutter) calc(112px + env(safe-area-inset-bottom));
   min-width: 0;
 }
 .page-heading {
@@ -464,6 +559,36 @@ svg {
 .page-heading > .button {
   flex-shrink: 0;
 }
+/*
+ * Programme and Médias leave their title to the dock's current tab and lift
+ * what sits beside it (the date, the add button) into the app header row.
+ */
+.app-shell:has(.page-heading-in-header) .app-header {
+  padding-right: calc(var(--page-gutter) + 124px);
+}
+.page-heading.page-heading-in-header {
+  display: block;
+  margin: 0;
+}
+.page-heading-in-header h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.page-heading-in-header > div > .muted {
+  position: absolute;
+  top: calc(21px + env(safe-area-inset-top));
+  right: var(--page-gutter);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+}
 .section-row {
   display: flex;
   align-items: center;
@@ -481,9 +606,9 @@ svg {
   gap: 10px;
   align-items: flex-start;
   padding: 12px 15px;
-  border-radius: 9px;
+  border-radius: var(--radius-small);
   margin: 14px 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 .notice svg {
   margin-top: 2px;
@@ -512,10 +637,9 @@ svg {
   text-align: center;
   min-height: 300px;
   padding: 44px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-large);
   margin-top: 24px;
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 .empty-icon {
   display: flex;
@@ -524,8 +648,8 @@ svg {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  background: var(--surface-raised);
+  color: var(--highlight);
   margin-bottom: 20px;
 }
 .empty-state h2 {
@@ -607,8 +731,8 @@ progress::-moz-progress-bar {
   max-width: min(1000px, calc(100vw - 32px));
   width: max-content;
   max-height: calc(100dvh - 32px);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-large);
   padding: 0;
   background: var(--background);
   color: var(--text);
@@ -687,17 +811,6 @@ progress::-moz-progress-bar {
 .checkbox-field:has(input:disabled) {
   cursor: not-allowed;
   opacity: 0.5;
-}
-.admin-section {
-  border-top: 1px solid var(--border);
-  margin-top: 40px;
-  padding-top: 32px;
-}
-.admin-section > .section-row .eyebrow {
-  margin-bottom: 7px;
-}
-.admin-section > .section-row h2 {
-  font-size: 23px;
 }
 .admin-intro {
   font-size: 13px;
@@ -840,105 +953,249 @@ progress::-moz-progress-bar {
   font-size: 11px;
 }
 .invitation-page {
+  --snow-height: 470px;
+  position: relative;
+  isolation: isolate;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 48px 22px;
-  background: var(--background);
+  padding: env(safe-area-inset-top) 24px
+    calc(28px + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+/* A warm glow behind the age ring. */
+.invitation-page::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 40px;
+  left: 50%;
+  width: 360px;
+  height: 360px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    transparent 68%
+  );
+  pointer-events: none;
 }
 .invitation-card {
-  width: min(100%, 440px);
-  padding: 40px 37px;
-  text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
-}
-.invitation-emblem {
-  position: relative;
+  flex: 1;
   display: flex;
-  width: 108px;
-  height: 108px;
-  margin: 4px auto 29px;
-  border: 1px solid var(--border-strong);
-  border-radius: 32px;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent-soft);
-  transform: rotate(-5deg);
+  flex-direction: column;
+  width: min(100%, 420px);
+  padding-top: 20px;
 }
-.invitation-emblem > span {
-  font-size: 65px;
-  color: var(--accent-text);
-  font-weight: 350;
-  letter-spacing: -5px;
+.invitation-card > .brand {
+  min-height: 24px;
+}
+.invitation-ring {
+  align-self: center;
+  flex-shrink: 0;
+  width: 228px;
+  height: 228px;
+  margin: 52px 0 40px;
+  padding: 4px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+}
+.invitation-ring > span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--background);
+  font-family: var(--font-display);
+  font-size: 92px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   line-height: 1;
-  transform: rotate(5deg);
-  padding-right: 5px;
 }
-.invitation-emblem > svg {
-  position: absolute;
-  bottom: -9px;
-  right: -9px;
-  color: var(--accent-text);
-  fill: var(--accent-soft);
-  transform: rotate(15deg);
-}
-.invitation-card > .eyebrow {
-  font-size: 10px;
-  letter-spacing: 2px;
-  margin-bottom: 14px;
-  overflow-wrap: anywhere;
+.invitation-ring-long > span {
+  font-size: 64px;
 }
 .invitation-card h1 {
-  font-size: 31px;
-  letter-spacing: -0.9px;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
+  margin-bottom: 12px;
+  font-size: clamp(26px, 7.6vw, 30px);
 }
 .invitation-intro {
+  margin: 0 0 12px;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.9;
-  margin-top: 19px;
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
-.invitation-divider {
-  width: 48px;
-  height: 1px;
-  background: var(--border-strong);
-  margin: 27px auto;
-}
 .invitation-card > .muted {
-  font-size: 14px;
+  margin: 0;
+}
+/* Error and not-found pages reuse the card with a single action. */
+.invitation-card > h1:first-child {
+  margin-top: 76px;
 }
 .invitation-card > .button {
-  margin-top: 6px;
+  align-self: flex-start;
+  margin-top: 20px;
 }
-.invitation-card > .fine-print {
-  font-size: 11px;
-  margin: 18px 0 0;
+.invitation-card > .loading-inline {
+  justify-content: flex-start;
+  margin: 8px 0 0;
+}
+.invitation-actions {
+  margin-top: auto;
+  padding-top: 32px;
+}
+.invitation-enter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 0 8px 0 26px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 18px;
+  font-weight: 800;
+  transition: background 0.15s;
+}
+.invitation-enter:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+.invitation-enter:disabled {
+  opacity: 0.8;
+}
+.invitation-enter-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--background);
+  color: var(--text);
+}
+.invitation-actions > .fine-print {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.invitation-help {
+  margin-top: 16px;
+  padding: 20px;
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 .invitation-help > svg {
-  color: var(--accent);
-  margin-bottom: 15px;
+  color: var(--highlight);
+  margin-bottom: 12px;
 }
 .invitation-help h2 {
   font-size: 18px;
+  margin-bottom: 6px;
 }
 .invitation-help p {
-  font-size: 13px;
+  font-size: 15px;
   margin-bottom: 0;
 }
 .invitation-footer {
-  font-size: 11px;
+  width: min(100%, 420px);
+  margin: 14px 0 0;
   color: var(--muted);
-  letter-spacing: 0.4px;
-  margin: 24px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+/*
+ * Tab changes: the page slides towards the pressed tab while the dock stays
+ * put and its pill glides to the new tab. Browsers without view transitions
+ * simply swap the page.
+ */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1);
+}
+/* Icons and labels keep their own size while a tab grows or shrinks. */
+::view-transition-old(.nav-tab),
+::view-transition-new(.nav-tab) {
+  width: auto;
+  height: 100%;
+}
+::view-transition-old(nav-indicator),
+::view-transition-new(nav-indicator) {
+  height: 100%;
+}
+::view-transition-old(.nav-forward) {
+  --slide-offset: -48px;
+  animation:
+    140ms ease-in both page-fade reverse,
+    320ms cubic-bezier(0.3, 0, 0.1, 1) both page-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 48px;
+  animation:
+    200ms ease-out 120ms both page-fade,
+    320ms cubic-bezier(0.3, 0, 0.1, 1) both page-slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 48px;
+  animation:
+    140ms ease-in both page-fade reverse,
+    320ms cubic-bezier(0.3, 0, 0.1, 1) both page-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -48px;
+  animation:
+    200ms ease-out 120ms both page-fade,
+    320ms cubic-bezier(0.3, 0, 0.1, 1) both page-slide;
+}
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes page-slide {
+  from {
+    translate: var(--slide-offset);
+  }
+  to {
+    translate: 0;
+  }
+}
+.snow {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: var(--snow-height, 130px);
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+.snow > span {
+  position: absolute;
+  top: 0;
+  border-radius: 50%;
+  background: var(--highlight-pale);
+  animation: snow-fall linear infinite;
+}
+.snow > .snow-warm {
+  background: var(--highlight);
+}
+@keyframes snow-fall {
+  from {
+    transform: translateY(-12px);
+  }
+  to {
+    transform: translateY(var(--snow-height, 130px));
+  }
 }
 .page-loading,
 .loading-inline {
@@ -989,10 +1246,9 @@ progress::-moz-progress-bar {
   }
   .navigation {
     bottom: 20px;
-    width: 520px;
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    box-shadow: var(--shadow);
+    width: max-content;
+    max-width: calc(100% - 48px);
+    gap: 8px;
   }
 }
 @media (min-width: 960px) {
@@ -1038,20 +1294,6 @@ progress::-moz-progress-bar {
   }
   .file-name {
     font-size: 12px;
-  }
-  .admin-section {
-    margin-top: 33px;
-    padding-top: 28px;
-  }
-  .admin-section > .section-row h2 {
-    font-size: 21px;
-  }
-  .admin-section > .section-row {
-    align-items: flex-end;
-  }
-  .admin-section > .section-row > .status-label {
-    font-size: 10px;
-    white-space: nowrap;
   }
   .admin-form {
     padding: 18px;
@@ -1125,28 +1367,6 @@ progress::-moz-progress-bar {
   .admin-event-list .icon-button {
     min-width: 36px;
   }
-  .invitation-page {
-    padding: 30px 22px;
-  }
-  .invitation-card {
-    padding: 33px 25px;
-    border-radius: 19px;
-  }
-  .invitation-card h1 {
-    font-size: 28px;
-  }
-  .invitation-emblem {
-    width: 94px;
-    height: 94px;
-    border-radius: 28px;
-    margin-bottom: 26px;
-  }
-  .invitation-emblem > span {
-    font-size: 58px;
-  }
-  .invitation-intro {
-    font-size: 13px;
-  }
 }
 @media (max-width: 360px) {
   :root {
@@ -1167,5 +1387,16 @@ progress::-moz-progress-bar {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  /* Still flakes, spread over the band, instead of a frozen first frame. */
+  .snow > span {
+    animation: none;
+    top: var(--snow-rest);
   }
 }

@@ -1,6 +1,5 @@
 const en = {
   "photos.title": "Media",
-  "photos.description": "See everyone's photos and videos, and add your own.",
   "photos.add": "Add media",
   "photos.addShort": "Add",
   "photos.view": "Media view",
@@ -9,7 +8,6 @@ const en = {
   "photos.downloadFrom": "Download the file from {name}",
   "photos.options": "File actions",
   "photos.details": "Open file",
-  "photos.jumpTo": "Show file {index}",
   "photos.gallery": "Gallery",
   "photos.privacy":
     "Photos: JPEG, PNG, WebP, up to {imageSize} MB · Videos: MP4, MOV, WebM, up to {videoSize} MB and 5 minutes",
@@ -23,8 +21,6 @@ const en = {
   "photos.uploadDetails": "Upload details",
   "photos.uploadHideDetails": "Hide upload details",
   "photos.uploading": "Uploading…",
-  "photos.uploads": "Uploads",
-  "photos.close": "Close",
   "photos.uploadProgress": "Upload progress",
   "photos.sentCountOne": "{sent} / {total} file sent",
   "photos.sentCountOther": "{sent} / {total} files sent",
@@ -33,16 +29,12 @@ const en = {
   "photos.queued": "Waiting",
   "photos.retry": "Retry {name}",
   "photos.removeFromQueue": "Remove {name} from the list",
-  "photos.addedCountOne": "{count} file added.",
-  "photos.addedCountOther": "{count} files added.",
   "photos.keepOpen": "Keep the app open while your files are sent.",
   "photos.receiving": "Finishing the transfer…",
   "photos.serverQueued": "Received, waiting to be prepared",
   "photos.safeToLeave":
     "Your files have arrived. You can close the app while they're prepared.",
   "photos.reselect": "Choose this file again to resend it.",
-  "photos.background": "Your uploads are continuing. View media",
-  "photos.needsAttention": "Some files need your attention. View media",
   "photos.selectionLimit":
     "Choose up to 20 files at a time. Wait for uploads to finish or remove failed files before adding more.",
   "photos.interrupted":
@@ -50,7 +42,6 @@ const en = {
   "photos.deleteConfirm": "Delete this file for all guests?",
   "photos.emptyTitle": "No photos or videos yet",
   "photos.emptyDescription": "Add a photo or video from the party.",
-  "photos.choose": "Choose files",
   "photos.all": "All media",
   "photos.allHeading": "The party album",
   "photos.countOne": "{count} file",
@@ -65,13 +56,9 @@ const en = {
   "photos.next": "Next file",
   "photos.download": "Download",
   "photos.delete": "Delete file",
-  "guestbook.title": "Guestbook",
   "guestbook.descriptionOne": "A few words to celebrate turning {age}.",
-  "guestbook.descriptionOther": "A few words to celebrate turning {age}.",
   "guestbook.composeTitle": "Leave a message",
-  "guestbook.composeDescription": "Share a memory or a birthday wish.",
   "guestbook.message": "Your message",
-  "guestbook.placeholder": "Happy birthday!",
   "guestbook.signed": "From {name}",
   "guestbook.publishing": "Posting…",
   "guestbook.publish": "Post message",
@@ -86,13 +73,11 @@ const en = {
   "guestbook.loading": "Loading…",
   "guestbook.loadMore": "Read earlier messages",
   "programme.title": "Schedule",
-  "programme.description": "The times and details for the party.",
   "programme.refresh": "Refresh schedule",
   "programme.manage": "Manage schedule",
   "programme.emptyTitle": "No events yet",
   "programme.emptyDescription": "Events added by the host will appear here.",
   "programme.locked": "Still a surprise",
-  "programme.available": "Details available",
   "programme.surprise": "Surprise",
   "programme.unlockAt": "Available on {date}.",
   "programme.waiting": "The details aren't available yet.",
@@ -109,8 +94,6 @@ type MediaMessages = Record<keyof typeof en, string>;
 
 const fr: MediaMessages = {
   "photos.title": "Médias",
-  "photos.description":
-    "Retrouve les photos et les vidéos de la fête, et ajoute les tiennes.",
   "photos.add": "Ajouter des médias",
   "photos.addShort": "Ajouter",
   "photos.view": "Affichage des médias",
@@ -119,7 +102,6 @@ const fr: MediaMessages = {
   "photos.downloadFrom": "Télécharger le fichier de {name}",
   "photos.options": "Actions du fichier",
   "photos.details": "Ouvrir le fichier",
-  "photos.jumpTo": "Voir le fichier {index}",
   "photos.gallery": "Galerie",
   "photos.privacy":
     "Photos : JPEG, PNG, WebP, {imageSize} Mo max. · Vidéos : MP4, MOV, WebM, {videoSize} Mo et 5 minutes max.",
@@ -133,8 +115,6 @@ const fr: MediaMessages = {
   "photos.uploadDetails": "Détail des envois",
   "photos.uploadHideDetails": "Masquer le détail",
   "photos.uploading": "Envoi en cours…",
-  "photos.uploads": "Envois",
-  "photos.close": "Fermer",
   "photos.uploadProgress": "Progression des envois",
   "photos.sentCountOne": "{sent} / {total} fichier envoyé",
   "photos.sentCountOther": "{sent} / {total} fichiers envoyés",
@@ -143,8 +123,6 @@ const fr: MediaMessages = {
   "photos.queued": "En attente",
   "photos.retry": "Réessayer l'envoi de {name}",
   "photos.removeFromQueue": "Retirer {name} de la liste",
-  "photos.addedCountOne": "{count} fichier ajouté.",
-  "photos.addedCountOther": "{count} fichiers ajoutés.",
   "photos.keepOpen":
     "Garde l’application ouverte pendant l’envoi des fichiers.",
   "photos.receiving": "Fin de l’envoi…",
@@ -152,9 +130,6 @@ const fr: MediaMessages = {
   "photos.safeToLeave":
     "Tes fichiers sont reçus. Tu peux fermer l’application pendant leur préparation.",
   "photos.reselect": "Choisis à nouveau ce fichier pour le renvoyer.",
-  "photos.background": "Tes envois continuent. Voir les médias",
-  "photos.needsAttention":
-    "Certains fichiers n’ont pas pu être ajoutés. Voir les médias",
   "photos.selectionLimit":
     "Choisis jusqu’à 20 fichiers à la fois. Attends la fin des envois ou retire les fichiers en échec avant d’en ajouter.",
   "photos.interrupted":
@@ -162,7 +137,6 @@ const fr: MediaMessages = {
   "photos.deleteConfirm": "Supprimer ce fichier pour tous les invités ?",
   "photos.emptyTitle": "Pas encore de photos ni de vidéos",
   "photos.emptyDescription": "Ajoute une photo ou une vidéo de la fête.",
-  "photos.choose": "Choisir des fichiers",
   "photos.all": "Tous les médias",
   "photos.allHeading": "L'album de la fête",
   "photos.countOne": "{count} fichier",
@@ -177,14 +151,9 @@ const fr: MediaMessages = {
   "photos.next": "Fichier suivant",
   "photos.download": "Télécharger",
   "photos.delete": "Supprimer le fichier",
-  "guestbook.title": "Livre d'or",
   "guestbook.descriptionOne": "Un mot pour fêter {age} an.",
-  "guestbook.descriptionOther": "Un mot pour fêter {age} ans.",
   "guestbook.composeTitle": "Laisse un message",
-  "guestbook.composeDescription":
-    "Raconte un souvenir ou souhaite un bon anniversaire.",
   "guestbook.message": "Ton message",
-  "guestbook.placeholder": "Bon anniversaire !",
   "guestbook.signed": "Signé {name}",
   "guestbook.publishing": "Publication…",
   "guestbook.publish": "Publier le message",
@@ -199,14 +168,12 @@ const fr: MediaMessages = {
   "guestbook.loading": "Chargement…",
   "guestbook.loadMore": "Lire les messages précédents",
   "programme.title": "Programme",
-  "programme.description": "Les horaires et les détails de la fête.",
   "programme.refresh": "Actualiser le programme",
   "programme.manage": "Gérer le programme",
   "programme.emptyTitle": "Pas encore d'événements",
   "programme.emptyDescription":
     "Les événements ajoutés par l'organisateur apparaîtront ici.",
   "programme.locked": "Encore secret",
-  "programme.available": "Détails disponibles",
   "programme.surprise": "Surprise",
   "programme.unlockAt": "Disponible le {date}.",
   "programme.waiting": "Les détails ne sont pas encore disponibles.",
@@ -221,8 +188,6 @@ const fr: MediaMessages = {
 
 const de: MediaMessages = {
   "photos.title": "Medien",
-  "photos.description":
-    "Schau dir die Fotos und Videos der Feier an und teile deine eigenen.",
   "photos.add": "Medien hinzufügen",
   "photos.addShort": "Hinzufügen",
   "photos.view": "Medienansicht",
@@ -231,7 +196,6 @@ const de: MediaMessages = {
   "photos.downloadFrom": "Datei von {name} herunterladen",
   "photos.options": "Dateiaktionen",
   "photos.details": "Datei öffnen",
-  "photos.jumpTo": "Datei {index} anzeigen",
   "photos.gallery": "Galerie",
   "photos.privacy":
     "Fotos: JPEG, PNG, WebP, bis {imageSize} MB · Videos: MP4, MOV, WebM, bis {videoSize} MB und 5 Minuten",
@@ -245,8 +209,6 @@ const de: MediaMessages = {
   "photos.uploadDetails": "Upload-Details",
   "photos.uploadHideDetails": "Upload-Details ausblenden",
   "photos.uploading": "Wird hochgeladen…",
-  "photos.uploads": "Uploads",
-  "photos.close": "Schließen",
   "photos.uploadProgress": "Upload-Fortschritt",
   "photos.sentCountOne": "{sent} / {total} Datei gesendet",
   "photos.sentCountOther": "{sent} / {total} Dateien gesendet",
@@ -255,8 +217,6 @@ const de: MediaMessages = {
   "photos.queued": "Wartet",
   "photos.retry": "{name} erneut hochladen",
   "photos.removeFromQueue": "{name} aus der Liste entfernen",
-  "photos.addedCountOne": "{count} Datei hinzugefügt.",
-  "photos.addedCountOther": "{count} Dateien hinzugefügt.",
   "photos.keepOpen":
     "Lass die App geöffnet, während deine Dateien gesendet werden.",
   "photos.receiving": "Übertragung wird abgeschlossen…",
@@ -265,9 +225,6 @@ const de: MediaMessages = {
     "Deine Dateien sind angekommen. Du kannst die App während der Verarbeitung schließen.",
   "photos.reselect":
     "Wähle diese Datei erneut aus, um sie noch einmal zu senden.",
-  "photos.background": "Deine Uploads laufen weiter. Medien ansehen",
-  "photos.needsAttention":
-    "Einige Dateien konnten nicht hinzugefügt werden. Medien ansehen",
   "photos.selectionLimit":
     "Wähle höchstens 20 Dateien auf einmal. Warte, bis die Uploads fertig sind, oder entferne fehlgeschlagene Uploads, bevor du weitere Dateien hinzufügst.",
   "photos.interrupted":
@@ -275,7 +232,6 @@ const de: MediaMessages = {
   "photos.deleteConfirm": "Diese Datei für alle Gäste löschen?",
   "photos.emptyTitle": "Noch keine Fotos oder Videos",
   "photos.emptyDescription": "Teile ein Foto oder Video von der Feier.",
-  "photos.choose": "Dateien auswählen",
   "photos.all": "Alle Medien",
   "photos.allHeading": "Das Album der Feier",
   "photos.countOne": "{count} Datei",
@@ -290,14 +246,9 @@ const de: MediaMessages = {
   "photos.next": "Nächste Datei",
   "photos.download": "Herunterladen",
   "photos.delete": "Datei löschen",
-  "guestbook.title": "Gästebuch",
   "guestbook.descriptionOne": "Ein paar Worte zum {age}. Geburtstag.",
-  "guestbook.descriptionOther": "Ein paar Worte zum {age}. Geburtstag.",
   "guestbook.composeTitle": "Hinterlasse eine Nachricht",
-  "guestbook.composeDescription":
-    "Teile eine Erinnerung oder einen Geburtstagswunsch.",
   "guestbook.message": "Deine Nachricht",
-  "guestbook.placeholder": "Alles Gute zum Geburtstag!",
   "guestbook.signed": "Von {name}",
   "guestbook.publishing": "Wird veröffentlicht…",
   "guestbook.publish": "Nachricht veröffentlichen",
@@ -312,14 +263,12 @@ const de: MediaMessages = {
   "guestbook.loading": "Wird geladen…",
   "guestbook.loadMore": "Ältere Nachrichten lesen",
   "programme.title": "Programm",
-  "programme.description": "Die Zeiten und Infos zur Feier.",
   "programme.refresh": "Programm aktualisieren",
   "programme.manage": "Programm verwalten",
   "programme.emptyTitle": "Noch keine Programmpunkte",
   "programme.emptyDescription":
     "Hier erscheinen die Programmpunkte, die der Gastgeber hinzufügt.",
   "programme.locked": "Noch geheim",
-  "programme.available": "Details verfügbar",
   "programme.surprise": "Überraschung",
   "programme.unlockAt": "Verfügbar ab {date}.",
   "programme.waiting": "Die Details sind noch nicht verfügbar.",
@@ -334,8 +283,6 @@ const de: MediaMessages = {
 
 const it: MediaMessages = {
   "photos.title": "Media",
-  "photos.description":
-    "Guarda le foto e i video della festa e aggiungi i tuoi.",
   "photos.add": "Aggiungi foto e video",
   "photos.addShort": "Aggiungi",
   "photos.view": "Visualizzazione dei media",
@@ -344,7 +291,6 @@ const it: MediaMessages = {
   "photos.downloadFrom": "Scarica il file di {name}",
   "photos.options": "Azioni del file",
   "photos.details": "Apri il file",
-  "photos.jumpTo": "Mostra il file {index}",
   "photos.gallery": "Galleria",
   "photos.privacy":
     "Foto: JPEG, PNG, WebP, fino a {imageSize} MB · Video: MP4, MOV, WebM, fino a {videoSize} MB e 5 minuti",
@@ -358,8 +304,6 @@ const it: MediaMessages = {
   "photos.uploadDetails": "Dettagli degli invii",
   "photos.uploadHideDetails": "Nascondi i dettagli",
   "photos.uploading": "Caricamento…",
-  "photos.uploads": "Caricamenti",
-  "photos.close": "Chiudi",
   "photos.uploadProgress": "Avanzamento dell'invio",
   "photos.sentCountOne": "{sent} / {total} file inviato",
   "photos.sentCountOther": "{sent} / {total} file inviati",
@@ -368,17 +312,12 @@ const it: MediaMessages = {
   "photos.queued": "In attesa",
   "photos.retry": "Riprova a caricare {name}",
   "photos.removeFromQueue": "Rimuovi {name} dall'elenco",
-  "photos.addedCountOne": "{count} file aggiunto.",
-  "photos.addedCountOther": "{count} file aggiunti.",
   "photos.keepOpen": "Lascia l’app aperta mentre i file vengono inviati.",
   "photos.receiving": "Invio quasi completato…",
   "photos.serverQueued": "Ricevuto, in attesa di elaborazione",
   "photos.safeToLeave":
     "I tuoi file sono arrivati. Puoi chiudere l’app durante l’elaborazione.",
   "photos.reselect": "Seleziona di nuovo questo file per inviarlo.",
-  "photos.background": "I caricamenti continuano. Vai a foto e video",
-  "photos.needsAttention":
-    "Alcuni file non sono stati aggiunti. Vai a foto e video",
   "photos.selectionLimit":
     "Scegli al massimo 20 file alla volta. Aspetta che i caricamenti finiscano o rimuovi i file con errori prima di aggiungerne altri.",
   "photos.interrupted":
@@ -386,7 +325,6 @@ const it: MediaMessages = {
   "photos.deleteConfirm": "Eliminare questo file per tutti gli invitati?",
   "photos.emptyTitle": "Non ci sono ancora foto o video",
   "photos.emptyDescription": "Aggiungi una foto o un video della festa.",
-  "photos.choose": "Scegli i file",
   "photos.all": "Tutte le foto e i video",
   "photos.allHeading": "L'album della festa",
   "photos.countOne": "{count} file",
@@ -401,14 +339,9 @@ const it: MediaMessages = {
   "photos.next": "File successivo",
   "photos.download": "Scarica",
   "photos.delete": "Elimina il file",
-  "guestbook.title": "Dediche",
   "guestbook.descriptionOne": "Un messaggio per festeggiare {age} anno.",
-  "guestbook.descriptionOther": "Un messaggio per festeggiare {age} anni.",
   "guestbook.composeTitle": "Lascia un messaggio",
-  "guestbook.composeDescription":
-    "Condividi un ricordo o un augurio di buon compleanno.",
   "guestbook.message": "Il tuo messaggio",
-  "guestbook.placeholder": "Buon compleanno!",
   "guestbook.signed": "Da {name}",
   "guestbook.publishing": "Pubblicazione…",
   "guestbook.publish": "Pubblica il messaggio",
@@ -423,14 +356,12 @@ const it: MediaMessages = {
   "guestbook.loading": "Caricamento…",
   "guestbook.loadMore": "Leggi i messaggi precedenti",
   "programme.title": "Programma",
-  "programme.description": "Gli orari e i dettagli della festa.",
   "programme.refresh": "Aggiorna il programma",
   "programme.manage": "Gestisci il programma",
   "programme.emptyTitle": "Non ci sono ancora eventi",
   "programme.emptyDescription":
     "Gli eventi aggiunti dall'organizzatore appariranno qui.",
   "programme.locked": "Ancora una sorpresa",
-  "programme.available": "Dettagli disponibili",
   "programme.surprise": "Sorpresa",
   "programme.unlockAt": "Disponibile dal {date}.",
   "programme.waiting": "I dettagli non sono ancora disponibili.",
@@ -445,8 +376,6 @@ const it: MediaMessages = {
 
 const es: MediaMessages = {
   "photos.title": "Multimedia",
-  "photos.description":
-    "Mira las fotos y los vídeos de la fiesta y añade los tuyos.",
   "photos.add": "Añadir fotos y vídeos",
   "photos.addShort": "Añadir",
   "photos.view": "Vista de fotos y vídeos",
@@ -455,7 +384,6 @@ const es: MediaMessages = {
   "photos.downloadFrom": "Descargar el archivo de {name}",
   "photos.options": "Acciones del archivo",
   "photos.details": "Abrir el archivo",
-  "photos.jumpTo": "Ver el archivo {index}",
   "photos.gallery": "Galería",
   "photos.privacy":
     "Fotos: JPEG, PNG, WebP, hasta {imageSize} MB · Vídeos: MP4, MOV, WebM, hasta {videoSize} MB y 5 minutos",
@@ -469,8 +397,6 @@ const es: MediaMessages = {
   "photos.uploadDetails": "Detalles de los envíos",
   "photos.uploadHideDetails": "Ocultar los detalles",
   "photos.uploading": "Subiendo…",
-  "photos.uploads": "Subidas",
-  "photos.close": "Cerrar",
   "photos.uploadProgress": "Progreso de los envíos",
   "photos.sentCountOne": "{sent} / {total} archivo enviado",
   "photos.sentCountOther": "{sent} / {total} archivos enviados",
@@ -479,8 +405,6 @@ const es: MediaMessages = {
   "photos.queued": "En espera",
   "photos.retry": "Volver a subir {name}",
   "photos.removeFromQueue": "Quitar {name} de la lista",
-  "photos.addedCountOne": "{count} archivo añadido.",
-  "photos.addedCountOther": "{count} archivos añadidos.",
   "photos.keepOpen":
     "Deja la aplicación abierta mientras se envían los archivos.",
   "photos.receiving": "Terminando el envío…",
@@ -488,9 +412,6 @@ const es: MediaMessages = {
   "photos.safeToLeave":
     "Tus archivos han llegado. Puedes cerrar la aplicación mientras se preparan.",
   "photos.reselect": "Elige este archivo de nuevo para volver a enviarlo.",
-  "photos.background": "Tus archivos se siguen enviando. Ver fotos y vídeos",
-  "photos.needsAttention":
-    "Algunos archivos no se han añadido. Ver fotos y vídeos",
   "photos.selectionLimit":
     "Selecciona un máximo de 20 archivos a la vez. Espera a que terminen las subidas o quita los archivos que han fallado antes de añadir más.",
   "photos.interrupted":
@@ -498,7 +419,6 @@ const es: MediaMessages = {
   "photos.deleteConfirm": "¿Eliminar este archivo para todos los invitados?",
   "photos.emptyTitle": "Todavía no hay fotos ni vídeos",
   "photos.emptyDescription": "Añade una foto o un vídeo de la fiesta.",
-  "photos.choose": "Elegir archivos",
   "photos.all": "Todas las fotos y los vídeos",
   "photos.allHeading": "El álbum de la fiesta",
   "photos.countOne": "{count} archivo",
@@ -513,14 +433,9 @@ const es: MediaMessages = {
   "photos.next": "Archivo siguiente",
   "photos.download": "Descargar",
   "photos.delete": "Eliminar archivo",
-  "guestbook.title": "Dedicatorias",
   "guestbook.descriptionOne": "Un mensaje para celebrar {age} año.",
-  "guestbook.descriptionOther": "Un mensaje para celebrar {age} años.",
   "guestbook.composeTitle": "Deja un mensaje",
-  "guestbook.composeDescription":
-    "Comparte un recuerdo o una felicitación de cumpleaños.",
   "guestbook.message": "Tu mensaje",
-  "guestbook.placeholder": "¡Feliz cumpleaños!",
   "guestbook.signed": "De {name}",
   "guestbook.publishing": "Publicando…",
   "guestbook.publish": "Publicar mensaje",
@@ -535,14 +450,12 @@ const es: MediaMessages = {
   "guestbook.loading": "Cargando…",
   "guestbook.loadMore": "Leer mensajes anteriores",
   "programme.title": "Programa",
-  "programme.description": "Los horarios y los detalles de la fiesta.",
   "programme.refresh": "Actualizar el programa",
   "programme.manage": "Gestionar el programa",
   "programme.emptyTitle": "Todavía no hay eventos",
   "programme.emptyDescription":
     "Aquí aparecerán los eventos que añada el organizador.",
   "programme.locked": "Aún es una sorpresa",
-  "programme.available": "Detalles disponibles",
   "programme.surprise": "Sorpresa",
   "programme.unlockAt": "Disponible el {date}.",
   "programme.waiting": "Los detalles aún no están disponibles.",

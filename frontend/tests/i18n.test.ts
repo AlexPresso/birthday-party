@@ -116,11 +116,11 @@ test("translators replace supplied values without interpreting guest content", (
   const t = createTranslator(getMessages("fr"));
   assert.equal(
     t("invitation.hello", { name: "Léa {age}" }),
-    "Salut Léa {age} !",
+    "Léa {age}, tu es de la fête.",
   );
-  assert.equal(t("invitation.hello", { name: "" }), "Salut  !");
+  assert.equal(t("invitation.hello", { name: "" }), ", tu es de la fête.");
   assert.equal(t("birthday.title", { age: 0 }), "Les 0 ans");
-  assert.equal(t("invitation.hello"), "Salut {name} !");
+  assert.equal(t("invitation.hello"), "{name}, tu es de la fête.");
 });
 
 test("every backend error code has a translation and the same English fallback", () => {
