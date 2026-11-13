@@ -115,8 +115,12 @@ type Repository interface {
 	Create(context.Context, Actor, Input, int) (Event, error)
 	Update(context.Context, Actor, int64, Input) (Event, error)
 	Delete(context.Context, Actor, int64) error
-	TransitionVote(context.Context, Actor, int64, VoteStatus, int64) (Event, error)
-	CastVote(context.Context, Actor, int64, int64) (Event, error)
+	TransitionVote(ctx context.Context, actor Actor, eventID int64, status VoteStatus, revision int64) (Event, error)
+	CastVote(ctx context.Context, actor Actor, eventID, optionID int64) (Event, error)
+	// CastWriteIn finds or creates the option carrying the normalized label
+	// and records the actor's vote for it in one transaction.
+	CastWriteIn(ctx context.Context, actor Actor, eventID int64, label string) (Event, error)
+	RemoveVoteOption(ctx context.Context, actor Actor, eventID, optionID int64) (Event, error)
 }
 
 // eventLimit bounds the programme; creation enforces it transactionally.

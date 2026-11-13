@@ -490,10 +490,10 @@ settings for that type; there is no nested activity collection.
 
 A missing type creates an ordinary `event`; omitting type on update preserves
 its existing type. Types cannot change after creation. Ordinary events have
-`vote: null` and `revision: 1`. Creating a vote requires
-`vote: { question, candidateIds, allowSelfVote }`. Event metadata, vote settings
-and candidates are saved in one transaction. Invalid settings leave no partial
-event. The programme is limited to 200 events across all types.
+`vote: null` and `revision: 1`. Creating a vote requires the `vote` settings
+described under [Vote events](#vote-events). Event metadata, vote settings and
+options are saved in one transaction. Invalid settings leave no partial event.
+The programme is limited to 200 events across all types.
 
 For guests, a locked published event returns the public teaser as `title`, or an
 empty title when no teaser is set, an empty `description`, `vote: null` and `questions: null`.
@@ -561,56 +561,121 @@ settings editor and renderer. The first interactive type is `vote`:
 ```typescript
 type Vote = {
   question: string;
-  status: "draft" | "open" | "closed" | "revealed";
-  allowSelfVote: boolean;
-  candidates: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-    active: boolean;
-  }[];
-  myCandidateId: number | null;
+  status: "draft" | "open" | "closed";
+  choices: "guests" | "custom";
+  allowSelfVote: boolean; // meaningful for "guests" only; false otherwise
+  allowWriteIns: boolean; // meaningful for "custom" only; false otherwise
+  options: VoteOption[]; // votes descending, then label (case-insensitive), then id
+  myOptionId: number | null; // the viewer's own choice only
   canVote: boolean;
-  participationCount: number | null;
-  results: { candidateId: number; votes: number }[] | null;
+};
+
+type VoteOption = {
+  id: number; // stable option id
+  label: string; // guest name or the custom text, unchanged
+  guestId: number | null; // set for "guests" options
+  avatarUrl: string | null; // authenticated avatar URL for guest options
+  active: boolean; // false for a revoked guest; custom options are always true
+  writeIn: boolean; // created by a guest
+  votes: number; // live count, visible to everyone who sees the vote
 };
 ```
 
-- `POST /api/admin/programme/{id}/vote/state { status, revision }` -> `Event`.
-- `PUT /api/programme/{id}/vote { candidateId }` -> `Event` for the signed-in voter.
+The options of a vote come from one source, chosen when the vote is created:
+`guests` offers active guests picked by the host, `custom` offers labels typed
+by the host. A `custom` vote may also let guests add a choice (`allowWriteIns`).
 
-Questions contain 1-240 characters after trimming. Select 2-200 distinct active
-guests as candidates. Voting for oneself defaults to disabled. Candidate selection
-and the self-vote setting can change only while the vote is a draft; the question
-and event metadata remain editable. Transitions are `draft` -> `open` -> `closed`
--> `revealed`. Closing and revealing are separate actions. The current revision
-is required for every edit to an existing vote event, including metadata-only
-updates with an omitted type or vote. Omitting vote on such an update preserves
-its settings. Host edits and transitions increment the revision; guest votes do
-not. Stale edits fail without changing metadata, settings or ballots.
+Create and edit (`POST /api/admin/programme`, `PUT /api/admin/programme/{id}`)
+take these `vote` settings:
+
+```typescript
+vote: {
+  question: string; // 1–240 characters after trimming
+  choices: "guests" | "custom";
+  candidateIds?: number[]; // "guests": 2–200 distinct active guests
+  labels?: string[]; // "custom": 0–200 distinct labels, 1–80 characters after trimming
+  allowSelfVote: boolean; // must be false for "custom"
+  allowWriteIns: boolean; // must be false for "guests"
+}
+```
+
+A `custom` vote needs at least 2 labels, or `allowWriteIns: true`; it may then
+start with one label or none. Labels are stored trimmed, as typed. They are
+compared case-insensitively after trimming, and duplicates are rejected.
+`candidateIds` belongs to `guests` and `labels` to `custom`; sending the other
+list non-empty is invalid. Invalid settings return `invalid_activity`, a label
+of the wrong length `invalid_vote_label`, and an unknown or revoked candidate
+`invalid_vote_option`.
+
+`choices`, the option list, `allowSelfVote` and `allowWriteIns` can change only
+while the vote is a draft; the question and event metadata stay editable. Once
+the vote is open, an edit must repeat the same settings: the same candidates in
+any order, or every label of the host. Labels of current write-ins may be
+included and are ignored; anything else returns `activity_conflict`. Saving a
+draft replaces its options, so option IDs are stable from the opening onwards.
+
+The current revision is required for every edit to an existing vote event,
+including metadata-only updates with an omitted type or vote. Omitting vote on
+such an update preserves its settings. Host edits and transitions increment the
+revision; guest votes, write-ins and the removal of a write-in do not. Stale
+edits fail without changing metadata, settings or ballots.
+
+- `POST /api/admin/programme/{id}/vote/state { status: "open" | "closed", revision }` -> `Event`.
+  Transitions are `draft` -> `open` -> `closed`. Opening a `guests` vote needs
+  at least 2 active candidates (`invalid_vote_option` otherwise).
+- `PUT /api/programme/{id}/vote { optionId }` -> `Event`. Votes for an existing
+  option.
+- `POST /api/programme/{id}/vote/options { label }` -> `Event` (200). Write-in:
+  only for an open `custom` vote with `allowWriteIns`. The label has 1–80
+  characters after trimming. If an option already carries it, whatever the case,
+  the viewer's vote goes to that option; otherwise the option is created with
+  the spelling typed and receives the vote. Both happen in one transaction, so
+  two guests typing the same new label create one option with two votes. A vote
+  has at most 200 options, write-ins included.
+- `DELETE /api/admin/programme/{id}/vote/options/{optionId}` -> `Event`. Removes
+  a write-in option and its votes, while the vote is open or closed. An option
+  of the host returns `activity_conflict`; an option that is unknown or belongs
+  to another vote returns `invalid_vote_option`.
 
 Each guest has one stored choice per vote event and can replace it while voting
-is open. The server derives the voter from the current session and atomically
-checks access, event availability, vote state and candidate eligibility before
-saving. Returning to the page restores the recorded choice. Revoked candidates
-remain in the saved list and historical results with `active: false`, but cannot
-receive new votes. Candidate portraits use authenticated profile photo URLs.
+is open, with either route. The server derives the voter from the current
+session and atomically checks access, event availability, vote state and option
+eligibility before saving. Nobody can vote for the option of a revoked guest,
+which stays listed with `active: false` and the votes it received. A guest
+cannot vote for their own option unless `allowSelfVote` is set. A write-in
+option that loses its last vote disappears in the same transaction; options of
+the host stay, even without votes.
 
-Only the admin endpoint exposes participation counts before revelation. Results
-remain `null` for everyone, including administrators, until the host reveals them.
-Responses never contain other voters' identities or individual choices;
-`myCandidateId` is only the viewer's own choice. PostgreSQL retains voter IDs to
-enforce uniqueness and allow replacing a vote.
+Every viewer who can see the vote receives all its options with their live
+counts, while it is open and after it closes; the total is the sum of
+`options[].votes`. Administrators receive the same `Vote` as guests, on both
+programme endpoints, plus drafts on the admin one. Responses never contain other
+voters' identities or individual choices; `myOptionId` is only the viewer's own
+choice, and `guestId` names the guest an option stands for, never a voter.
+`canVote` is true while the vote is open and offers the viewer an eligible
+option or accepts write-ins. PostgreSQL retains voter IDs to enforce uniqueness
+and allow replacing a vote.
 
-Changes publish the shared `programme` invalidation after commit. Clients refresh
-through authorized HTTP requests without polling. These events require full app
-access and do not grant access during the welcome sequence.
+Draft votes are omitted from the guest programme and a locked event hides its
+vote entirely; both return 404 to a guest who tries to vote. Changes publish the
+shared `programme` invalidation after commit. Clients refresh through authorized
+HTTP requests without polling. These events require full app access and do not
+grant access during the welcome sequence.
 
 A database constraint prevents multiple activity records belonging to one event.
 
-Vote errors retain the codes `invalid_activity`, `activity_conflict`,
-`vote_closed`, `invalid_vote_candidate` and `self_vote_forbidden`, alongside
-existing event, access and not-found errors.
+Vote errors, alongside existing event, access and not-found errors:
+
+| Code                  | Status | Meaning                                                                |
+| --------------------- | ------ | ---------------------------------------------------------------------- |
+| `invalid_activity`    | 400    | Invalid question, source, option count, duplicate or flag combination  |
+| `invalid_vote_label`  | 400    | A label or write-in without 1–80 characters after trimming             |
+| `invalid_vote_option` | 400    | Unknown, inactive or foreign option                                    |
+| `self_vote_forbidden` | 400    | The viewer's own option while self-votes are off                       |
+| `write_ins_disabled`  | 403    | Write-in on a `guests` vote or a `custom` vote that does not allow it  |
+| `vote_closed`         | 409    | Vote or write-in after the vote closed                                 |
+| `vote_option_limit`   | 409    | A new write-in when the vote already has 200 options                   |
+| `activity_conflict`   | 409    | Stale revision, frozen setting, bad transition, removing a host option |
 
 ## Guestbook
 

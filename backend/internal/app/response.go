@@ -35,7 +35,12 @@ func respond(w http.ResponseWriter, status int, value any) {
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return pathValueID(w, r, "id")
+}
+
+// pathValueID reads the positive identifier in the named path segment.
+func pathValueID(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil || id < 1 {
 		fail(w, "invalid_id")
 		return 0, false

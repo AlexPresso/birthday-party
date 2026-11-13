@@ -3,6 +3,7 @@ package programme
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -10,6 +11,7 @@ import (
 type memoryEvents struct {
 	items     []Event
 	input     Input
+	label     string
 	writes    int
 	limit     int
 	err       error
@@ -49,7 +51,44 @@ func (repository *memoryEvents) TransitionVote(context.Context, Actor, int64, Vo
 	return Event{}, repository.err
 }
 func (repository *memoryEvents) CastVote(context.Context, Actor, int64, int64) (Event, error) {
+	repository.writes++
 	return Event{}, repository.err
+}
+func (repository *memoryEvents) CastWriteIn(_ context.Context, _ Actor, _ int64, label string) (Event, error) {
+	repository.label = label
+	repository.writes++
+	return Event{}, repository.err
+}
+func (repository *memoryEvents) RemoveVoteOption(context.Context, Actor, int64, int64) (Event, error) {
+	repository.writes++
+	return Event{}, repository.err
+}
+
+func TestServiceNormalizesWriteInsAndRejectsInvalidOptionsBeforePersistence(t *testing.T) {
+	repository := &memoryEvents{}
+	service := New(repository)
+	for _, label := range []string{"", " \t ", strings.Repeat("é", 81)} {
+		if _, err := service.WriteIn(t.Context(), Actor{}, 7, label); !errors.Is(err, ErrInvalidLabel) {
+			t.Fatalf("label %q: error=%v", label, err)
+		}
+	}
+	for _, optionID := range []int64{0, -1} {
+		if _, err := service.Vote(t.Context(), Actor{}, 7, optionID); !errors.Is(err, ErrInvalidOption) {
+			t.Fatalf("vote for option %d: error=%v", optionID, err)
+		}
+		if _, err := service.RemoveOption(t.Context(), Actor{}, 7, optionID); !errors.Is(err, ErrInvalidOption) {
+			t.Fatalf("removal of option %d: error=%v", optionID, err)
+		}
+	}
+	if repository.writes != 0 {
+		t.Fatal("invalid input reached persistence")
+	}
+	if _, err := service.WriteIn(t.Context(), Actor{}, 7, "  Tarte Tatin \n"); err != nil {
+		t.Fatal(err)
+	}
+	if repository.label != "Tarte Tatin" {
+		t.Fatalf("persisted label=%q", repository.label)
+	}
 }
 
 func TestServiceValidatesBeforePersistenceAndUsesAtomicCapacity(t *testing.T) {

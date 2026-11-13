@@ -27,10 +27,31 @@ paired with `backend/data`, independently of the deployed application's media vo
 
 ## Schema
 
-`backend/internal/app/migrations/0001_baseline.sql` creates the complete schema.
+`backend/internal/app/migrations/0001_baseline.sql` creates the initial schema.
 It replaced the earlier migration history, so a database created before the
 baseline is refused at startup ("applied migration has changed"): drop it, or its
-Compose volume, and let the backend create a fresh one.
+Compose volume, and let the backend create a fresh one. Later files change the
+schema in order; read them together for its current shape.
+
+`0002_vote_options.sql` lets a vote offer guests or labels written by the host,
+with optional write-ins from guests:
+
+- `programme_votes` gains `choices` (`guests` or `custom`) and
+  `allow_write_ins`. Two checks keep `allow_self_vote` for `guests` votes and
+  `allow_write_ins` for `custom` ones. The `revealed` status disappears: counts
+  are visible as soon as the vote is, so existing revealed votes become `closed`.
+- `programme_vote_options` replaces `programme_vote_candidates`. A row is either
+  a guest or a label of 1 to 80 characters, never both. `write_in` marks a label
+  added by a guest. A unique index on `(activity_id, lower(label))` makes labels
+  unique per vote whatever their case, so the database decides which labels are
+  the same; `lower` follows the database's collation.
+- `programme_ballots.option_id` replaces `candidate_id`. Its composite foreign
+  key keeps a ballot on an option of its own vote and removes it with the
+  option. The primary key `(activity_id, guest_id)` finds a voter's ballot; the
+  index on `(activity_id, option_id)` counts the votes of each option.
+
+Existing candidates become guest options in their saved order and every ballot
+follows its candidate.
 
 Conventions for new tables and columns:
 
@@ -56,7 +77,7 @@ same limits: a statement that needs longer must start with
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
-   `0002_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
+   `0003_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
 2. Put the schema change in that file, with any necessary data backfill. Do not add
    DDL to request handlers or change an already applied migration.
 3. Run `npm run check` against its disposable PostgreSQL instance. Include tests

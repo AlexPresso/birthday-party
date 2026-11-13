@@ -240,10 +240,11 @@ HTTP request logs never include these tokens.
   photo/video originals and their thumbnails. Both share permissions, survive
   recovery and are deleted together. Lists are paginated
   at 24 items by default, maximum 48. Hosts can manage up to 500 guest identities
-  and 200 programme entries. These are initial explicit bounds, not performance
-  claims.
+  and 200 programme entries. A vote offers at most 200 options, guests' write-ins
+  included. These are initial explicit bounds, not performance claims.
 - PostgreSQL migrations are embedded SQL files in `internal/app/migrations`,
-  starting with `0001_baseline.sql`, which creates the whole schema.
+  starting with `0001_baseline.sql`, which creates the initial schema. Later files
+  change it: `0002_vote_options.sql` gives votes their options and write-ins.
   Startup validates names and checksums and applies pending files transactionally
   under an advisory lock. Add the next `NNNN_description.sql` for every schema
   change; never edit an applied migration. A database created before the baseline
