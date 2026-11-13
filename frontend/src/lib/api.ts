@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { MessageKey, Translator } from "./i18n";
+import "./zod-config.ts";
 
 export class ApiError extends Error {
   code: string;
