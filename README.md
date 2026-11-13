@@ -47,8 +47,7 @@ conservées telles quelles, avec leurs ressources utiles et les crédits d'origi
 ## Démarrer en local
 
 Prérequis : Node.js 24 ou plus récent (obligatoire : les scripts et les tests
-exécutent TypeScript directement), npm, Go 1.26+ (la CI et l'image utilisent
-Go 1.27.2), `ffmpeg` et `ffprobe` dans le `PATH`
+exécutent TypeScript directement), npm, Go 1.27.2 ou plus récent, `ffmpeg` et `ffprobe` dans le `PATH`
 pour vérifier les vidéos et créer leurs vignettes JPEG. Docker fournit
 [FFmpeg](https://ffmpeg.org/download.html) automatiquement. Les tests vidéo
 utilisent aussi les encodeurs H.264/AAC et VP9/Opus pour créer leurs fichiers.
@@ -539,7 +538,6 @@ avec le backend arrêté pour conserver leur cohérence.
 
 Le schéma PostgreSQL est créé par une migration de base unique au premier
 démarrage ; les changements suivants s'ajoutent comme migrations numérotées.
-L'import automatique d'une ancienne base `birthday.sqlite` a été retiré.
 
 ## Licence
 

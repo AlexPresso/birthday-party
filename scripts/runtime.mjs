@@ -35,7 +35,7 @@ export function findGo() {
     }
   }
   throw new Error(
-    "Go was not found: install Go 1.26+ or set GO_BIN to its executable path.",
+    "Go was not found: install Go 1.27.2+ or set GO_BIN to its executable path.",
   );
 }
 
@@ -55,8 +55,6 @@ export function localEnvironment() {
     PUBLIC_URL: process.env.PUBLIC_URL || `http://localhost:${port}`,
     DATA_DIR: path.resolve(backend, process.env.DATA_DIR || "data"),
     DATABASE_URL: process.env.DATABASE_URL || database.toString(),
-    // These scripts explicitly target local HTTP development.
-    COOKIE_SECURE: process.env.COOKIE_SECURE || "false",
   };
 }
 
