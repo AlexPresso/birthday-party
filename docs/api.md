@@ -1,7 +1,8 @@
 # API contract
 
-The browser uses same-origin `/api/*`. Next.js proxies these requests to the Go
-service. JSON uses camelCase. IDs are positive integers. Timestamps are RFC3339
+The browser uses same-origin `/api/*`. In production the Ingress sends these
+requests straight to the Go service; in local development and Compose Next.js
+proxies them. JSON uses camelCase. IDs are positive integers. Timestamps are RFC3339
 UTC strings with at most microsecond precision; optional timestamps are `null`.
 Errors contain a stable machine-readable
 `code` and an English fallback `error`: `{ "code": "...", "error": "..." }`.
