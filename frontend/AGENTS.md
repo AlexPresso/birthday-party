@@ -10,6 +10,15 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   only, so do not add `prefers-color-scheme` branches.
 - Keep the design brief self-contained so contributors without the skill can
   follow the same direction. Do not embed machine-specific skill paths here.
+- Every stylesheet starts with `@layer base, components, features;` and wraps
+  its rules in one of those layers: tokens and element defaults in `base`, shared
+  classes in `components`, everything under `src/features` in `features`. An
+  unlayered rule beats all layered ones, so never leave a new file unwrapped.
+  Feature-specific rules live with their feature, not in `globals.css`.
+- Pages are served with a nonce-based Content Security Policy from
+  `src/proxy.ts`. Do not add inline scripts, external origins or `eval`; widen
+  the policy deliberately when a feature truly needs it. HSTS belongs to the
+  Ingress.
 - Use semantic HTML, accessible names, visible focus, readable contrast, and
   comfortable touch targets. Support keyboard navigation and reduced motion.
 - Preserve coherent typography, spacing, color, and reusable controls across
@@ -27,6 +36,9 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
   around useful responsibilities rather than arbitrary size limits.
 - Validate external data at its boundary; TypeScript types alone do not validate
   API responses. Keep the API contract consistent with the Go implementation.
+  Response schemas check shape, enums, same-origin URLs and the invariants the
+  interface relies on; leave length and count ceilings to Go, so raising a
+  backend limit never blanks a page.
 
 ## Source ownership and dependencies
 
@@ -94,30 +106,32 @@ Read `../AGENTS.md` for shared architecture and behavior requirements.
 ## Verification and setup
 
 The frontend uses Next.js 16.4 App Router, React 19.3, strict TypeScript, npm,
-plain CSS, Lucide icons, and Zod response validation. Node 24 LTS is recommended.
+plain CSS, Lucide icons, and Zod response validation. Node 24 is required.
 Keep the lockfile committed and use `npm ci` for a reproducible install.
 
 Run these commands from `frontend/`:
 
 - `npm run dev`: Next development server at `http://127.0.0.1:3000`.
 - `npm run build`: production compilation and framework type checks.
-- `npm start`: production server after a successful build.
+- `npm start`: the standalone production server (`node startup.mjs`) after a
+  successful build.
 - `npm run typecheck`: generate Next route types, then TypeScript without emit.
 - `npm run lint`: ESLint with the matching Next configuration.
 - `npm run format`: format tracked source and guidance with Prettier.
 - `npm run format:check`: verify formatting without changing files.
-- `npm test`: Node tests for API boundary validation and upload constraints.
+- `npm test`: Node unit tests for contracts, translations, realtime, autosave,
+  drafts and uploads.
 - `npm run test:runtime`: after a production build, verify the container startup's
   runtime backend selection for HTTP, WebSocket and server rendering.
 
 Start the Go service too. `API_INTERNAL_URL` defaults to
 `http://127.0.0.1:8080`; `.env.example` documents it. Browser requests always use
-the same-origin `/api` proxy. The container's `startup.mjs` updates the compiled
+same-origin `/api`: the Next rewrite forwards it in development and Compose,
+and the production Ingress sends it straight to Go. The container's `startup.mjs` updates the compiled
 API rewrite from the runtime `API_INTERNAL_URL` before Next starts, including
 WebSocket forwarding. Use an HTTP(S) origin without credentials or a path.
 The image can be reused with different backend service names without rebuilding;
-keep `.next/routes-manifest.json` writable by the container user. Plain `npm start`
-uses the build's rewrite destination. Root scripts manage the full stack and
+keep `.next/routes-manifest.json` writable by the container user. Root scripts manage the full stack and
 browser tests; see `../README.md`.
 
 Use the repository-root `.env` for shared configuration. Docker Compose reads
@@ -164,13 +178,25 @@ entering a custom name.
 
 Use one shared WebSocket connection per browser tab for `welcome`, `uploads` and
 `programme` invalidations. Validate the small message contract and refetch only
-the affected mounted resources through the existing API. Initial subscription,
-reconnection and return to a visible page resynchronize current state. Coalesce
+the affected mounted resources through the existing API, using the shared
+`useRealtimeResource` hook. Server-rendered resources resynchronize on the
+socket handshake, or once over HTTP if it fails; reconnection resynchronizes
+too. A hidden page pauses without reporting a failure, and returning to it
+reads again only when no socket is live or connecting. Coalesce
 signals during a request into a trailing refresh; abort requests on unmount.
 Reconnect with bounded, jittered backoff and detect stalled connections using
 heartbeats. Do not add recurring HTTP polling as a fallback. Session close code
 4401 requires a full navigation to the invitation page. Release the socket and
 listeners when the last consumer unmounts. Server timers signal programme unlocks.
+
+### Requests and confirmations
+
+Browser requests go through `lib/api.ts` and fail as a translated connection
+error after 15 seconds; multipart uploads have no deadline. A caller's own abort
+stays an abort. Ask for confirmation with `useConfirm()` from
+`components/confirm-dialog.tsx`, never `window.confirm`: browsers suppress native
+dialogs in background tabs. Never open a dialog from an automatic save; a
+programme conflict is resolved by the explicit "save my draft" action.
 
 ### Sessions
 

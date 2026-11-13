@@ -50,7 +50,7 @@ function CopyField({
   };
 
   return (
-    <div className="configuration-copy-field">
+    <div>
       <label htmlFor={`${id}-mode`}>
         {t(
           type === "title"
@@ -208,7 +208,7 @@ export function ConfigurationEditor({
     >
       <fieldset className="configuration-fields">
         {section === "age" && (
-          <div className="configuration-field">
+          <div>
             <label htmlFor={`${id}-age`}>{t("configuration.age")}</label>
             <input
               id={`${id}-age`}
@@ -228,7 +228,7 @@ export function ConfigurationEditor({
             <p className="fine-print" id={`${id}-upload-limits`}>
               {t("configuration.uploadHint")}
             </p>
-            <div className="configuration-field">
+            <div>
               <label htmlFor={`${id}-images`}>
                 {t("configuration.images")}
               </label>
@@ -245,7 +245,7 @@ export function ConfigurationEditor({
                 aria-describedby={`${id}-upload-limits`}
               />
             </div>
-            <div className="configuration-field">
+            <div>
               <label htmlFor={`${id}-videos`}>
                 {t("configuration.videos")}
               </label>

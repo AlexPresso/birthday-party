@@ -20,6 +20,16 @@ export default async function ActivityPage({
 }) {
   const { id } = await params;
   if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound();
+  // The round needs only the id, so it loads while the session and the event
+  // list resolve. Its outcome is examined last: the event decides first
+  // whether this page exists, and Go still refuses a round the guest may not read.
+  const roundRequest = serverApi(
+    `/programme/${id}/questions`,
+    questionRoundSchema,
+  ).then(
+    (round) => ({ round }),
+    (error: unknown) => ({ error }),
+  );
   const session = await getSession();
   const isAdmin = session.guest.role === "admin";
   const events = await serverApi(
@@ -30,13 +40,13 @@ export default async function ActivityPage({
   if (!event || event.type !== "questions") notFound();
   if (event.locked) redirect("/programme");
 
-  const round = await serverApi(
-    `/programme/${id}/questions`,
-    questionRoundSchema,
-  ).catch((error: unknown) => {
+  const roundResult = await roundRequest;
+  if ("error" in roundResult) {
+    const { error } = roundResult;
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
-  });
+  }
+  const { round } = roundResult;
   return (
     <QuestionActivity
       key={event.id}

@@ -32,8 +32,9 @@ import {
 import { formatDate } from "@/lib/dates";
 import { type Guest } from "@/features/guests/contracts";
 import { PageHeading, EmptyState, ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
-import { useUploads } from "./upload-provider";
+import { useCompletedUploads } from "./upload-provider";
 import { MediaPicker } from "./media-picker";
 import { MediaSlideshow } from "./media-slideshow";
 import "./gallery.css";
@@ -59,6 +60,7 @@ export function PhotoGallery({
   categoryId: number | null;
 }) {
   const { locale, t } = useI18n();
+  const confirm = useConfirm();
   const numbers = new Intl.NumberFormat(locale);
   const plurals = new Intl.PluralRules(locale);
   const router = useRouter();
@@ -70,8 +72,8 @@ export function PhotoGallery({
       : t("categories.privateOption", { name: category.name })
     : t("categories.main");
   const [storedPhotos, setPhotos] = useState(initial.items);
-  const uploads = useUploads();
-  const completedInCategory = uploads.completed.filter(
+  const { completed, forgetPhoto } = useCompletedUploads();
+  const completedInCategory = completed.filter(
     (photo) => photo.categoryId === categoryId,
   );
   const photosById = new Map(
@@ -129,19 +131,32 @@ export function PhotoGallery({
   const currentIndex = photos.findIndex((photo) => photo.id === selected);
   const current = photos[currentIndex];
   async function deletePhoto(photo: Photo) {
-    if (!window.confirm(t("photos.deleteConfirm"))) return;
+    const confirmed = await confirm({
+      message: t("photos.deleteConfirm"),
+      destructive: true,
+    });
+    if (!confirmed) return;
     setDeleting(true);
     setError(null);
     try {
       await remove(`/photos/${photo.id}`);
       setSelected(null);
       setPhotos((items) => items.filter((item) => item.id !== photo.id));
-      uploads.forgetPhoto(photo.id);
+      forgetPhoto(photo.id);
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
       setDeleting(false);
     }
+  }
+
+  // The slideshow continues from the loaded list of the current category.
+  function startSlideshow() {
+    setSlideshow({
+      items: photos,
+      nextCursor: cursor,
+      limits: initial.limits,
+    });
   }
 
   return (
@@ -157,7 +172,7 @@ export function PhotoGallery({
           }}
         >
           {category && (
-            <p className="fine-print media-destination">
+            <p className="fine-print">
               {t("categories.destination", { name: categoryName })}
             </p>
           )}
@@ -260,6 +275,16 @@ export function PhotoGallery({
               </span>
             </div>
             <div className="media-view-actions">
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t("slideshow.start")}
+                title={t("slideshow.start")}
+                disabled={filterPending}
+                onClick={startSlideshow}
+              >
+                <Presentation size={22} aria-hidden="true" />
+              </button>
               <div
                 className="media-view-switch"
                 role="group"
@@ -326,13 +351,7 @@ export function PhotoGallery({
                       <button
                         type="button"
                         disabled={filterPending}
-                        onClick={() =>
-                          setSlideshow({
-                            items: photos,
-                            nextCursor: cursor,
-                            limits: initial.limits,
-                          })
-                        }
+                        onClick={startSlideshow}
                       >
                         <Presentation size={17} aria-hidden="true" />
                         {t("slideshow.start")}

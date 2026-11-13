@@ -4,12 +4,7 @@ import { useId, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { useI18n } from "@/lib/i18n-context";
 import type { Guest } from "../guests/contracts";
-
-export type VoteDraft = {
-  question: string;
-  candidateIds: number[];
-  allowSelfVote: boolean;
-};
+import type { VoteDraft } from "./event-draft";
 
 export function VoteEditor({
   draft,

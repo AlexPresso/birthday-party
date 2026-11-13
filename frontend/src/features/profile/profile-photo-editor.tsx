@@ -7,6 +7,7 @@ import { api, errorMessage } from "@/lib/api";
 import { profileSchema } from "./contracts";
 import { type Guest } from "@/features/guests/contracts";
 import { useI18n } from "@/lib/i18n-context";
+import { imageAccept, isImageType } from "@/lib/media-types";
 import { ErrorNotice } from "@/components/ui";
 import "./profile-photo-editor.css";
 
@@ -64,7 +65,7 @@ export function ProfilePhotoEditor({
     setError(null);
     // Reset the native input so selecting the same file can retry validation.
     if (input.current) input.current.value = "";
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!isImageType(file.type)) {
       setError(t("errors.unsupported_profile_photo_type"));
       return;
     }
@@ -136,7 +137,7 @@ export function ProfilePhotoEditor({
         <input
           ref={input}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept={imageAccept}
           aria-label={t("profile.photo")}
           aria-describedby={`${id}-hint`}
           disabled={pending !== null}

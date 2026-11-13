@@ -1,3 +1,5 @@
+import { isImageType } from "../../lib/media-types.ts";
+
 /** Owns bounded local image previews independently of retryable upload files. */
 export function createUploadPreviews() {
   const urls = new Map<string, string>();
@@ -11,8 +13,7 @@ export function createUploadPreviews() {
   return {
     get: (id: string) => urls.get(id),
     remember(id: string, file: File) {
-      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
-        return;
+      if (!isImageType(file.type)) return;
       release(id);
       urls.set(id, URL.createObjectURL(file));
       while (urls.size > 20) release(urls.keys().next().value!);

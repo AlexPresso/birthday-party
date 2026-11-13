@@ -1,13 +1,11 @@
 import { z } from "zod";
+import { imageMimeTypes, videoMimeTypes } from "../../lib/media-types.ts";
 import { id, instant } from "../../lib/schema.ts";
 import { authorSchema } from "../guests/contracts.ts";
 
 export const mediaCategorySchema = z.object({
   id,
-  name: z
-    .string()
-    .min(1)
-    .refine((value) => Array.from(value).length <= 80),
+  name: z.string().min(1),
   isPublic: z.boolean(),
   coverThumbnailUrl: z
     .string()
@@ -17,7 +15,7 @@ export const mediaCategorySchema = z.object({
 });
 
 export const mediaCategoriesSchema = z.object({
-  items: z.array(mediaCategorySchema).max(100),
+  items: z.array(mediaCategorySchema),
 });
 
 export type MediaCategory = z.infer<typeof mediaCategorySchema>;
@@ -45,15 +43,8 @@ export const photoSchema = z.object({
   categoryId: id.nullable(),
   author: authorSchema,
   kind: z.enum(["image", "video"]),
-  mimeType: z.enum([
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "video/mp4",
-    "video/quicktime",
-    "video/webm",
-    "video/x-matroska",
-  ]),
+  // Go labels a stored Matroska container as such; browsers never offer it.
+  mimeType: z.enum([...imageMimeTypes, ...videoMimeTypes, "video/x-matroska"]),
   width: z.number().positive(),
   height: z.number().positive(),
   createdAt: instant,
@@ -61,15 +52,15 @@ export const photoSchema = z.object({
   thumbnailUrl: mediaUrl,
 });
 
-const welcomeRevision = z.number().int().nonnegative();
+export const welcomeRevisionSchema = z.number().int().nonnegative();
 
-const welcomeWidgetIndex = z.number().int().min(0).max(11);
+export const welcomeWidgetIndexSchema = z.number().int().nonnegative();
 
 const uploadFields = {
   id,
   categoryId: id.nullable(),
-  welcomeRevision: welcomeRevision.nullable(),
-  welcomeWidgetIndex: welcomeWidgetIndex.nullable(),
+  welcomeRevision: welcomeRevisionSchema.nullable(),
+  welcomeWidgetIndex: welcomeWidgetIndexSchema.nullable(),
   clientUploadId: z.uuid(),
   filename: z.string().min(1),
   kind: z.enum(["image", "video"]),
@@ -102,7 +93,7 @@ export const uploadSchema = z
   );
 
 export const uploadsSchema = z.object({
-  items: z.array(uploadSchema).max(150),
+  items: z.array(uploadSchema),
 });
 
 export const photosSchema = z.object({

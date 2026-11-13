@@ -2,8 +2,10 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -16,8 +18,7 @@ import {
   returnToWelcome,
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
-import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
-import { retryRealtime, subscribeRealtime } from "@/lib/realtime-browser";
+import { useRealtimeResource } from "@/lib/use-realtime-resource";
 import { uploadProblem } from "./upload-validation";
 import { createUploadPreviews } from "./upload-previews";
 import {
@@ -50,7 +51,6 @@ export type Transfer = UploadDestination & {
 type UploadContextValue = {
   transfers: Transfer[];
   jobs: UploadJob[];
-  completed: Photo[];
   error: string | null;
   refresh: () => Promise<void>;
   addFiles: (
@@ -63,10 +63,17 @@ type UploadContextValue = {
   canRetryJob: (job: UploadJob) => boolean;
   previewUrl: (id: string) => string | undefined;
   dismiss: (id: string) => void;
+};
+
+type CompletedUploads = {
+  completed: Photo[];
   forgetPhoto: (id: number) => void;
 };
 
+// The queue changes with every progress step. Completed media sit in their own
+// context so the gallery renders again only when a file becomes ready.
 const UploadContext = createContext<UploadContextValue | null>(null);
+const CompletedUploadsContext = createContext<CompletedUploads | null>(null);
 
 function newUploadId() {
   if (crypto.randomUUID) return crypto.randomUUID();
@@ -93,13 +100,40 @@ export function UploadProvider({
   const [completed, setCompleted] = useState<Photo[]>([]);
   const [hidden, setHidden] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [connectionFailed, setConnectionFailed] = useState(false);
-  const refreshQueue = useRef<() => Promise<void>>(() => Promise.resolve());
   const requests = useRef(new Map<string, XMLHttpRequest>());
   const files = useRef(new Map<string, File>());
   const [previews] = useState(createUploadPreviews);
   const dismissed = useRef<string[]>([]);
   const mounted = useRef(true);
+  const {
+    connectionFailed,
+    refresh: refreshQueue,
+    retry: retryQueue,
+  } = useRealtimeResource({
+    topic: "uploads",
+    restartKey: welcomeRevision,
+    async read(signal) {
+      const data = await api("/uploads", uploadsSchema, { signal });
+      signal.throwIfAborted();
+      const items =
+        welcomeRevision === null
+          ? data.items
+          : data.items.filter((job) => job.welcomeRevision === welcomeRevision);
+      const accepted = new Set(items.map((job) => job.clientUploadId));
+      // The queue can confirm acceptance before the original HTTP response.
+      // Keep its XHR alive, but show only the durable job, including failures.
+      setTransfers((previous) =>
+        previous.filter((item) => !accepted.has(item.clientUploadId)),
+      );
+      setJobs(items);
+      setHidden(dismissed.current);
+      rememberCompleted(items, true);
+      setError(null);
+      for (const job of data.items)
+        if (job.status === "ready") files.current.delete(job.clientUploadId);
+    },
+    onError: (err) => setError(errorMessage(err, t)),
+  });
 
   function rememberCompleted(items: UploadJob[], replace = false) {
     const ready = items.flatMap((job) =>
@@ -111,10 +145,13 @@ export function UploadProvider({
         const photosById = new Map(
           candidates.map((photo) => [photo.id, photo]),
         );
-        const newestFirst = [...photosById.values()].sort(
-          (a, b) => b.id - a.id,
-        );
-        return newestFirst.slice(0, 150);
+        const newestFirst = [...photosById.values()]
+          .sort((a, b) => b.id - a.id)
+          .slice(0, 150);
+        const unchanged =
+          newestFirst.length === previous.length &&
+          newestFirst.every((photo, index) => photo.id === previous[index].id);
+        return unchanged ? previous : newestFirst;
       });
     }
   }
@@ -186,9 +223,14 @@ export function UploadProvider({
           String(item.welcomeWidgetIndex),
         );
       request.timeout = 600000;
+      let reported = 0;
       request.upload.onprogress = (event) => {
-        if (event.lengthComputable)
-          update({ progress: Math.round((event.loaded / event.total) * 100) });
+        if (!event.lengthComputable) return;
+        const progress = Math.round((event.loaded / event.total) * 100);
+        // Browsers report progress far more often than the percentage changes.
+        if (progress === reported) return;
+        reported = progress;
+        update({ progress });
       };
       request.onload = () => {
         requests.current.delete(item.clientUploadId);
@@ -219,7 +261,7 @@ export function UploadProvider({
             ...items.filter((entry) => entry.id !== job.id),
           ]);
           if (job.status === "ready") files.current.delete(job.clientUploadId);
-          void refreshQueue.current();
+          void refreshQueue();
         } catch (err) {
           update({ status: "error", error: errorMessage(err, t) });
         }
@@ -235,48 +277,7 @@ export function UploadProvider({
       data.append("file", item.file);
       request.send(data);
     }
-  }, [transfers, t]);
-
-  useEffect(() => {
-    const refresh = createInvalidationRefresh(
-      async (signal) => {
-        const data = await api("/uploads", uploadsSchema, {
-          signal,
-        });
-        signal.throwIfAborted();
-        const items =
-          welcomeRevision === null
-            ? data.items
-            : data.items.filter(
-                (job) => job.welcomeRevision === welcomeRevision,
-              );
-        const accepted = new Set(items.map((job) => job.clientUploadId));
-        // The queue can confirm acceptance before the original HTTP response.
-        // Keep its XHR alive, but show only the durable job, including failures.
-        setTransfers((previous) =>
-          previous.filter((item) => !accepted.has(item.clientUploadId)),
-        );
-        setJobs(items);
-        setHidden(dismissed.current);
-        rememberCompleted(items, true);
-        setError(null);
-        for (const job of data.items)
-          if (job.status === "ready") files.current.delete(job.clientUploadId);
-      },
-      (err) => setError(errorMessage(err, t)),
-    );
-    refreshQueue.current = refresh.request;
-    const unsubscribe = subscribeRealtime(
-      "uploads",
-      () => void refresh.request(),
-      (connected) => setConnectionFailed(!connected),
-    );
-    return () => {
-      refreshQueue.current = () => Promise.resolve();
-      unsubscribe();
-      refresh.dispose();
-    };
-  }, [t, welcomeRevision]);
+  }, [transfers, t, refreshQueue]);
 
   function addFiles(
     selected: File[],
@@ -372,44 +373,54 @@ export function UploadProvider({
       },
     ]);
   }
+  const forgetPhoto = useCallback((id: number) => {
+    setCompleted((items) => items.filter((photo) => photo.id !== id));
+    setJobs((items) =>
+      items.map((job) =>
+        job.status === "ready" && job.photo?.id === id
+          ? { ...job, photo: null }
+          : job,
+      ),
+    );
+  }, []);
+  const completedUploads = useMemo(
+    () => ({ completed, forgetPhoto }),
+    [completed, forgetPhoto],
+  );
   return (
-    <UploadContext
-      value={{
-        transfers,
-        refresh: () => {
-          retryRealtime();
-          return refreshQueue.current();
-        },
-        error:
-          error ?? (connectionFailed ? t("common.connectionFailed") : null),
-        addFiles,
-        retryTransfer,
-        retryJob,
-        completed,
-        canRetryJob: (job) =>
-          job.status === "failed" && files.current.has(job.clientUploadId),
-        previewUrl: previews.get,
-        dismiss,
-        jobs: jobs.filter((job) => !hidden.includes(job.clientUploadId)),
-        forgetPhoto: (id) => {
-          setCompleted((items) => items.filter((photo) => photo.id !== id));
-          setJobs((items) =>
-            items.map((job) =>
-              job.status === "ready" && job.photo?.id === id
-                ? { ...job, photo: null }
-                : job,
-            ),
-          );
-        },
-      }}
-    >
-      {children}
-    </UploadContext>
+    <CompletedUploadsContext value={completedUploads}>
+      <UploadContext
+        value={{
+          transfers,
+          refresh: retryQueue,
+          error:
+            error ?? (connectionFailed ? t("common.connectionFailed") : null),
+          addFiles,
+          retryTransfer,
+          retryJob,
+          canRetryJob: (job) =>
+            job.status === "failed" && files.current.has(job.clientUploadId),
+          previewUrl: previews.get,
+          dismiss,
+          jobs: jobs.filter((job) => !hidden.includes(job.clientUploadId)),
+        }}
+      >
+        {children}
+      </UploadContext>
+    </CompletedUploadsContext>
   );
 }
 
+/** The upload queue: it changes with every transfer progress step. */
 export function useUploads() {
   const context = useContext(UploadContext);
+  if (!context) throw new Error("UploadProvider is required.");
+  return context;
+}
+
+/** Media that became ready in this session, unaffected by transfer progress. */
+export function useCompletedUploads() {
+  const context = useContext(CompletedUploadsContext);
   if (!context) throw new Error("UploadProvider is required.");
   return context;
 }

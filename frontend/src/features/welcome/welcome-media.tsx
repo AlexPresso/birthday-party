@@ -27,7 +27,6 @@ export function WelcomeMedia({
   useEffect(() => {
     let disposed = false;
     const controller = new AbortController();
-    const deadline = setTimeout(() => controller.abort(), 10000);
     void api(
       `/welcome/upload-context?widgetIndex=${widgetIndex}`,
       welcomeUploadContextSchema,
@@ -44,18 +43,11 @@ export function WelcomeMedia({
         setContext(next);
       })
       .catch((cause) => {
-        if (!disposed)
-          setError(
-            controller.signal.aborted
-              ? t("common.connectionFailed")
-              : errorMessage(cause, t),
-          );
-      })
-      .finally(() => clearTimeout(deadline));
+        if (!disposed) setError(errorMessage(cause, t));
+      });
     return () => {
       disposed = true;
       controller.abort();
-      clearTimeout(deadline);
     };
   }, [attempt, revision, widgetIndex, t]);
 

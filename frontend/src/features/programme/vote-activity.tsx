@@ -62,11 +62,10 @@ export function VoteActivity({
   event: PartyEvent;
   vote: Vote;
   guestId: number;
-  headingId?: string;
+  headingId: string;
   onSave: (event: PartyEvent) => void;
 }) {
   const { t, locale } = useI18n();
-  const heading = useId();
   const searchId = useId();
   const [selection, setSelection] = useState<number | undefined>(undefined);
   const [query, setQuery] = useState("");
@@ -107,17 +106,7 @@ export function VoteActivity({
   }
 
   return (
-    <section className="programme-vote" aria-labelledby={headingId ?? heading}>
-      {!headingId && (
-        <h3
-          id={heading}
-          className={
-            vote.question === event.title ? "visually-hidden" : undefined
-          }
-        >
-          {vote.question}
-        </h3>
-      )}
+    <section className="programme-vote" aria-labelledby={headingId}>
       {vote.status === "revealed" ? (
         <VoteResults vote={vote} />
       ) : (

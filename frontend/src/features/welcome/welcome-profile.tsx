@@ -18,24 +18,15 @@ export function WelcomeProfile() {
   useEffect(() => {
     let disposed = false;
     const controller = new AbortController();
-    const deadline = setTimeout(() => controller.abort(), 10000);
     void api("/profile", profileSchema, { signal: controller.signal })
       .then((next) => {
         if (!disposed) setProfile(next);
       })
       .catch((cause) => {
-        if (!disposed) {
-          setError(
-            controller.signal.aborted
-              ? t("common.connectionFailed")
-              : errorMessage(cause, t),
-          );
-        }
-      })
-      .finally(() => clearTimeout(deadline));
+        if (!disposed) setError(errorMessage(cause, t));
+      });
     return () => {
       disposed = true;
-      clearTimeout(deadline);
       controller.abort();
     };
   }, [attempt, t]);

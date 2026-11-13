@@ -553,7 +553,8 @@ Les éléments tiers inclus gardent leur propre licence, fournie dans leur dossi
 
 - les polices Unbounded et Figtree, sous SIL Open Font License 1.1
   ([frontend/public/fonts](frontend/public/fonts)) ;
-- les icônes de l'application, dérivées de Lucide, sous licence ISC
+- les icônes de l'interface viennent de Lucide (licence ISC) ; les icônes de
+  l'application sont un dessin original du projet
   ([frontend/public/icons/LICENSE.txt](frontend/public/icons/LICENSE.txt)) ;
 - les skills d'agents de `.agents/skills/`, sous licence Apache-2.0 ou MIT selon
   le skill (fichier `LICENSE` de chaque dossier).

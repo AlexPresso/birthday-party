@@ -10,7 +10,8 @@ function getClient() {
       url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
       return new WebSocket(url);
     },
-    available: () => !document.hidden && navigator.onLine,
+    visible: () => !document.hidden,
+    online: () => navigator.onLine,
     onExpired: returnToInvitation,
     watch: (resume) => {
       document.addEventListener("visibilitychange", resume);
@@ -32,8 +33,9 @@ export function subscribeRealtime(
   topic: RealtimeTopic,
   refresh: () => void,
   connectionChanged: (connected: boolean) => void,
+  options?: { hasInitialData?: boolean },
 ) {
-  return getClient().subscribe(topic, refresh, connectionChanged);
+  return getClient().subscribe(topic, refresh, connectionChanged, options);
 }
 
 export function retryRealtime() {

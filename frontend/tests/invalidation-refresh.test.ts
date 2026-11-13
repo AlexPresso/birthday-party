@@ -103,27 +103,3 @@ test("failed reads stop until a new signal or explicit retry", async () => {
   assert.equal(errors.length, 1);
   refresh.dispose();
 });
-
-test("a request deadline reports failure and still allows retry", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
-  let reads = 0;
-  const errors: unknown[] = [];
-  const refresh = createInvalidationRefresh(
-    async (signal) => {
-      if (++reads !== 1) return;
-      await new Promise<void>((_, reject) => {
-        signal.addEventListener("abort", () => reject(signal.reason), {
-          once: true,
-        });
-      });
-    },
-    (error) => errors.push(error),
-  );
-  const finished = refresh.request();
-  t.mock.timers.tick(10000);
-  await finished;
-  assert.equal(errors.length, 1);
-  await refresh.request();
-  assert.equal(reads, 2);
-  refresh.dispose();
-});

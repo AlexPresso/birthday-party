@@ -5,6 +5,7 @@ import { api, errorMessage } from "@/lib/api";
 import { mediaCategorySchema, type MediaCategory } from "./contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import "./media-categories.css";
 
 export function MediaCategoriesAdmin({
@@ -15,6 +16,7 @@ export function MediaCategoriesAdmin({
   onSaved: (category: MediaCategory) => void;
 }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const [name, setName] = useState("");
   const [isPublic, setPublic] = useState(false);
   const [busy, setBusy] = useState<number | "create" | null>(null);
@@ -48,7 +50,9 @@ export function MediaCategoriesAdmin({
     if (busy !== null) return;
     if (
       !category.isPublic &&
-      !window.confirm(t("categories.publishConfirm", { name: category.name }))
+      !(await confirm({
+        message: t("categories.publishConfirm", { name: category.name }),
+      }))
     )
       return;
     setBusy(category.id);
@@ -85,7 +89,7 @@ export function MediaCategoriesAdmin({
         </h2>
       </div>
       <p className="muted">{t("categories.description")}</p>
-      <form className="media-category-create" onSubmit={create}>
+      <form onSubmit={create}>
         <label htmlFor="new-media-category">{t("categories.name")}</label>
         <div className="media-category-create-row">
           <input

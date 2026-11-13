@@ -8,14 +8,13 @@ import {
   type PointerEvent,
   type RefObject,
 } from "react";
-import type { WelcomeWidget } from "./contracts";
-import type { WidgetDraft } from "./editor-model";
 
-type Source =
-  | { type: "new"; widgetType: WelcomeWidget["type"] }
-  | { type: "existing"; key: number; from: number };
-type Session = {
-  source: Source;
+/** A row of the list being reordered, or a new item dragged in from outside. */
+export type DragSource<New = never> =
+  { type: "new"; item: New } | { type: "existing"; key: number; from: number };
+
+type Session<New> = {
+  source: DragSource<New>;
   pointerId: number;
   handle: HTMLButtonElement;
   startX: number;
@@ -28,28 +27,46 @@ type Session = {
   order: string;
 };
 
-export function useWelcomeWidgetDrag({
+/**
+ * Pointer dragging for the welcome editor's ordered lists, from a dedicated
+ * handle so scrolling and text selection keep working elsewhere. A drop commits
+ * only inside the list; Escape, a disabled editor, a hidden page or a change to
+ * the rows cancels the drag without touching the draft.
+ *
+ * `to` is the final position among the other rows, or null outside the list.
+ */
+export function useWelcomeDrag<New = never>({
   list,
-  widgets,
+  keys,
+  rowKey,
   disabled,
+  scrollPage = false,
+  onStart,
   onAdd,
   onMove,
   onCancel,
 }: {
   list: RefObject<HTMLOListElement | null>;
-  widgets: WidgetDraft[];
+  /** Row keys in their current order. */
+  keys: number[];
+  /** The `data-*` attribute, in dataset form, that carries each row's key. */
+  rowKey: "stepKey" | "widgetKey";
   disabled: boolean;
-  onAdd: (type: WelcomeWidget["type"], to: number) => void;
+  /** Also scroll the page near its edges, for a source stacked above the list. */
+  scrollPage?: boolean;
+  onStart?: () => void;
+  onAdd?: (item: New, to: number) => void;
   onMove: (from: number, to: number) => void;
   onCancel: () => void;
 }) {
-  const session = useRef<Session | null>(null);
+  const session = useRef<Session<New> | null>(null);
   const [drag, setDrag] = useState<{
-    source: Source;
+    source: DragSource<New>;
     to: number | null;
   } | null>(null);
+  const order = keys.join(",");
 
-  function locate(current: Session) {
+  function locate(current: Session<New>) {
     if (!list.current) return;
     const bounds = list.current.getBoundingClientRect();
     const inside =
@@ -63,9 +80,9 @@ export function useWelcomeWidgetDrag({
       for (const row of list.current.children) {
         if (
           !(row instanceof HTMLElement) ||
-          !row.dataset.widgetKey ||
+          !row.dataset[rowKey] ||
           (current.source.type === "existing" &&
-            Number(row.dataset.widgetKey) === current.source.key)
+            Number(row.dataset[rowKey]) === current.source.key)
         )
           continue;
         const rect = row.getBoundingClientRect();
@@ -98,10 +115,11 @@ export function useWelcomeWidgetDrag({
         else if (current.y <= bottom && current.y > bottom - 40)
           list.current.scrollTop += 9;
       }
-      // The palette and canvas can be stacked on a phone, so allow dragging across the page.
-      if (current.y < 55) window.scrollBy(0, -9);
-      else if (current.y > bottom && current.y > window.innerHeight - 110)
-        window.scrollBy(0, 9);
+      if (scrollPage) {
+        if (current.y < 55) window.scrollBy(0, -9);
+        else if (current.y > bottom && current.y > window.innerHeight - 110)
+          window.scrollBy(0, 9);
+      }
       locate(current);
     }
     current.frame = requestAnimationFrame(scroll);
@@ -116,20 +134,18 @@ export function useWelcomeWidgetDrag({
       current.handle.releasePointerCapture(current.pointerId);
     setDrag(null);
     if (!current.active) return;
-    if (commit && !disabled && current.to !== null) {
-      if (current.source.type === "new")
-        onAdd(current.source.widgetType, current.to);
-      else {
-        onMove(current.source.from, current.to);
-        requestAnimationFrame(() =>
-          current.handle.focus({ preventScroll: true }),
-        );
-      }
-    } else {
+    const { source, to, handle } = current;
+    const restoreFocus = () =>
+      requestAnimationFrame(() => handle.focus({ preventScroll: true }));
+    if (!commit || disabled || to === null) {
       onCancel();
-      requestAnimationFrame(() =>
-        current.handle.focus({ preventScroll: true }),
-      );
+      restoreFocus();
+    } else if (source.type === "new") {
+      // The owner focuses the row it creates.
+      onAdd?.(source.item, to);
+    } else {
+      if (to !== source.from) onMove(source.from, to);
+      restoreFocus();
     }
   }
 
@@ -138,12 +154,8 @@ export function useWelcomeWidgetDrag({
     if (disabled) cancel();
   }, [disabled]);
   useEffect(() => {
-    if (
-      session.current &&
-      session.current.order !== widgets.map((widget) => widget.key).join(",")
-    )
-      cancel();
-  }, [widgets]);
+    if (session.current && session.current.order !== order) cancel();
+  }, [order]);
   useEffect(() => {
     const interrupt = () => cancel();
     const visibility = () => {
@@ -166,7 +178,10 @@ export function useWelcomeWidgetDrag({
     };
   }, []);
 
-  function start(event: PointerEvent<HTMLButtonElement>, source: Source) {
+  function start(
+    event: PointerEvent<HTMLButtonElement>,
+    source: DragSource<New>,
+  ) {
     if (disabled || !event.isPrimary || event.button !== 0 || session.current)
       return;
     event.preventDefault();
@@ -183,8 +198,9 @@ export function useWelcomeWidgetDrag({
       active: false,
       to: null,
       frame: 0,
-      order: widgets.map((widget) => widget.key).join(","),
+      order,
     };
+    onStart?.();
     session.current.frame = requestAnimationFrame(scroll);
   }
 
@@ -210,7 +226,8 @@ export function useWelcomeWidgetDrag({
     }
   }
 
-  function bindings(source: Source) {
+  /** Pointer handlers for one drag handle. */
+  function bindings(source: DragSource<New>) {
     return {
       onPointerDown: (event: PointerEvent<HTMLButtonElement>) =>
         start(event, source),

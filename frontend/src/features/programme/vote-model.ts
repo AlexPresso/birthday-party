@@ -26,3 +26,22 @@ export function rankedResults(vote: Vote) {
     return { ...result, rank };
   });
 }
+
+/** The next state of a vote with its action label and confirmation question. */
+export const voteTransitions = {
+  draft: {
+    status: "open",
+    label: "activities.open",
+    confirmation: "activities.openConfirm",
+  },
+  open: {
+    status: "closed",
+    label: "activities.close",
+    confirmation: "activities.closeConfirm",
+  },
+  closed: {
+    status: "revealed",
+    label: "activities.reveal",
+    confirmation: "activities.revealConfirm",
+  },
+} as const;

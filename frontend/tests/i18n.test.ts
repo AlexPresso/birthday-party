@@ -235,13 +235,87 @@ test("network failures are translated while request cancellations remain cancell
       return true;
     },
   );
-  const aborted = new DOMException("Aborted", "AbortError");
-  fetchMock.mock.mockImplementation(async () => {
-    throw aborted;
+  const controller = new AbortController();
+  fetchMock.mock.mockImplementation(untilAborted);
+  const cancelled = api("/invitations/preview", schema, {
+    signal: controller.signal,
   });
+  controller.abort();
   await assert.rejects(
-    api("/invitations/preview", schema),
-    (error: unknown) => error === aborted,
+    cancelled,
+    (error: unknown) => error === controller.signal.reason,
+  );
+});
+
+// Mirrors fetch: a stalled request settles only when its signal aborts.
+function untilAborted(_input: unknown, options?: RequestInit) {
+  return new Promise<Response>((_, reject) => {
+    const signal = options!.signal!;
+    signal.addEventListener("abort", () => reject(signal.reason), {
+      once: true,
+    });
+  });
+}
+
+test("a stalled request fails as a translated connection error after its deadline", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const t = createTranslator(getMessages("es"));
+  const schema = z.object({ ok: z.boolean() });
+  context.mock.method(globalThis, "fetch", untilAborted);
+  const connectionFailed = (error: unknown) => {
+    assert.ok(error instanceof ApiError);
+    assert.equal(errorMessage(error, t), t("common.connectionFailed"));
+    return true;
+  };
+
+  const read = api("/profile", schema);
+  context.mock.timers.tick(14_999);
+  const custom = api("/profile", schema, { timeout: 2000 });
+  context.mock.timers.tick(1);
+  await assert.rejects(read, connectionFailed);
+  context.mock.timers.tick(1999);
+  await assert.rejects(custom, connectionFailed);
+
+  const controller = new AbortController();
+  const write = remove("/guestbook/1", "DELETE", { signal: controller.signal });
+  context.mock.timers.tick(15_000);
+  await assert.rejects(write, connectionFailed);
+  assert.equal(controller.signal.aborted, false);
+});
+
+test("multipart uploads have no default deadline and a body that stalls counts as a failure", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const schema = z.object({ ok: z.boolean() });
+  const fetchMock = context.mock.method(globalThis, "fetch", untilAborted);
+  const controller = new AbortController();
+  const upload = api("/profile/avatar", schema, {
+    method: "PUT",
+    body: new FormData(),
+    signal: controller.signal,
+  });
+  context.mock.timers.tick(600_000);
+  controller.abort();
+  await assert.rejects(
+    upload,
+    (error: unknown) => error === controller.signal.reason,
+  );
+
+  // The headers arrive, then the body never completes.
+  fetchMock.mock.mockImplementation(
+    async (_input: unknown, options?: RequestInit) =>
+      ({
+        ok: true,
+        status: 200,
+        json: () => untilAborted(null, options),
+      }) as unknown as Response,
+  );
+  const stalled = api("/profile", schema);
+  await Promise.resolve();
+  context.mock.timers.tick(15_000);
+  await assert.rejects(
+    stalled,
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "common.connectionFailed",
   );
 });
 
@@ -253,7 +327,8 @@ test("subscription removal sends its endpoint and accepts an empty successful re
     "fetch",
     async (_path: string, options: RequestInit) => {
       assert.equal(options.method, "DELETE");
-      assert.equal(options.signal, controller.signal);
+      assert.equal(options.signal?.aborted, false);
+      assert.equal(options.cache, "no-store");
       assert.equal(options.credentials, "same-origin");
       assert.equal(options.body, JSON.stringify(body));
       assert.equal(
