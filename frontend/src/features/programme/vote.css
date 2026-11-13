@@ -1,0 +1,403 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+/* The vote page (vote-activity.tsx). */
+@layer features {
+  .vote-page {
+    min-width: 0;
+  }
+
+  .vote-heading {
+    margin-bottom: 22px;
+  }
+
+  .vote-heading .eyebrow {
+    margin-bottom: 6px;
+    overflow-wrap: anywhere;
+  }
+
+  .vote-heading h1 {
+    margin-bottom: 12px;
+    text-wrap: balance;
+  }
+
+  .vote-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .vote-description {
+    margin: 12px 0 0;
+    color: var(--muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .vote-feedback {
+    margin-bottom: 20px;
+  }
+
+  .vote-feedback .notice {
+    margin-bottom: 0;
+  }
+
+  .vote-layout {
+    display: grid;
+    gap: 28px;
+  }
+
+  .vote-board {
+    min-width: 0;
+  }
+
+  .vote-hint,
+  .vote-empty {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .vote-empty {
+    padding: 28px 18px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    text-align: center;
+  }
+
+  .vote-choices {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .vote-options {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Receives the focus after the host removes a choice. */
+  .vote-options:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 5px;
+    border-radius: var(--radius);
+  }
+
+  .vote-option {
+    --option-padding: 16px;
+    --option-gap: 14px;
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition:
+      border-color 120ms ease,
+      background 120ms ease;
+  }
+
+  .vote-option:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .vote-option:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .vote-option-choice {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--option-gap);
+    min-width: 0;
+    margin: 0;
+    padding: 14px var(--option-padding);
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  label.vote-option-choice {
+    cursor: pointer;
+  }
+
+  label.vote-option-choice:has(input:disabled) {
+    cursor: default;
+  }
+
+  /* The native radio keeps the keyboard and the semantics; the mark is drawn. */
+  .vote-option-choice > input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+  }
+
+  .vote-option-mark {
+    flex: 0 0 22px;
+    display: grid;
+    place-items: center;
+    height: 22px;
+    border: 2px solid var(--border-strong);
+    border-radius: 50%;
+    color: transparent;
+  }
+
+  input:checked + .vote-option-mark {
+    border-color: var(--accent);
+    background: var(--button-fill);
+    color: var(--on-accent);
+  }
+
+  /* An option the viewer cannot choose keeps its place without a mark. */
+  input:disabled + .vote-option-mark {
+    visibility: hidden;
+  }
+
+  .vote-option .avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 28px;
+  }
+
+  .vote-option-text {
+    flex: 1;
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .vote-option-label {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .vote-option-notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .vote-option-notes:empty {
+    display: none;
+  }
+
+  .vote-option-notes > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .vote-option-mine {
+    color: var(--accent-text);
+    font-weight: 700;
+  }
+
+  .vote-option-leading {
+    color: var(--highlight);
+    font-weight: 700;
+  }
+
+  .vote-option-bar {
+    display: block;
+    height: 4px;
+    overflow: hidden;
+    border-radius: var(--radius-tiny);
+    background: var(--border);
+  }
+
+  .vote-option-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--highlight);
+    transition: width 320ms cubic-bezier(0.3, 0, 0.1, 1);
+  }
+
+  .vote-option-count {
+    flex-shrink: 0;
+    min-width: 2ch;
+    color: var(--highlight);
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: right;
+  }
+
+  /* The host's actions sit under the option, as on the questions page. */
+  .vote-option-host {
+    flex-basis: 100%;
+    margin-top: -8px;
+    padding: 0 var(--option-padding) 4px;
+  }
+
+  /* On a ballot the actions start under the label, past the radio mark. */
+  .vote-option:has(.vote-option-mark) > .vote-option-host {
+    padding-left: calc(var(--option-padding) + 22px + var(--option-gap));
+  }
+
+  .vote-option-host > .text-button {
+    color: var(--text);
+  }
+
+  .vote-option-host > .text-button:hover {
+    color: var(--danger);
+  }
+
+  /*
+   * The vote button floats above the dock while the list runs under it, and
+   * rests below the last option once the list ends. It is sticky rather than
+   * fixed, so scrolling moves it clear of an upload banner in the same place.
+   */
+  .vote-confirm {
+    position: sticky;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    z-index: 1;
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 7px;
+    border: 1px solid var(--border);
+    /* Concentric with the pill button inside the padding. */
+    border-radius: calc(var(--radius-large) + 7px);
+    background: var(--nav-background);
+    box-shadow: var(--shadow);
+  }
+
+  .vote-confirm > .notice {
+    margin: 0;
+    border-radius: var(--radius-large);
+  }
+
+  .vote-confirm-status {
+    margin: 0;
+    padding: 5px 14px 0;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .vote-confirm-status:empty {
+    display: none;
+  }
+
+  .vote-confirm > .button {
+    width: 100%;
+  }
+
+  .vote-sidebar {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+  }
+
+  .vote-write-in {
+    display: grid;
+    gap: 12px;
+  }
+
+  .vote-write-in > label {
+    margin: 0;
+    font-size: 16px;
+  }
+
+  .vote-write-in > .notice {
+    margin: 0;
+  }
+
+  .vote-sidebar > .button {
+    justify-self: start;
+  }
+
+  @media (max-width: 360px) {
+    .vote-option {
+      --option-padding: 12px;
+      --option-gap: 10px;
+    }
+
+    .vote-option-choice {
+      padding-block: 12px;
+    }
+  }
+
+  @media (min-width: 761px) {
+    .vote-confirm {
+      bottom: calc(96px + env(safe-area-inset-bottom));
+    }
+  }
+
+  @media (min-width: 960px) {
+    .vote-heading {
+      max-width: 760px;
+      margin-bottom: 30px;
+    }
+
+    .vote-heading h1 {
+      font-size: 32px;
+    }
+
+    /* A reading column for the options, with the tools beside it. */
+    .vote-layout {
+      grid-template-columns: minmax(0, 680px) minmax(0, 360px);
+      align-items: start;
+      gap: 40px;
+    }
+
+    .vote-option {
+      --option-padding: 20px;
+      --option-gap: 18px;
+    }
+
+    .vote-option-choice {
+      padding-block: 16px;
+    }
+
+    .vote-option .avatar {
+      width: 88px;
+      height: 88px;
+      font-size: 34px;
+    }
+
+    .vote-option-count {
+      font-size: 24px;
+    }
+
+    .vote-confirm {
+      width: min(420px, 100%);
+      margin-inline: auto;
+    }
+
+    .vote-sidebar {
+      position: sticky;
+      top: 24px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+  }
+}

@@ -19,7 +19,6 @@ export default async function ProgrammePage() {
       <Programme
         initial={events.items}
         party={party}
-        guestId={session.guest.id}
         isAdmin={session.guest.role === "admin"}
       />
     </PageTransition>

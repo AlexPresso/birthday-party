@@ -1,5 +1,5 @@
 "use client";
-import { useId, useRef, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -11,44 +11,54 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { useRealtimeResource } from "@/lib/use-realtime-resource";
-import { eventsSchema, type PartyEvent } from "./contracts";
+import { eventsSchema, type PartyEvent, type VoteOption } from "./contracts";
 import { formatDate } from "@/lib/dates";
 import { type Party } from "@/features/party/contracts";
 import { PageHeading, EmptyState, ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
-import { VoteActivity, VoteStatus } from "./vote-activity";
-import { replaceEvent } from "./vote-model";
+import { VoteStatus } from "./vote-status";
 import { ActivityLink } from "./activity-link";
 import "./programme.css";
+
+const previewedOptions = 3;
+
+/** The leading options of the featured vote: portraits for guests, labels otherwise. */
+function VotePreview({ options }: { options: VoteOption[] }) {
+  return (
+    <div className="programme-vote-preview" aria-hidden="true">
+      {options.map((option) =>
+        option.guestId !== null ? (
+          <Avatar
+            key={option.id}
+            name={option.label}
+            avatarUrl={option.avatarUrl}
+          />
+        ) : (
+          <span key={option.id} className="programme-vote-choice">
+            {option.label}
+          </span>
+        ),
+      )}
+    </div>
+  );
+}
 
 function ProgrammeEvent({
   event,
   timezone,
   partyDate,
-  guestId,
-  isAdmin,
   featured,
   showAgendaHeading,
-  onSave,
 }: {
   event: PartyEvent;
   timezone: string;
   partyDate: string | null;
-  guestId: number;
-  isAdmin: boolean;
   featured: boolean;
   showAgendaHeading: boolean;
-  onSave: (event: PartyEvent) => void;
 }) {
   const { locale, t } = useI18n();
-  const heading = useId();
-  const questionHeading = useId();
-  const [expanded, setExpanded] = useState(false);
   const vote = event.locked ? null : event.vote;
   const questionIsTitle = vote?.question === event.title;
-  const previewCandidates =
-    vote?.candidates.filter((candidate) => candidate.active) ?? [];
-  const showVote = expanded || (vote !== null && vote.status !== "open");
   const title =
     event.locked && !event.title ? t("programme.surprise") : event.title;
   const day = new Intl.DateTimeFormat(locale, {
@@ -75,10 +85,6 @@ function ProgrammeEvent({
           date: formatDate(event.unlockAt, timezone, true, locale),
         });
   }
-  let voteAction = t("programme.vote");
-  if (expanded) voteAction = t("programme.hideVote");
-  else if (vote && !vote.canVote) voteAction = t("programme.viewVote");
-  else if (vote?.myCandidateId != null) voteAction = t("programme.changeVote");
 
   return (
     <li className={featured ? "programme-featured" : "programme-agenda-item"}>
@@ -130,17 +136,20 @@ function ProgrammeEvent({
           {featured && vote ? (
             <>
               <p className="programme-featured-status">
-                {t("activities.openStatus")}
+                <VoteStatus status={vote.status} />
               </p>
-              <h2 id={questionHeading} className="programme-vote-question">
-                {vote.question}
-              </h2>
+              <h2 className="programme-vote-question">{vote.question}</h2>
+              {vote.options.length > 0 && (
+                <VotePreview
+                  options={vote.options.slice(0, previewedOptions)}
+                />
+              )}
+              <ActivityLink event={event} variant="featured" />
             </>
           ) : (
             <>
               {vote && <VoteStatus status={vote.status} />}
               <h2
-                id={heading}
                 className={
                   vote && !questionIsTitle ? "programme-vote-title" : undefined
                 }
@@ -148,93 +157,21 @@ function ProgrammeEvent({
                 {title}
               </h2>
               {vote && !questionIsTitle && (
-                <h3 id={questionHeading} className="programme-vote-question">
-                  {vote.question}
-                </h3>
+                <h3 className="programme-vote-question">{vote.question}</h3>
               )}
-            </>
-          )}
-          {event.locked ? (
-            <p className="programme-event-note">{unlockMessage}</p>
-          ) : (
-            !featured &&
-            event.description && (
-              <p className="programme-event-description">{event.description}</p>
-            )
-          )}
-          {vote && (
-            <>
-              {vote.status === "open" && (
-                <div className="programme-vote-preview" aria-hidden="true">
-                  {previewCandidates.slice(0, 3).map((candidate) => (
-                    <Avatar
-                      key={candidate.id}
-                      name={candidate.name}
-                      avatarUrl={candidate.avatarUrl}
-                    />
-                  ))}
-                  {!featured && previewCandidates.length > 3 && (
-                    <span>
-                      +
-                      {new Intl.NumberFormat(locale).format(
-                        previewCandidates.length - 3,
-                      )}
-                    </span>
-                  )}
-                </div>
-              )}
-              <details
-                className="programme-ballot"
-                open={showVote}
-                onToggle={(event) => {
-                  if (vote.status === "open")
-                    setExpanded(event.currentTarget.open);
-                }}
-              >
-                <summary
-                  className="button primary"
-                  hidden={vote.status !== "open"}
-                >
-                  {voteAction}
-                </summary>
-                {featured && (
-                  <div className="programme-vote-details">
-                    {!questionIsTitle && <h3>{event.title}</h3>}
-                    {event.startsAt && (
-                      <p className="programme-event-note">
-                        {formatDate(event.startsAt, timezone, true, locale)}
-                      </p>
-                    )}
-                    {event.description && (
-                      <p className="programme-event-description">
-                        {event.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {isAdmin && vote.participationCount !== null && (
-                  <p className="programme-event-note programme-participation">
-                    {t("activities.participation", {
-                      count: new Intl.NumberFormat(locale).format(
-                        vote.participationCount,
-                      ),
-                    })}
+              {event.locked ? (
+                <p className="programme-event-note">{unlockMessage}</p>
+              ) : (
+                event.description && (
+                  <p className="programme-event-description">
+                    {event.description}
                   </p>
-                )}
-                <VoteActivity
-                  event={event}
-                  vote={vote}
-                  guestId={guestId}
-                  headingId={
-                    featured || !questionIsTitle ? questionHeading : heading
-                  }
-                  onSave={onSave}
-                />
-              </details>
+                )
+              )}
             </>
           )}
         </div>
-        <ActivityLink event={event} />
+        {!featured && <ActivityLink event={event} />}
       </article>
     </li>
   );
@@ -243,45 +180,35 @@ function ProgrammeEvent({
 export function Programme({
   initial,
   party,
-  guestId,
   isAdmin,
 }: {
   initial: PartyEvent[];
   party: Party;
-  guestId: number;
   isAdmin: boolean;
 }) {
   const { locale, t } = useI18n();
   const [events, setEvents] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const savedRevision = useRef(0);
   const { connectionFailed, retry } = useRealtimeResource({
     topic: "programme",
     hasInitialData: true,
     restartKey: initial,
     async read(signal) {
-      const revision = savedRevision.current;
       const data = await api("/programme", eventsSchema, { signal });
       signal.throwIfAborted();
-      // A ballot saved during the request is newer than this response.
-      if (revision === savedRevision.current) setEvents(data.items);
+      setEvents(data.items);
       setError(null);
     },
     onError: (err) => setError(errorMessage(err, t)),
   });
+  // The first open vote leaves the agenda for the featured card.
   const featured = events.find(
     (event) => !event.locked && event.vote?.status === "open",
   );
-  // Stable keys keep each ballot's draft when realtime updates change its placement.
   const displayedEvents = featured
     ? [featured, ...events.filter((event) => event.id !== featured.id)]
     : events;
-
-  function saveVote(saved: PartyEvent) {
-    savedRevision.current++;
-    setEvents((current) => replaceEvent(current, saved));
-  }
 
   return (
     <>
@@ -357,11 +284,8 @@ export function Programme({
               event={event}
               timezone={party.timezone}
               partyDate={party.date}
-              guestId={guestId}
-              isAdmin={isAdmin}
               featured={event.id === featured?.id}
               showAgendaHeading={index === (featured ? 1 : 0)}
-              onSave={saveVote}
             />
           ))}
         </ol>

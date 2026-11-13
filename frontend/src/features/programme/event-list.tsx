@@ -5,11 +5,37 @@ import { Avatar } from "@/components/avatar";
 import { formatDate } from "@/lib/dates";
 import { useI18n } from "@/lib/i18n-context";
 import { ActivityLink } from "./activity-link";
-import type { PartyEvent } from "./contracts";
-import { VoteResults, VoteStatus } from "./vote-activity";
-import { voteTransitions } from "./vote-model";
+import type { PartyEvent, Vote } from "./contracts";
+import { totalVotes, voteTransitions } from "./vote-model";
+import { VoteStatus } from "./vote-status";
 
 const previewedCandidates = 8;
+
+/** The first portraits of a vote for guests, with the count of the others. */
+function CandidatePreview({ vote }: { vote: Vote }) {
+  const { locale } = useI18n();
+  const candidates = vote.options.filter((option) => option.guestId !== null);
+  if (candidates.length === 0) return null;
+  return (
+    <div className="activity-candidate-preview">
+      {candidates.slice(0, previewedCandidates).map((candidate) => (
+        <Avatar
+          key={candidate.id}
+          name={candidate.label}
+          avatarUrl={candidate.avatarUrl}
+        />
+      ))}
+      {candidates.length > previewedCandidates && (
+        <span>
+          +
+          {new Intl.NumberFormat(locale).format(
+            candidates.length - previewedCandidates,
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
 
 /** The host's list of saved events with their edit, delete and vote actions. */
 export function EventList({
@@ -26,7 +52,7 @@ export function EventList({
   busy: boolean;
   onEdit: (event: PartyEvent) => void;
   onDelete: (event: PartyEvent) => void;
-  /** Moves a vote to its next state: open, closed, then revealed. */
+  /** Moves a vote to its next state: open, then closed. */
   onTransition: (event: PartyEvent) => void;
   /** Saves the open draft before leaving for an activity page. */
   beforeNavigate: () => Promise<boolean>;
@@ -91,35 +117,13 @@ export function EventList({
               {event.vote.question !== event.title && (
                 <p>{event.vote.question}</p>
               )}
-              <div className="activity-candidate-preview">
-                {event.vote.candidates
-                  .slice(0, previewedCandidates)
-                  .map((candidate) => (
-                    <Avatar
-                      key={candidate.id}
-                      name={candidate.name}
-                      avatarUrl={candidate.avatarUrl}
-                    />
-                  ))}
-                {event.vote.candidates.length > previewedCandidates && (
-                  <span>
-                    +
-                    {numbers.format(
-                      event.vote.candidates.length - previewedCandidates,
-                    )}
-                  </span>
-                )}
-              </div>
-              {event.vote.participationCount !== null && (
-                <p className="fine-print">
-                  {t("activities.participation", {
-                    count: numbers.format(event.vote.participationCount),
-                  })}
-                </p>
-              )}
-              {event.vote.status === "revealed" ? (
-                <VoteResults vote={event.vote} />
-              ) : (
+              <CandidatePreview vote={event.vote} />
+              <p className="fine-print">
+                {t("activities.participation", {
+                  count: numbers.format(totalVotes(event.vote)),
+                })}
+              </p>
+              {event.vote.status !== "closed" && (
                 <button
                   type="button"
                   className="button secondary activity-state-button"
@@ -131,7 +135,11 @@ export function EventList({
               )}
             </div>
           )}
-          <ActivityLink event={event} beforeNavigate={beforeNavigate} />
+          <ActivityLink
+            event={event}
+            variant="settings"
+            beforeNavigate={beforeNavigate}
+          />
         </li>
       ))}
     </ul>

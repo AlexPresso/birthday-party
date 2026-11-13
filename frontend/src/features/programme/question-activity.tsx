@@ -15,6 +15,7 @@ import {
   type QuestionRound,
 } from "./contracts";
 import { QuestionComposer } from "./question-composer";
+import "./activity-page.css";
 import "./questions.css";
 
 type ActivityHeading = Pick<PartyEvent, "id" | "title" | "description">;
@@ -166,7 +167,7 @@ export function QuestionActivity({
 
   return (
     <div className="question-page">
-      <Link className="question-back" href="/programme">
+      <Link className="activity-back" href="/programme">
         <ArrowLeft size={21} aria-hidden="true" />
         {t("nav.programme")}
       </Link>

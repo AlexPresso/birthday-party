@@ -5,12 +5,15 @@ const en = {
     "This activity has reached its limit of 200 questions.",
   no_jokers_left: "Both jokers have already been used.",
   invalid_activity:
-    "Add a question of up to 240 characters and choose 2 to 200 different candidates.",
+    "Add a question of up to 240 characters and 2 to 200 different choices.",
   activity_conflict:
     "This activity changed or this action is no longer available. Refresh and try again.",
   vote_closed: "Voting is closed.",
-  invalid_vote_candidate: "Choose an available candidate.",
+  invalid_vote_option: "This choice is no longer available. Pick another one.",
   self_vote_forbidden: "You cannot vote for yourself in this activity.",
+  write_ins_disabled: "Adding a choice isn’t allowed for this vote.",
+  vote_option_limit: "This vote already has the maximum number of choices.",
+  invalid_vote_label: "Enter a choice of 1 to 80 characters.",
 
   invalid_notification_subscription:
     "Notifications couldn't be set up. Try again.",
@@ -111,14 +114,16 @@ export const errorMessages = {
       "Cette activité a atteint sa limite de 200 questions.",
     no_jokers_left: "Les deux jokers ont déjà été utilisés.",
     invalid_activity:
-      "Écris une question de 240 caractères maximum et choisis de 2 à 200 personnes différentes.",
+      "Écris une question de 240 caractères maximum et ajoute de 2 à 200 choix différents.",
     activity_conflict: "Cette activité a changé. Vérifie son état et réessaie.",
     vote_closed:
       "Le vote est fermé. Ton dernier choix enregistré est conservé.",
-    invalid_vote_candidate:
-      "Cette personne ne peut plus recevoir de votes. Choisis quelqu’un d’autre.",
+    invalid_vote_option: "Ce choix n’est plus disponible. Choisis-en un autre.",
     self_vote_forbidden:
       "Tu ne peux pas voter pour toi-même dans cette activité.",
+    write_ins_disabled: "Ce vote n’accepte pas de nouveaux choix.",
+    vote_option_limit: "Ce vote a déjà le nombre maximum de choix.",
+    invalid_vote_label: "Écris un choix de 1 à 80 caractères.",
 
     invalid_notification_subscription:
       "Les notifications n’ont pas pu être configurées. Réessaie.",
@@ -224,15 +229,20 @@ export const errorMessages = {
       "Diese Aktivität hat das Limit von 200 Fragen erreicht.",
     no_jokers_left: "Beide Joker wurden schon verwendet.",
     invalid_activity:
-      "Schreibe eine Frage mit höchstens 240 Zeichen und wähle 2 bis 200 verschiedene Personen.",
+      "Schreibe eine Frage mit höchstens 240 Zeichen und füge 2 bis 200 verschiedene Optionen hinzu.",
     activity_conflict:
       "Diese Aktivität wurde geändert. Prüfe ihren Stand und versuche es erneut.",
     vote_closed:
       "Die Abstimmung ist geschlossen. Deine letzte gespeicherte Wahl bleibt erhalten.",
-    invalid_vote_candidate:
-      "Diese Person kann keine Stimmen mehr erhalten. Wähle jemand anderen.",
+    invalid_vote_option:
+      "Diese Option ist nicht mehr verfügbar. Wähle eine andere.",
     self_vote_forbidden:
       "Bei dieser Aktivität kannst du nicht für dich selbst stimmen.",
+    write_ins_disabled:
+      "Bei dieser Abstimmung lassen sich keine Optionen hinzufügen.",
+    vote_option_limit:
+      "Diese Abstimmung hat bereits die maximale Anzahl an Optionen.",
+    invalid_vote_label: "Gib eine Option mit 1 bis 80 Zeichen ein.",
 
     invalid_notification_subscription:
       "Benachrichtigungen konnten nicht eingerichtet werden. Versuch es erneut.",
@@ -342,13 +352,16 @@ export const errorMessages = {
       "Questa attività ha raggiunto il limite di 200 domande.",
     no_jokers_left: "Hai già usato entrambi i jolly.",
     invalid_activity:
-      "Scrivi una domanda di massimo 240 caratteri e scegli da 2 a 200 persone diverse.",
+      "Scrivi una domanda di massimo 240 caratteri e aggiungi da 2 a 200 scelte diverse.",
     activity_conflict:
       "Questa attività è cambiata. Controlla il suo stato e riprova.",
     vote_closed: "La votazione è chiusa. L’ultima scelta salvata è conservata.",
-    invalid_vote_candidate:
-      "Questa persona non può più ricevere voti. Scegli qualcun altro.",
+    invalid_vote_option:
+      "Questa scelta non è più disponibile. Scegline un’altra.",
     self_vote_forbidden: "Non puoi votare per te stesso in questa attività.",
+    write_ins_disabled: "In questa votazione non si possono aggiungere scelte.",
+    vote_option_limit: "Questa votazione ha già il numero massimo di scelte.",
+    invalid_vote_label: "Scrivi una scelta da 1 a 80 caratteri.",
 
     invalid_notification_subscription:
       "Non è stato possibile configurare le notifiche. Riprova.",
@@ -451,14 +464,16 @@ export const errorMessages = {
       "Esta actividad ha alcanzado el límite de 200 preguntas.",
     no_jokers_left: "Ya se han usado los dos comodines.",
     invalid_activity:
-      "Escribe una pregunta de hasta 240 caracteres y elige de 2 a 200 personas distintas.",
+      "Escribe una pregunta de hasta 240 caracteres y añade de 2 a 200 opciones distintas.",
     activity_conflict:
       "Esta actividad ha cambiado. Comprueba su estado e inténtalo de nuevo.",
     vote_closed:
       "La votación está cerrada. Tu última elección guardada se conserva.",
-    invalid_vote_candidate:
-      "Esta persona ya no puede recibir votos. Elige a otra.",
+    invalid_vote_option: "Esta opción ya no está disponible. Elige otra.",
     self_vote_forbidden: "No puedes votar por ti mismo en esta actividad.",
+    write_ins_disabled: "En esta votación no se pueden añadir opciones.",
+    vote_option_limit: "Esta votación ya tiene el número máximo de opciones.",
+    invalid_vote_label: "Escribe una opción de 1 a 80 caracteres.",
 
     invalid_notification_subscription:
       "No se han podido configurar las notificaciones. Inténtalo de nuevo.",

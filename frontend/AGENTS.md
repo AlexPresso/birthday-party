@@ -353,9 +353,10 @@ for all participants with app access. Guests visiting
 `/parametres` redirect to `/profil` before admin data is fetched. Capitalize
 translated labels and keep existing routes. Host controls live in settings.
 Question activities use the existing programme editor and shared realtime topic.
-Question activities open their own module page at `/programme/[id]` from the
-agenda or settings; keep explicit activity-type routing in the App Router and
-the UI inside the programme feature. Read only authorized, unlocked activities.
+Question and vote activities open their own module page at `/programme/[id]`
+from the agenda or settings; keep explicit activity-type routing in the App
+Router and the UI inside the programme feature. Read only authorized, unlocked
+activities.
 Guests send anonymous text and toggle one upvote per pending question. Show
 server-sorted questions in pending/answered/joker tabs and the two-joker counter.
 Host controls open/close submissions, mark answers and confirm spending a joker.
@@ -401,17 +402,30 @@ The Programme administration shortcut opens the matching settings section.
 Use the existing programme subscription for activity state and participation
 updates. Preserve host drafts and unsent guest selections on unrelated refreshes;
 restore the recorded vote after navigation. Do not fetch the admin guest list
-from guest voting screens. Render only candidate names, authenticated avatars and
-the viewer's own choice returned by the programme API.
+from guest voting screens. Render only what the programme API returns: option
+labels, authenticated avatars, vote counts and the viewer's own choice.
 
-The vote activity uses a searchable portrait grid and an explicit confirmation
-button. Keep names visible, use initials when no photo exists, and convey
-selection with a check plus color. Support keyboard selection and comfortable
-touch targets. Show results only when the backend returns them after revelation;
-candidate totals and individual voter identities must not be inferred from hidden
-UI data. Host settings support adding, scheduling, configuring and deleting each
-event, with separate open, close and reveal actions for votes. Candidate selection and
-self-voting are editable only in draft; question corrections remain available.
+A vote has its own page at `/programme/[id]`, served by the same route as the
+question activity. The Programme tab only previews it: the featured card shows
+the status, the question and the three leading options, and links to the page.
+Options come from one source, guests or custom choices, and are all listed in
+the server's order with their live counts. There is no reveal step, and who
+voted for what is never available to the interface. While the vote is open the
+list is one radio group with an explicit confirmation button that stays above
+the dock. Keep names visible, use initials when no photo exists, and mark the
+recorded choice with a label and a check as well as color. Keep an unsent
+selection across live updates and say why when its option disappears.
+`useReorderedList` glides reordered options to their new place and keeps the
+keyboard focus on a radio that moved; it skips the motion under reduced motion.
+A custom vote that allows write-ins shows a field that votes for the typed
+choice. A closed vote is read-only and marks every leading option. Hosts remove
+write-ins on the page, through a confirmation, and reach the settings from it.
+
+Host settings support adding, scheduling, configuring and deleting each event,
+with separate open and close actions for votes. The source, the candidates or
+typed choices, self-voting and write-ins are editable only in draft; question
+corrections remain available. Choice rows keep the order the host typed them in,
+although the server sorts options itself.
 
 ### Guestbook
 

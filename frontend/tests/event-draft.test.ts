@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { PartyEvent } from "../src/features/programme/contracts.ts";
+import type {
+  PartyEvent,
+  Vote,
+  VoteOption,
+} from "../src/features/programme/contracts.ts";
 import {
   draftProblem,
   eventDraft,
@@ -13,11 +17,47 @@ import {
   type EventDraft,
 } from "../src/features/programme/event-draft.ts";
 
-const candidates = [
-  { id: 1, name: "Alex", avatarUrl: null, active: true },
-  { id: 2, name: "Sam", avatarUrl: null, active: true },
-  { id: 3, name: "Robin", avatarUrl: null, active: true },
-];
+function option(changes: Partial<VoteOption> & { id: number }): VoteOption {
+  return {
+    label: `Option ${changes.id}`,
+    guestId: null,
+    avatarUrl: null,
+    active: true,
+    writeIn: false,
+    votes: 0,
+    ...changes,
+  };
+}
+
+const guestVote: Vote = {
+  question: "Who has the best costume?",
+  status: "draft",
+  choices: "guests",
+  allowSelfVote: false,
+  allowWriteIns: false,
+  options: [
+    option({ id: 31, label: "Alex", guestId: 1 }),
+    option({ id: 32, label: "Sam", guestId: 2 }),
+    option({ id: 33, label: "Robin", guestId: 3 }),
+  ],
+  myOptionId: null,
+  canVote: false,
+};
+
+// The server lists choices by votes, then by name.
+const customVote: Vote = {
+  question: "What do we eat at midnight?",
+  status: "draft",
+  choices: "custom",
+  allowSelfVote: false,
+  allowWriteIns: true,
+  options: [
+    option({ id: 41, label: "Burgers" }),
+    option({ id: 42, label: "Pizza" }),
+  ],
+  myOptionId: null,
+  canVote: false,
+};
 
 function voteEvent(changes: Partial<PartyEvent> = {}): PartyEvent {
   return {
@@ -30,16 +70,7 @@ function voteEvent(changes: Partial<PartyEvent> = {}): PartyEvent {
     startsAt: "2026-07-01T18:30:00Z",
     unlockAt: null,
     locked: false,
-    vote: {
-      question: "Who has the best costume?",
-      status: "draft",
-      allowSelfVote: false,
-      candidates,
-      myCandidateId: null,
-      canVote: false,
-      participationCount: 0,
-      results: null,
-    },
+    vote: guestVote,
     ...changes,
   };
 }
@@ -52,8 +83,11 @@ test("a draft mirrors its event and submits the same instant in UTC", () => {
   assert.equal(draft.unlockAt, "");
   assert.deepEqual(draft.vote, {
     question: "Who has the best costume?",
+    choices: "guests",
     candidateIds: [1, 2, 3],
+    labels: [],
     allowSelfVote: false,
+    allowWriteIns: false,
   });
   const body = eventRequestBody(draft, event, [1, 2, 3]);
   assert.equal(body.startsAt, "2026-07-01T18:30:00.000Z");
@@ -63,12 +97,75 @@ test("a draft mirrors its event and submits the same instant in UTC", () => {
   const fresh = newEventDraft("vote");
   assert.deepEqual(fresh.vote, {
     question: "",
+    choices: "guests",
     candidateIds: [],
+    labels: [],
     allowSelfVote: false,
+    allowWriteIns: false,
   });
   assert.equal(newEventDraft("questions", "Sans filtre").title, "Sans filtre");
   assert.equal(newEventDraft("event").vote, null);
   assert.equal("revision" in eventRequestBody(fresh, undefined, []), false);
+});
+
+test("a request carries the list and the rule of the chosen source only", () => {
+  const draft = eventDraft(voteEvent());
+  assert.deepEqual(
+    eventRequestBody(
+      { ...draft, vote: { ...draft.vote!, allowSelfVote: true } },
+      undefined,
+      [1, 2],
+    ).vote,
+    {
+      question: "Who has the best costume?",
+      choices: "guests",
+      candidateIds: [1, 2],
+      allowSelfVote: true,
+      allowWriteIns: false,
+    },
+  );
+  // The guests picked before switching stay in the draft, not in the request.
+  const custom = {
+    ...draft.vote!,
+    question: " Midnight snack? ",
+    choices: "custom" as const,
+    labels: [" Pizza ", "Burgers"],
+    allowSelfVote: true,
+    allowWriteIns: true,
+  };
+  assert.deepEqual(
+    eventRequestBody({ ...draft, vote: custom }, undefined, [1, 2]).vote,
+    {
+      question: "Midnight snack?",
+      choices: "custom",
+      labels: ["Pizza", "Burgers"],
+      allowSelfVote: false,
+      allowWriteIns: true,
+    },
+  );
+  assert.equal(
+    eventRequestBody(newEventDraft("event"), undefined, []).vote,
+    null,
+  );
+});
+
+test("a custom vote's draft holds the host's choices, not the guests' write-ins", () => {
+  const withWriteIn: Vote = {
+    ...customVote,
+    status: "open",
+    options: [
+      option({ id: 43, label: "Crêpes", writeIn: true, votes: 2 }),
+      ...customVote.options,
+    ],
+  };
+  assert.deepEqual(eventDraft(voteEvent({ vote: withWriteIn })).vote, {
+    question: "What do we eat at midnight?",
+    choices: "custom",
+    candidateIds: [],
+    labels: ["Burgers", "Pizza"],
+    allowSelfVote: false,
+    allowWriteIns: true,
+  });
 });
 
 test("a completed save keeps what the host typed during the request", () => {
@@ -95,6 +192,38 @@ test("a completed save keeps what the host typed during the request", () => {
   assert.notEqual(untouched.vote, submitted.vote, "drafts are never shared");
 });
 
+test("a completed save keeps custom choices in the order the host typed them", () => {
+  const saved = eventDraft(voteEvent({ revision: 4, vote: customVote }));
+  const typed = {
+    ...saved.vote!,
+    labels: [" Pizza", "Burgers "],
+  };
+  const submitted: EventDraft = { ...saved, revision: 3, vote: typed };
+
+  // The server answers in its own order; the rows stay where they are.
+  const merged = mergeSavedDraft(submitted, submitted, saved);
+  assert.deepEqual(merged.vote?.labels, ["Pizza", "Burgers"]);
+  assert.equal(sameDraft(merged, saved), true, "nothing is left to save");
+
+  // A row typed during the request is kept for the next save.
+  const current: EventDraft = {
+    ...submitted,
+    vote: { ...typed, labels: [...typed.labels, "Crêpes"] },
+  };
+  const pending = mergeSavedDraft(current, submitted, saved);
+  assert.deepEqual(pending.vote?.labels, [" Pizza", "Burgers ", "Crêpes"]);
+  assert.equal(sameDraft(pending, saved), false);
+
+  // Switching the source, or one of its rules, is a change to save.
+  const switched: EventDraft = {
+    ...saved,
+    vote: { ...saved.vote!, choices: "guests" },
+  };
+  assert.equal(sameDraft(switched, saved), false);
+  const closed = { ...saved, vote: { ...saved.vote!, allowWriteIns: false } };
+  assert.equal(sameDraft(closed, saved), false);
+});
+
 test("a first save gives the draft its identity without losing newer edits", () => {
   const submitted = newEventDraft("event", "Dinner");
   const current = { ...submitted, title: "Dinner at eight" };
@@ -116,16 +245,16 @@ test("drafts need a title, a question and 2 to 200 candidates until voting opens
   assert.equal(draftProblem(draft, null, [1, 2]), null);
   assert.equal(
     draftProblem({ ...draft, title: "  " }, null, [1, 2]),
-    "invalid_event",
+    "errors.invalid_event",
   );
-  assert.equal(draftProblem(draft, null, [1]), "invalid_activity");
+  assert.equal(draftProblem(draft, null, [1]), "errors.invalid_activity");
   assert.equal(
     draftProblem(
       draft,
       null,
       Array.from({ length: 201 }, (_, index) => index + 1),
     ),
-    "invalid_activity",
+    "errors.invalid_activity",
   );
   assert.equal(
     draftProblem(
@@ -133,20 +262,37 @@ test("drafts need a title, a question and 2 to 200 candidates until voting opens
       null,
       [1, 2],
     ),
-    "invalid_activity",
+    "errors.invalid_activity",
   );
   assert.equal(draftProblem({ ...draft, vote: null }, null, []), null);
 
   // An opened vote keeps its candidates, including guests who left since.
-  const open = voteEvent({ vote: { ...event.vote!, status: "open" } });
+  const open = voteEvent({ vote: { ...guestVote, status: "open" } });
   assert.equal(frozenVote(event), null);
   assert.equal(frozenVote(open), open.vote);
   assert.equal(draftProblem(draft, frozenVote(open), [1]), null);
+  assert.equal(
+    draftProblem(
+      { ...draft, vote: { ...draft.vote!, question: "" } },
+      frozenVote(open),
+      [1],
+    ),
+    "errors.invalid_activity",
+    "the question stays required",
+  );
   const body = eventRequestBody(
     {
       ...draft,
       title: " Best costume ",
-      vote: { question: " Who? ", candidateIds: [1], allowSelfVote: true },
+      vote: {
+        ...draft.vote!,
+        question: " Who? ",
+        choices: "custom",
+        candidateIds: [1],
+        labels: ["Ignored"],
+        allowSelfVote: true,
+        allowWriteIns: true,
+      },
     },
     open,
     [1],
@@ -154,9 +300,88 @@ test("drafts need a title, a question and 2 to 200 candidates until voting opens
   assert.equal(body.title, "Best costume");
   assert.deepEqual(body.vote, {
     question: "Who?",
+    choices: "guests",
     candidateIds: [1, 2, 3],
     allowSelfVote: false,
+    allowWriteIns: false,
   });
+});
+
+test("custom choices are filled in, distinct and at least two unless guests may add theirs", () => {
+  const draft = eventDraft(voteEvent({ vote: customVote }));
+  const withChoices = (labels: string[], allowWriteIns = false) =>
+    draftProblem(
+      { ...draft, vote: { ...draft.vote!, labels, allowWriteIns } },
+      null,
+      [],
+    );
+  assert.equal(withChoices(["Pizza", "Burgers"]), null);
+  assert.equal(withChoices(["Pizza"]), "activities.choicesRequired");
+  assert.equal(withChoices([]), "activities.choicesRequired");
+  // Guests can fill a vote that starts with one choice, or none.
+  assert.equal(withChoices(["Pizza"], true), null);
+  assert.equal(withChoices([], true), null);
+
+  assert.equal(withChoices(["Pizza", "  "]), "activities.choiceEmpty");
+  assert.equal(withChoices(["Pizza", ""], true), "activities.choiceEmpty");
+  assert.equal(withChoices(["Pizza", " pizza "]), "activities.choiceDuplicate");
+  assert.equal(
+    withChoices(["Pizza", "Burgers", "PIZZA"], true),
+    "activities.choiceDuplicate",
+  );
+  assert.equal(withChoices(["Pizza", "x".repeat(80)]), null);
+  assert.equal(
+    withChoices(["Pizza", "x".repeat(81)]),
+    "errors.invalid_vote_label",
+  );
+  const numbered = (count: number) =>
+    Array.from({ length: count }, (_, index) => `Choice ${index + 1}`);
+  assert.equal(withChoices(numbered(200)), null);
+  assert.equal(withChoices(numbered(201)), "errors.vote_option_limit");
+
+  // The guests picked earlier do not count for a custom vote.
+  assert.equal(
+    draftProblem(
+      { ...draft, vote: { ...draft.vote!, labels: [], allowWriteIns: false } },
+      null,
+      [1, 2, 3],
+    ),
+    "activities.choicesRequired",
+  );
+
+  // Once open, the saved choices are resubmitted without the write-ins.
+  const open: Vote = {
+    ...customVote,
+    status: "open",
+    options: [
+      option({ id: 43, label: "Crêpes", writeIn: true, votes: 1 }),
+      ...customVote.options,
+    ],
+  };
+  const frozen = voteEvent({ vote: open });
+  assert.equal(withChoices([]), "activities.choicesRequired");
+  assert.equal(
+    draftProblem(
+      { ...draft, vote: { ...draft.vote!, labels: [] } },
+      frozenVote(frozen),
+      [],
+    ),
+    null,
+  );
+  assert.deepEqual(
+    eventRequestBody(
+      { ...draft, vote: { ...draft.vote!, question: "Snack?", labels: [] } },
+      frozen,
+      [],
+    ).vote,
+    {
+      question: "Snack?",
+      choices: "custom",
+      labels: ["Burgers", "Pizza"],
+      allowSelfVote: false,
+      allowWriteIns: true,
+    },
+  );
 });
 
 test("an overwrite submits the latest saved revision rather than the draft's", () => {

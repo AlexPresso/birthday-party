@@ -378,8 +378,10 @@ test("the five screens adapt to phones and desktops in the dark theme while pres
         unlockAt: null,
         vote: {
           question: "Qui met l’ambiance ?",
+          choices: "guests",
           candidateIds: guests.map(({ id }) => id),
           allowSelfVote: false,
+          allowWriteIns: false,
         },
       },
     });
@@ -555,6 +557,13 @@ test("the five screens adapt to phones and desktops in the dark theme while pres
         ).toBeCloseTo(1440 * 0.9);
         await capture(desktopPage, `desktop-${route}`);
       }
+      // The vote has a page of its own, in the same theme.
+      await desktopPage.goto(`/programme/${vote.id}`);
+      await expect(desktopPage.locator("h1")).toHaveText(
+        "Qui met l’ambiance ?",
+      );
+      await expect(desktopPage.getByRole("radio")).toHaveCount(guests.length);
+      await capture(desktopPage, "desktop-vote");
       await desktopPage.goto("/photos");
       await expect(desktopPage.locator(".media-grid")).toBeVisible();
       await capture(desktopPage, "desktop-media-grid");
@@ -609,6 +618,8 @@ test("the five screens adapt to phones and desktops in the dark theme while pres
           await desktopPage.goto(`/${route}`);
           await capture(desktopPage, `${width}-${route}`);
         }
+        await desktopPage.goto(`/programme/${vote.id}`);
+        await capture(desktopPage, `${width}-vote`);
         await adminPage.goto("/parametres");
         await capture(adminPage, `${width}-parametres`);
       }
