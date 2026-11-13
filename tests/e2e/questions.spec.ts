@@ -334,7 +334,7 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
       }),
     ).toBeVisible();
     await expect(launch).toHaveCount(0);
-    await page.locator(".question-back").click();
+    await page.locator(".activity-back").click();
     await expect(page).toHaveURL("/programme");
     await page.goBack();
     await expect(page).toHaveURL(activityURL);

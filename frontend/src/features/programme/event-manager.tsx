@@ -30,6 +30,7 @@ import {
 import { useEventDraft } from "./use-event-draft";
 import { EventForm } from "./event-form";
 import { EventList } from "./event-list";
+import "./activities.css";
 
 export function EventManager({
   initial,
@@ -133,7 +134,7 @@ export function EventManager({
       submitted.vote?.candidateIds.filter((id) => activeIds.has(id)) ?? [];
     const problem = draftProblem(submitted, frozenVote(saved), candidateIds);
     if (problem) {
-      setError(t(`errors.${problem}`));
+      setError(t(problem));
       return false;
     }
     // Autosave never replaces a newer version on its own: it can run from a
@@ -168,7 +169,7 @@ export function EventManager({
   async function transition(event: PartyEvent) {
     if (!(await autosave.flush())) return;
     event = latestEvents().find((item) => item.id === event.id) ?? event;
-    if (!event.vote || event.vote.status === "revealed" || busy) return;
+    if (!event.vote || event.vote.status === "closed" || busy) return;
     const next = voteTransitions[event.vote.status];
     if (!(await confirm({ message: t(next.confirmation) }))) return;
     setBusy(true);
