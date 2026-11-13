@@ -151,5 +151,5 @@ Birthday Party is released under the GNU Affero General Public License, version
 the app and offer it online, the licence asks you to make your modified source
 available to its users.
 
-The bundled fonts, icons and agent skills keep their own licences, listed in
+The bundled fonts and icons keep their own licences, listed in
 the [development guide](docs/development.md#third-party-material).

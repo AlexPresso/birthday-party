@@ -174,5 +174,4 @@ preserves it. Event edits retain the round and its accepted questions.
 
 The scoped [frontend](../frontend/AGENTS.md) and
 [backend](../backend/AGENTS.md) instructions define the current implementation
-rules. The repository-local skills supply supporting guidance; project rules
-take precedence.
+rules.

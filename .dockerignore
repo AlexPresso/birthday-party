@@ -2,7 +2,6 @@
 .github
 .idea
 .claude
-.agents
 **/node_modules
 **/.next
 **/.cache

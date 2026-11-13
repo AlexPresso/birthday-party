@@ -38,9 +38,8 @@ and `internal/locale` hold the two conventions every feature shares: how instant
 are written and which languages are supported. See [code organization](../docs/architecture.md) for ownership, dependency
 rules and the testing strategy.
 
-Go changes use the project-local [Go Style Guide](../.agents/skills/go-style-guide/SKILL.md).
-[AGENTS.md](AGENTS.md) defines the project's conventions and when to grow the
-architecture. The skill's upstream commit and license are included in the repository.
+[AGENTS.md](AGENTS.md) defines the project's Go conventions and when to grow the
+architecture.
 
 ## Run
 

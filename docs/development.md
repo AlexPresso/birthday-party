@@ -169,18 +169,8 @@ switch it off.
 ## Working with coding agents
 
 [AGENTS.md](../AGENTS.md) and the `AGENTS.md` files in `frontend/` and
-`backend/` describe the project's rules for AI coding agents. They refer to
-five skills vendored under [.agents/skills](../.agents/skills), each with its
-licence and source: Code Simplifier (from
-[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)),
-Go Style Guide
-([madflojo/go-style-agent-skill](https://github.com/madflojo/go-style-agent-skill)),
-Vercel React Best Practices
-([vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills)), UX
-Writing
-([content-designer/ux-writing-skill](https://github.com/content-designer/ux-writing-skill))
-and Humanizer ([blader/humanizer](https://github.com/blader/humanizer)). The
-app does not use them: they are not part of the build or the images.
+`backend/` describe the project's rules for AI coding agents. The app does not
+use them: they are not part of the build or the images.
 
 ## Third-party material
 
@@ -190,6 +180,4 @@ Bundled third-party material keeps its own licence, included next to it:
   ([frontend/public/fonts](../frontend/public/fonts));
 - the interface icons, from Lucide (ISC). The app icons are an original drawing
   for this project
-  ([frontend/public/icons/LICENSE.txt](../frontend/public/icons/LICENSE.txt));
-- the agent skills in `.agents/skills/`, under Apache-2.0 or MIT depending on
-  the skill (see the `LICENSE` file in each folder).
+  ([frontend/public/icons/LICENSE.txt](../frontend/public/icons/LICENSE.txt)).
