@@ -17,7 +17,7 @@ import (
 func TestCoreDependenciesPointInward(t *testing.T) {
 	const module = "birthday-party/backend/"
 	corePackages := map[string]bool{
-		"access": true, "guestbook": true, "identity": true,
+		"access": true, "guestbook": true, "identity": true, "information": true,
 		"media": true, "notifications": true, "party": true,
 		"profile": true, "programme": true, "welcome": true,
 		// API conventions shared by features; they obey the same rules.

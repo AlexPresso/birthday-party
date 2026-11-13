@@ -691,6 +691,33 @@ Vote errors, alongside existing event, access and not-found errors:
 | `vote_option_limit`   | 409    | A new write-in when the vote already has 200 options                   |
 | `activity_conflict`   | 409    | Stale revision, frozen setting, bad transition, removing a host option |
 
+## Information page
+
+The host writes one page of titled texts and decides when guests see it.
+
+`InformationTab = { title: string, body: string }`
+`Information = { enabled: boolean, tabs: InformationTab[] }`
+`AdminInformation = { enabled: boolean, revision: number, tabs: InformationTab[] }`
+
+- `GET /api/information` -> `Information`. Needs full app access, so it answers
+  423 `welcome_required` during the welcome sequence. `enabled` is true only
+  when the host turned the page on and it has at least one tab; otherwise
+  `tabs` is always empty, so a page that is off gives nothing away.
+- `GET /api/admin/information` -> `AdminInformation`, administrators only.
+  `enabled` is the host's switch as saved, even without a tab.
+- `PUT /api/admin/information { revision, enabled, tabs }` -> `AdminInformation`
+  with the next revision. Send the last `revision` received; a stale one
+  returns 409 `information_conflict` and changes nothing. Up to 8 tabs, kept in
+  order. A title has 1–40 characters and a text 1–4,000 after trimming, counted
+  in Unicode code points; anything else returns 400 `invalid_information`.
+  Missing fields, unknown fields and wrong types return 400 `invalid_body`.
+  The JSON body limit is 256 KiB so the largest page fits.
+
+Texts are authored content: stored as written, never translated, and plain.
+The interface keeps their line breaks and turns web addresses, e-mail addresses
+and phone numbers into links; nothing else is interpreted. Changes are not
+signalled over the WebSocket: the interface reads the page when it renders.
+
 ## Guestbook
 
 `Entry = { id, author: Author | null, anonymous: boolean, canDelete: boolean, body, createdAt }`

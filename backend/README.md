@@ -16,7 +16,7 @@ realtime connections and worker startup/shutdown.
 
 Core packages keep models, rules, concrete services and required ports together:
 `access`, `identity`, `programme`, `guestbook`, `welcome`, `profile`, `party`,
-`media` and `notifications`. Their ports use domain types and have no dependency
+`information`, `media` and `notifications`. Their ports use domain types and have no dependency
 on SQL, HTTP handlers, media libraries or infrastructure implementations.
 
 - `internal/adapters/postgres/<feature>` implements persistence and complete atomic

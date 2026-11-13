@@ -8,6 +8,7 @@ import (
 	"birthday-party/backend/internal/access"
 	"birthday-party/backend/internal/guestbook"
 	"birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/information"
 	"birthday-party/backend/internal/media"
 	"birthday-party/backend/internal/notifications"
 	"birthday-party/backend/internal/party"
@@ -57,6 +58,10 @@ var apiErrors = map[string]apiError{
 	"unknown_timezone":      {http.StatusBadRequest, "This time zone was not found. Try Europe/Zurich."},
 	"invalid_date":          {http.StatusBadRequest, "Choose the date and time again, then save."},
 	"invalid_configuration": {http.StatusBadRequest, "Choose an age from 1 to 150 and upload limits from 1 to 1024 MiB. Invitation titles allow 200 characters and descriptions 2000."},
+
+	// Information page.
+	"invalid_information":  {http.StatusBadRequest, "Add up to 8 tabs. Each needs a title of up to 40 characters and a text of up to 4,000."},
+	"information_conflict": {http.StatusConflict, "The information page changed. Refresh it before trying again."},
 
 	// Welcome sequence.
 	"welcome_conflict":           {http.StatusConflict, "The welcome sequence changed. Refresh it before trying again."},
@@ -149,6 +154,7 @@ func errorCode(err error) (string, bool) {
 		denied       access.Error
 		sequence     welcome.Error
 		details      party.Error
+		page         information.Error
 		photo        profile.Error
 		activity     programme.ActivityError
 		upload       *media.Error
@@ -161,6 +167,8 @@ func errorCode(err error) (string, bool) {
 		return string(sequence), true
 	case errors.As(err, &details):
 		return string(details), true
+	case errors.As(err, &page):
+		return string(page), true
 	case errors.As(err, &photo):
 		return string(photo), true
 	case errors.As(err, &activity):
