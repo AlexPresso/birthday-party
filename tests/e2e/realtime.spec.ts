@@ -317,6 +317,10 @@ test("programme edits and scheduled unlocks arrive without minute polling or sec
 test("queue reads retry explicitly and socket receipts recover a lost upload response", async ({
   page,
 }) => {
+  // The idle window below takes 10.5 seconds on its own, and each of the waits
+  // around it may use its full 15 seconds on a slow runner. Together they do
+  // not fit in the default minute, which also has to cover the teardown.
+  test.setTimeout(120_000);
   await signInGuest(host, page, "Realtime Receipt Guest");
   let unavailable = true;
   await page.route("**/api/uploads", async (route) => {
