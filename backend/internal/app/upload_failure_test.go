@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"birthday-party/backend/internal/media"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -37,6 +40,10 @@ func TestMissingProcessingStorageKeepsUploadForRetry(t *testing.T) {
 			if err = os.Mkdir(storage, 0700); err != nil {
 				t.Fatal(err)
 			}
+			if _, err = a.claimUpload(t.Context()); !errors.Is(err, sql.ErrNoRows) {
+				t.Fatalf("failed upload was retried without waiting: %v", err)
+			}
+			advanceClock(a, time.Minute)
 			job, err = a.claimUpload(t.Context())
 			if err != nil {
 				t.Fatal(err)
@@ -198,5 +205,44 @@ func TestFailedWorkerUnlockDiscardsConnection(t *testing.T) {
 	defer cancel()
 	if _, err = other.ExecContext(ctx, "SELECT pg_advisory_lock(hashtext(current_schema()),73002)"); err != nil {
 		t.Fatalf("failed unlock retained worker ownership: %v", err)
+	}
+}
+
+func TestUploadThatKeepsFailingStopsAfterItsLastAttempt(t *testing.T) {
+	a := testApp(t)
+	host, identity := admin(t, a)
+	response := queuedUpload(t, a, host, "", pngBytes(t))
+	status(t, response, 202)
+	if err := os.Remove(filepath.Join(a.config.DataDir, "tmp")); err != nil {
+		t.Fatal(err)
+	}
+	var key string
+	for attempt := 1; attempt <= media.MaxAttempts; attempt++ {
+		job, err := a.claimUpload(t.Context())
+		if err != nil || job.attempts != attempt {
+			t.Fatalf("attempt %d: claimed %+v: %v", attempt, job, err)
+		}
+		key = job.key
+		a.processUpload(t.Context(), job)
+		current, err := a.uploadByID(t.Context(), job.id, identity.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if attempt < media.MaxAttempts {
+			if current.Status != "queued" || current.ErrorCode != nil {
+				t.Fatalf("attempt %d ended the job early: %+v", attempt, current)
+			}
+			advanceClock(a, time.Hour)
+			continue
+		}
+		if current.Status != "failed" || current.ErrorCode == nil || *current.ErrorCode != "photo_upload_failed" {
+			t.Fatalf("exhausted upload was not failed: %+v", current)
+		}
+	}
+	if _, err := a.claimUpload(t.Context()); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("failed upload was claimed again: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(a.config.DataDir, "uploads", key+".input")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("failed upload kept its input: %v", err)
 	}
 }

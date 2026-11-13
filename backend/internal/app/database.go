@@ -12,7 +12,19 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-func openDatabase(ctx context.Context, databaseURL, dataDir string) (*sql.DB, error) {
+// sessionDefaults bound runaway statements, lock queues and abandoned
+// transactions on every pooled connection. They limit a statement or an open
+// transaction, never an idle session, so the connection that holds the worker
+// advisory lock is unaffected. The lock timeout stays above the workers' own
+// query deadline so their context, not PostgreSQL, ends a blocked query.
+// A connection string may override each value.
+var sessionDefaults = map[string]string{
+	"statement_timeout":                   "30s",
+	"lock_timeout":                        "10s",
+	"idle_in_transaction_session_timeout": "60s",
+}
+
+func openDatabase(ctx context.Context, databaseURL string) (*sql.DB, error) {
 	if strings.TrimSpace(databaseURL) == "" {
 		return nil, errors.New("DATABASE_URL is required")
 	}
@@ -23,6 +35,11 @@ func openDatabase(ctx context.Context, databaseURL, dataDir string) (*sql.DB, er
 	}
 	if config.ConnectTimeout == 0 {
 		config.ConnectTimeout = 10 * time.Second
+	}
+	for name, value := range sessionDefaults {
+		if _, chosen := config.RuntimeParams[name]; !chosen {
+			config.RuntimeParams[name] = value
+		}
 	}
 	db := stdlib.OpenDB(*config)
 	db.SetMaxOpenConns(10)
@@ -37,16 +54,5 @@ func openDatabase(ctx context.Context, databaseURL, dataDir string) (*sql.DB, er
 		db.Close()
 		return nil, fmt.Errorf("migrate PostgreSQL: %w", err)
 	}
-	if err := importSQLite(ctx, db, dataDir); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("import SQLite: %w", err)
-	}
 	return db, nil
-}
-
-func flag(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
 }

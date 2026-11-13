@@ -4,20 +4,21 @@ import (
 	"net/http"
 
 	"birthday-party/backend/internal/access"
-	"birthday-party/backend/internal/identity"
 )
 
 // Handler returns the API router with authentication and mutation origin checks.
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
+		respond(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 	mux.HandleFunc("GET /api/config", a.getPublicConfiguration)
 	mux.HandleFunc("GET /api/admin/config", a.auth(true, a.getConfiguration))
 	mux.HandleFunc("PUT /api/admin/config", a.auth(true, a.updateConfiguration))
 	mux.HandleFunc("POST /api/invitations/preview", a.previewInvitation)
 	mux.HandleFunc("POST /api/invitations/accept", a.acceptInvitation)
-	mux.HandleFunc("GET /api/session", a.auth(false, func(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
-		respond(w, 200, map[string]any{"guest": guest})
+	mux.HandleFunc("GET /api/session", a.auth(false, func(w http.ResponseWriter, _ *http.Request, viewer access.Viewer) {
+		respond(w, http.StatusOK, map[string]any{"guest": viewer.Guest})
 	}))
 	mux.HandleFunc("POST /api/logout", a.auth(false, a.logout))
 	mux.HandleFunc("GET /api/realtime", a.realtimeHTTP)
@@ -72,7 +73,7 @@ func (a *App) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if r.Header.Get("X-Requested-With") != "birthday-party" || (r.Header.Get("Origin") != "" && r.Header.Get("Origin") != a.config.PublicURL) {
-				fail(w, 403, "request_forbidden")
+				fail(w, "request_forbidden")
 				return
 			}
 		}

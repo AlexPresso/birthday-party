@@ -17,14 +17,25 @@ const (
 	SessionTTL = 90 * 24 * time.Hour
 )
 
+// Role distinguishes the host from invited guests.
+type Role string
+
+const (
+	RoleGuest Role = "guest"
+	RoleAdmin Role = "admin"
+)
+
 // Guest is the public identity of an invited participant.
 type Guest struct {
 	ID        int64   `json:"id"`
 	Name      string  `json:"name"`
-	Role      string  `json:"role"`
+	Role      Role    `json:"role"`
 	Active    bool    `json:"active"`
 	AvatarURL *string `json:"avatarUrl"`
 }
+
+// IsAdmin reports whether the guest is a host.
+func (g Guest) IsAdmin() bool { return g.Role == RoleAdmin }
 
 // Author is the public attribution attached to a named contribution.
 type Author struct {

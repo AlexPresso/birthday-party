@@ -23,10 +23,10 @@ const PositionSQL = `(p.generation=w.generation AND NOT p.completed
 
 type Store struct {
 	db      *sql.DB
-	enqueue func(context.Context, *sql.Tx, welcome.State, string) error
+	enqueue func(context.Context, *sql.Tx, welcome.State, welcome.Action) error
 }
 
-func New(db *sql.DB, enqueue func(context.Context, *sql.Tx, welcome.State, string) error) *Store {
+func New(db *sql.DB, enqueue func(context.Context, *sql.Tx, welcome.State, welcome.Action) error) *Store {
 	return &Store{db: db, enqueue: enqueue}
 }
 
@@ -119,7 +119,7 @@ func (s *Store) Edit(ctx context.Context, revision int64, steps []welcome.Step) 
 	return state, err
 }
 
-func (s *Store) Transition(ctx context.Context, revision int64, action string) (welcome.State, error) {
+func (s *Store) Transition(ctx context.Context, revision int64, action welcome.Action) (welcome.State, error) {
 	tx, state, err := s.lock(ctx)
 	if err != nil {
 		return state, err
@@ -129,10 +129,8 @@ func (s *Store) Transition(ctx context.Context, revision int64, action string) (
 	if err != nil {
 		return state, err
 	}
-	if s.enqueue != nil {
-		if err = s.enqueue(ctx, tx, state, action); err != nil {
-			return state, err
-		}
+	if err = s.enqueue(ctx, tx, state, action); err != nil {
+		return state, err
 	}
 	err = save(ctx, tx, &state)
 	return state, err
@@ -207,7 +205,7 @@ func (s *Store) Enroll(ctx context.Context, guestID int64) (welcome.State, welco
 	return state, progress, tx.Commit()
 }
 
-func (s *Store) Navigate(ctx context.Context, guestID, revision int64, action string) (welcome.State, welcome.Progress, error) {
+func (s *Store) Navigate(ctx context.Context, guestID, revision int64, action welcome.Action) (welcome.State, welcome.Progress, error) {
 	var state welcome.State
 	var progress welcome.Progress
 	tx, err := s.db.BeginTx(ctx, nil)

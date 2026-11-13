@@ -14,7 +14,7 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-// Both startup operations use the same transaction-scoped lock within each schema.
+// startupLock serializes concurrent migration runs within one schema.
 const startupLock = `SELECT pg_advisory_xact_lock(hashtextextended(current_database() || ':' || current_schema() || ':birthday-startup', 0))`
 
 func migrate(ctx context.Context, db *sql.DB) error {

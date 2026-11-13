@@ -11,8 +11,22 @@ type Step struct {
 	Widgets []Widget `json:"widgets"`
 }
 
+// WidgetType names what a welcome widget shows or lets the guest do.
+type WidgetType string
+
+const (
+	WidgetTitle               WidgetType = "title"
+	WidgetText                WidgetType = "text"
+	WidgetProfilePhoto        WidgetType = "profile_photo"
+	WidgetMediaUpload         WidgetType = "media_upload"
+	WidgetEnableNotifications WidgetType = "enable_notifications"
+)
+
+// authored reports whether the widget carries host-written text.
+func (t WidgetType) authored() bool { return t == WidgetTitle || t == WidgetText }
+
 type Widget struct {
-	Type        string       `json:"type"`
+	Type        WidgetType   `json:"type"`
 	Text        string       `json:"text,omitempty"`
 	MediaUpload *MediaUpload `json:"mediaUpload,omitempty"`
 }
@@ -34,10 +48,10 @@ func (w *Widget) UnmarshalJSON(data []byte) error {
 			return errors.New("unsupported welcome widget field")
 		}
 	}
-	if _, exists := fields["text"]; exists && input.Type != "title" && input.Type != "text" {
+	if _, exists := fields["text"]; exists && !input.Type.authored() {
 		return errors.New("text is only supported on title and text widgets")
 	}
-	if _, exists := fields["mediaUpload"]; exists && input.Type != "media_upload" {
+	if _, exists := fields["mediaUpload"]; exists && input.Type != WidgetMediaUpload {
 		return errors.New("mediaUpload is only supported on media upload widgets")
 	}
 	*w = Widget(input)

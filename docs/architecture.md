@@ -78,13 +78,17 @@ SQL drivers, HTTP handlers, image libraries or FFmpeg:
 | `party`         | Party details, timezone validation and date normalization                 |
 | `media`         | Gallery permissions, upload destinations and durable processing workflows |
 | `notifications` | Subscription validation and durable delivery decisions                    |
+| `timestamp`     | The one text format for instants exchanged with the API                   |
+| `locale`        | The supported interface languages                                         |
 
 The adapters provide the concrete infrastructure:
 
 | Location                               | Responsibility                                                      |
 | -------------------------------------- | ------------------------------------------------------------------- |
 | `internal/adapters/postgres/<feature>` | SQL, row/advisory locks and complete atomic persistence operations  |
+| `internal/adapters/postgres/access`    | Also the shared "lock the guest and require a live session" helpers |
 | `internal/adapters/avatar`             | Bounded profile image decoding and normalization                    |
+| `internal/adapters/preview`            | Flattening onto the theme background and JPEG encoding of previews  |
 | `internal/adapters/mediafiles`         | Private file storage, media inspection, image processing and FFmpeg |
 | `internal/adapters/webpush`            | Web Push signing, payload serialization and delivery                |
 | `internal/adapters/pushtransport`      | Restricted outbound HTTPS, DNS validation and connection limits     |

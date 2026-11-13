@@ -98,7 +98,7 @@ func TestProfilePhotoLifecyclePermissionsAndPersistence(t *testing.T) {
 	status(t, request(t, a, "GET", firstURL, nil, nil), 401)
 	imageResponse := request(t, a, "GET", firstURL, nil, other)
 	status(t, imageResponse, 200)
-	if imageResponse.Header().Get("Content-Type") != "image/jpeg" || imageResponse.Header().Get("Cache-Control") != "private, no-store" || imageResponse.Header().Get("X-Content-Type-Options") != "nosniff" {
+	if imageResponse.Header().Get("Content-Type") != "image/jpeg" || imageResponse.Header().Get("Cache-Control") != "private, no-cache" || imageResponse.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("unsafe avatar headers: %v", imageResponse.Header())
 	}
 	status(t, request(t, a, "GET", strings.Replace(firstURL, "v=1", "v=999", 1), nil, owner), 404)
@@ -289,18 +289,23 @@ func TestProfilePhotoConcurrencyIsBoundedAndReplacementAtomic(t *testing.T) {
 	host, _ := admin(t, a)
 	owner, identity, _ := guest(t, a, host, "Concurrent profile")
 	initial := profileGuest(t, uploadAvatar(t, a, owner, pngBytes(t)))
+	// A photo still arriving from a slow connection must not make others wait.
 	r := avatarRequest(t, owner, pngBytes(t))
 	r.Body = io.NopCloser(&welcomeClosureReader{Reader: r.Body, onRead: func() {
-		response := uploadAvatar(t, a, host, pngBytes(t))
-		status(t, response, 429)
-		if response.Header().Get("Retry-After") == "" {
-			t.Fatal("busy response omitted Retry-After")
-		}
+		status(t, uploadAvatar(t, a, host, pngBytes(t)), 200)
 	}})
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, r)
 	status(t, w, 200)
 	status(t, request(t, a, "GET", *initial.AvatarURL, nil, owner), 404)
+	// Only decoding is exclusive: a busy decoder asks the client to retry.
+	a.avatarProcessors <- struct{}{}
+	busy := uploadAvatar(t, a, host, pngBytes(t))
+	<-a.avatarProcessors
+	status(t, busy, 429)
+	if busy.Header().Get("Retry-After") == "" {
+		t.Fatal("busy response omitted Retry-After")
+	}
 	data, err := avatar.New().Prepare(t.Context(), bytes.NewReader(pngBytes(t)))
 	if err != nil {
 		t.Fatal(err)

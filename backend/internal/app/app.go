@@ -72,6 +72,8 @@ type App struct {
 	notificationSender  *push.Sender
 	realtime            *realtimeHub
 	programmeReschedule chan struct{}
+	mediaWake           wakeSignal
+	notificationWake    wakeSignal
 }
 
 // Open prepares private storage, opens PostgreSQL and applies pending migrations.
@@ -104,7 +106,7 @@ func Open(config Config) (*App, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	db, err := openDatabase(ctx, config.DatabaseURL, config.DataDir)
+	db, err := openDatabase(ctx, config.DatabaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +122,8 @@ func Open(config Config) (*App, error) {
 		workerErrors:        make(chan error, 1),
 		realtime:            newRealtimeHub(),
 		programmeReschedule: make(chan struct{}, 1),
+		mediaWake:           newWakeSignal(mediaWorkers),
+		notificationWake:    newWakeSignal(1),
 	}
 	clock := func() time.Time { return a.now() }
 	partyStore := pgparty.New(db, clock)

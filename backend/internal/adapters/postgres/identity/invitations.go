@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"birthday-party/backend/internal/identity"
 )
@@ -13,7 +12,7 @@ func issueInvitation(ctx context.Context, tx *sql.Tx, id int64, credential ident
 	if _, err := tx.ExecContext(ctx, "DELETE FROM invitations WHERE guest_id=$1", id); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, "INSERT INTO invitations(token_hash,guest_id,expires_at) VALUES($1,$2,$3)", credential.TokenHash, id, credential.ExpiresAt.Unix())
+	_, err := tx.ExecContext(ctx, "INSERT INTO invitations(token_hash,guest_id,expires_at) VALUES($1,$2,$3)", credential.TokenHash, id, credential.ExpiresAt)
 	return err
 }
 
@@ -30,9 +29,9 @@ func (s *Store) EnsureAdminInvitation(ctx context.Context, name *string, issue f
 	}
 	var id int64
 	if name == nil {
-		err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE role='admin' AND active=1 ORDER BY id LIMIT 1").Scan(&id)
+		err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE role='admin' AND active ORDER BY id LIMIT 1").Scan(&id)
 	} else {
-		err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE name=$1 AND role='admin' AND active=1 ORDER BY id LIMIT 1", *name).Scan(&id)
+		err = tx.QueryRowContext(ctx, "SELECT id FROM guests WHERE name=$1 AND role='admin' AND active ORDER BY id LIMIT 1", *name).Scan(&id)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		newName := "Admin"
@@ -57,16 +56,14 @@ func (s *Store) EnsureAdminInvitation(ctx context.Context, name *string, issue f
 // Invitation loads private state for service-side availability checks.
 func (s *Store) Invitation(ctx context.Context, hash string) (identity.PendingInvitation, error) {
 	var pending identity.PendingInvitation
-	var expires int64
 	err := s.db.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active,i.expires_at,i.used_at IS NOT NULL FROM invitations i JOIN guests g ON g.id=i.guest_id WHERE i.token_hash=$1`, hash).
-		Scan(&pending.Guest.ID, &pending.Guest.Name, &pending.Guest.Role, &pending.Guest.Active, &expires, &pending.Used)
+		Scan(&pending.Guest.ID, &pending.Guest.Name, &pending.Guest.Role, &pending.Guest.Active, &pending.ExpiresAt, &pending.Used)
 	if errors.Is(err, sql.ErrNoRows) {
 		return identity.PendingInvitation{}, identity.ErrUnavailableInvitation
 	}
 	if err != nil {
 		return identity.PendingInvitation{}, err
 	}
-	pending.ExpiresAt = time.Unix(expires, 0)
 	return pending, nil
 }
 
@@ -77,7 +74,7 @@ func (s *Store) RenewInvitation(ctx context.Context, id int64, issue func() (ide
 		return err
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, "UPDATE guests SET active=1 WHERE id=$1", id)
+	result, err := tx.ExecContext(ctx, "UPDATE guests SET active=TRUE WHERE id=$1", id)
 	if err := changed(result, err); err != nil {
 		return err
 	}

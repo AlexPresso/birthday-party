@@ -2,56 +2,45 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"birthday-party/backend/internal/access"
-	"birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/locale"
 	"birthday-party/backend/internal/party"
 )
 
 func (a *App) getPublicConfiguration(w http.ResponseWriter, r *http.Request) {
 	configuration, err := a.configuration.Get(r.Context())
 	if err != nil {
-		internal(w, err)
+		failError(w, err)
 		return
 	}
 	respond(w, http.StatusOK, configuration.PublicConfiguration)
 }
 
-func (a *App) getConfiguration(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) getConfiguration(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
 	configuration, err := a.configuration.Get(r.Context())
 	if err != nil {
-		internal(w, err)
+		failError(w, err)
 		return
 	}
 	respond(w, http.StatusOK, configuration)
 }
 
-func (a *App) updateConfiguration(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) updateConfiguration(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	var body json.RawMessage
 	if !decode(w, r, &body) {
 		return
 	}
 	var input party.Configuration
 	if !completeConfiguration(body) || json.Unmarshal(body, &input) != nil {
-		fail(w, http.StatusBadRequest, "invalid_body")
+		fail(w, "invalid_body")
 		return
 	}
-	cookie, _ := r.Cookie(cookieName)
-	actor := party.ConfigurationActor{GuestID: guest.ID, SessionHash: identity.HashToken(cookie.Value)}
+	actor := party.ConfigurationActor{GuestID: viewer.Guest.ID, SessionHash: viewer.SessionHash}
 	configuration, err := a.configuration.Update(r.Context(), actor, input)
 	if err != nil {
-		switch {
-		case errors.Is(err, party.ErrInvalidConfiguration):
-			fail(w, http.StatusBadRequest, "invalid_configuration")
-		case errors.Is(err, access.ErrAdmin):
-			fail(w, http.StatusForbidden, "admin_required")
-		case errors.Is(err, access.ErrExpired):
-			fail(w, http.StatusUnauthorized, "session_expired")
-		default:
-			internal(w, err)
-		}
+		failError(w, err)
 		return
 	}
 	respond(w, http.StatusOK, configuration)
@@ -79,7 +68,7 @@ func completeConfiguration(body json.RawMessage) bool {
 	if invitation == nil {
 		return false
 	}
-	locales := object(invitation["locales"], "en", "fr", "de", "it", "es")
+	locales := object(invitation["locales"], locale.Supported()...)
 	if locales == nil {
 		return false
 	}
@@ -99,7 +88,7 @@ type uploadLimits struct {
 func (a *App) currentUploadLimits(w http.ResponseWriter, r *http.Request) (uploadLimits, bool) {
 	configuration, err := a.configuration.Get(r.Context())
 	if err != nil {
-		internal(w, err)
+		failError(w, err)
 		return uploadLimits{}, false
 	}
 	return uploadLimits{ImageBytes: int64(configuration.ImageSizeMB) << 20, VideoBytes: int64(configuration.VideoSizeMB) << 20}, true

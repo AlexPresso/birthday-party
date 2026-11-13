@@ -15,6 +15,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"birthday-party/backend/internal/access"
+	guestidentity "birthday-party/backend/internal/identity"
 )
 
 func videoFixture(t *testing.T, format string) []byte {
@@ -94,7 +97,7 @@ func TestVideoUploadPreservesContainersAndProtectsPlayback(t *testing.T) {
 			partial := httptest.NewRecorder()
 			a.Handler().ServeHTTP(partial, r)
 			status(t, partial, 206)
-			if !bytes.Equal(partial.Body.Bytes(), data[:32]) || !strings.HasPrefix(partial.Header().Get("Content-Range"), "bytes 0-31/") || partial.Header().Get("Content-Type") != originalMIME || partial.Header().Get("Cache-Control") != "private, no-store" {
+			if !bytes.Equal(partial.Body.Bytes(), data[:32]) || !strings.HasPrefix(partial.Header().Get("Content-Range"), "bytes 0-31/") || partial.Header().Get("Content-Type") != originalMIME || partial.Header().Get("Cache-Control") != "private, no-cache" {
 				t.Fatalf("invalid private range response: %v", partial.Header())
 			}
 			thumb := request(t, a, "GET", media.ThumbnailURL, nil, two)
@@ -203,7 +206,7 @@ func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	host, identity := admin(t, a)
-	if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=$1", identity.ID); err != nil {
+	if _, err := a.db.Exec("UPDATE guests SET active=FALSE WHERE id=$1", identity.ID); err != nil {
 		t.Fatal(err)
 	}
 	var body bytes.Buffer
@@ -223,7 +226,7 @@ func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 	r.AddCookie(host)
 	w := httptest.NewRecorder()
 	// Simulate revocation after the authentication middleware read this identity.
-	a.uploadPhoto(w, r, identity)
+	a.uploadPhoto(w, r, access.Viewer{Guest: identity, SessionHash: guestidentity.HashToken(host.Value)})
 	status(t, w, 401)
 	if !strings.Contains(w.Body.String(), `"code":"access_revoked"`) {
 		t.Fatal(w.Body.String())

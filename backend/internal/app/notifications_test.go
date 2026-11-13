@@ -225,7 +225,7 @@ func TestNotificationsCoalesceEncryptAndPreserveNewerUpdates(t *testing.T) {
 }
 
 func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
-	for _, scenario := range []string{"retry limit", "expired endpoint", "logout", "expired session", "inactive guest", "completed welcome", "restarted welcome", "expired message", "redirect"} {
+	for _, scenario := range []string{"retry limit", "expired endpoint", "logout", "expired session", "inactive guest", "completed welcome", "restarted welcome", "expired message", "redirect", "rejected request"} {
 		t.Run(scenario, func(t *testing.T) {
 			a := testApp(t)
 			host, visitor, state, input := queuedTestNotification(t, a)
@@ -240,6 +240,8 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 					code = 410
 				case "redirect":
 					code = 307
+				case "rejected request":
+					code = 403
 				}
 				return &http.Response{StatusCode: code, Body: io.NopCloser(strings.NewReader(""))}, nil
 			})
@@ -247,11 +249,11 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 			case "logout":
 				status(t, request(t, a, "POST", "/api/logout", nil, visitor), 204)
 			case "expired session":
-				if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", a.now().Unix(), guestidentity.HashToken(visitor.Value)); err != nil {
+				if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", a.now(), guestidentity.HashToken(visitor.Value)); err != nil {
 					t.Fatal(err)
 				}
 			case "inactive guest":
-				if _, err := a.db.Exec("UPDATE guests SET active=0 WHERE id=(SELECT guest_id FROM sessions WHERE token_hash=$1)", guestidentity.HashToken(visitor.Value)); err != nil {
+				if _, err := a.db.Exec("UPDATE guests SET active=FALSE WHERE id=(SELECT guest_id FROM sessions WHERE token_hash=$1)", guestidentity.HashToken(visitor.Value)); err != nil {
 					t.Fatal(err)
 				}
 			case "completed welcome":
@@ -264,8 +266,9 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 				now := a.now().Add(notifications.Lifetime)
 				a.now = func() time.Time { return now }
 			}
+			bounded := scenario == "retry limit" || scenario == "rejected request"
 			iterations := 1
-			if scenario == "retry limit" {
+			if bounded {
 				iterations = 5
 			}
 			for range iterations {
@@ -279,7 +282,7 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 				t.Fatal("terminal or unauthorized notification remained queued")
 			}
 			wantCalls := 0
-			if scenario == "retry limit" {
+			if bounded {
 				wantCalls = 5
 			}
 			if scenario == "expired endpoint" || scenario == "redirect" {

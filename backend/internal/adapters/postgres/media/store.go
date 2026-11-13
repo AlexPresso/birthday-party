@@ -10,7 +10,11 @@ import (
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/media"
+	"birthday-party/backend/internal/timestamp"
 )
+
+// quotaLock serializes queue and gallery capacity decisions within one schema.
+const quotaLock = "SELECT pg_advisory_xact_lock(hashtext(current_schema()),73003)"
 
 type Store struct {
 	db  *sql.DB
@@ -18,12 +22,13 @@ type Store struct {
 }
 
 func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: now} }
-func stamp(t time.Time) string                    { return t.UTC().Format(time.RFC3339Nano) }
+
+var _ media.Repository = (*Store)(nil)
 
 func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *int64, before int64, limit int) ([]media.Photo, error) {
 	if categoryID != nil {
 		var id int64
-		err := s.db.QueryRowContext(ctx, "SELECT id FROM media_categories WHERE id=$1 AND (is_public OR $2)", *categoryID, guest.Role == "admin").Scan(&id)
+		err := s.db.QueryRowContext(ctx, "SELECT id FROM media_categories WHERE id=$1 AND (is_public OR $2)", *categoryID, guest.IsAdmin()).Scan(&id)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &media.Error{Code: "media_category_not_found"}
 		}
@@ -34,7 +39,7 @@ func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *in
 	rows, err := s.db.QueryContext(ctx, `SELECT p.id,p.category_id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END FROM photos p JOIN guests g ON p.guest_id=g.id
  LEFT JOIN media_categories c ON c.id=p.category_id
  WHERE ($1::bigint=0 OR p.id<$1) AND p.category_id IS NOT DISTINCT FROM $3::bigint
- AND (p.category_id IS NULL OR c.is_public OR $4) ORDER BY p.id DESC LIMIT $2`, before, limit+1, categoryID, guest.Role == "admin")
+ AND (p.category_id IS NULL OR c.is_public OR $4) ORDER BY p.id DESC LIMIT $2`, before, limit+1, categoryID, guest.IsAdmin())
 	if err != nil {
 		return nil, err
 	}
@@ -42,10 +47,12 @@ func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *in
 	items := []media.Photo{}
 	for rows.Next() {
 		var item media.Photo
+		var created time.Time
 		var avatarVersion int64
-		if err := rows.Scan(&item.ID, &item.CategoryID, &item.Author.ID, &item.Author.Name, &item.Width, &item.Height, &item.CreatedAt, &item.MIMEType, &avatarVersion); err != nil {
+		if err := rows.Scan(&item.ID, &item.CategoryID, &item.Author.ID, &item.Author.Name, &item.Width, &item.Height, &created, &item.MIMEType, &avatarVersion); err != nil {
 			return nil, err
 		}
+		item.CreatedAt = timestamp.Format(created)
 		item.SetURLs()
 		item.Author.AvatarURL = identity.AvatarURL(item.Author.ID, avatarVersion)
 		items = append(items, item)
@@ -55,7 +62,8 @@ func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *in
 
 func (s *Store) PhotoFile(ctx context.Context, guest identity.Guest, id int64) (media.File, error) {
 	var file media.File
-	err := s.db.QueryRowContext(ctx, `SELECT p.filename,p.thumbnail,p.mime,p.guest_id FROM photos p LEFT JOIN media_categories c ON c.id=p.category_id WHERE p.id=$1 AND (p.category_id IS NULL OR c.is_public OR $2)`, id, guest.Role == "admin").Scan(&file.Filename, &file.Thumbnail, &file.MIME, &file.AuthorID)
+	err := s.db.QueryRowContext(ctx, `SELECT p.filename,p.thumbnail,p.mime,p.guest_id,p.created_at FROM photos p LEFT JOIN media_categories c ON c.id=p.category_id
+ WHERE p.id=$1 AND (p.category_id IS NULL OR c.is_public OR $2)`, id, guest.IsAdmin()).Scan(&file.Filename, &file.Thumbnail, &file.MIME, &file.AuthorID, &file.Created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return file, &media.Error{Code: "photo_not_found"}
 	}
@@ -65,7 +73,7 @@ func (s *Store) PhotoFile(ctx context.Context, guest identity.Guest, id int64) (
 func (s *Store) DeletePhoto(ctx context.Context, guest identity.Guest, id int64) (media.File, error) {
 	var file media.File
 	err := s.db.QueryRowContext(ctx, `DELETE FROM photos p WHERE p.id=$1 AND (p.guest_id=$3 OR $2) AND
- (p.category_id IS NULL OR $2 OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public)) RETURNING filename,thumbnail,guest_id`, id, guest.Role == "admin", guest.ID).Scan(&file.Filename, &file.Thumbnail, &file.AuthorID)
+ (p.category_id IS NULL OR $2 OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public)) RETURNING filename,thumbnail,guest_id`, id, guest.IsAdmin(), guest.ID).Scan(&file.Filename, &file.Thumbnail, &file.AuthorID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return file, &media.Error{Code: "photo_not_found"}
 	}
@@ -149,10 +157,11 @@ func (s *Store) UploadContext(ctx context.Context, guestID int64, index int) (me
 }
 
 func (s *Store) Ready(ctx context.Context, id int64) (bool, error) {
-	var status string
+	var status media.Status
 	err := s.db.QueryRowContext(ctx, "SELECT status FROM upload_jobs WHERE id=$1", id).Scan(&status)
-	return status == "ready", err
+	return status == media.StatusReady, err
 }
+
 func changed(result sql.Result, err error) (bool, error) {
 	if err != nil {
 		return false, err
@@ -160,19 +169,27 @@ func changed(result sql.Result, err error) (bool, error) {
 	count, err := result.RowsAffected()
 	return count > 0, err
 }
-func (s *Store) Requeue(ctx context.Context, job media.Pending, now time.Time) (bool, error) {
-	return changed(s.db.ExecContext(ctx, "UPDATE upload_jobs SET status='queued',updated_at=$1 WHERE id=$2 AND status='processing' AND attempt_id=$3", stamp(now), job.ID, job.Attempt))
+
+// Requeue only returns the job while the given attempt still owns it.
+func (s *Store) Requeue(ctx context.Context, job media.Pending, now, available time.Time) (bool, error) {
+	return changed(s.db.ExecContext(ctx, `UPDATE upload_jobs SET status='queued',updated_at=$1,available_at=$2
+ WHERE id=$3 AND status='processing' AND attempt_id=$4`, now, available, job.ID, job.Attempt))
 }
+
+// Fail only fails the job while the given attempt still owns it.
 func (s *Store) Fail(ctx context.Context, job media.Pending, code string, now time.Time) (bool, error) {
-	return changed(s.db.ExecContext(ctx, "UPDATE upload_jobs SET status='failed',error_code=$1,updated_at=$2 WHERE id=$3 AND status='processing' AND attempt_id=$4", code, stamp(now), job.ID, job.Attempt))
+	return changed(s.db.ExecContext(ctx, `UPDATE upload_jobs SET status='failed',error_code=$1,updated_at=$2
+ WHERE id=$3 AND status='processing' AND attempt_id=$4`, code, now, job.ID, job.Attempt))
 }
+
 func (s *Store) CleanHistory(ctx context.Context, before time.Time) ([]int64, error) {
-	rows, err := s.db.QueryContext(ctx, "DELETE FROM upload_jobs WHERE status IN ('ready','failed') AND updated_at::timestamptz<$1::timestamptz RETURNING guest_id", stamp(before))
+	rows, err := s.db.QueryContext(ctx, "DELETE FROM upload_jobs WHERE status IN ('ready','failed') AND updated_at<$1 RETURNING guest_id", before)
 	if err != nil {
 		return nil, err
 	}
 	return readOwners(rows)
 }
+
 func readOwners(rows *sql.Rows) ([]int64, error) {
 	defer rows.Close()
 	seen := map[int64]bool{}
@@ -189,8 +206,6 @@ func readOwners(rows *sql.Rows) ([]int64, error) {
 	}
 	return owners, rows.Err()
 }
-
-var _ media.Repository = (*Store)(nil)
 
 func (s *Store) CategoryOwners(ctx context.Context, categoryID int64) ([]int64, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT DISTINCT guest_id FROM upload_jobs WHERE category_id=$1 LIMIT 500", categoryID)

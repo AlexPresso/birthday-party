@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	guestidentity "birthday-party/backend/internal/identity"
 )
@@ -52,14 +53,14 @@ func TestStartupAdminInvitationCreatesAdministrator(t *testing.T) {
 		t.Fatal("startup invitation has an invalid token")
 	}
 	var stored string
-	var expires int64
+	var expires time.Time
 	if err := a.db.QueryRow("SELECT token_hash,expires_at FROM invitations").Scan(&stored, &expires); err != nil {
 		t.Fatal(err)
 	}
 	if stored == token || stored != guestidentity.HashToken(token) {
 		t.Fatal("startup invitation token must only be stored hashed")
 	}
-	if expires != a.now().Add(guestidentity.InvitationTTL).Unix() {
+	if !expires.Equal(a.now().Add(guestidentity.InvitationTTL)) {
 		t.Fatal("startup invitation does not use the standard expiry")
 	}
 	accepted := request(t, a, "POST", "/api/invitations/accept", map[string]string{"token": token}, nil)
@@ -148,7 +149,7 @@ func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			a := testApp(t)
 			for _, guest := range test.guests {
-				if _, err := a.db.Exec("INSERT INTO guests(name,role,active) VALUES($1,$2,$3)", guest.Name, guest.Role, flag(guest.Active)); err != nil {
+				if _, err := a.db.Exec("INSERT INTO guests(name,role,active) VALUES($1,$2,$3)", guest.Name, guest.Role, guest.Active); err != nil {
 					t.Fatal(err)
 				}
 			}

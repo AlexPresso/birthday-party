@@ -2,9 +2,11 @@
 
 ## Product
 
-A friendly app for a 30th birthday celebration. Guests will share photos, videos and
-discover events or surprises that become available later. Prioritize easy mobile
-use, a personal visual identity, simple code, and responsive interactions.
+A friendly app for a birthday celebration, first used for a 30th and meant to be
+reused by other hosts with one installation per party. Guests share photos and
+videos and discover events or surprises that become available later. Prioritize
+easy mobile use, a distinctive visual identity, simple code, and responsive
+interactions.
 
 ## Instruction map
 
@@ -148,8 +150,6 @@ use, a personal visual identity, simple code, and responsive interactions.
   step, guests navigate explicitly. Hide Next until another step is available,
   and do not show a Start button while waiting. Add widget types explicitly with
   validation, permissions and a matching component.
-  Migrate existing steps without losing
-  authored content or accepted uploads.
 - The notification widget asks permission only after an explicit guest click.
   Persist Web Push subscriptions with their guest, session and browser language;
   permission alone does not mean delivery is enabled. Guests can manage their
@@ -167,14 +167,16 @@ use, a personal visual identity, simple code, and responsive interactions.
 - PostgreSQL stores records and media jobs; a private local data directory stores
   photos, videos, thumbnails and pending inputs. Back up both together. This setup
   targets one Go process and persistent local storage.
-- All schema changes use new numbered SQL files under
-  `backend/internal/app/migrations/`. Startup applies them transactionally and
-  verifies recorded checksums; never edit an applied migration.
-- Existing `DATA_DIR/birthday.sqlite` is imported once into an empty PostgreSQL
-  database, preserving identities, sessions and media filenames. Keep the source
-  intact; SQLite is used only for this legacy import.
-- The frontend proxies same-origin `/api/*` to Go. The public API contract is in
-  `docs/api.md`; keep frontend validators and backend responses aligned.
+- The schema starts from one baseline migration under
+  `backend/internal/app/migrations/`. Later schema changes use new numbered SQL
+  files there. Startup applies them transactionally and verifies recorded
+  checksums; never edit an applied migration.
+- Browsers always call same-origin `/api/*`. In production the Ingress sends it
+  straight to Go, so uploads and the WebSocket never pass through Node; the
+  Next.js rewrite proxies it only in local development and Compose. The public
+  API contract is in `docs/api.md`. Frontend response validators check shape,
+  enums, same-origin URLs and the invariants the interface relies on; length
+  and count ceilings are enforced by Go alone.
 - Activities are programme events themselves, with stable event IDs and an
   explicit type: `event` for ordinary entries and `vote` for voting. A vote has
   a question, 2–200 selected active candidates
@@ -184,9 +186,7 @@ use, a personal visual identity, simple code, and responsive interactions.
   each vote separately. Freeze candidates and the self-vote rule after opening;
   allow question corrections. One choice per guest is replaceable while open.
   Keep ballots across event edits and schedule changes; remove them with the event.
-  Migrate existing nested activities into individual events without losing
-  authored content, schedules, candidates, status or ballots. Each event has at
-  most one vote extension. Keep its type fixed after creation.
+  Each event has at most one vote extension. Keep its type fixed after creation.
   Omit draft vote events from guest lists and hide vote details in locked events.
   Never expose other guests' choices; administrators see participation counts,
   but all candidate totals stay hidden until revelation. Enforce current access,
@@ -217,7 +217,9 @@ use, a personal visual identity, simple code, and responsive interactions.
   FFmpeg generates JPEG thumbnails only; never downscale or transcode the video.
   Existing converted videos remain usable, but deleted originals cannot be restored.
   Apply the same permissions to originals and thumbnails, count both in storage
-  quotas, preserve them during recovery and remove them together. Compose includes
+  quotas, preserve them during recovery and remove them together. Serve media
+  and avatars with a validator and `Cache-Control: private, no-cache`, and
+  authorize before answering 304; JSON responses stay `no-store`. Compose includes
   FFmpeg. Keep processing and file sizes bounded.
   Accepted uploads enter a persistent queue; two background workers prepare them.
   Preserve progress across navigation and restore accepted jobs after reload.
@@ -234,7 +236,8 @@ use, a personal visual identity, simple code, and responsive interactions.
 - Upload limits default to 15/100 MiB and accept integers from 1 to 1024.
   Go applies a settings snapshot to each incoming request; preserve already
   accepted jobs when limits decrease. Expose effective limits in the media and
-  profile APIs. The Next proxy has a fixed 1024 MiB plus 64 KiB ceiling.
+  profile APIs. The development proxy in Next has a fixed 1024 MiB plus 64 KiB
+  ceiling; the production Ingress must allow the same.
 - Invitation copy resolves the saved locale-specific text before the shared text
   and localized default. A null value inherits; an explicitly empty value hides
   the text. Preserve this distinction during environment import, editing and rendering.

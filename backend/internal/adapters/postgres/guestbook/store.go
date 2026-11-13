@@ -29,7 +29,7 @@ func (s *Store) List(ctx context.Context, beforeID int64, limit int) ([]guestboo
 			e.body,
 			e.created_at,
 			CASE
-				WHEN e.anonymous=0 AND g.avatar_jpeg IS NOT NULL THEN g.avatar_version
+				WHEN NOT e.anonymous AND g.avatar_jpeg IS NOT NULL THEN g.avatar_version
 				ELSE 0
 			END
 		FROM entries e
@@ -64,15 +64,11 @@ func (s *Store) List(ctx context.Context, beforeID int64, limit int) ([]guestboo
 
 // Create retains the owner even when the entry is anonymous.
 func (s *Store) Create(ctx context.Context, record guestbook.Record) (int64, error) {
-	anonymousFlag := 0
-	if record.Anonymous {
-		anonymousFlag = 1
-	}
 	var id int64
 	err := s.db.QueryRowContext(ctx, `
 		INSERT INTO entries(guest_id,anonymous,body,created_at)
 		VALUES($1,$2,$3,$4)
-		RETURNING id`, record.Author.ID, anonymousFlag, record.Body, record.CreatedAt).Scan(&id)
+		RETURNING id`, record.Author.ID, record.Anonymous, record.Body, record.CreatedAt).Scan(&id)
 	return id, err
 }
 

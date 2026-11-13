@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"unicode/utf8"
+
+	"birthday-party/backend/internal/locale"
 )
 
 const ErrInvalidConfiguration Error = "invalid_configuration"
@@ -59,12 +61,14 @@ func (s *ConfigurationService) Update(ctx context.Context, actor ConfigurationAc
 }
 
 func DefaultConfiguration() Configuration {
+	locales := make(map[string]InvitationText, len(locale.Supported()))
+	for _, tag := range locale.Supported() {
+		locales[tag] = InvitationText{}
+	}
 	return Configuration{
-		PublicConfiguration: PublicConfiguration{Age: 30, Invitation: InvitationCopy{Locales: map[string]InvitationText{
-			"en": {}, "fr": {}, "de": {}, "it": {}, "es": {},
-		}}},
-		ImageSizeMB: 15,
-		VideoSizeMB: 100,
+		PublicConfiguration: PublicConfiguration{Age: 30, Invitation: InvitationCopy{Locales: locales}},
+		ImageSizeMB:         15,
+		VideoSizeMB:         100,
 	}
 }
 
@@ -86,12 +90,13 @@ func normalizeConfiguration(input Configuration, restrictText bool) (Configurati
 		return input, err
 	}
 	input.Invitation.InvitationText = text
-	if len(input.Invitation.Locales) != 5 {
+	supported := locale.Supported()
+	if len(input.Invitation.Locales) != len(supported) {
 		return input, ErrInvalidConfiguration
 	}
-	locales := make(map[string]InvitationText, 5)
-	for _, locale := range []string{"en", "fr", "de", "it", "es"} {
-		text, exists := input.Invitation.Locales[locale]
+	locales := make(map[string]InvitationText, len(supported))
+	for _, tag := range supported {
+		text, exists := input.Invitation.Locales[tag]
 		if !exists {
 			return input, ErrInvalidConfiguration
 		}
@@ -99,7 +104,7 @@ func normalizeConfiguration(input Configuration, restrictText bool) (Configurati
 		if err != nil {
 			return input, err
 		}
-		locales[locale] = normalized
+		locales[tag] = normalized
 	}
 	input.Invitation.Locales = locales
 	return input, nil

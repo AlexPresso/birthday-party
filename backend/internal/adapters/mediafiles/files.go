@@ -3,6 +3,7 @@ package mediafiles
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -37,7 +38,7 @@ func (f *Files) RemovePublished(file media.File) error {
 	}
 	return result
 }
-func (f *Files) OpenPublished(name string) (media.ReadSeekCloser, error) {
+func (f *Files) OpenPublished(name string) (io.ReadSeekCloser, error) {
 	file, err := os.Open(filepath.Join(f.root, "photos", name))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, &media.Error{Code: "photo_unavailable"}

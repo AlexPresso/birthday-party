@@ -10,7 +10,9 @@ import (
 
 var _ programme.QuestionRepository = (*Store)(nil)
 
-func (s *Store) questionTransaction(ctx context.Context, actor programme.Actor, eventID int64, admin, write bool) (*sql.Tx, int64, programme.QuestionRound, error) {
+// questionTransaction authorizes the actor and locks the event's question round.
+// Guests only reach rounds the host has opened or closed, never drafts.
+func (s *Store) questionTransaction(ctx context.Context, actor programme.Actor, eventID int64, admin, write bool) (*transaction, int64, programme.QuestionRound, error) {
 	tx, err := s.begin(ctx, actor, eventID, admin, nil)
 	if err != nil {
 		return nil, 0, programme.QuestionRound{}, err
@@ -24,7 +26,7 @@ func (s *Store) questionTransaction(ctx context.Context, actor programme.Actor, 
 	err = tx.QueryRowContext(ctx, `SELECT a.id,a.revision,q.status,q.jokers_used
  FROM programme_activities a JOIN programme_question_rounds q ON q.activity_id=a.id
  WHERE a.event_id=$1`+lock, eventID).Scan(&id, &round.Revision, &round.Status, &round.JokersUsed)
-	if errors.Is(err, sql.ErrNoRows) || err == nil && !admin && round.Status == "draft" {
+	if errors.Is(err, sql.ErrNoRows) || err == nil && !admin && round.Status == programme.RoundDraft {
 		err = programme.ErrNotFound
 	}
 	if err != nil {
@@ -34,7 +36,8 @@ func (s *Store) questionTransaction(ctx context.Context, actor programme.Actor, 
 	return tx, id, round, nil
 }
 
-func (s *Store) finishQuestions(ctx context.Context, tx *sql.Tx, actor programme.Actor, id int64) (programme.QuestionRound, error) {
+// finishQuestions reads the round for the response and commits.
+func (s *Store) finishQuestions(ctx context.Context, tx *transaction, actor programme.Actor, id int64) (programme.QuestionRound, error) {
 	round := programme.QuestionRound{Items: []programme.Question{}}
 	err := tx.QueryRowContext(ctx, `SELECT a.revision,q.status,q.jokers_used FROM programme_activities a
  JOIN programme_question_rounds q ON q.activity_id=a.id WHERE a.id=$1`, id).Scan(&round.Revision, &round.Status, &round.JokersUsed)
@@ -62,10 +65,7 @@ func (s *Store) finishQuestions(ctx context.Context, tx *sql.Tx, actor programme
 		return round, err
 	}
 	round.QuestionCount = len(round.Items)
-	if err := s.checkExpiry(ctx, tx, actor); err != nil {
-		return round, err
-	}
-	return round, tx.Commit()
+	return round, s.commit(tx)
 }
 
 func (s *Store) ReadQuestions(ctx context.Context, actor programme.Actor, eventID int64, admin bool) (programme.QuestionRound, error) {
@@ -83,7 +83,7 @@ func (s *Store) AddQuestion(ctx context.Context, actor programme.Actor, eventID 
 		return round, err
 	}
 	defer tx.Rollback()
-	if round.Status != "open" {
+	if round.Status != programme.RoundOpen {
 		return round, programme.ErrQuestionsClosed
 	}
 	var count int
@@ -105,14 +105,14 @@ func (s *Store) UpvoteQuestion(ctx context.Context, actor programme.Actor, event
 		return round, err
 	}
 	defer tx.Rollback()
-	if round.Status != "open" {
+	if round.Status != programme.RoundOpen {
 		return round, programme.ErrQuestionsClosed
 	}
-	status, err := questionStatus(ctx, tx, id, questionID)
+	status, err := questionStatus(ctx, tx.Tx, id, questionID)
 	if err != nil {
 		return round, err
 	}
-	if status != "pending" {
+	if status != programme.QuestionPending {
 		return round, programme.ErrActivityConflict
 	}
 	if upvoted {
@@ -126,7 +126,7 @@ func (s *Store) UpvoteQuestion(ctx context.Context, actor programme.Actor, event
 	return s.finishQuestions(ctx, tx, actor, id)
 }
 
-func (s *Store) TransitionQuestions(ctx context.Context, actor programme.Actor, eventID int64, status string, revision int64) (programme.QuestionRound, error) {
+func (s *Store) TransitionQuestions(ctx context.Context, actor programme.Actor, eventID int64, status programme.RoundStatus, revision int64) (programme.QuestionRound, error) {
 	tx, id, round, err := s.questionTransaction(ctx, actor, eventID, true, true)
 	if err != nil {
 		return round, err
@@ -135,7 +135,7 @@ func (s *Store) TransitionQuestions(ctx context.Context, actor programme.Actor, 
 	if err := round.CheckTransition(status, revision); err != nil {
 		return round, err
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE programme_question_rounds SET status=$1 WHERE activity_id=$2", status, id); err != nil {
+	if _, err := tx.ExecContext(ctx, "UPDATE programme_question_rounds SET status=$1 WHERE activity_id=$2", string(status), id); err != nil {
 		return round, err
 	}
 	if _, err := tx.ExecContext(ctx, "UPDATE programme_activities SET revision=revision+1 WHERE id=$1", id); err != nil {
@@ -144,8 +144,8 @@ func (s *Store) TransitionQuestions(ctx context.Context, actor programme.Actor, 
 	return s.finishQuestions(ctx, tx, actor, id)
 }
 
-func questionStatus(ctx context.Context, tx *sql.Tx, activityID, questionID int64) (string, error) {
-	var status string
+func questionStatus(ctx context.Context, tx *sql.Tx, activityID, questionID int64) (programme.QuestionStatus, error) {
+	var status programme.QuestionStatus
 	err := tx.QueryRowContext(ctx, "SELECT status FROM programme_questions WHERE id=$1 AND activity_id=$2", questionID, activityID).Scan(&status)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = programme.ErrNotFound
@@ -153,25 +153,25 @@ func questionStatus(ctx context.Context, tx *sql.Tx, activityID, questionID int6
 	return status, err
 }
 
-func (s *Store) ResolveQuestion(ctx context.Context, actor programme.Actor, eventID, questionID int64, status string, revision int64) (programme.QuestionRound, error) {
+func (s *Store) ResolveQuestion(ctx context.Context, actor programme.Actor, eventID, questionID int64, status programme.QuestionStatus, revision int64) (programme.QuestionRound, error) {
 	tx, id, round, err := s.questionTransaction(ctx, actor, eventID, true, true)
 	if err != nil {
 		return round, err
 	}
 	defer tx.Rollback()
-	current, err := questionStatus(ctx, tx, id, questionID)
+	current, err := questionStatus(ctx, tx.Tx, id, questionID)
 	if err != nil {
 		return round, err
 	}
 	if err := round.CheckResolution(current, status, revision); err != nil {
 		return round, err
 	}
-	if status == "joker" {
+	if status == programme.QuestionJoker {
 		if _, err := tx.ExecContext(ctx, "UPDATE programme_question_rounds SET jokers_used=jokers_used+1 WHERE activity_id=$1", id); err != nil {
 			return round, err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE programme_questions SET status=$1 WHERE id=$2", status, questionID); err != nil {
+	if _, err := tx.ExecContext(ctx, "UPDATE programme_questions SET status=$1 WHERE id=$2", string(status), questionID); err != nil {
 		return round, err
 	}
 	if _, err := tx.ExecContext(ctx, "UPDATE programme_activities SET revision=revision+1 WHERE id=$1", id); err != nil {

@@ -1,17 +1,20 @@
 package mediafiles
 
 import (
-	"birthday-party/backend/internal/media"
-	"github.com/disintegration/imaging"
-	_ "golang.org/x/image/webp"
 	"image"
-	"image/color"
-	"image/draw"
-	"image/jpeg"
+	_ "image/jpeg"
 	_ "image/png"
 	"io"
 	"os"
+
+	"birthday-party/backend/internal/adapters/preview"
+	"birthday-party/backend/internal/media"
+
+	"github.com/disintegration/imaging"
+	_ "golang.org/x/image/webp"
 )
+
+const thumbnailSide = 720
 
 type preparedMedia struct {
 	path, thumbnailPath, mimeType, extension string
@@ -29,20 +32,16 @@ func prepareImage(input *os.File, thumbnailPath string) (preparedMedia, error) {
 	if _, err = input.Seek(0, io.SeekStart); err != nil {
 		return preparedMedia{}, err
 	}
-	// Apply phone EXIF orientation, then flatten transparency onto dark plum.
+	// Apply phone EXIF orientation before measuring and resizing.
 	decoded, err := imaging.Decode(input, imaging.AutoOrientation(true))
 	if err != nil {
 		return preparedMedia{}, &media.Error{Code: "unreadable_photo"}
 	}
-	thumbnail := imaging.Fit(decoded, 720, 720, imaging.Linear)
-	flat := image.NewRGBA(thumbnail.Bounds())
-	draw.Draw(flat, flat.Bounds(), &image.Uniform{C: color.RGBA{R: 32, G: 19, B: 31, A: 255}}, image.Point{}, draw.Src)
-	draw.Draw(flat, flat.Bounds(), thumbnail, thumbnail.Bounds().Min, draw.Over)
 	thumb, err := os.OpenFile(thumbnailPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return preparedMedia{}, err
 	}
-	encodeErr := jpeg.Encode(thumb, flat, &jpeg.Options{Quality: 82})
+	encodeErr := preview.EncodeJPEG(thumb, imaging.Fit(decoded, thumbnailSide, thumbnailSide, imaging.Linear))
 	closeErr := thumb.Close()
 	if encodeErr != nil {
 		return preparedMedia{}, encodeErr

@@ -33,6 +33,24 @@ type Error struct{ Code string }
 
 func (e *Error) Error() string { return e.Code }
 
+// Kind is the broad type of a file, decided by inspecting its content.
+type Kind string
+
+const (
+	KindImage Kind = "image"
+	KindVideo Kind = "video"
+)
+
+// Status is the state of an upload job in the durable queue.
+type Status string
+
+const (
+	StatusQueued     Status = "queued"
+	StatusProcessing Status = "processing"
+	StatusReady      Status = "ready"
+	StatusFailed     Status = "failed"
+)
+
 type Photo struct {
 	ID           int64           `json:"id"`
 	CategoryID   *int64          `json:"categoryId"`
@@ -42,14 +60,14 @@ type Photo struct {
 	CreatedAt    string          `json:"createdAt"`
 	URL          string          `json:"url"`
 	ThumbnailURL string          `json:"thumbnailUrl"`
-	Kind         string          `json:"kind"`
+	Kind         Kind            `json:"kind"`
 	MIMEType     string          `json:"mimeType"`
 }
 
 func (p *Photo) SetURLs() {
-	p.Kind = "image"
+	p.Kind = KindImage
 	if strings.HasPrefix(p.MIMEType, "video/") {
-		p.Kind = "video"
+		p.Kind = KindVideo
 	}
 	p.URL = "/api/photos/" + strconv.FormatInt(p.ID, 10) + "/image"
 	p.ThumbnailURL = p.URL + "?size=thumb"
@@ -65,9 +83,9 @@ type Category struct {
 type Upload struct {
 	ID                 int64   `json:"id"`
 	ClientUploadID     string  `json:"clientUploadId"`
-	Status             string  `json:"status"`
+	Status             Status  `json:"status"`
 	Filename           string  `json:"filename"`
-	Kind               string  `json:"kind"`
+	Kind               Kind    `json:"kind"`
 	CreatedAt          string  `json:"createdAt"`
 	ErrorCode          *string `json:"errorCode"`
 	Photo              *Photo  `json:"photo"`
@@ -76,21 +94,29 @@ type Upload struct {
 	WelcomeWidgetIndex *int64  `json:"welcomeWidgetIndex"`
 }
 
+// Pending is a claimed job. Attempt names this claim, so a superseded worker
+// cannot settle the job, and Attempts counts every claim including this one.
 type Pending struct {
-	ID, GuestID                int64
-	Key, Kind, Format, Attempt string
+	ID, GuestID          int64
+	Key, Format, Attempt string
+	Kind                 Kind
+	Attempts             int
 }
 type Received struct {
-	Path, Filename, Kind, Format string
-	Size                         int64
+	Path, Filename, Format string
+	Kind                   Kind
+	Size                   int64
 }
 type Destination struct {
 	CategoryID, WelcomeRevision, WelcomeWidgetIndex *int64
 	SessionHash                                     string
 }
+
+// File locates a published photo's private files. Created is when it was published.
 type File struct {
 	Filename, Thumbnail, MIME string
 	AuthorID                  int64
+	Created                   time.Time
 }
 type Output struct {
 	Filename, Thumbnail, MIME string
@@ -118,10 +144,12 @@ type Repository interface {
 	Accept(context.Context, int64, string, string, Received, Destination, func() error) (Upload, bool, error)
 	Upload(context.Context, int64, int64) (Upload, error)
 	Recent(context.Context, int64, time.Time) ([]Upload, error)
-	Claim(context.Context, string) (Pending, error)
+	// Claim takes the queued job that became available first and counts the attempt.
+	Claim(ctx context.Context, attempt string) (Pending, error)
 	Publish(context.Context, Pending, Output) (bool, error)
 	Ready(context.Context, int64) (bool, error)
-	Requeue(context.Context, Pending, time.Time) (bool, error)
+	// Requeue returns a claimed job to the queue; it can be claimed from available on.
+	Requeue(ctx context.Context, job Pending, now, available time.Time) (bool, error)
 	Fail(context.Context, Pending, string, time.Time) (bool, error)
 	CleanHistory(context.Context, time.Time) ([]int64, error)
 }
@@ -134,24 +162,20 @@ type Files interface {
 	RemoveAttempt(Pending)
 	Prepare(context.Context, Pending) (Output, error)
 	RemovePublished(File) error
-	OpenPublished(string) (ReadSeekCloser, error)
-}
-type ReadSeekCloser interface {
-	io.Reader
-	io.Seeker
-	io.Closer
+	OpenPublished(string) (io.ReadSeekCloser, error)
 }
 
 type Service struct {
-	repo   Repository
-	files  Files
-	now    func() time.Time
-	notify func(int64)
-	logf   func(string, ...any)
+	repo        Repository
+	files       Files
+	now         func() time.Time
+	notify      func(int64)
+	logf        func(string, ...any)
+	recordRetry time.Duration
 }
 
 func New(repo Repository, files Files, now func() time.Time, notify func(int64), logf func(string, ...any)) *Service {
-	return &Service{repo: repo, files: files, now: now, notify: notify, logf: logf}
+	return &Service{repo: repo, files: files, now: now, notify: notify, logf: logf, recordRetry: recordRetryInterval}
 }
 
 func NewUploadID() (string, error) {
@@ -179,20 +203,20 @@ func SameDestination(job Upload, destination Destination) error {
 }
 
 // AuthorizeDestination runs against the guest's locked current welcome snapshot.
-func AuthorizeDestination(role string, view welcome.View, destination *Destination) error {
+func AuthorizeDestination(guest identity.Guest, view welcome.View, destination *Destination) error {
 	var selected *welcome.Widget
 	var hasMedia bool
 	if view.Step != nil {
 		for i := range view.Step.Widgets {
 			widget := &view.Step.Widgets[i]
-			hasMedia = hasMedia || widget.Type == "media_upload"
+			hasMedia = hasMedia || widget.Type == welcome.WidgetMediaUpload
 			if destination.WelcomeWidgetIndex != nil && int64(i) == *destination.WelcomeWidgetIndex {
 				selected = widget
 			}
 		}
 	}
 	if destination.WelcomeRevision != nil {
-		if view.Open || selected == nil || selected.Type != "media_upload" || view.ProgressRevision != *destination.WelcomeRevision {
+		if view.Open || selected == nil || selected.Type != welcome.WidgetMediaUpload || view.ProgressRevision != *destination.WelcomeRevision {
 			return &Error{Code: "welcome_conflict"}
 		}
 		categoryID := selected.MediaUpload.CategoryID
@@ -200,7 +224,7 @@ func AuthorizeDestination(role string, view welcome.View, destination *Destinati
 			return &Error{Code: "invalid_media_category"}
 		}
 		destination.CategoryID = categoryID
-	} else if role != "admin" && !view.Open {
+	} else if !guest.IsAdmin() && !view.Open {
 		if hasMedia {
 			return &Error{Code: "invalid_body"}
 		}
@@ -215,7 +239,7 @@ func (s *Service) Photos(ctx context.Context, guest identity.Guest, category *in
 func (s *Service) PhotoFile(ctx context.Context, guest identity.Guest, id int64) (File, error) {
 	return s.repo.PhotoFile(ctx, guest, id)
 }
-func (s *Service) OpenPublished(name string) (ReadSeekCloser, error) {
+func (s *Service) OpenPublished(name string) (io.ReadSeekCloser, error) {
 	return s.files.OpenPublished(name)
 }
 func (s *Service) DeletePhoto(ctx context.Context, guest identity.Guest, id int64) error {
@@ -223,7 +247,7 @@ func (s *Service) DeletePhoto(ctx context.Context, guest identity.Guest, id int6
 	if err != nil {
 		return err
 	}
-	if guest.ID != current.AuthorID && guest.Role != "admin" {
+	if guest.ID != current.AuthorID && !guest.IsAdmin() {
 		return &Error{Code: "photo_delete_forbidden"}
 	}
 	file, err := s.repo.DeletePhoto(ctx, guest, id)

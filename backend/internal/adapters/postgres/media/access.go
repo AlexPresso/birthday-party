@@ -1,37 +1,33 @@
 package media
 
 import (
-	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
-	"birthday-party/backend/internal/media"
 	"context"
 	"database/sql"
 	"errors"
+
+	pgaccess "birthday-party/backend/internal/adapters/postgres/access"
+	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
+	"birthday-party/backend/internal/media"
 )
 
 func (s *Store) authorizeUpload(ctx context.Context, tx *sql.Tx, guestID int64, destination *media.Destination) error {
-	var active bool
-	var role string
-	if err := tx.QueryRowContext(ctx, "SELECT active,role FROM guests WHERE id=$1 FOR UPDATE", guestID).Scan(&active, &role); err != nil {
-		return err
-	}
-	if !active {
-		return &media.Error{Code: "access_revoked"}
-	}
-	var expires int64
-	err := tx.QueryRowContext(ctx, "SELECT expires_at FROM sessions WHERE token_hash=$1 AND guest_id=$2 FOR SHARE", destination.SessionHash, guestID).Scan(&expires)
-	// Guest/session locks may wait past expiry; evaluate the clock after acquiring them.
-	if errors.Is(err, sql.ErrNoRows) || err == nil && expires <= s.now().Unix() {
-		return &media.Error{Code: "session_expired"}
-	}
+	// Lock order: quota (when accepting), guest, session, welcome, progress, category.
+	guest, session, err := pgaccess.LockGuestSession(ctx, tx, guestID, destination.SessionHash, pgaccess.GuestForUpdate)
 	if err != nil {
 		return err
 	}
-	// Lock order: quota (when accepting), guest, session, welcome, progress, category.
+	if !guest.Active {
+		return &media.Error{Code: "access_revoked"}
+	}
+	// Guest/session locks may wait past expiry; evaluate the clock after acquiring them.
+	if !session.ValidAt(s.now()) {
+		return &media.Error{Code: "session_expired"}
+	}
 	view, err := pgwelcome.CurrentGuest(ctx, tx, guestID)
 	if err != nil {
 		return err
 	}
-	if err := media.AuthorizeDestination(role, view, destination); err != nil {
+	if err := media.AuthorizeDestination(guest, view, destination); err != nil {
 		return err
 	}
 	if destination.CategoryID != nil {
@@ -43,7 +39,7 @@ func (s *Store) authorizeUpload(ctx context.Context, tx *sql.Tx, guestID int64, 
 		if err != nil {
 			return err
 		}
-		if !public && role != "admin" && destination.WelcomeRevision == nil {
+		if !public && !guest.IsAdmin() && destination.WelcomeRevision == nil {
 			return &media.Error{Code: "media_category_not_found"}
 		}
 	}

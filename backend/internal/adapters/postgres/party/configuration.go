@@ -7,7 +7,7 @@ import (
 	"errors"
 
 	"birthday-party/backend/internal/access"
-	"birthday-party/backend/internal/identity"
+	pgaccess "birthday-party/backend/internal/adapters/postgres/access"
 	"birthday-party/backend/internal/party"
 )
 
@@ -52,8 +52,7 @@ func (s *Store) SaveConfiguration(ctx context.Context, actor party.Configuration
 		return err
 	}
 	defer tx.Rollback()
-	var guest identity.Guest
-	err = tx.QueryRowContext(ctx, "SELECT id,role,active FROM guests WHERE id=$1 FOR SHARE", actor.GuestID).Scan(&guest.ID, &guest.Role, &guest.Active)
+	guest, session, err := pgaccess.LockGuestSession(ctx, tx, actor.GuestID, actor.SessionHash, pgaccess.GuestForShare)
 	if errors.Is(err, sql.ErrNoRows) {
 		return access.ErrExpired
 	}
@@ -63,20 +62,12 @@ func (s *Store) SaveConfiguration(ctx context.Context, actor party.Configuration
 	if err := access.Check(access.Snapshot{Guest: guest}, access.Request{Admin: true, Scope: access.Session}); err != nil {
 		return err
 	}
-	var expiry int64
-	err = tx.QueryRowContext(ctx, "SELECT expires_at FROM sessions WHERE guest_id=$1 AND token_hash=$2 FOR SHARE", actor.GuestID, actor.SessionHash).Scan(&expiry)
-	if errors.Is(err, sql.ErrNoRows) {
-		return access.ErrExpired
-	}
-	if err != nil {
-		return err
-	}
 	var id int
 	if err := tx.QueryRowContext(ctx, "SELECT id FROM product_configuration WHERE id=1 FOR UPDATE").Scan(&id); err != nil {
 		return err
 	}
 	// Lock waits can outlast the session; sample time only after every lock is held.
-	if expiry <= s.now().Unix() {
+	if !session.ValidAt(s.now()) {
 		return access.ErrExpired
 	}
 	copy, err := json.Marshal(input.Invitation)

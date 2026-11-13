@@ -33,10 +33,14 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - The core packages are `access`, `identity`, `programme`, `guestbook`, `welcome`,
   `profile`, `party`, `media` and `notifications`. They must not import `app`,
   adapters, database drivers or HTTP/image/process infrastructure. Dependencies
-  between feature models and pure rules must remain acyclic.
+  between feature models and pure rules must remain acyclic. Two pure packages
+  hold conventions every feature shares and follow the same rules: `timestamp`
+  (instants as RFC 3339 UTC strings) and `locale` (supported languages). Use
+  them instead of formatting times or listing languages again.
 - Put feature SQL in `internal/adapters/postgres/<feature>`. Profile image processing
   belongs in `adapters/avatar`; private media storage and FFmpeg belong in
-  `adapters/mediafiles`. `adapters/webpush` implements notification delivery using
+  `adapters/mediafiles`; both encode derived JPEGs through `adapters/preview`.
+  `adapters/webpush` implements notification delivery using
   `adapters/pushtransport` for bounded public HTTPS access.
 - Ports describe required capabilities in domain types. Keep transaction handles,
   generic query interfaces and SQL statements out of the core. Pass initialized
@@ -45,7 +49,9 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
 - PostgreSQL adapters own complete atomic operations and invoke core rules using
   locked state. Preserve the existing quota/guest/session/welcome/progress/category
   lock order. Profile writes and notification registration must recheck current
-  authorization in their save transaction. Shared PostgreSQL welcome helpers stay
+  authorization in their save transaction. Lock the acting guest and session
+  through `postgres/access` (`LockGuestSession`, `LockSession`) rather than with
+  another hand-written query, and sample the clock after the last lock wait. Shared PostgreSQL welcome helpers stay
   inside the adapter layer; never replace atomic checks with separate service reads.
 - Compose the notification enqueue callback into the welcome PostgreSQL adapter so
   host transitions and the durable outbox commit together. Map feature errors to
@@ -54,6 +60,8 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   processing and transport beside their adapters. HTTP/database integration tests
   in `app` verify composed permissions, concurrency and transaction boundaries.
   Preserve import-boundary checks and applied migration paths and checksums.
+  Compare roles, statuses, kinds, widget types and actions through the typed
+  constants of their feature package, never through string literals.
   See [code organization](../docs/architecture.md) for dependency direction.
 - Prefer the standard library where it solves the problem cleanly. Choose a framework, database,
   or storage provider only when the requirements justify it.
@@ -65,7 +73,11 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   HTTP responses without exposing internal details.
 - API errors expose a stable `code` and an English fallback `error`. The frontend
   translates codes into the viewer's language; Go does not negotiate language.
-  Keep developer logs and CLI output in English.
+  Keep developer logs and CLI output in English. `internal/app/errors.go` is the
+  only place that assigns an HTTP status to a code: register a new code there
+  and answer failures with `failError`, without a per-feature mapper.
+- `authorize` reads the session cookie once and passes an `access.Viewer` (guest
+  plus session digest) to every handler; do not read the cookie again.
 - Pass request contexts through database and external calls. Configure appropriate server and
   downstream timeouts; release resources and stop work when requests are cancelled.
 - Bound pagination, queries, upload sizes, and concurrent work. Avoid unbounded goroutines,
@@ -115,8 +127,8 @@ Apply [the shared instructions](../AGENTS.md) alongside these Go-specific rules.
   the welcome lock at acceptance; stale transfers must not become ordinary uploads.
   Keep the accepted revision/index/destination on the job across recovery and
   retain the destination on the resulting photo. An upload ID cannot switch
-  widgets, even when they have the same destination. Legacy accepted jobs may
-  have a welcome revision with a null widget index after migration 0007.
+  widgets, even when they have the same destination. A job records both the
+  revision and the widget index, or neither.
   Return no photo details in guest queue responses while that guest's welcome
   access is closed, even if the host has opened the application for others.
 
@@ -139,8 +151,7 @@ PostgreSQL adapter. Activities are individual programme events of type `event`
 or `vote`, plus `questions` for anonymous questions and upvotes. Save event metadata and vote settings in one transaction; never create
 an empty event first and attach a vote in a second request. Stable event and vote
 identities preserve ballots across metadata and schedule edits. Keep the event's
-type fixed after creation. A numbered migration promotes former nested activities
-to events while retaining their configuration and ballots. The vote tables remain
+type fixed after creation. The vote tables remain
 an internal extension with at most one vote per event. Add future types explicitly.
 
 Voting requires full app access and an available vote event. Recheck guest,
@@ -192,7 +203,8 @@ Store stable VAPID keys and the durable, coalesced outbox in PostgreSQL. Queue
 generic welcome unlock/open notifications in the host transaction and send them
 with a bounded worker owned by the existing startup/shutdown lifecycle. Recheck
 session expiry and guest activity at delivery. Expired endpoints are removed;
-transient failures have bounded retries. Keep private content out of push payloads.
+only a 2xx answer counts as delivered and every other failure has bounded
+retries. Keep private content out of push payloads.
 
 ## Media uploads
 
@@ -226,6 +238,10 @@ transient failures have bounded retries. Keep private content out of push payloa
   the original and thumbnail in publication, quotas, restart recovery and deletion.
   Existing /api/photos URLs serve the stored original; `?download=1` serves it as
   an attachment with the same authorization. Keep range requests authenticated.
+  Media and avatar responses use `Cache-Control: private, no-cache` with a strong
+  `ETag`; set the validator only after every authorization check has passed so a
+  `304` is never easier to obtain than the file. JSON stays `no-store`.
+  Media transfers extend the short server deadlines per request (`server.go`).
   Existing converted videos remain usable without attempting to restore lost data.
 - Accept uploads into a private spool and PostgreSQL job queue before processing.
   Return 202 once durable, process two jobs in the background, and recover
@@ -234,31 +250,39 @@ transient failures have bounded retries. Keep private content out of push payloa
   independent of the request. Invitation CLI commands must not start workers.
 - Distinguish invalid media from processing infrastructure failures. Retain the
   original for retry on missing tools, cancellation, storage failures or unknown
-  command failures; only confirmed validation failures discard it. Preserve error
+  command failures; only confirmed validation failures discard it at once.
+  Count every claim as an attempt and retry with the delays in `media/worker.go`;
+  after `media.MaxAttempts` the job fails with an existing error code and its
+  input is removed, so a poison file cannot occupy the workers forever. Preserve error
   causes without exposing private filenames or tool diagnostics. Bound probe
   output through composition so `io.Copy` cannot bypass the writer's size cap.
+- Background work runs in the `worker` loop of `internal/app`: a step reports
+  whether it found work, idle workers sleep until a `wakeSignal` or the
+  five-second fallback poll, and a failed step is logged and retried with
+  bounded, jittered backoff. Notify the signal after committing new work. Only
+  losing the advisory-lock connection ends the serving process.
 - Give worker startup, maintenance and lock cleanup database calls deadlines.
   Discard the dedicated lock connection if its advisory unlock cannot be confirmed;
   never return a potentially locked connection to the pool.
 - Anonymous guestbook posts retain their owner only in PostgreSQL. Serialize author
   as null for all viewers, including administrators, and compute canDelete from
-  the authenticated viewer. Migrations preserve existing named messages.
+  the authenticated viewer.
 
 ## Implementation and commands
 
-- Module: `birthday-party/backend`, Go 1.26+. One standard-library HTTP service
+- Module: `birthday-party/backend`, Go 1.27.2+. One standard-library HTTP service
   under `cmd/server`; composition, HTTP and lifecycle under `internal/app`, core
   feature services/ports under `internal/`, and persistence/external I/O under
   `internal/adapters`. Atomic feature transactions belong in PostgreSQL adapters.
 - PostgreSQL uses `pgx` through `database/sql`, with `$n` placeholders and
   `RETURNING` for generated IDs. Use row/advisory locks for concurrent invariants.
   `DATABASE_URL` is required; Compose supplies private connection settings.
-- Schema changes belong in new sequential `internal/app/migrations/NNNN_name.sql`
-  files. Embedded migrations run under a transaction and advisory lock at startup;
-  applied names/checksums are verified. Never change an applied SQL file.
-- `modernc.org/sqlite` is retained only for the one-time read-only import of an
-  existing `DATA_DIR/birthday.sqlite`. Import into an empty destination, preserve
-  IDs and sessions, reset sequences and record completion in the same transaction.
+- `internal/app/migrations/0001_baseline.sql` creates the whole schema. Schema
+  changes belong in new sequential `NNNN_name.sql` files beside it. Embedded
+  migrations run under a transaction and advisory lock at startup; applied
+  names/checksums are verified. Never change an applied SQL file. Use `BOOLEAN`
+  flags, `TIMESTAMPTZ` instants and `CHECK`-constrained `TEXT` for closed sets;
+  see [database changes](../docs/database.md).
 - `imaging` handles phone EXIF orientation and thumbnail resizing; `x/image/webp`
   registers WebP decoding. Do not replace content inspection with MIME/extension checks.
 - Go owns the route contract in [docs/api.md](../docs/api.md). Cookie path must
