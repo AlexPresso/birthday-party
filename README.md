@@ -1,558 +1,342 @@
-# Les 30 ans
+# Birthday Party
 
-Application privée pour un anniversaire : photos et vidéos, programme avec surprises
-programmées, livre d'or et paramètres. L'interface utilise un seul thème sombre
-à accent orange, « K · Neige », décrit dans [le brief](docs/design.md).
+A private web app for one birthday party. Guests open a personal link on their
+phone, add their photos and videos to a shared gallery, follow the evening's
+schedule, vote, ask the host awkward questions and sign the guestbook. The host
+runs all of it from a settings screen on the same phone.
 
-Next.js et TypeScript affichent l'application. Un service Go gère les invitations,
-les sessions, les permissions, PostgreSQL et les médias sur disque. Le navigateur
-utilise une seule origine. En local et avec Compose, Next transmet `/api/*` au
-serveur Go ; sur Kubernetes, l'Ingress envoie `/api` directement au backend.
-Le [contrat HTTP](docs/api.md) décrit les échanges.
-L'[organisation du code](docs/architecture.md) précise les responsabilités des
-features frontend, des packages Go et des modules partagés.
+It was built for a 30th birthday and is meant to be reused, with one installation
+per party. You host it yourself: the records live in PostgreSQL and the media in
+a folder on your server.
 
-## Skills du projet
+<p align="center">
+  <img src="docs/screenshots/invitation.webp" width="24%" alt="Invitation page: a large 30 in an orange ring, “Inès, you’re invited” and an Enter button">
+  <img src="docs/screenshots/gallery.webp" width="24%" alt="Media tab: a mosaic of party photos, each with its author's name and portrait">
+  <img src="docs/screenshots/schedule.webp" width="24%" alt="Schedule tab: an open vote at the top, then the evening's events with their times">
+  <img src="docs/screenshots/vote-guests.webp" width="24%" alt="Vote page: guests listed with their portraits and live vote counts">
+</p>
 
-Les skills sont inclus dans `.agents/skills/`, avec leurs références et licences :
+<sub>The screenshots show a made-up party. Its photos and portraits are drawings
+generated for the demo.</sub>
 
-- [Code Simplifier](.agents/skills/code-simplifier/SKILL.md), adapté de l'agent
-  `code-simplifier` d'[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)
-  (Apache-2.0), pour les nettoyages demandés et la relecture de lisibilité après
-  une implémentation. La provenance est conservée dans
-  [SOURCE.md](.agents/skills/code-simplifier/SOURCE.md).
-- [Go Style Guide](.agents/skills/go-style-guide/SKILL.md), issu de
-  [madflojo/go-style-agent-skill](https://github.com/madflojo/go-style-agent-skill)
-  (Apache-2.0), pour le code Go et l'évolution de l'architecture. Le commit source
-  est fixé dans [UPSTREAM.md](.agents/skills/go-style-guide/UPSTREAM.md) ; les choix
-  du projet sont précisés dans [backend/AGENTS.md](backend/AGENTS.md).
-- [Vercel React Best Practices](.agents/skills/vercel-react-best-practices/SKILL.md),
-  issu de [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills),
-  sous licence MIT, pour les composants React, les échanges réseau et les bundles.
-  La provenance est conservée dans
-  [UPSTREAM.md](.agents/skills/vercel-react-best-practices/UPSTREAM.md). Les règles
-  du projet gardent la priorité, notamment pour les données privées et le rôle de Go.
-- [UX Writing](.agents/skills/ux-writing/SKILL.md), issu de
-  [content-designer/ux-writing-skill](https://github.com/content-designer/ux-writing-skill),
-  sous licence MIT, pour les textes de l'interface.
-- [Humanizer](.agents/skills/humanizer/SKILL.md), issu de
-  [blader/humanizer](https://github.com/blader/humanizer), sous licence MIT, pour la
-  relecture du style.
+## What guests see
 
-[AGENTS.md](AGENTS.md) précise leur usage et le ton de l'application.
-Ces copies sont propres au dépôt et peuvent être partagées avec le code ; aucune
-installation globale n'est nécessaire. Les instructions des `SKILL.md` sont
-conservées telles quelles, avec leurs ressources utiles et les crédits d'origine.
+### A link instead of an account
 
-## Démarrer en local
+The host prepares a profile for each guest and sends them a personal link, by
+whatever means they like. There is no sign-up and no password. Opening the link
+shows the invitation; tapping **Enter** uses it up and keeps that browser signed
+in for 90 days. A link works once and expires after 7 days. If a guest changes
+phone, the host issues a new link and the guest gets the same profile back.
 
-Prérequis : Node.js 24 ou plus récent (obligatoire : les scripts et les tests
-exécutent TypeScript directement), npm, Go 1.27.2 ou plus récent, `ffmpeg` et `ffprobe` dans le `PATH`
-pour vérifier les vidéos et créer leurs vignettes JPEG. Docker fournit
-[FFmpeg](https://ffmpeg.org/download.html) automatiquement. Les tests vidéo
-utilisent aussi les encodeurs H.264/AAC et VP9/Opus pour créer leurs fichiers.
-PostgreSQL 18 est fourni par Docker Compose. Les commandes ci-dessous fonctionnent
-dans PowerShell à la racine du projet.
+### Media
 
-```powershell
+Everyone's photos and videos land in one gallery, shown as a mosaic or as a feed,
+each with the name of the person who added it. The host can create categories,
+which appear as round filters above the gallery, and any of them can be played
+as a slideshow: photos stay five seconds, videos play to the end, muted until
+you turn the sound on.
+
+Uploads go into a queue on the server. A guest can pick twenty files, switch
+tabs and keep using the app while one progress bar follows the lot. Videos are
+stored exactly as they were sent, so what you download later is the original
+file. The server only adds a JPEG thumbnail. Whether a video plays in the page
+depends on what the guest's browser can decode; the download always works.
+
+<p align="center">
+  <img src="docs/screenshots/gallery-desktop.webp" width="90%" alt="The gallery on a desktop screen, four columns wide">
+</p>
+
+### Schedule and surprises
+
+The schedule lists the events of the party in order, with times shown in the
+party's timezone. An event can stay locked until a moment the host picks. Until
+then the server sends guests an optional teaser and nothing else, so the
+surprise cannot be read out of the page source.
+
+### Votes
+
+A vote is an event with its own page. The host chooses what people vote on:
+guests, shown with their profile photos, or a list of choices typed by the host.
+For a list, the host can also let guests add a choice of their own.
+
+Every option is always visible with its count, the leader first, and the
+ranking moves as votes come in. Each guest has one vote and can change it until
+the host closes voting. Nobody can see who voted for what, the host included.
+
+<p align="center">
+  <img src="docs/screenshots/vote-choices.webp" width="24%" alt="A vote on which song opens the dance floor, with four choices and a field to add another">
+  <img src="docs/screenshots/no-filter.webp" width="24%" alt="No Filter page: anonymous questions ranked by upvotes, and two jokers left">
+  <img src="docs/screenshots/guestbook.webp" width="24%" alt="Guestbook: a message field, a “Post anonymously” checkbox and signed messages">
+</p>
+
+### No Filter
+
+In a No Filter activity, guests send anonymous questions and upvote the ones
+they want to hear. The host answers out loud, marks each question as answered,
+and has two jokers for the whole activity to skip a question. A spent joker
+stays spent. Questions are anonymous for everyone: the host's screens do not
+show the authors or the voters either.
+
+### Guestbook and profile
+
+Guests leave a message, signed or anonymous. An anonymous message hides the
+name from the other guests and from the host, and its author can still delete
+it. From **Profile**, a guest sets a photo, manages notifications for that
+device and signs out.
+
+### In the guest's language
+
+The interface follows the phone's language: French, English, German, Italian
+or Spanish, with English as the fallback. There is no language switch. Names,
+messages, event titles and anything else people typed stay as written and are
+never sent to a translation service.
+
+## What the host does
+
+The host is a guest with a **Settings** tab. Fields save when you leave them.
+
+<p align="center">
+  <img src="docs/screenshots/settings.webp" width="24%" alt="Settings: party details, schedule, guest welcome, guests and invitations, invitation, categories, upload limits">
+  <img src="docs/screenshots/welcome.webp" width="24%" alt="A guest's first welcome step, asking for a profile photo">
+</p>
+
+- **Party details** holds the name, the age shown on the invitation, the date,
+  the venue and the timezone (`Europe/Zurich` until you change it).
+- **Schedule** is where you add events, votes and No Filter activities, and
+  where you open and close them.
+- **Guests and invitations** lets you add a guest, copy their link, issue a new
+  one or revoke their access. The app sends no email and no message: you pass
+  the links on yourself.
+- **Invitation** edits the title and description of the sign-in page, for all
+  languages at once or one language at a time.
+- **Categories and visibility** creates media categories. A private category is
+  visible to hosts only, and making it public later reveals everything in it.
+- **Upload limits** sets the largest photo and video the server accepts.
+
+### Guest welcome
+
+Before the party opens, you can walk guests through a few steps. Each step is a
+list of blocks you arrange yourself: a title, a text, the guest's profile photo,
+a photo and video upload, a prompt to turn on notifications. A step holds up to
+12 blocks and a welcome up to 12 steps.
+
+**Turn on the waiting screen** puts every guest on hold. From there you unlock
+the steps one at a time, and each guest moves forward or back at their own pace.
+Unlocking a step never moves anyone or interrupts an upload. **Open the app**
+unlocks whatever is left and lets guests in. With **Required** on, someone who
+arrives late still goes through every step first.
+
+An upload block sends its files to the main gallery or to a category of your
+choice. Pointed at a private category, it collects photos that only you can see
+until you decide to publish them.
+
+### Notifications
+
+A guest who accepts notifications gets one when you unlock a step or open the
+app. They carry a generic text, with no names and no media. Phones need the app
+served over HTTPS, and on iPhone and iPad it must first be added to the home
+screen; the notification block shows the right instructions. There is no
+account to create with a push provider: the server generates its own keys and
+keeps them in PostgreSQL.
+
+## Run it
+
+### Try it on your machine
+
+You need Docker. This builds both images and starts the app with PostgreSQL:
+
+```sh
+git clone https://github.com/AlexPresso/birthday-party.git
+cd birthday-party
+docker compose up -d
+docker compose logs backend
+```
+
+The backend log contains a line `Administrator invitation: <url>`. Open that
+link, tap **Enter**, and you are the host of an empty party at
+http://localhost:3000, under a profile called `Admin`. Nothing else is created
+for you: no guests, no events, no content.
+
+Each backend start prints a fresh link for the first host and keeps their
+existing sessions; set `PRINT_ADMIN_INVITATION=false` in `.env` to turn that
+off. To create another host under their own name:
+
+```sh
+docker compose exec backend birthday-server invite-admin --name "Your name"
+```
+
+Compose only listens on `127.0.0.1:3000` and is meant for trying the app and
+for development. `docker compose down` stops it; the volumes `postgres-data`
+and `party-data` keep the records and the media.
+
+### Develop
+
+You need Node.js 24 or newer, Go 1.27.2 or newer, `ffmpeg` and `ffprobe` on the
+`PATH`, and Docker for PostgreSQL.
+
+```sh
 npm ci
 npm --prefix frontend ci
 docker compose -p birthday-party-dev -f compose.yaml -f compose.dev.yaml up -d --wait postgres
 npm run dev
 ```
 
-Ouvrir **http://localhost:3000**. Le serveur Go écoute sur `127.0.0.1:8080`.
-`Ctrl+C` arrête les deux processus. Next recharge les modifications du frontend ;
-relancer la commande après une modification Go. Les médias locaux sont dans
-`backend/data/`, exclu de Git ; les données sont dans PostgreSQL. Aucun invité ni
-contenu de fête n'est créé au démarrage.
-Avec `PRINT_ADMIN_INVITATION=true`, un profil technique `Admin` est créé seulement
-s'il n'existe aucun administrateur actif.
+The app is at http://localhost:3000 and the Go server on `127.0.0.1:8080`.
+Next.js reloads frontend changes; restart the command after changing Go code.
+Local media go to `backend/data/`, which Git ignores. To get a host link in
+development, run this in a second terminal:
 
-Le script utilise Go dans le `PATH`, puis recherche un éventuel SDK local dans
-`~/.codex/tools/go-*/go/bin/`. Pour un autre emplacement, définir `GO_BIN` :
-
-```powershell
-$env:GO_BIN = 'C:/path/to/go/bin/go.exe'
-```
-
-Les scripts chargent un éventuel `.env` à la racine ; les variables déjà définies
-dans le terminal sont prioritaires. `.env.example` donne les options sans secret.
-Avec un `DATA_DIR` relatif, le chemin est résolu à partir de `backend/`.
-Les scripts construisent l'adresse PostgreSQL locale depuis `POSTGRES_DB`,
-`POSTGRES_USER`, `POSTGRES_PASSWORD` et `POSTGRES_PORT` (5432 par défaut).
-Une variable `DATABASE_URL` explicite permet d'utiliser une autre base.
-L'extension `compose.dev.yaml` expose PostgreSQL uniquement sur `127.0.0.1`.
-Le projet Compose `birthday-party-dev` possède sa propre base : les médias locaux
-et ceux du déploiement Docker restent associés à leurs enregistrements respectifs.
-
-## Diaporama
-
-Dans **Médias**, sélectionne une catégorie puis clique sur **Lancer le diaporama**.
-Seuls les médias de cette catégorie défilent, y compris ceux qui ne sont pas
-encore chargés dans la grille. **Médias principaux** affiche uniquement les médias
-sans catégorie.
-
-Les photos restent affichées cinq secondes et les vidéos sont lues jusqu’au bout,
-avec le son coupé au départ. Tu peux activer le son dans le lecteur, mettre en
-pause, passer au média précédent ou suivant, et utiliser le plein écran si ton
-navigateur le permet. Le diaporama reprend au début après le dernier média.
-Ferme-le avec la croix ou la touche Échap.
-
-## Sans filtre
-
-Dans **Paramètres → Programme → Ajouter un événement**, choisis **Sans filtre**.
-Règle son nom et son horaire, puis ouvre les questions depuis **Voir les questions**.
-Les invités posent leurs questions anonymement, même les plus osées, et votent
-pour celles qu’ils veulent entendre. Un second appui retire leur vote.
-
-Les questions en attente remontent selon leurs votes. Tu réponds honnêtement à
-l’oral, puis cliques sur **Marquer comme répondu**. Tu disposes de **deux jokers
-pour toute l’activité** pour passer des questions. Le compteur est partagé entre
-tous les invités ; un joker utilisé ne peut pas être annulé. Fermer les questions
-arrête les nouveaux envois et les votes, tout en te laissant répondre aux questions
-restantes. Chaque activité accepte jusqu’à 200 questions de 1 000 caractères.
-
-## Photo de profil
-
-Dans **Profil**, choisir une photo lance son envoi et remplace automatiquement
-la photo de profil. Il est ensuite possible de la remplacer ou de la supprimer.
-La photo apparaît dans l’en-tête et à côté de ses messages signés. Les messages
-anonymes gardent leur icône neutre.
-
-Les formats JPEG, PNG et WebP sont acceptés, avec la limite photo définie dans **Paramètres → Limites d’envoi**. Le serveur recadre la photo au centre et conserve une petite
-version JPEG dans PostgreSQL ; l’original est supprimé. Ces photos restent
-privées et sont incluses dans la sauvegarde de la base.
-
-## Accueillir les invités par étapes
-
-Dans **Paramètres → Accueil des invités**, crée jusqu’à 12 étapes. Chaque étape
-contient une liste de widgets, sans titre ni texte obligatoire en dehors de cette
-liste. Glisse un widget **Titre**, **Texte**, **Photo de profil**, **Photos et
-vidéos** ou **Activer les notifications** depuis le volet des widgets vers l’étape, puis déplace-le à l’endroit
-souhaité. Les boutons d’ajout et de déplacement permettent aussi de tout faire
-au clavier. Enregistre les étapes pour conserver tes modifications.
-
-Une étape peut contenir jusqu’à 12 widgets. Tu peux ajouter plusieurs titres,
-textes ou zones d’envoi, une photo de profil et un widget de notifications. Les textes restent dans la langue
-où tu les as écrits.
-
-Le widget **Photo de profil** permet aux invités d’ajouter leur photo pendant
-l’accueil, avec un aperçu avant l’enregistrement. La photo reste liée au profil
-après l’accueil. Tu décides quand débloquer la suite ; chaque invité choisit
-quand il est prêt à avancer.
-
-Le widget d’envoi de photos et vidéos permet de recevoir des médias pendant
-l’accueil. Dans ses réglages, choisis **Médias principaux** ou une catégorie.
-Chaque zone d’envoi garde sa propre destination et affiche ses propres envois.
-Les fichiers partagent la file d’attente habituelle, limitée à deux transferts
-simultanés. Débloquer une nouvelle étape laisse les envois en cours continuer.
-Quand l’invité change lui-même d’étape, les transferts que le serveur n’a pas
-encore acceptés s’arrêtent ; les envois déjà acceptés continuent leur préparation.
-Dans les médias comme dans chaque widget, une seule barre suit l’ensemble des
-envois, avec le nombre de fichiers reçus sur le total. Les fichiers en attente
-comptent dans ce total. Dans l’application, un bandeau compact suit les envois
-au-dessus de la navigation. Un appui ouvre le statut de chaque fichier et permet
-de réessayer un envoi en échec ; une vidéo reçue peut encore être en préparation.
-Quand tous les fichiers sont prêts, la confirmation disparaît après deux secondes.
-Elle reste visible pendant la consultation des détails ; les erreurs restent
-affichées. Chaque média de la galerie est présenté individuellement, sans compteur
-« 1/3 » ni bande de miniatures sous une publication.
-
-**Activer l’écran d’attente** place tous les invités sur un écran séparé, y compris
-ceux déjà connectés. Ton accès administrateur reste disponible. Clique sur
-**Débloquer la première étape** : elle s’affiche automatiquement pour les invités
-en attente. Aucun bouton **Commencer** n’apparaît avant ce déblocage. Pour la suite,
-utilise **Débloquer l’étape suivante**. Le bouton **Suivant** apparaît alors chez
-les invités, qui avancent à leur rythme et peuvent revenir avec **Précédent**.
-Débloquer la suite laisse chacun sur son étape et garde ses widgets ouverts.
-Les changements arrivent en direct par WebSocket ; après une reconnexion,
-l’application retrouve la progression enregistrée.
-
-Le switch **Obligatoire** impose toutes les étapes aux invités qui arrivent pour
-la première fois, même si l’application est déjà ouverte. Sans cette option, un
-nouvel arrivant rejoint la dernière étape débloquée pendant l’accueil, ou entre
-directement si l’application est ouverte. Le réglage s’enregistre immédiatement.
-
-**Ouvrir l’application** débloque les étapes restantes et permet aux invités de
-choisir **Entrer dans l’application**. Ceux qui suivent un parcours obligatoire
-doivent d’abord atteindre la dernière étape. Chacun garde sa position tant qu’il
-n’a pas choisi d’entrer.
-
-Tu peux modifier les étapes et leurs widgets à tout moment, même après leur
-déblocage ou l’ouverture de l’application. Les changements enregistrés s’affichent
-en direct. Une correction de texte conserve les sélections en cours ; un changement
-de widget ou de destination réinitialise les widgets de l’étape concernée. Les envois déjà
-acceptés gardent leur destination. Si la liste raccourcit, les invités concernés
-reviennent à la dernière position disponible. Ceux qui ont terminé gardent leur accès.
-Les étapes et la progression individuelle sont conservées après un rechargement
-de page ou un redémarrage des conteneurs. **Relancer l’accueil** recommence le
-parcours pour tous les invités.
-
-L’application reste ouverte tant que tu n’as pas activé l’écran d’attente.
-
-## Notifications sur le téléphone
-
-Ajoute le widget **Activer les notifications** à une étape. L’invité choisit de
-les activer, puis accepte la demande du navigateur. Il reçoit une notification
-quand tu débloques une étape ou ouvres l’application. La notification ouvre sa
-position actuelle, sans le faire avancer. Il peut aussi gérer les notifications
-de cet appareil depuis **Profil**. Refuser n’empêche pas de poursuivre l’accueil.
-
-Sur téléphone, l’application doit être servie en **HTTPS**. Sur iPhone et iPad,
-ajoute-la à l’écran d’accueil puis ouvre-la depuis son icône avant d’activer les
-notifications. Le widget affiche les instructions adaptées. Le site sur
-`http://localhost` peut être utilisé pour les tests sur ordinateur.
-Voir les conditions de [Web Push sur iOS/iPadOS](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)
-et des [contextes sécurisés](https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe).
-
-Les clés de notification sont créées automatiquement et conservées dans
-PostgreSQL, avec les abonnements des appareils. Aucun compte auprès d’un service
-tiers n’est à créer. Le navigateur utilise son propre service de réception.
-Les notifications ne contiennent ni noms d’invités, ni consignes privées, ni médias.
-Se déconnecter supprime l’abonnement associé à cette session.
-
-`VAPID_SUBJECT` permet de préciser une adresse de contact, par exemple
-`mailto:you@example.com`. En HTTPS, sa valeur par défaut est `PUBLIC_URL`.
-Le serveur envoie les notifications en arrière-plan et limite les tentatives en
-cas de panne ; une notification n’est donc pas une garantie de réception immédiate.
-Aucune nouvelle variable d’environnement n’est nécessaire.
-
-## Catégories de médias
-
-Dans **Paramètres → Catégories et visibilité**, crée une catégorie et choisis sa visibilité :
-
-- **Privée** : seuls les administrateurs peuvent consulter ses fichiers, même
-  lorsqu’un invité les a envoyés pendant l’accueil.
-- **Publique** : les invités connectés peuvent la consulter dans l’onglet Médias
-  une fois l’accès à l’application ouvert.
-
-Tu peux rendre une catégorie publique plus tard pour dévoiler tous ses médias.
-La galerie principale conserve les fichiers sans catégorie ; un filtre permet
-de consulter chaque catégorie accessible. Les catégories sont limitées à 100,
-avec un nom de 80 caractères maximum. Leur nom reste dans la langue où tu l’as écrit.
-
-## Personnaliser l’anniversaire
-
-Le bouton **Paramètres** est réservé aux administrateurs. Les réglages sont
-regroupés sous **La fête**, **Invités et accès** et **Photos et vidéos**.
-Chaque ligne ouvre une sous-page qui glisse de droite à gauche, avec une flèche
-de retour dans le sens inverse. Les champs se sauvegardent quand tu les quittes
-ou reviens au menu. En cas d’erreur, la page et ta saisie restent visibles.
-L’âge se règle dans **Infos de la fête**, avec l’icône gâteau, et **Accueil des
-invités** se trouve sous **La fête**. **Profil**, accessible à tous par la photo
-ronde en bas à droite, regroupe la photo, les notifications et la déconnexion.
-
-L’âge accepte un entier de 1 à 150 et apparaît sur l’invitation, dans l’en-tête
-et dans le livre d’or. Les textes de l’invitation sont publics. Pour le titre
-et la description, choisir le texte par défaut, masquer le texte ou fournir un
-texte personnalisé. Des variantes peuvent être enregistrées en français,
-anglais, allemand, italien et espagnol. La priorité est : texte de la langue,
-texte commun, puis texte traduit par défaut. Masquer une variante la cache même
-si un texte commun existe. Les contenus personnalisés ne sont pas traduits
-automatiquement. Le titre accepte 200 caractères et la description 2 000.
-
-Le nom de la fête reste modifiable séparément dans les paramètres. S’il est
-vide, l’en-tête utilise le titre d’invitation ou le titre traduit par défaut.
-La date, le lieu et le fuseau horaire se règlent indépendamment.
-
-Les modifications sont enregistrées dans PostgreSQL et prennent effet sur les
-prochaines lectures, sans redémarrage ni reconstruction. Lors du premier
-démarrage de cette version, les valeurs existantes de `BIRTHDAY_AGE`,
-`INVITATION_TITLE`, `INVITATION_DESCRIPTION`, leurs variantes par langue et les
-limites de fichiers sont importées depuis le `.env` racine. Une variable absente
-conserve le texte par défaut ; une valeur explicitement vide le masque. Les
-démarrages suivants préservent la configuration enregistrée dans l’application.
-
-Le `.env` racine et Compose gardent les réglages techniques : connexion à la
-base, URL publique, cookies, ports et stockage. Compose ignore `frontend/.env`
-et `frontend/.env.local`. Le script `npm run dev` charge également le `.env`
-racine ; les variables du terminal sont prioritaires. `frontend/.env.example`
-sert uniquement à lancer Next.js indépendamment.
-
-## Limites des fichiers
-
-Dans **Paramètres → Limites d’envoi**, régler les poids maximaux des photos et
-vidéos en Mio (1 Mio = 1 048 576 octets), avec des entiers de 1 à 1024.
-Les valeurs par défaut sont 15 Mio pour les photos et 100 Mio pour les vidéos.
-La limite photo s’applique aussi aux photos de profil.
-
-Go applique les limites enregistrées aux nouveaux envois. Les fichiers déjà
-acceptés continuent leur traitement si une limite diminue. Recharger les pages
-Médias ou Profil pour actualiser les indications et la sélection des fichiers.
-En local et avec Compose, le proxy Next autorise jusqu’à 1024 Mio plus le
-formulaire pour permettre une augmentation immédiate, sans redémarrage. Sur
-Kubernetes, les envois vont directement de l’Ingress au backend : son contrôleur
-doit accepter les limites choisies, comme tout autre reverse proxy externe. Le
-[guide de la chart](charts/birthday-party/README.md#ingress-fichiers-et-websocket)
-donne les réglages.
-
-`MAX_IMAGE_SIZE_MB` et `MAX_VIDEO_SIZE_MB` dans le `.env` servent uniquement à
-l’import initial. La durée maximale des vidéos reste de 5 minutes, les images
-sont limitées à 40 mégapixels et les vidéos à la 4K. Les vidéos sont conservées
-sans modification ; seule une vignette JPEG supplémentaire est créée.
-
-## Langue de l’interface
-
-L’application suit les préférences de langue du téléphone ou du navigateur,
-transmises dans `Accept-Language`. Elle prend en charge le français, l’anglais,
-l’allemand, l’italien et l’espagnol. Les variantes régionales utilisent la même
-traduction, par exemple `fr-CH` et `fr-FR` utilisent le français. Si aucune langue
-préférée n’est disponible, l’application utilise l’anglais.
-
-La traduction s’applique dès le premier affichage aux onglets, formulaires,
-messages d’erreur, confirmations, textes d’aide et libellés d’accessibilité.
-Les onglets gardent leur ordre et leurs adresses ; Paramètres est réservé aux
-administrateurs. Le bouton Profil reste accessible à tous. Les dates suivent la
-langue de l’utilisateur, avec le fuseau horaire de la fête ; les champs de saisie
-de dates de l’organisateur utilisent celui de son appareil.
-
-Les prénoms, messages du livre d’or, titres et descriptions saisis par les invités
-ou l’organisateur restent tels qu’ils ont été écrits. Ils ne sont pas envoyés à un
-service de traduction. Pour personnaliser la connexion dans plusieurs langues,
-utiliser le sélecteur **Texte à modifier** dans **Paramètres → Page d’invitation**. Une ancienne
-valeur commune française importée reste affichée telle quelle : choisir
-**Par défaut** permet de retrouver les traductions de l’application.
-
-## Créer l'accès organisateur
-
-Avec Docker Compose, le backend affiche automatiquement une ligne
-`Administrator invitation: <url>` au démarrage. Ouvrir ce lien puis choisir
-**Entrer**. Pour retrouver la ligne après un démarrage en arrière-plan :
-
-```powershell
-docker compose logs backend
-```
-
-Le lien utilise `PUBLIC_URL`. À chaque démarrage du backend, il remplace l'ancien
-lien du premier administrateur actif, en conservant son identité et ses sessions.
-S'il n'existe aucun administrateur actif, le profil `Admin` est créé. Le lien est
-à usage unique et expire après 7 jours. Utiliser le dernier lien affiché.
-
-Pour désactiver cet affichage, définir `PRINT_ADMIN_INVITATION=false` dans le `.env`
-racine puis lancer `docker compose up -d`. En local avec `npm run dev`, il faut
-définir explicitement `PRINT_ADMIN_INVITATION=true` pour activer cette fonction.
-
-Pour créer manuellement un accès à ton nom, la commande reste disponible :
-
-```powershell
-docker compose exec backend birthday-server invite-admin --name "Your name"
-```
-
-En développement local, dans un second terminal avec la même configuration :
-
-```powershell
+```sh
 npm run backend -- invite-admin --name "Your name"
 ```
 
-Cette commande affiche un lien personnel d'activation. L'ouvrir puis choisir
-**Entrer**. Conserver ce lien privé ; il représente un accès organisateur jusqu'à
-son utilisation ou son expiration. Le serveur n'affiche pas ce lien dans ses logs
-HTTP ordinaires.
+The scripts read an optional `.env` at the repository root, and
+[.env.example](.env.example) lists what it can contain. If Go is not on the
+`PATH`, point `GO_BIN` at the `go` executable.
 
-Dans **paramètres**, l'organisateur peut renseigner la fête, ajouter les invités,
-copier leurs liens personnels, réémettre un lien, révoquer un accès et gérer le
-programme. Les liens sont envoyés manuellement par le moyen de son choix.
-L'application n'envoie aucun e-mail ni message WhatsApp.
+### Check your changes
 
-## Invitations et confidentialité
-
-- Chaque invité possède un profil préparé par l'organisateur. Il n'existe pas
-  d'inscription publique, de mot de passe ni de compte de démonstration.
-- Le lien d'invitation expire après 7 jours et fonctionne une seule fois.
-  L'ouverture seule ne le consomme pas : il faut appuyer sur **Entrer**.
-- Le navigateur garde une session pendant 90 jours, sauf déconnexion ou révocation.
-  Une nouvelle invitation peut retrouver le même profil sur un autre navigateur.
-- Réinviter une personne dont l'accès a été retiré réactive son profil et conserve
-  ses contributions. Ses anciennes sessions restent invalides ; elle doit
-  activer le nouveau lien.
-- Avant activation, une personne à qui le lien est transféré peut prendre cet
-  accès. Le partager uniquement avec son destinataire. Une session déjà ouverte
-  dépend aussi de la confidentialité du navigateur utilisé.
-- Tous les invités actifs voient les photos, les vidéos, les messages et les événements
-  disponibles. Un auteur peut supprimer ses propres contributions ;
-  l'organisateur peut modérer toutes les contributions.
-- Dans le livre d’or, cocher **Publier anonymement** masque le nom aux invités
-  et à l’organisateur. L’auteur peut toujours supprimer son message. Son identité
-  reste enregistrée dans la base privée pour gérer ce droit.
-- Les photos et vidéos sont protégées par la même connexion que l'application.
-  Les formats acceptés sont JPEG, PNG et WebP, jusqu'à 40 mégapixels.
-  Les vidéos acceptées sont MP4, MOV et WebM, jusqu’à 5 minutes et 4K.
-  Les poids maximaux se règlent dans **Paramètres → Limites d’envoi** : 15 Mio par image et 100 Mio par vidéo
-  par défaut.
-  Le fichier vidéo d’origine est conservé sans modification pour la lecture et
-  le téléchargement : résolution, fréquence d’images, audio et qualité restent
-  identiques. FFmpeg crée uniquement la vignette. La lecture dépend des formats
-  et codecs pris en charge par le navigateur ; le téléchargement reste disponible.
-  Les anciennes vidéos déjà converties gardent leur version MP4 ; leurs originaux
-  supprimés ne peuvent pas être récupérés.
-  La galerie accepte au plus 5 000 médias et 10 Gio ; le poids total inclut les
-  originaux et les vignettes. Supprimer un média retire
-  tous ses fichiers. Le volume Docker `party-data` conserve ces versions ensemble.
-- Les fichiers reçus sont placés dans une file persistante, puis préparés deux
-  par deux. L'invité peut changer d'onglet pendant l'envoi et retrouver les fichiers
-  déjà reçus après un rechargement. Les fichiers encore sur le téléphone exigent
-  de garder la page ouverte jusqu'à la fin de leur transfert.
-  La file accepte 100 fichiers actifs par invité, 1 000 au total et 10 Gio d'entrées.
-- Go masque le titre privé et la description des surprises avant leur ouverture.
-  Un aperçu public peut être défini. Le fuseau initial est **Europe/Zurich**,
-  modifiable par l'organisateur ; les instants sont enregistrés en UTC.
-- Aucune suppression automatique des souvenirs n'est programmée. L'organisateur
-  décide de leur durée de conservation et peut supprimer les contributions.
-
-## Vérifier le projet
-
-```powershell
-# Go static analysis and tests, frontend lint, types and tests
+```sh
+# Go vet and tests, frontend lint, types and unit tests
 npm run check
 
-# Frontend production build
+# Production build of the frontend
 npm --prefix frontend run build
 
-# End-to-end browser tests (Chrome, ffmpeg and ffprobe must be installed)
+# Browser tests in Chrome (needs ffmpeg and ffprobe)
 npm run test:e2e
 
-# Check frontend formatting
+# Formatting
 npm --prefix frontend run format:check
 ```
 
-Arrêter `npm run dev` avant les tests navigateur ou une compilation de production :
-ces commandes partagent le répertoire de compilation Next. Les tests navigateur
-utilisent un port, un dossier de médias et un conteneur PostgreSQL temporaires
-propres aux tests. Docker doit tourner pour `npm run check` et `npm run test:e2e` ;
-la base de test est supprimée après la commande, sans toucher aux données de la fête.
-Voir aussi les
-instructions [frontend](frontend/AGENTS.md) et [backend](backend/AGENTS.md).
+`npm run check` and `npm run test:e2e` start a throwaway PostgreSQL container,
+so Docker must be running, and they never touch the party's data. Stop
+`npm run dev` before the browser tests or a production build, because they share
+Next.js's build directory. GitHub Actions runs the same checks on every push
+and pull request, and publishes the images only when they pass.
 
-La CI GitHub Actions lance ces vérifications à chaque push et pull request :
-`go vet` et les tests Go avec PostgreSQL et FFmpeg, le lint, les types et les
-tests du frontend sur Node.js 24, puis les parcours Chrome. Les images ne sont
-publiées qu’après leur réussite. Si un parcours échoue, le rapport Playwright et
-les traces sont joints à l’exécution du workflow.
+Two more checks are worth running before a release. The `go` commands run from
+`backend/`:
 
-Vérifications complémentaires, à lancer au besoin :
-
-```powershell
-# Go race detector: needs cgo, so run it on Linux with TEST_DATABASE_URL set
-go test -race ./...
-
+```sh
 # Known vulnerabilities in production dependencies
 npm --prefix frontend audit --omit=dev
 go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+# Race detector: needs cgo, so run it on Linux with TEST_DATABASE_URL set
+go test -race ./...
 ```
 
-Les commandes `go` se lancent depuis `backend/`. Sans `TEST_DATABASE_URL`, les
-tests Go qui utilisent PostgreSQL sont ignorés ; sans `ffmpeg` ni `ffprobe`, les
-tests vidéo le sont aussi.
+### Deploy
 
-## Exécuter avec Docker
+Production runs on Kubernetes with the Helm chart in
+[charts/birthday-party](charts/birthday-party/README.md) (guide in French). It
+installs the frontend, one Go backend and PostgreSQL, with persistent volumes,
+network policies and an HTTPS Ingress that sends `/api` straight to Go. The
+images are `ghcr.io/alexpresso/birthday-party-backend` and
+`ghcr.io/alexpresso/birthday-party-frontend`, built for `linux/amd64` and
+`linux/arm64`; deploy both with the same `sha-<full commit SHA>` tag.
 
-Les [workflows GitHub Actions](.github/workflows) construisent les deux images et
-les publient dans GHCR depuis la branche par défaut, les tags `v*` ou un lancement
-manuel, une fois les tests réussis. Les pull requests vérifient la construction
-sans publication. Les images
-publiées prennent en charge `linux/amd64` et `linux/arm64` ; leurs noms sont
-`ghcr.io/alexpresso/birthday-party-backend` et
-`ghcr.io/alexpresso/birthday-party-frontend`. Utiliser le même tag `sha-<SHA complet>`
-pour déployer une révision précise des deux composants.
+Whatever sits in front of the app has a few things to get right:
 
-La mise en production se fait sur Kubernetes : la
-[chart Helm](charts/birthday-party/README.md) fournit les services, PostgreSQL
-intégré ou externe, les volumes persistants, les NetworkPolicy et l'Ingress HTTPS
-configurable, qui envoie `/api` directement au backend. Son guide décrit les
-Secrets à créer et la commande `helm upgrade --install`.
+- `PUBLIC_URL` must be the exact origin guests use. Invitation links are built
+  from it and the server refuses WebSocket connections from any other origin.
+  With an `https` URL, cookies become `Secure` on their own.
+- `/api/realtime` is a WebSocket. Let the upgrade through and keep idle
+  connections open for more than 30 seconds.
+- Uploads need a body limit at least as large as your biggest upload limit plus
+  64 KiB, and a 10-minute timeout.
+- Do not cache private pages, API responses or media.
 
-La configuration Compose sert au développement local et aux essais sur une
-machine. Elle fournit les deux applications et PostgreSQL 18.
-Le volume `postgres-data` conserve les enregistrements et la file d'attente ;
-`party-data` conserve les photos, vidéos, vignettes et fichiers en attente.
-L'application reste accessible uniquement depuis la machine hôte sur le port 3000 ;
-Go et PostgreSQL n'ont aucun port public.
+The app targets one Go process with local storage. Back up PostgreSQL and the
+media folder together, with the backend stopped;
+[docs/database.md](docs/database.md) has the procedure and explains migrations.
 
-```powershell
-docker compose up -d
-docker compose logs -f backend
-docker compose down
-```
+## Settings and limits
 
-Le lien administrateur apparaît dans les logs du backend à chaque démarrage.
-`docker compose up` sur un backend déjà lancé et inchangé ne génère pas de nouveau
-lien. `docker compose restart backend` en génère un nouveau.
+Everything about the party itself is edited in the app and stored in
+PostgreSQL, with no restart. The root `.env` only carries deployment settings
+such as the public URL, the database and the port. Its `BIRTHDAY_AGE`,
+`INVITATION_*` and `MAX_*_SIZE_MB` values are imported once, on the first
+start, and the app's own settings win from then on.
 
-Ouvrir **http://localhost:3000** sur cette machine. `docker compose ps` doit
-afficher `127.0.0.1:3000->3000/tcp` pour le frontend. Si le conteneur démarre mais
-que ce port n'est pas publié, recréer uniquement le frontend pour rétablir son
-raccordement au réseau, sans toucher au volume de données :
+| What                | Limit                                                        |
+| ------------------- | ------------------------------------------------------------ |
+| Photos              | JPEG, PNG or WebP, up to 40 megapixels, 15 MiB by default    |
+| Videos              | MP4, MOV or WebM, up to 5 minutes and 4K, 100 MiB by default |
+| Upload size setting | 1 to 1024 MiB each for photos and videos                     |
+| Gallery             | 5,000 media and 10 GiB, originals and thumbnails included    |
+| Upload queue        | 100 files in progress per guest, 1,000 in total              |
+| Media categories    | 100                                                          |
+| Vote                | 2 to 200 guests, or up to 200 choices of 80 characters       |
+| No Filter           | 200 questions of 1,000 characters, two jokers                |
+| Invitation link     | single use, valid for 7 days                                 |
+| Session             | 90 days, until sign-out or revocation                        |
 
-```powershell
-docker compose up -d --no-deps --force-recreate frontend
-```
+Nothing is deleted automatically. The host decides how long the memories stay
+and can remove any contribution; guests can remove their own.
 
-Cette configuration ne publie pas le site ; pour le mettre en ligne, utiliser la
-chart Helm. Pour essayer Compose derrière un reverse proxy HTTPS, définir
-`PUBLIC_URL=https://votre-domaine` puis recréer les conteneurs : les cookies
-sécurisés s'activent automatiquement avec une URL `https`. Laisser
-`COOKIE_SECURE` non défini ; le backend refuse de démarrer avec
-`COOKIE_SECURE=false` et une URL `https`. Conserver le backend sur le réseau
-privé et le volume de données sur un stockage persistant. Les invitations
-générées utilisent `PUBLIC_URL` :
-`localhost` ne permet pas aux invités de se connecter depuis leur téléphone.
+## Privacy
 
-Les activités sont des événements du programme. Depuis **Programme → Gérer le
-programme → Ajouter un événement**, choisir un événement classique ou un vote
-pour une personne. Pour un vote, définir la question, les candidats et les horaires
-dans le même formulaire, puis ouvrir le vote quand tout est prêt.
-Les invités choisissent un portrait et confirment leur choix. Ils peuvent le
-modifier jusqu’à la fermeture. L’organisateur voit le nombre de votes reçus,
-ferme le vote, puis révèle les résultats quand il le souhaite. Les choix
-individuels restent privés dans l’interface, y compris pour les administrateurs.
-La liste des candidats et l’autorisation de voter pour soi-même se règlent avant
-l’ouverture ; la question reste modifiable. Les votes sont conservés lors des
-modifications du texte et des horaires de l’événement.
+- Only people with a link from the host get in. Before it is used, a link works
+  for whoever opens it, so send each one to its guest only.
+- Photos, videos, thumbnails and profile photos are served behind the same
+  session as the app, and the server refuses a private category's files to
+  guests.
+- Locked events and draft activities are held back by the server.
+- Individual votes, question authors and anonymous guestbook authors are not
+  shown to anyone. The database keeps the author of an anonymous message only
+  so that they can delete it.
+- Request logs leave out invitation and session tokens. The host link printed
+  at startup is the one exception, and you can switch it off.
 
-L’accueil, la file d’envoi des médias et le programme se mettent à jour par une
-connexion WebSocket partagée, sans requêtes périodiques du navigateur. Le serveur
-signale les changements et les déblocages programmés ; l’écran recharge alors les
-données concernées. Après une coupure, la connexion se rétablit et l’écran récupère
-l’état actuel. Les envois déjà acceptés continuent leur traitement sur le serveur.
+## How it is built
 
-Avec Compose, le proxy Next transmet aussi `/api/realtime` au backend ; aucun
-port ni variable supplémentaire n’est nécessaire. Sur Kubernetes, l’Ingress envoie
-ce chemin directement au backend. Le reverse proxy HTTPS ou l’Ingress doit laisser
-passer les connexions WebSocket (`Upgrade` et `Connection`) sur ce chemin et les
-garder ouvertes, avec un délai d’inactivité supérieur à 30 secondes. `PUBLIC_URL`
-doit correspondre exactement à l’origine utilisée par les invités ; le serveur
-refuse les connexions WebSocket provenant d’une autre origine.
+Next.js 16 and TypeScript render the interface. A single Go service owns the
+rules: invitations, sessions, permissions, scheduled unlocks, the upload queue
+and media processing with FFmpeg. PostgreSQL 18 stores the records and the
+queue. The browser talks to one origin and keeps one WebSocket open, which only
+carries "something changed" signals; the data itself is always fetched through
+the authorised HTTP API.
 
-Le reverse proxy doit accepter le plus grand des deux poids configurés,
-avec au moins 64 Kio pour le formulaire, et un délai de 10 minutes pour
-l’envoi des fichiers. La préparation des vidéos continue en arrière-plan après
-la réponse 202. Le proxy ne doit pas mettre en
-cache les pages privées, les API ni les médias authentifiés. La destination du
-proxy Next est configurée au démarrage via `API_INTERNAL_URL` ; redémarrer le
-frontend avec la nouvelle valeur si cette adresse interne change.
+- [docs/architecture.md](docs/architecture.md): who owns what, in the frontend
+  and in the Go packages
+- [docs/api.md](docs/api.md): the HTTP and WebSocket contract
+- [docs/design.md](docs/design.md): the visual brief, a dark theme with one
+  orange accent called “K · Neige”
+- [backend/README.md](backend/README.md): the Go service in more detail
 
-Les migrations SQL et la procédure de sauvegarde sont décrites dans
-[docs/database.md](docs/database.md). Sauvegarder ensemble PostgreSQL et les médias,
-avec le backend arrêté pour conserver leur cohérence.
+### Working with coding agents
 
-Le schéma PostgreSQL est créé par une migration de base unique au premier
-démarrage ; les changements suivants s'ajoutent comme migrations numérotées.
+[AGENTS.md](AGENTS.md) and the `AGENTS.md` files in `frontend/` and `backend/`
+describe the project's rules for AI coding agents. They refer to five skills
+vendored under [.agents/skills](.agents/skills), each with its licence and
+source: Code Simplifier (from
+[anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)),
+Go Style Guide
+([madflojo/go-style-agent-skill](https://github.com/madflojo/go-style-agent-skill)),
+Vercel React Best Practices
+([vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills)), UX
+Writing
+([content-designer/ux-writing-skill](https://github.com/content-designer/ux-writing-skill))
+and Humanizer ([blader/humanizer](https://github.com/blader/humanizer)). The
+app does not use them: they are not part of the build or the images.
 
-## Licence
+## License
 
-Birthday Party est distribué sous la licence GNU Affero General Public License,
-version 3 uniquement (`AGPL-3.0-only`) ; le texte complet se trouve dans
-[LICENSE](LICENSE). Si tu modifies l'application et la proposes en ligne, cette
-licence te demande de mettre ton code source modifié à disposition de ses
-utilisateurs.
+Birthday Party is released under the GNU Affero General Public License, version
+3 only (`AGPL-3.0-only`); the full text is in [LICENSE](LICENSE). If you modify
+the app and offer it online, the licence asks you to make your modified source
+available to its users.
 
-Les éléments tiers inclus gardent leur propre licence, fournie dans leur dossier :
+Bundled third-party material keeps its own licence, included next to it:
 
-- les polices Unbounded et Figtree, sous SIL Open Font License 1.1
-  ([frontend/public/fonts](frontend/public/fonts)) ;
-- les icônes de l'interface viennent de Lucide (licence ISC) ; les icônes de
-  l'application sont un dessin original du projet
-  ([frontend/public/icons/LICENSE.txt](frontend/public/icons/LICENSE.txt)) ;
-- les skills d'agents de `.agents/skills/`, sous licence Apache-2.0 ou MIT selon
-  le skill (fichier `LICENSE` de chaque dossier).
+- the Unbounded and Figtree fonts, under the SIL Open Font License 1.1
+  ([frontend/public/fonts](frontend/public/fonts));
+- the interface icons, from Lucide (ISC). The app icons are an original drawing
+  for this project
+  ([frontend/public/icons/LICENSE.txt](frontend/public/icons/LICENSE.txt));
+- the agent skills in `.agents/skills/`, under Apache-2.0 or MIT depending on
+  the skill (see the `LICENSE` file in each folder).
