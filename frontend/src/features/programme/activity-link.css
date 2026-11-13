@@ -1,8 +1,13 @@
-.programme-activity-link {
-  width: fit-content;
-  margin-top: 14px;
-}
-.programme-event > .programme-activity-link {
-  grid-column: 2;
-  margin-top: 0;
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  .programme-activity-link {
+    width: fit-content;
+    margin-top: 14px;
+  }
+  .programme-event > .programme-activity-link {
+    grid-column: 2;
+    margin-top: 0;
+  }
 }

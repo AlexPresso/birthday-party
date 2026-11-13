@@ -40,6 +40,8 @@
   --media-overlay: #100f0eb8;
   --media-border: #ffffff59;
   --radius: 18px;
+  /* Thin bars, drop indicators and checkboxes. */
+  --radius-tiny: 4px;
   --radius-small: 12px;
   --radius-large: 24px;
   --radius-pill: 999px;

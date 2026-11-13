@@ -38,6 +38,24 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Font files keep stable names (see public/fonts/SOURCE.md), so they
+        // are cached for a year without `immutable`: a replaced file is still
+        // picked up when the browser revalidates.
+        source: "/fonts/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000" }],
+      },
+      {
+        // App icons may be redrawn under the same names: a day of caching,
+        // then a background refresh for up to a week.
+        source: "/icons/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      {
         source: "/sw.js",
         headers: [
           {

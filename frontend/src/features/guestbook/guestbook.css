@@ -1,240 +1,245 @@
-.guestbook-page {
-  max-width: 640px;
-  margin-inline: auto;
-}
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
 
-.guestbook-page .page-heading {
-  margin-bottom: 22px;
-}
-
-.guestbook-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 38px;
-}
-
-@media (min-width: 960px) {
+@layer features {
   .guestbook-page {
-    max-width: none;
+    max-width: 640px;
+    margin-inline: auto;
   }
+
+  .guestbook-page .page-heading {
+    margin-bottom: 22px;
+  }
+
   .guestbook-layout {
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-    gap: 64px;
-    align-items: start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 38px;
   }
+
+  @media (min-width: 960px) {
+    .guestbook-page {
+      max-width: none;
+    }
+    .guestbook-layout {
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+      gap: 64px;
+      align-items: start;
+    }
+    .guestbook-compose {
+      position: sticky;
+      top: 32px;
+    }
+  }
+
   .guestbook-compose {
-    position: sticky;
-    top: 32px;
+    min-width: 0;
   }
-}
 
-.guestbook-compose {
-  min-width: 0;
-}
+  .guestbook-compose textarea {
+    display: block;
+    width: 100%;
+    min-height: 144px;
+    height: 144px;
+    padding: 15px 16px;
+    border-radius: var(--radius-small);
+    background: var(--surface);
+    font-size: 16px;
+    line-height: 1.5;
+    resize: vertical;
+  }
 
-.guestbook-compose textarea {
-  display: block;
-  width: 100%;
-  min-height: 144px;
-  height: 144px;
-  padding: 15px 16px;
-  border-radius: 10px;
-  background: var(--surface);
-  font-size: 16px;
-  line-height: 1.5;
-  resize: vertical;
-}
+  .guestbook-compose .checkbox-field {
+    margin: 6px 0 12px;
+    min-height: 44px;
+    gap: 12px;
+    font-size: 14px;
+  }
 
-.guestbook-compose .checkbox-field {
-  margin: 6px 0 12px;
-  min-height: 44px;
-  gap: 12px;
-  font-size: 14px;
-}
-
-.guestbook-compose .checkbox-field input {
-  appearance: none;
-  display: grid;
-  place-content: center;
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: transparent;
-}
-
-.guestbook-compose .checkbox-field input::after {
-  content: "";
-  width: 10px;
-  height: 6px;
-  margin-top: -3px;
-  border: solid var(--on-accent);
-  border-width: 0 0 2px 2px;
-  transform: rotate(-45deg);
-  opacity: 0;
-}
-
-.guestbook-compose .checkbox-field input:checked {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.guestbook-compose .checkbox-field input:checked::after {
-  opacity: 1;
-}
-
-.guestbook-compose .button {
-  min-height: 48px;
-  font-size: 15px;
-}
-
-.compose-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 6px;
-}
-
-.guestbook-compose .success-notice {
-  margin: 14px 0 0;
-  font-size: 13px;
-}
-
-.guestbook-compose .success-notice:empty {
-  margin: 0;
-}
-
-.guestbook-entry {
-  padding: 30px 0 32px;
-  border-top: 1px solid var(--border);
-}
-
-.guestbook-entry > header {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 14px;
-}
-
-.guestbook-entry > header .avatar {
-  width: 54px;
-  height: 54px;
-}
-
-.guestbook-entry > header > div {
-  flex: 1;
-  min-width: 0;
-}
-
-.guestbook-entry > header strong {
-  display: block;
-  font-size: 16px;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.guestbook-entry > header p {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.guestbook-entry .entry-body {
-  margin: 0;
-  color: var(--text);
-  font-size: 16px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.anonymous-avatar {
-  overflow: hidden;
-  color: var(--avatar-neutral-foreground);
-  background: var(--avatar-neutral-background);
-}
-
-.anonymous-avatar svg {
-  align-self: flex-end;
-  width: 42px;
-  height: 42px;
-  transform: translateY(3px);
-}
-
-@media (forced-colors: active) {
   .guestbook-compose .checkbox-field input {
-    appearance: auto;
+    appearance: none;
+    display: grid;
+    place-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-tiny);
+    background: transparent;
   }
 
   .guestbook-compose .checkbox-field input::after {
+    content: "";
+    width: 10px;
+    height: 6px;
+    margin-top: -3px;
+    border: solid var(--on-accent);
+    border-width: 0 0 2px 2px;
+    transform: rotate(-45deg);
+    opacity: 0;
+  }
+
+  .guestbook-compose .checkbox-field input:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+
+  .guestbook-compose .checkbox-field input:checked::after {
+    opacity: 1;
+  }
+
+  .guestbook-compose .button {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  .compose-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+
+  .guestbook-compose .success-notice {
+    margin: 14px 0 0;
+    font-size: 13px;
+  }
+
+  .guestbook-compose .success-notice:empty {
+    margin: 0;
+  }
+
+  .guestbook-entry {
+    padding: 30px 0 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  .guestbook-entry > header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+
+  .guestbook-entry > header .avatar {
+    width: 54px;
+    height: 54px;
+  }
+
+  .guestbook-entry > header > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .guestbook-entry > header strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .guestbook-entry > header p {
+    margin: 3px 0 0;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .guestbook-entry .entry-body {
+    margin: 0;
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .anonymous-avatar {
+    overflow: hidden;
+    color: var(--avatar-neutral-foreground);
+    background: var(--avatar-neutral-background);
+  }
+
+  .anonymous-avatar svg {
+    align-self: flex-end;
+    width: 42px;
+    height: 42px;
+    transform: translateY(3px);
+  }
+
+  @media (forced-colors: active) {
+    .guestbook-compose .checkbox-field input {
+      appearance: auto;
+    }
+
+    .guestbook-compose .checkbox-field input::after {
+      display: none;
+    }
+  }
+
+  .entry-actions {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .entry-actions > summary {
+    list-style: none;
+    color: var(--text);
+  }
+
+  .entry-actions > summary::-webkit-details-marker {
     display: none;
   }
-}
 
-.entry-actions {
-  position: relative;
-  flex-shrink: 0;
-}
+  .entry-menu {
+    position: absolute;
+    z-index: 2;
+    top: 44px;
+    right: 0;
+    width: max-content;
+    max-width: min(280px, 75vw);
+    padding: 5px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
 
-.entry-actions > summary {
-  list-style: none;
-  color: var(--text);
-}
+  .entry-menu > button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    text-align: left;
+  }
 
-.entry-actions > summary::-webkit-details-marker {
-  display: none;
-}
+  .entry-menu > button:hover {
+    background: var(--surface-raised);
+  }
 
-.entry-menu {
-  position: absolute;
-  z-index: 2;
-  top: 44px;
-  right: 0;
-  width: max-content;
-  max-width: min(280px, 75vw);
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
+  .entry-menu > .entry-delete {
+    color: var(--danger);
+  }
 
-.entry-menu > button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  text-align: left;
-}
+  .guestbook-empty {
+    padding: 32px 12px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
 
-.entry-menu > button:hover {
-  background: var(--surface-raised);
-}
+  .guestbook-empty > svg {
+    margin-bottom: 12px;
+    color: var(--accent-text);
+  }
 
-.entry-menu > .entry-delete {
-  color: var(--danger);
-}
+  .guestbook-empty h2 {
+    font-size: 18px;
+  }
 
-.guestbook-empty {
-  padding: 32px 12px;
-  border-top: 1px solid var(--border);
-  text-align: center;
-}
-
-.guestbook-empty > svg {
-  margin-bottom: 12px;
-  color: var(--accent-text);
-}
-
-.guestbook-empty h2 {
-  font-size: 18px;
-}
-
-.guestbook-empty p {
-  margin-bottom: 10px;
-  font-size: 14px;
+  .guestbook-empty p {
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
 }
