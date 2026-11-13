@@ -2,6 +2,7 @@
 
 import type { FocusEventHandler } from "react";
 import { X } from "lucide-react";
+import { ErrorNotice } from "@/components/ui";
 import { useI18n } from "@/lib/i18n-context";
 import type { Guest } from "../guests/contracts";
 import type { PartyEvent } from "./contracts";
@@ -16,6 +17,7 @@ export function EventForm({
   timezone,
   zone,
   busy,
+  error,
   voteEditorKey,
   onChange,
   onBlur,
@@ -31,6 +33,11 @@ export function EventForm({
   /** The browser's timezone, in which the date inputs are expressed. */
   zone: string;
   busy: boolean;
+  /**
+   * Shown below the fields: above them, appearing on blur would push the form
+   * down between a press and its click, so the first click on Close missed.
+   */
+  error: string | null;
   voteEditorKey: number;
   /** `commit` asks for an immediate save, for controls that never blur. */
   onChange: (changes: Partial<EventDraft>, commit?: boolean) => void;
@@ -152,6 +159,7 @@ export function EventForm({
           {t("admin.eventDateHint", { zone, timezone })}
         </p>
       </fieldset>
+      <ErrorNotice message={error} />
     </form>
   );
 }

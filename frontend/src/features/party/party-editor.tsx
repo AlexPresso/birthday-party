@@ -1,8 +1,8 @@
 "use client";
 import { useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import { api, errorMessage } from "@/lib/api";
 import { useAutosave } from "@/lib/autosave";
+import { useRouteRefresh } from "@/lib/use-route-refresh";
 import { useI18n } from "@/lib/i18n-context";
 import { localInput, utcInput } from "@/lib/dates";
 import { partySchema, type Party } from "./contracts";
@@ -18,7 +18,7 @@ export function PartyEditor({
   onSave: (party: Party) => void;
 }) {
   const { locale, t } = useI18n();
-  const router = useRouter();
+  const refreshRoute = useRouteRefresh();
   const form = useRef<HTMLFormElement>(null);
   const savedRequest = useRef(party);
   const [title, setTitle] = useState(party.title);
@@ -78,7 +78,7 @@ export function PartyEditor({
       onSave(updated);
       setSavedDraft(submitted);
       setSaved(true);
-      router.refresh();
+      refreshRoute();
       return true;
     } catch (err) {
       setError(

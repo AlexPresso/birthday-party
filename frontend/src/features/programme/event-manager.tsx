@@ -257,7 +257,8 @@ export function EventManager({
           </button>
         </div>
       )}
-      <ErrorNotice message={error} />
+      {/* With the editor open, the form shows the error below its fields. */}
+      <ErrorNotice message={draft ? null : error} />
       {refreshMessage && (
         <div>
           <ErrorNotice message={refreshMessage} />
@@ -281,6 +282,7 @@ export function EventManager({
           timezone={timezone}
           zone={zone}
           busy={busy}
+          error={error}
           voteEditorKey={editorKey}
           onChange={change}
           onBlur={autosave.onBlur}
