@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { errorMessage } from "@/lib/api";
 import { useAutosave } from "@/lib/autosave";
 import { useRouteRefresh } from "@/lib/use-route-refresh";
@@ -327,12 +327,13 @@ export function ConfigurationEditor({
       <ErrorNotice message={error} />
       <div className="configuration-save">
         <span className="success-notice" role="status">
-          {autosave.saving
-            ? t("configuration.saving")
-            : saved && !dirty
-              ? t("configuration.saved")
-              : ""}
+          {autosave.saving ? t("configuration.saving") : ""}
         </span>
+        <SavedAnnouncement
+          message={
+            !autosave.saving && saved && !dirty ? t("configuration.saved") : ""
+          }
+        />
       </div>
     </form>
   );

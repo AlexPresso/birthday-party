@@ -10,6 +10,19 @@ export function ErrorNotice({ message }: { message: string | null }) {
   ) : null;
 }
 
+/**
+ * Tells screen readers that a save went through. Sighted hosts get no
+ * message: the fields they left keep their values, and only a running save,
+ * an error or a conflict is shown.
+ */
+export function SavedAnnouncement({ message }: { message: string }) {
+  return (
+    <p className="visually-hidden" role="status">
+      {message}
+    </p>
+  );
+}
+
 export function PageHeading({
   title,
   description,

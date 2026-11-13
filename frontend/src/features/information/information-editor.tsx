@@ -9,7 +9,7 @@ import { moveItem } from "@/lib/reorder";
 import { useLatestState } from "@/lib/use-latest-state";
 import { useRouteRefresh } from "@/lib/use-route-refresh";
 import { useConfirm } from "@/components/confirm-dialog";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import {
   adminInformationSchema,
   type AdminInformation,
@@ -74,6 +74,8 @@ export function InformationEditor({
   const dirty = enabled !== state.enabled || !sameTabs(tabs, state.tabs);
   const locked = !!busy || conflict;
   const draftKept = notice === t("information.draftKept");
+  // A finished save is announced to screen readers only.
+  const savedNotice = notice === t("information.saved");
   const { flush, saving, onBlur } = useAutosave({ save });
   const structure = draft.map(({ key }) => key).join();
   const previousStructure = useRef(structure);
@@ -381,25 +383,28 @@ export function InformationEditor({
           {announcement}
         </p>
 
-        <button
-          type="button"
-          id={`${id}-add`}
-          className="button secondary"
-          disabled={locked || draft.length >= maxTabs}
-          onClick={add}
-        >
-          <Plus size={17} aria-hidden="true" />
-          {t("information.add")}
-        </button>
-        {draft.length >= maxTabs && (
-          <p className="fine-print information-limit">
-            {t("information.limit", { count: number(maxTabs) })}
-          </p>
-        )}
+        <div className="form-actions information-editor-actions">
+          <button
+            type="button"
+            id={`${id}-add`}
+            className="button secondary"
+            disabled={locked || draft.length >= maxTabs}
+            onClick={add}
+          >
+            <Plus size={17} aria-hidden="true" />
+            {t("information.add")}
+          </button>
+          {draft.length >= maxTabs && (
+            <p className="fine-print">
+              {t("information.limit", { count: number(maxTabs) })}
+            </p>
+          )}
+        </div>
 
         <p className="information-notice" role="status">
-          {saving ? t("admin.saving") : notice}
+          {saving ? t("admin.saving") : savedNotice ? "" : notice}
         </p>
+        <SavedAnnouncement message={!saving && savedNotice ? notice : ""} />
         <ErrorNotice message={error} />
         {(conflict || (dirty && (error || draftKept))) && (
           <div className="form-actions">

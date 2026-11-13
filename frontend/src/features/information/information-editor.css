@@ -8,8 +8,8 @@
     line-height: 1.6;
   }
   .information-switch {
-    padding: 14px 0 18px;
-    border-block: 1px solid var(--border);
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
   }
   .information-switch > p {
     max-width: 68ch;
@@ -55,7 +55,7 @@
   .information-tab-list {
     display: grid;
     gap: 16px;
-    margin: 22px 0 18px;
+    margin: 22px 0 0;
     padding: 0;
     list-style: none;
   }
@@ -101,8 +101,14 @@
   .information-tab-hint[data-partial] {
     color: var(--danger);
   }
-  .information-limit {
-    margin: 10px 0 0;
+  /* The same breathing room as the welcome editor's "add a step" row. */
+  .information-editor-actions {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .information-editor-actions > p {
+    margin: 0;
   }
   .information-notice {
     min-height: 1.6em;

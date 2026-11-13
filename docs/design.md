@@ -155,8 +155,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
   editors mounted so returning to the list preserves drafts, and restore focus
   to the originating row. Respect reduced motion and keep inactive pages inert.
   Save editable settings when a field loses focus and before returning to the
-  menu, without Save buttons. Keep pending edits and errors visible, and remain
-  on the editor if validation or saving fails. Changes made during a request
+  menu, without Save buttons. A successful save shows nothing: announce it to
+  screen readers only, and keep visible messages for errors and for results
+  the host must see, such as a copied link. Keep pending edits and errors
+  visible, and remain on the editor if validation or saving fails. Changes made during a request
   must remain intact and be saved by the next queued request. Each configuration
   page saves its own fields while preserving the other saved configuration
   values; serialize those writes. Creation, deletion and vote/welcome transitions
@@ -166,6 +168,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
   right when relevant, and a chevron. Keep longer descriptions accessible without
   adding a second visible line to every row. Show actual saved age and upload
   limits in the list; preserve the three groups and sliding subpages.
+- The information page follows the settings layout. On phones it opens on a
+  vertical menu of the host's tab titles, and a title slides its text in with a
+  back arrow. From 960px the titles stay in a list on the left and the selected
+  text fills the right. A page with one tab shows it directly.
 - Media is the first destination after authentication when full access is open.
   During the host-led welcome, guests see a separate waiting screen without tabs.
   Use a personalized welcome heading while waiting, then show the current

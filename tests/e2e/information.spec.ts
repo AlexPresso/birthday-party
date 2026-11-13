@@ -2,7 +2,6 @@ import {
   test,
   expect,
   type APIRequestContext,
-  type Locator,
   type Page,
 } from "@playwright/test";
 import {
@@ -12,7 +11,10 @@ import {
   shareSession,
   signInGuest,
 } from "./support/party";
-import { openSettingsSection } from "./support/settings";
+import {
+  expectSavedAnnouncement,
+  openSettingsSection,
+} from "./support/settings";
 import { acceptConfirmation } from "./support/confirm";
 
 type InformationTab = { title: string; body: string };
@@ -167,15 +169,19 @@ function informationLink(page: Page) {
   return dock(page).getByRole("link", { name: "Informations", exact: true });
 }
 
-async function expectSelected(tab: Locator, panel: Locator, body: string) {
-  await expect(tab).toHaveAttribute("aria-selected", "true");
-  await expect(panel).toHaveAccessibleName((await tab.textContent()) ?? "");
-  // The text is rendered exactly as typed, line breaks included.
-  expect(
-    await panel
-      .locator(".information-text")
-      .evaluate((text) => text.textContent),
-  ).toBe(body);
+/** The text of the tab that is open; the other tabs stay in hidden screens. */
+function openText(page: Page) {
+  return page.locator(".information-text:visible");
+}
+
+/** The open text is rendered exactly as typed, line breaks included. */
+async function expectOpenText(page: Page, body: string) {
+  // A page that slid away stays visible until its transition has finished.
+  await expect(page.locator(".information-screen[data-leaving]")).toHaveCount(
+    0,
+  );
+  await expect(openText(page)).toHaveCount(1);
+  expect(await openText(page).evaluate((text) => text.textContent)).toBe(body);
 }
 
 test("the host writes the information page, an unfinished tab never unpublishes one, guests read tabs and links, and turning it off removes it", async ({
@@ -251,6 +257,9 @@ test("the host writes the information page, an unfinished tab never unpublishes 
     await first.body.fill(firstDraft.body);
     await saved(hostPage, () => first.body.blur());
     await expect(incompleteHint(hostPage)).toHaveCount(0);
+    // No visible "saved" message: only screen readers are told.
+    await expectSavedAnnouncement(editor, "La page est enregistrée.");
+    await expect(editor.locator(".information-notice")).toBeEmpty();
     expect(await adminInformation()).toMatchObject({
       enabled: true,
       tabs: [firstDraft],
@@ -343,35 +352,63 @@ test("the host writes the information page, an unfinished tab never unpublishes 
       }),
     ).toBeVisible();
 
-    const tabs = page.getByRole("tablist", { name: "Rubriques", exact: true });
-    const usefulTab = tabs.getByRole("tab", { name: "Utiles", exact: true });
-    const sleepingTab = tabs.getByRole("tab", { name: "Dormir", exact: true });
-    const panel = page.getByRole("tabpanel");
-    await expect(tabs.getByRole("tab")).toHaveCount(2);
-    await expectSelected(usefulTab, panel, useful.body);
-    await expect(sleepingTab).toHaveAttribute("aria-selected", "false");
-    await expect(panel.locator(".information-text")).toHaveCSS(
-      "white-space",
-      "pre-wrap",
+    // A phone first lists the titles; no text is open yet.
+    const menu = page.getByRole("navigation", {
+      name: "Rubriques",
+      exact: true,
+    });
+    const usefulLink = menu.getByRole("link", { name: "Utiles", exact: true });
+    const sleepingLink = menu.getByRole("link", {
+      name: "Dormir",
+      exact: true,
+    });
+    const back = page.getByRole("button", {
+      name: "Retour aux informations",
+      exact: true,
+    });
+    const tabHeading = (name: string, level: number) =>
+      page.getByRole("heading", { name, exact: true, level });
+    await expect(menu.getByRole("link")).toHaveCount(2);
+    await expect(usefulLink).toHaveAttribute("href", "/informations?onglet=1");
+    await expect(sleepingLink).toHaveAttribute(
+      "href",
+      "/informations?onglet=2",
     );
+    await expect(openText(page)).toHaveCount(0);
+    await expect(back).toHaveCount(0);
+    await page.screenshot({
+      path: test.info().outputPath("information-guest-menu-mobile.png"),
+      fullPage: true,
+      animations: "disabled",
+      style: "nextjs-portal { visibility: hidden; }",
+    });
+
+    // A title opens its text as a page of its own, named in the address.
+    await usefulLink.click();
+    await expect(page).toHaveURL(/\/informations\?onglet=1$/);
+    await expect(tabHeading("Utiles", 1)).toBeFocused();
+    await expect(menu).toBeHidden();
+    await expectOpenText(page, useful.body);
+    await expect(openText(page)).toHaveCSS("white-space", "pre-wrap");
 
     // Addresses and numbers are links; the date and the times are not.
-    await expect(panel.getByRole("link")).toHaveCount(3);
-    const web = panel.getByRole("link", {
+    const text = openText(page);
+    await expect(text.getByRole("link")).toHaveCount(3);
+    const web = text.getByRole("link", {
       name: "https://example.com/plan",
       exact: true,
     });
     await expect(web).toHaveAttribute("href", "https://example.com/plan");
     await expect(web).toHaveAttribute("target", "_blank");
     await expect(web).toHaveAttribute("rel", "noopener noreferrer");
-    const mail = panel.getByRole("link", {
+    const mail = text.getByRole("link", {
       name: "lea@example.com",
       exact: true,
     });
     await expect(mail).toHaveAttribute("href", "mailto:lea@example.com");
     expect(await mail.getAttribute("target")).toBeNull();
     await expect(
-      panel.getByRole("link", { name: "+41 79 123 45 67", exact: true }),
+      text.getByRole("link", { name: "+41 79 123 45 67", exact: true }),
     ).toHaveAttribute("href", "tel:+41791234567");
     await page.screenshot({
       path: test.info().outputPath("information-guest-mobile.png"),
@@ -380,32 +417,66 @@ test("the host writes the information page, an unfinished tab never unpublishes 
       style: "nextjs-portal { visibility: hidden; }",
     });
 
-    // Tabs switch with a click and with the arrow, Home and End keys.
-    await sleepingTab.click();
-    await expectSelected(sleepingTab, panel, sleeping.body);
-    await expect(usefulTab).toHaveAttribute("aria-selected", "false");
+    // The back arrow returns to the menu, on the title that was opened.
+    await back.click();
+    await expect(page).toHaveURL(/\/informations$/);
+    await expect(usefulLink).toBeFocused();
+    await expect(openText(page)).toHaveCount(0);
+
+    // The browser's own back and forward buttons follow the same pages.
+    await sleepingLink.click();
+    await expect(page).toHaveURL(/\/informations\?onglet=2$/);
+    await expect(tabHeading("Dormir", 1)).toBeFocused();
+    await expectOpenText(page, sleeping.body);
     await expect(
-      panel.getByRole("link", { name: "www.example.org/hotel", exact: true }),
+      openText(page).getByRole("link", {
+        name: "www.example.org/hotel",
+        exact: true,
+      }),
     ).toHaveAttribute("href", "https://www.example.org/hotel");
-    await sleepingTab.press("ArrowLeft");
-    await expect(usefulTab).toBeFocused();
-    await expectSelected(usefulTab, panel, useful.body);
-    await usefulTab.press("ArrowRight");
-    await expect(sleepingTab).toBeFocused();
-    await expectSelected(sleepingTab, panel, sleeping.body);
-    await sleepingTab.press("ArrowRight");
-    await expect(usefulTab).toBeFocused();
-    await usefulTab.press("End");
-    await expect(sleepingTab).toBeFocused();
-    await sleepingTab.press("Home");
-    await expect(usefulTab).toBeFocused();
-    await expectSelected(usefulTab, panel, useful.body);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/informations$/);
+    await expect(sleepingLink).toBeFocused();
+    await page.goForward();
+    await expect(page).toHaveURL(/\/informations\?onglet=2$/);
+    await expectOpenText(page, sleeping.body);
 
     // A long word wraps instead of widening a 320px phone.
-    await sleepingTab.click();
     await page.setViewportSize({ width: 320, height: 740 });
     await expectNoHorizontalOverflow(page);
     await page.setViewportSize(phone);
+
+    // A tab that does not exist shows the menu.
+    for (const value of ["3", "0", "abc"]) {
+      await page.goto(`/informations?onglet=${value}`);
+      await expect(menu.getByRole("link")).toHaveCount(2);
+      await expect(openText(page)).toHaveCount(0);
+    }
+
+    // From 960px the titles stay on the left, beside the first text.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/informations");
+    await expect(usefulLink).toHaveAttribute("aria-current", "page");
+    await expect(tabHeading("Informations", 1)).toBeVisible();
+    await expect(tabHeading("Utiles", 2)).toBeVisible();
+    await expectOpenText(page, useful.body);
+    await expect(back).toBeHidden();
+    await sleepingLink.click();
+    await expect(page).toHaveURL(/\/informations\?onglet=2$/);
+    await expect(sleepingLink).toHaveAttribute("aria-current", "page");
+    await expect(usefulLink).not.toHaveAttribute("aria-current", "page");
+    await expect(tabHeading("Dormir", 2)).toBeFocused();
+    await expect(menu).toBeVisible();
+    await expectOpenText(page, sleeping.body);
+    await expectNoHorizontalOverflow(page);
+    await page.screenshot({
+      path: test.info().outputPath("information-guest-desktop.png"),
+      fullPage: true,
+      animations: "disabled",
+      style: "nextjs-portal { visibility: hidden; }",
+    });
+    await page.setViewportSize(phone);
+    await expectOpenText(page, sleeping.body);
 
     // Clearing the title of a saved tab does not unpublish it: guests keep
     // the tab as last saved.
@@ -429,7 +500,7 @@ test("the host writes the information page, an unfinished tab never unpublishes 
       published,
     );
     await page.reload();
-    await expect(sleepingTab).toBeVisible();
+    await expectOpenText(page, sleeping.body);
     // The editor stays open while a tab is unfinished and shows which one.
     await hostPage
       .getByRole("button", { name: "Retour aux paramètres", exact: true })
@@ -455,15 +526,14 @@ test("the host writes the information page, an unfinished tab never unpublishes 
       enabled: true,
       tabs: [useful],
     });
-    // One tab needs no tab list: its title heads the text.
+    // One tab needs no menu: its title heads the text, whatever the address.
     await page.reload();
-    await expect(page.getByRole("tablist")).toHaveCount(0);
-    await expect(
-      page.getByRole("heading", { name: "Utiles", exact: true, level: 2 }),
-    ).toBeVisible();
-    await expect(page.locator(".information-text")).toContainText(
-      "Rendez-vous le 14.11.2026",
-    );
+    await expect(page).toHaveURL(/\/informations\?onglet=2$/);
+    await expect(menu).toHaveCount(0);
+    await expect(back).toHaveCount(0);
+    await expect(tabHeading("Informations", 1)).toBeVisible();
+    await expect(tabHeading("Utiles", 2)).toBeVisible();
+    await expectOpenText(page, useful.body);
 
     // Turning the page off removes the dock item and closes the route.
     await saved(hostPage, () => toggle.uncheck());
@@ -486,4 +556,110 @@ test("the host writes the information page, an unfinished tab never unpublishes 
   } finally {
     await hostContext.close();
   }
+});
+
+type InformationSlide = {
+  screen: string;
+  from: number;
+  to: number;
+  fades: boolean;
+  duration: number;
+};
+
+/** Records every slide of an information screen from now on. */
+async function recordSlides(page: Page) {
+  await page.evaluate(() => {
+    const target = window as Window & {
+      informationSlides?: InformationSlide[];
+    };
+    target.informationSlides = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (keyframes, options) {
+      const animation = animate.call(this, keyframes, options);
+      if (
+        this instanceof HTMLElement &&
+        this.matches(".information-screen") &&
+        animation.effect instanceof KeyframeEffect
+      ) {
+        const frames = animation.effect.getKeyframes();
+        // Horizontal offsets in pixels, whatever notation the keyframes use.
+        const offset = (frame: ComputedKeyframe) =>
+          Math.round(new DOMMatrixReadOnly(String(frame.transform)).e * 100) /
+          100;
+        target.informationSlides!.push({
+          screen: this.dataset.informationScreen!,
+          from: offset(frames[0]),
+          to: offset(frames[frames.length - 1]),
+          fades:
+            Number(frames[0].opacity) === 1 &&
+            Number(frames[frames.length - 1].opacity) === 0,
+          duration: Number(animation.effect.getTiming().duration),
+        });
+      }
+      return animation;
+    };
+  });
+}
+
+function slides(page: Page) {
+  return page.evaluate(
+    () =>
+      (window as Window & { informationSlides?: InformationSlide[] })
+        .informationSlides,
+  );
+}
+
+test("a tab slides in like a settings section and returning reverses it, without motion when reduced motion is requested", async ({
+  page,
+}) => {
+  await saveInformation(true, [useful, sleeping]);
+  await signInGuest(host, page, "Information Motion Guest");
+  const link = page
+    .getByRole("navigation", { name: "Rubriques", exact: true })
+    .getByRole("link", { name: "Utiles", exact: true });
+  const heading = page.getByRole("heading", {
+    name: "Utiles",
+    exact: true,
+    level: 1,
+  });
+  const back = page.getByRole("button", {
+    name: "Retour aux informations",
+    exact: true,
+  });
+  const width = page.viewportSize()!.width;
+  const duration = 380;
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/informations");
+  await recordSlides(page);
+  await link.click();
+  await expect(heading).toBeFocused();
+  // The tab crosses the whole screen; the menu drifts a third as far.
+  const forward: InformationSlide[] = [
+    { screen: "1", from: width, to: 0, fades: false, duration },
+    { screen: "menu", from: 0, to: -0.3 * width, fades: true, duration },
+  ];
+  await expect.poll(() => slides(page)).toEqual(forward);
+  await expect(link).toBeHidden();
+  await back.click();
+  await expect(link).toBeFocused();
+  await expect
+    .poll(() => slides(page))
+    .toEqual([
+      ...forward,
+      { screen: "menu", from: -width, to: 0, fades: false, duration },
+      { screen: "1", from: 0, to: 0.3 * width, fades: true, duration },
+    ]);
+  await expect(heading).toBeHidden();
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/informations");
+  await recordSlides(page);
+  await link.click();
+  await expect(heading).toBeFocused();
+  await expect(link).toBeHidden();
+  await back.click();
+  await expect(link).toBeFocused();
+  await expect(heading).toBeHidden();
+  expect(await slides(page)).toEqual([]);
 });

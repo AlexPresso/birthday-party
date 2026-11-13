@@ -2,57 +2,103 @@
 @layer base, components, features;
 
 @layer features {
-  /* Titles are authored and can be long: tabs wrap instead of scrolling. */
-  .information-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    max-width: 720px;
-    margin-bottom: 16px;
+  /*
+   * Several tabs follow the layout of the host's settings: a menu of rows that
+   * each open a page on phones, a sidebar beside the open text from 960px.
+   */
+  .information-page {
+    position: relative;
+    width: 100%;
+    margin-inline: auto;
   }
-  .information-tabs [role="tab"] {
-    min-width: 0;
-    max-width: 100%;
-    min-height: 44px;
-    padding: 8px 18px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--text);
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.35;
-    text-align: left;
-    overflow-wrap: anywhere;
-    transition:
-      background 0.15s,
-      border-color 0.15s;
-  }
-  @media (hover: hover) {
-    .information-tabs [role="tab"]:not([aria-selected="true"]):hover {
-      background: var(--surface-raised);
+  /* Screens slide across the whole viewport; clip them at its edges. */
+  @media (max-width: 959px) {
+    .app-shell:has(.information-page) {
+      overflow-x: clip;
     }
   }
-  /* The selected tab is filled and heavier, so color is not its only mark. */
-  .information-tabs [role="tab"][aria-selected="true"] {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--on-accent);
-    font-weight: 800;
+  .information-screen {
+    min-width: 0;
   }
-  .information-tabs [role="tab"]:focus-visible {
-    outline-offset: 3px;
+  .information-screen[data-leaving] {
+    position: absolute;
+    inset: 0 0 auto;
+    pointer-events: none;
+  }
+  .information-menu {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: linear-gradient(120deg, var(--surface), var(--background));
+    overflow: clip;
+  }
+  .information-menu > a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 56px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  .information-menu > a:first-child {
+    border-top: 0;
+  }
+  /* Titles are authored and can be long: they wrap inside their row. */
+  .information-menu > a > span {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .information-menu > a > svg {
+    color: var(--muted);
+  }
+  .information-menu > a:focus-visible {
+    outline-offset: -3px;
+  }
+  @media (hover: hover) {
+    .information-menu > a:hover {
+      background: var(--surface-muted);
+    }
+  }
+  /* Only the back button stays pinned, as a round control with its own surface. */
+  .information-back {
+    position: sticky;
+    top: calc(8px + env(safe-area-inset-top));
+    z-index: 2;
+    float: left;
+    margin: 0 12px 0 0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+  }
+  .information-back:hover {
+    background: var(--surface-raised);
+  }
+  .information-tab-heading {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0 0 24px;
+  }
+  .information-tab-heading [data-information-title] {
+    margin: 0;
+    font-size: clamp(19px, 5.4vw, 24px);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .information-tab-heading [data-information-title]:focus {
+    outline: none;
   }
   .information-panel {
+    clear: both;
     min-width: 0;
     max-width: 720px;
     padding: 20px;
     border-radius: var(--radius);
     background: var(--surface);
-  }
-  .information-panel:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
   }
   .information-panel > h2 {
     margin-bottom: 12px;
@@ -80,7 +126,67 @@
       color: var(--accent-hover);
     }
   }
+  @media (max-width: 360px) {
+    .information-menu > a {
+      gap: 11px;
+      padding-inline: 12px;
+    }
+  }
+
   @media (min-width: 960px) {
+    .information-page {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 40px;
+      align-items: start;
+      min-height: calc(100dvh - 244px);
+    }
+    .information-screen[data-information-screen="menu"] {
+      position: sticky;
+      top: 24px;
+      grid-column: 1;
+      grid-row: 1;
+      padding: 0 24px 24px 0;
+      border-right: 1px solid var(--border);
+      max-height: calc(100dvh - 144px);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .information-screen[data-information-screen="menu"] h1 {
+      font-size: 26px;
+    }
+    .information-screen:not([data-information-screen="menu"]) {
+      grid-column: 2;
+      grid-row: 1;
+      padding-top: 4px;
+    }
+    .information-menu {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      overflow: visible;
+    }
+    .information-menu > a {
+      gap: 12px;
+      min-height: 56px;
+      padding: 14px 12px;
+      border: 0;
+      border-radius: var(--radius-small);
+      margin-block: 4px;
+      font-size: 14px;
+    }
+    .information-menu > a[aria-current="page"] {
+      background: var(--surface-raised);
+      font-weight: 600;
+    }
+    .information-menu > a > svg,
+    .information-back {
+      display: none;
+    }
+    .information-tab-heading {
+      min-height: 32px;
+      margin: 0 0 32px;
+    }
     .information-panel {
       padding: 28px;
     }
