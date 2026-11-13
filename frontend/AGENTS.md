@@ -132,7 +132,7 @@ API rewrite from the runtime `API_INTERNAL_URL` before Next starts, including
 WebSocket forwarding. Use an HTTP(S) origin without credentials or a path.
 The image can be reused with different backend service names without rebuilding;
 keep `.next/routes-manifest.json` writable by the container user. Root scripts manage the full stack and
-browser tests; see `../README.md`.
+browser tests; see `../docs/development.md`.
 
 Use the repository-root `.env` for shared configuration. Docker Compose reads
 it automatically and forwards the declared variables to each service; it does

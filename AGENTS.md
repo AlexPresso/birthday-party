@@ -254,5 +254,5 @@ interactions.
 - Compose enables `PRINT_ADMIN_INVITATION` by default. Startup reuses the oldest
   active administrator, creating a technical `Admin` profile only if none exists.
   Each start replaces its invitation without invalidating existing sessions.
-- Refer to `README.md` and scoped instruction files for commands. Keep lockfiles
+- Refer to `docs/development.md` and scoped instruction files for commands. Keep lockfiles
   committed and verify framework guidance against the installed versions.
