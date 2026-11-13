@@ -102,9 +102,7 @@ function SettingsPages({
   const { t } = useI18n();
   const searchParams = useSearchParams();
   const section = searchParams.get("section");
-  const requested =
-    pages.find((page) => page.id === (section === "age" ? "party" : section))
-      ?.id ?? "index";
+  const requested = pages.find((page) => page.id === section)?.id ?? "index";
   const [active, setActive] = useState<SettingsSection | "index">(requested);
   const desktop = useSyncExternalStore(
     subscribeDesktop,

@@ -32,17 +32,21 @@ type Subscriber = {
   topic: RealtimeTopic;
   refresh: () => void;
   connectionChanged: (connected: boolean) => void;
+  /** Its first read is left to the handshake of the pending connection. */
+  awaitsHandshake: boolean;
 };
 
 export function createRealtimeClient({
   connect,
-  available,
+  visible,
+  online,
   onExpired,
   watch,
   random = Math.random,
 }: {
   connect: () => WebSocket;
-  available: () => boolean;
+  visible: () => boolean;
+  online: () => boolean;
   onExpired: () => void;
   watch: (resume: () => void) => () => void;
   random?: () => number;
@@ -57,6 +61,7 @@ export function createRealtimeClient({
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
   let stopWatching: (() => void) | undefined;
+  const available = () => visible() && online();
 
   function disconnect() {
     clearTimeout(heartbeatTimer);
@@ -72,20 +77,30 @@ export function createRealtimeClient({
     previous.close();
   }
 
-  function refresh(affected?: RealtimeTopic[]) {
+  function refresh(concerns: (subscriber: Subscriber) => boolean = () => true) {
+    for (const subscriber of subscribers) {
+      if (!concerns(subscriber)) continue;
+      subscriber.awaitsHandshake = false;
+      subscriber.refresh();
+    }
+  }
+
+  function reportConnection(connected: boolean) {
     for (const subscriber of subscribers)
-      if (!affected || affected.includes(subscriber.topic))
-        subscriber.refresh();
+      subscriber.connectionChanged(connected);
   }
 
   function failed() {
     disconnect();
-    for (const subscriber of subscribers) subscriber.connectionChanged(false);
+    reportConnection(false);
     // A session can expire between the disconnect and a failed HTTP upgrade.
     // Check it once per outage through the existing reads, never on every retry.
     if (hadReady && !checkedDisconnect && available()) {
       checkedDisconnect = true;
       refresh();
+    } else {
+      // No handshake came: subscribers that counted on it read once instead.
+      refresh((subscriber) => subscriber.awaitsHandshake);
     }
     if (expired || !subscribers.size || !available()) return;
     clearTimeout(reconnectTimer);
@@ -116,11 +131,11 @@ export function createRealtimeClient({
           hadReady = true;
           checkedDisconnect = false;
           attempts = 0;
-          for (const subscriber of subscribers)
-            subscriber.connectionChanged(true);
+          reportConnection(true);
           refresh();
         } else if (message.type === "invalidate" && ready) {
-          refresh(message.topics);
+          const { topics } = message;
+          refresh((subscriber) => topics.includes(subscriber.topic));
         }
       };
       current.onerror = () => {
@@ -145,11 +160,18 @@ export function createRealtimeClient({
     if (!available()) {
       clearTimeout(reconnectTimer);
       disconnect();
-      for (const subscriber of subscribers) subscriber.connectionChanged(false);
-    } else {
-      refresh();
-      start();
+      // Leaving the page pauses the connection on purpose; only a lost
+      // network while the page is visible is a failure worth reporting.
+      if (visible()) reportConnection(false);
+      return;
     }
+    // A live socket has delivered every signal, and a connecting one reads on
+    // its handshake. Focus and visibility events also tend to arrive together.
+    if (socket) return;
+    // Read through HTTP as well: it detects an expired session even if the
+    // upgrade fails.
+    refresh();
+    start();
   }
 
   return {
@@ -157,14 +179,18 @@ export function createRealtimeClient({
       topic: RealtimeTopic,
       refresh: () => void,
       connectionChanged: (connected: boolean) => void,
+      { hasInitialData = false }: { hasInitialData?: boolean } = {},
     ) {
-      const subscriber = { topic, refresh, connectionChanged };
+      // The handshake of a pending connection reads for every subscriber.
+      // Read now when no handshake will follow, or when the subscriber has
+      // nothing to show until then; HTTP also works while reconnecting.
+      const awaitsHandshake = hasInitialData && !ready && !expired;
+      const subscriber = { topic, refresh, connectionChanged, awaitsHandshake };
       subscribers.add(subscriber);
       if (subscribers.size === 1) stopWatching = watch(resume);
       if (ready) connectionChanged(true);
-      // Initial HTTP loading also works while the socket is reconnecting.
       if (!expired) {
-        refresh();
+        if (!awaitsHandshake) refresh();
         start();
       }
       return () => {

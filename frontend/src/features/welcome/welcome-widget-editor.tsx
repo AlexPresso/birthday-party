@@ -18,7 +18,7 @@ import type { WelcomeWidget } from "./contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { moveItem } from "@/lib/reorder";
 import type { StepDraft, WidgetDraft } from "./editor-model";
-import { useWelcomeWidgetDrag } from "./use-welcome-widget-drag";
+import { useWelcomeDrag } from "./use-welcome-drag";
 import "./welcome-widget-editor.css";
 
 const types = [
@@ -135,10 +135,13 @@ export function WelcomeWidgetEditor({
             ?.focus(),
     );
   }
-  const { drag, bindings } = useWelcomeWidgetDrag({
+  const { drag, bindings } = useWelcomeDrag<WelcomeWidget["type"]>({
     list,
-    widgets: step.widgets,
+    keys: step.widgets.map((widget) => widget.key),
+    rowKey: "widgetKey",
     disabled,
+    // The palette sits above the canvas on a phone.
+    scrollPage: true,
     onAdd: add,
     onMove: move,
     onCancel: () => setAnnouncement(t("adminWelcome.dragCancelled")),
@@ -172,7 +175,7 @@ export function WelcomeWidgetEditor({
                   className="icon-button welcome-drag-handle"
                   disabled={!canAdd(type)}
                   aria-label={t("widgets.dragNew", { name: t(labels[type]) })}
-                  {...bindings({ type: "new", widgetType: type })}
+                  {...bindings({ type: "new", item: type })}
                 >
                   <GripVertical size={18} aria-hidden="true" />
                 </button>

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   eventSchema,
+  questionRoundSchema,
   voteSchema,
   type PartyEvent,
   type Vote,
@@ -64,8 +65,13 @@ test("programme events support typed settings and redacted or administrator view
 
 test("votes validate candidates, portraits and private results", () => {
   assert.deepEqual(voteSchema.parse(vote), vote);
+  // The form and Go limit the question length; the response does not.
+  assert.equal(
+    voteSchema.safeParse({ ...vote, question: "x".repeat(241) }).success,
+    true,
+  );
   for (const invalid of [
-    { ...vote, question: "x".repeat(241) },
+    { ...vote, question: "" },
     { ...vote, candidates: [vote.candidates[0]] },
     { ...vote, candidates: [vote.candidates[0], vote.candidates[0]] },
     {
@@ -144,4 +150,31 @@ test("late ballot acknowledgements cannot reopen a vote or overwrite newer event
   assert.equal(replaceEvent([closed], accepted)[0].vote?.myCandidateId, 1);
   assert.equal(closed.vote?.myCandidateId, 2);
   assert.deepEqual(replaceEvent([], accepted), []);
+});
+
+test("question rounds keep the two-joker budget without frontend ceilings", () => {
+  const question = {
+    id: 1,
+    body: "x".repeat(1001),
+    status: "pending",
+    votes: 3,
+    upvoted: false,
+  };
+  const round = {
+    status: "open",
+    jokersUsed: 2,
+    questionCount: 201,
+    revision: 4,
+    items: Array(201).fill(question),
+  };
+  assert.equal(questionRoundSchema.safeParse(round).success, true);
+  for (const invalid of [
+    { ...round, jokersUsed: 3 },
+    { ...round, jokersUsed: -1 },
+    { ...round, questionCount: -1 },
+    { ...round, status: "revealed" },
+    { ...round, items: [{ ...question, body: "" }] },
+    { ...round, items: [{ ...question, status: "skipped" }] },
+  ])
+    assert.equal(questionRoundSchema.safeParse(invalid).success, false);
 });

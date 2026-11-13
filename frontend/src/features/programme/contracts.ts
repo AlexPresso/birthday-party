@@ -2,18 +2,15 @@ import { z } from "zod";
 import { id, instant } from "../../lib/schema.ts";
 import { authorSchema } from "../guests/contracts.ts";
 
+// Responses are checked for their shape and for the invariants the interface
+// relies on. Length and count ceilings stay with Go and the forms, so raising
+// a backend limit cannot blank a page.
 export const voteSchema = z
   .object({
-    question: z
-      .string()
-      .min(1)
-      .refine((value) => [...value].length <= 240),
+    question: z.string().min(1),
     status: z.enum(["draft", "open", "closed", "revealed"]),
     allowSelfVote: z.boolean(),
-    candidates: z
-      .array(authorSchema.extend({ active: z.boolean() }))
-      .min(2)
-      .max(200),
+    candidates: z.array(authorSchema.extend({ active: z.boolean() })).min(2),
     myCandidateId: id.nullable(),
     canVote: z.boolean(),
     participationCount: z.number().int().nonnegative().nullable(),
@@ -21,7 +18,6 @@ export const voteSchema = z
       .array(
         z.object({ candidateId: id, votes: z.number().int().nonnegative() }),
       )
-      .max(200)
       .nullable(),
   })
   .superRefine((vote, ctx) => {
@@ -64,25 +60,21 @@ export const voteSchema = z
 
 const questionSummarySchema = z.object({
   status: z.enum(["draft", "open", "closed"]),
+  // The activity page draws exactly two joker tickets.
   jokersUsed: z.number().int().min(0).max(2),
-  questionCount: z.number().int().min(0).max(200),
+  questionCount: z.number().int().nonnegative(),
 });
 export const questionRoundSchema = questionSummarySchema.extend({
   revision: z.number().int().positive(),
-  items: z
-    .array(
-      z.object({
-        id,
-        body: z
-          .string()
-          .min(1)
-          .refine((body) => [...body].length <= 1000),
-        status: z.enum(["pending", "answered", "joker"]),
-        votes: z.number().int().nonnegative(),
-        upvoted: z.boolean(),
-      }),
-    )
-    .max(200),
+  items: z.array(
+    z.object({
+      id,
+      body: z.string().min(1),
+      status: z.enum(["pending", "answered", "joker"]),
+      votes: z.number().int().nonnegative(),
+      upvoted: z.boolean(),
+    }),
+  ),
 });
 export type QuestionRound = z.infer<typeof questionRoundSchema>;
 

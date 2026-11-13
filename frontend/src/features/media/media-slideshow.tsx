@@ -39,9 +39,7 @@ export function MediaSlideshow({
   const [cursor, setCursor] = useState(initial.nextCursor);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [visible, setVisible] = useState(
-    () => typeof document === "undefined" || !document.hidden,
-  );
+  const [visible, setVisible] = useState(() => !document.hidden);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<SlideshowError | null>(null);
   const [visit, setVisit] = useState(0);
@@ -56,8 +54,7 @@ export function MediaSlideshow({
   const mediaKey = `${current?.id}:${visit}`;
   const active = playing && visible && !error && !loading;
   const numbers = new Intl.NumberFormat(locale);
-  const fullscreenSupported =
-    typeof document !== "undefined" && document.fullscreenEnabled;
+  const fullscreenSupported = document.fullscreenEnabled;
 
   useEffect(() => {
     const player = video.current;
@@ -121,11 +118,6 @@ export function MediaSlideshow({
     }
 
     const controller = new AbortController();
-    let timedOut = false;
-    const timeout = window.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, 10_000);
     pending.current = controller;
     setLoading(true);
     try {
@@ -156,24 +148,13 @@ export function MediaSlideshow({
         setIndex(0);
       }
     } catch (cause) {
-      if (
-        pending.current !== controller ||
-        (controller.signal.aborted && !timedOut)
-      )
-        return;
+      if (pending.current !== controller || controller.signal.aborted) return;
       setPlaying(false);
-      setError({
-        kind: "page",
-        message: errorMessage(
-          timedOut ? new ApiError("common.connectionFailed") : cause,
-          t,
-        ),
-      });
+      setError({ kind: "page", message: errorMessage(cause, t) });
     } finally {
-      window.clearTimeout(timeout);
       if (pending.current === controller) {
         pending.current = null;
-        if (!controller.signal.aborted || timedOut) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
   }, [categoryId, cursor, index, items, t]);

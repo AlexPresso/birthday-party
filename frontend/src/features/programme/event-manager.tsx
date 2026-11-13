@@ -4,118 +4,32 @@ import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   Plus,
-  Trash2,
-  Pencil,
   Vote as VoteIcon,
   MessageCircle,
-  X,
 } from "lucide-react";
 import { api, remove, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
-import { formatDate, localInput, utcInput, browserZone } from "@/lib/dates";
+import { browserZone } from "@/lib/dates";
 import { eventSchema, eventsSchema, type PartyEvent } from "./contracts";
 import { ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import type { Guest } from "../guests/contracts";
-import { Avatar } from "@/components/avatar";
-import { VoteEditor, type VoteDraft } from "./vote-editor";
-import { VoteResults, VoteStatus } from "./vote-activity";
-import { replaceEvent } from "./vote-model";
-import { ActivityLink } from "./activity-link";
-import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
-import { subscribeRealtime } from "@/lib/realtime-browser";
+import { replaceEvent, voteTransitions } from "./vote-model";
+import { useRealtimeResource } from "@/lib/use-realtime-resource";
+import { useLatestState } from "@/lib/use-latest-state";
 import { useAutosave } from "@/lib/autosave";
-
-type EventDraft = {
-  id: number | null;
-  type: PartyEvent["type"];
-  revision: number;
-  title: string;
-  description: string;
-  teaser: string;
-  startsAt: string;
-  unlockAt: string;
-  vote: VoteDraft | null;
-};
-
-const emptyDraft: EventDraft = {
-  id: null,
-  type: "event",
-  revision: 0,
-  title: "",
-  description: "",
-  teaser: "",
-  startsAt: "",
-  unlockAt: "",
-  vote: null,
-};
-
-function eventDraft(event: PartyEvent): EventDraft {
-  return {
-    id: event.id,
-    type: event.type,
-    revision: event.revision,
-    title: event.title,
-    description: event.description,
-    teaser: event.teaser,
-    startsAt: localInput(event.startsAt),
-    unlockAt: localInput(event.unlockAt),
-    vote: event.vote
-      ? {
-          question: event.vote.question,
-          candidateIds: event.vote.candidates.map((candidate) => candidate.id),
-          allowSelfVote: event.vote.allowSelfVote,
-        }
-      : null,
-  };
-}
-
-function mergeSavedDraft(
-  current: EventDraft,
-  submitted: EventDraft,
-  saved: EventDraft,
-): EventDraft {
-  const merged = { ...current, id: saved.id, revision: saved.revision };
-  for (const field of [
-    "title",
-    "description",
-    "teaser",
-    "startsAt",
-    "unlockAt",
-  ] as const) {
-    if (current[field] === submitted[field]) merged[field] = saved[field];
-  }
-  if (current.vote && submitted.vote && saved.vote) {
-    merged.vote = { ...current.vote };
-    if (current.vote.question === submitted.vote.question)
-      merged.vote.question = saved.vote.question;
-    if (
-      JSON.stringify(current.vote.candidateIds) ===
-      JSON.stringify(submitted.vote.candidateIds)
-    )
-      merged.vote.candidateIds = saved.vote.candidateIds;
-    if (current.vote.allowSelfVote === submitted.vote.allowSelfVote)
-      merged.vote.allowSelfVote = saved.vote.allowSelfVote;
-  }
-  return merged;
-}
-
-const voteTransitions = {
-  draft: {
-    status: "open",
-    label: "activities.open",
-    confirmation: "activities.openConfirm",
-  },
-  open: {
-    status: "closed",
-    label: "activities.close",
-    confirmation: "activities.closeConfirm",
-  },
-  closed: {
-    status: "revealed",
-    label: "activities.reveal",
-    confirmation: "activities.revealConfirm",
-  },
-} as const;
+import {
+  draftProblem,
+  eventDraft,
+  eventRequestBody,
+  frozenVote,
+  newEventDraft,
+  withSavedEvent,
+  type EventDraft,
+} from "./event-draft";
+import { useEventDraft } from "./use-event-draft";
+import { EventForm } from "./event-form";
+import { EventList } from "./event-list";
 
 export function EventManager({
   initial,
@@ -126,10 +40,12 @@ export function EventManager({
   timezone: string;
   guests: Guest[];
 }) {
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
-  const [events, setEvents] = useState(initial);
-  const [draft, setDraft] = useState<EventDraft | null>(null);
+  const [events, setEvents, latestEvents] = useLatestState(initial);
+  const editor = useEventDraft();
+  const { draft } = editor;
   const [palette, setPalette] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,136 +54,91 @@ export function EventManager({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [selectionRevision, setSelectionRevision] = useState(0);
   const [editorKey, setEditorKey] = useState(0);
-  const eventsRef = useRef(initial);
-  const draftRef = useRef<EventDraft | null>(null);
-  const savedDraftRef = useRef<EventDraft | null>(null);
+  // Counts local writes so a read that started before one is not applied.
   const revision = useRef(0);
-  const refreshNow = useRef<() => void>(() => {});
-  const editing = events.find((event) => event.id === draft?.id);
-  const frozenVote =
-    editing?.vote && editing.vote.status !== "draft" ? editing.vote : null;
+  // The server revision the host explicitly chose to replace with the draft.
+  const overwriteRevision = useRef<number | null>(null);
+  const { connectionFailed, refresh, retry } = useRealtimeResource({
+    topic: "programme",
+    hasInitialData: true,
+    // Server props change when another settings editor refreshes the route.
+    restartKey: initial,
+    async read(signal) {
+      const started = revision.current;
+      const data = await api("/admin/programme", eventsSchema, { signal });
+      signal.throwIfAborted();
+      if (started === revision.current) setEvents(data.items);
+      setRefreshError(null);
+    },
+    onError: (err) => setRefreshError(errorMessage(err, t)),
+  });
+  const refreshMessage =
+    refreshError ?? (connectionFailed ? t("common.connectionFailed") : null);
   const activeIds = new Set(
     guests.filter((guest) => guest.active).map((guest) => guest.id),
   );
-  const candidateIds =
-    draft?.vote?.candidateIds.filter((id) => frozenVote || activeIds.has(id)) ??
-    [];
   const autosave = useAutosave({ save });
   const flushAutosave = autosave.flush;
-
-  function updateEvents(items: PartyEvent[]) {
-    eventsRef.current = items;
-    setEvents(items);
-  }
-
-  function updateDraft(value: EventDraft | null) {
-    draftRef.current = value;
-    setDraft(value);
-  }
-
-  function updateSavedDraft(value: EventDraft | null) {
-    savedDraftRef.current = value;
-  }
 
   useEffect(() => {
     if (selectionRevision > 0) void flushAutosave();
   }, [selectionRevision, flushAutosave]);
-  useEffect(() => {
-    const refresh = createInvalidationRefresh(
-      async (signal) => {
-        const started = revision.current;
-        const data = await api("/admin/programme", eventsSchema, { signal });
-        signal.throwIfAborted();
-        if (started === revision.current) updateEvents(data.items);
-        setRefreshError(null);
-      },
-      (err) => setRefreshError(errorMessage(err, t)),
+
+  // A failed save keeps the draft unless the host agrees to lose it.
+  async function leaveDraft() {
+    return (
+      (await autosave.flush()) ||
+      (await confirm({ message: t("autosave.discard"), destructive: true }))
     );
-    refreshNow.current = () => void refresh.request();
-    const unsubscribe = subscribeRealtime(
-      "programme",
-      () => void refresh.request(),
-      (connected) => {
-        if (!connected) setRefreshError(t("common.connectionFailed"));
-      },
-    );
-    return () => {
-      refreshNow.current = () => {};
-      unsubscribe();
-      refresh.dispose();
-    };
-  }, [initial, t]);
+  }
+
   async function edit(event?: PartyEvent, type: PartyEvent["type"] = "event") {
-    if (!(await autosave.flush()) && !window.confirm(t("autosave.discard")))
-      return;
+    if (!(await leaveDraft())) return;
     setZone(browserZone());
     setError(null);
     setNotice("");
     setPalette(false);
     setEditorKey((value) => value + 1);
-    const latest =
-      event && eventsRef.current.find((item) => item.id === event.id);
-    const next = latest
-      ? eventDraft(latest)
-      : {
-          ...emptyDraft,
-          type,
-          title: type === "questions" ? t("questions.name") : "",
-          vote:
-            type === "vote"
-              ? { question: "", candidateIds: [], allowSelfVote: false }
-              : null,
-        };
-    updateDraft(next);
-    updateSavedDraft(
-      !latest && type === "questions" ? { ...next, title: "" } : next,
-    );
+    const latest = event && latestEvents().find((item) => item.id === event.id);
+    if (latest) editor.open(eventDraft(latest));
+    else if (type === "questions")
+      // The suggested name is an unsaved change, so the first save creates it.
+      editor.open(
+        newEventDraft(type, t("questions.name")),
+        newEventDraft(type),
+      );
+    else editor.open(newEventDraft(type));
   }
-  function change(
-    key: "title" | "description" | "teaser" | "startsAt" | "unlockAt",
-    value: string,
-  ) {
-    if (draftRef.current) updateDraft({ ...draftRef.current, [key]: value });
+
+  function change(changes: Partial<EventDraft>, commit = false) {
+    editor.change(changes);
     setNotice("");
+    if (commit) setSelectionRevision((value) => value + 1);
   }
+
   async function closeEditor() {
-    if (!(await autosave.flush()) && !window.confirm(t("autosave.discard")))
-      return;
-    updateDraft(null);
-    updateSavedDraft(null);
+    if (!(await leaveDraft())) return;
+    editor.close();
     setError(null);
   }
+
   async function save(): Promise<boolean> {
-    const submitted = draftRef.current;
-    if (
-      !submitted ||
-      JSON.stringify(submitted) === JSON.stringify(savedDraftRef.current)
-    )
-      return true;
-    const editing = eventsRef.current.find(
-      (event) => event.id === submitted.id,
-    );
-    const frozenVote =
-      editing?.vote && editing.vote.status !== "draft" ? editing.vote : null;
+    const submitted = editor.current();
+    if (!submitted) return true;
+    const saved = latestEvents().find((event) => event.id === submitted.id);
+    const overwriting =
+      saved !== undefined && overwriteRevision.current === saved.revision;
+    if (!overwriting && !editor.hasUnsavedChanges()) return true;
     const candidateIds =
       submitted.vote?.candidateIds.filter((id) => activeIds.has(id)) ?? [];
-    if (!submitted.title.trim()) {
-      setError(t("errors.invalid_event"));
+    const problem = draftProblem(submitted, frozenVote(saved), candidateIds);
+    if (problem) {
+      setError(t(`errors.${problem}`));
       return false;
     }
-    if (
-      submitted.vote &&
-      (!submitted.vote.question.trim() ||
-        (!frozenVote && (candidateIds.length < 2 || candidateIds.length > 200)))
-    ) {
-      setError(t("errors.invalid_activity"));
-      return false;
-    }
-    if (
-      editing &&
-      editing.revision !== submitted.revision &&
-      !window.confirm(t("activities.overwriteConfirm"))
-    )
+    // Autosave never replaces a newer version on its own: it can run from a
+    // blur or a background tab. The conflict notice offers the explicit action.
+    if (saved && saved.revision !== submitted.revision && !overwriting)
       return false;
     setError(null);
     setNotice("");
@@ -277,68 +148,29 @@ export function EventManager({
         eventSchema,
         {
           method: submitted.id ? "PUT" : "POST",
-          body: {
-            type: submitted.type,
-            ...(submitted.id
-              ? { revision: editing?.revision ?? submitted.revision }
-              : {}),
-            title: submitted.title.trim(),
-            description: submitted.description.trim(),
-            teaser: submitted.teaser.trim(),
-            startsAt: utcInput(submitted.startsAt),
-            unlockAt: utcInput(submitted.unlockAt),
-            vote: submitted.vote
-              ? {
-                  question: submitted.vote.question.trim(),
-                  candidateIds: frozenVote
-                    ? frozenVote.candidates.map((candidate) => candidate.id)
-                    : candidateIds,
-                  allowSelfVote: frozenVote
-                    ? frozenVote.allowSelfVote
-                    : submitted.vote.allowSelfVote,
-                }
-              : null,
-          },
+          body: eventRequestBody(submitted, saved, candidateIds),
         },
       );
       revision.current++;
-      const items = eventsRef.current;
-      const updated = items.some((item) => item.id === data.id)
-        ? replaceEvent(items, data)
-        : [...items, data];
-      updateEvents(
-        updated.sort(
-          (a, b) =>
-            (a.startsAt || "9999").localeCompare(b.startsAt || "9999") ||
-            a.id - b.id,
-        ),
-      );
-      const saved = eventDraft(data);
-      updateSavedDraft(saved);
-      const current = draftRef.current;
-      if (current) {
-        const next = mergeSavedDraft(current, submitted, saved);
-        updateDraft(next);
-        setNotice(
-          JSON.stringify(next) === JSON.stringify(saved)
-            ? t("admin.programmeSaved")
-            : "",
-        );
-      }
+      overwriteRevision.current = null;
+      setEvents(withSavedEvent(latestEvents(), data));
+      if (editor.acceptSaved(submitted, data))
+        setNotice(t("admin.programmeSaved"));
       return true;
     } catch (err) {
       setError(errorMessage(err, t));
       return false;
     } finally {
-      refreshNow.current();
+      void refresh();
     }
   }
+
   async function transition(event: PartyEvent) {
     if (!(await autosave.flush())) return;
-    event = eventsRef.current.find((item) => item.id === event.id) ?? event;
+    event = latestEvents().find((item) => item.id === event.id) ?? event;
     if (!event.vote || event.vote.status === "revealed" || busy) return;
     const next = voteTransitions[event.vote.status];
-    if (!window.confirm(t(next.confirmation))) return;
+    if (!(await confirm({ message: t(next.confirmation) }))) return;
     setBusy(true);
     setError(null);
     setNotice("");
@@ -352,39 +184,32 @@ export function EventManager({
         },
       );
       revision.current++;
-      updateEvents(replaceEvent(eventsRef.current, saved));
-      if (draftRef.current?.id === saved.id) {
-        const next = eventDraft(saved);
-        updateDraft(next);
-        updateSavedDraft(next);
-      }
+      setEvents(replaceEvent(latestEvents(), saved));
+      if (editor.current()?.id === saved.id) editor.open(eventDraft(saved));
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
       setBusy(false);
-      refreshNow.current();
+      void refresh();
     }
   }
+
   async function deleteEvent(event: PartyEvent) {
-    if (
-      !window.confirm(
-        event.vote
-          ? t("activities.deleteConfirm", { question: event.title })
-          : t("admin.deleteEventConfirmation", { name: event.title }),
-      )
-    )
-      return;
-    if (!(await autosave.flush()) && draftRef.current?.id !== event.id) return;
+    const confirmed = await confirm({
+      message: event.vote
+        ? t("activities.deleteConfirm", { question: event.title })
+        : t("admin.deleteEventConfirmation", { name: event.title }),
+      destructive: true,
+    });
+    if (!confirmed) return;
+    if (!(await autosave.flush()) && editor.current()?.id !== event.id) return;
     setBusy(true);
     setError(null);
     try {
       await remove(`/admin/programme/${event.id}`);
       revision.current++;
-      updateEvents(eventsRef.current.filter((item) => item.id !== event.id));
-      if (draftRef.current?.id === event.id) {
-        updateDraft(null);
-        updateSavedDraft(null);
-      }
+      setEvents(latestEvents().filter((item) => item.id !== event.id));
+      if (editor.current()?.id === event.id) editor.close();
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, t));
@@ -392,6 +217,7 @@ export function EventManager({
       setBusy(false);
     }
   }
+
   return (
     <div className="admin-form">
       <div className="section-row">
@@ -432,13 +258,13 @@ export function EventManager({
         </div>
       )}
       <ErrorNotice message={error} />
-      {refreshError && (
+      {refreshMessage && (
         <div>
-          <ErrorNotice message={refreshError} />
+          <ErrorNotice message={refreshMessage} />
           <button
             type="button"
             className="text-button"
-            onClick={() => refreshNow.current()}
+            onClick={() => void retry()}
           >
             {t("programme.refresh")}
           </button>
@@ -448,212 +274,36 @@ export function EventManager({
         {autosave.saving ? t("admin.saving") : notice}
       </p>
       {draft && (
-        <form
-          className="event-editor"
+        <EventForm
+          draft={draft}
+          saved={events.find((event) => event.id === draft.id)}
+          guests={guests}
+          timezone={timezone}
+          zone={zone}
+          busy={busy}
+          voteEditorKey={editorKey}
+          onChange={change}
           onBlur={autosave.onBlur}
-          onSubmit={(event) => {
-            event.preventDefault();
+          onSubmit={() => void autosave.flush()}
+          onOverwrite={(event) => {
+            overwriteRevision.current = event.revision;
             void autosave.flush();
           }}
-        >
-          <div className="section-row">
-            <h3>
-              {draft.id
-                ? t("admin.editEvent")
-                : draft.type === "vote"
-                  ? t("activities.voteType")
-                  : draft.type === "questions"
-                    ? t("questions.name")
-                    : t("admin.newEvent")}
-            </h3>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => void closeEditor()}
-              disabled={busy}
-              aria-label={t("autosave.close")}
-            >
-              <X size={18} />
-            </button>
-          </div>
-          {editing && editing.revision !== draft.revision && (
-            <p className="fine-print" role="status">
-              {t("activities.conflict")}
-            </p>
-          )}
-          <fieldset className="event-editor-fields" disabled={busy}>
-            <label htmlFor="event-title">{t("admin.eventTitle")}</label>
-            <input
-              id="event-title"
-              value={draft.title}
-              onChange={(event) => change("title", event.target.value)}
-              maxLength={160}
-              required
-              autoFocus
-            />
-            {draft.vote && (
-              <VoteEditor
-                key={editorKey}
-                draft={{ ...draft.vote, candidateIds }}
-                frozen={Boolean(frozenVote)}
-                guests={guests}
-                busy={busy}
-                onChange={(vote, commit) => {
-                  if (draftRef.current)
-                    updateDraft({ ...draftRef.current, vote });
-                  setNotice("");
-                  if (commit) setSelectionRevision((value) => value + 1);
-                }}
-              />
-            )}
-            <label htmlFor="event-description">{t("admin.eventDetails")}</label>
-            <textarea
-              id="event-description"
-              rows={3}
-              maxLength={4000}
-              value={draft.description}
-              onChange={(event) => change("description", event.target.value)}
-            />
-            <label htmlFor="event-teaser">{t("admin.teaser")}</label>
-            <input
-              id="event-teaser"
-              value={draft.teaser}
-              maxLength={160}
-              onChange={(event) => change("teaser", event.target.value)}
-              placeholder={t("admin.teaserPlaceholder")}
-            />
-            <div className="form-grid">
-              <div>
-                <label htmlFor="event-start">{t("admin.eventStart")}</label>
-                <input
-                  id="event-start"
-                  type="datetime-local"
-                  value={draft.startsAt}
-                  onChange={(event) => change("startsAt", event.target.value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="event-unlock">{t("admin.eventUnlock")}</label>
-                <input
-                  id="event-unlock"
-                  type="datetime-local"
-                  value={draft.unlockAt}
-                  onChange={(event) => change("unlockAt", event.target.value)}
-                />
-              </div>
-            </div>
-            <p className="fine-print">
-              {t("admin.eventDateHint", { zone, timezone })}
-            </p>
-          </fieldset>
-        </form>
+          onClose={() => void closeEditor()}
+        />
       )}
       {events.length === 0 && !draft && (
         <p className="admin-empty">{t("admin.emptyProgramme")}</p>
       )}
-      <ul className="admin-event-list programme-admin-events">
-        {events.map((event) => (
-          <li key={event.id}>
-            <div className="programme-admin-event-heading">
-              <div>
-                <strong>{event.title}</strong>
-                {event.vote && (
-                  <div>
-                    <VoteStatus status={event.vote.status} />
-                  </div>
-                )}
-                <p className="fine-print">
-                  {event.startsAt
-                    ? formatDate(event.startsAt, timezone, true, locale)
-                    : t("admin.timePending")}
-                </p>
-                <span className="fine-print">
-                  {event.vote?.status === "draft"
-                    ? t("activities.draftVisibility")
-                    : event.unlockAt
-                      ? t("admin.revealedAt", {
-                          date: formatDate(
-                            event.unlockAt,
-                            timezone,
-                            true,
-                            locale,
-                          ),
-                        })
-                      : t("admin.detailsVisible")}
-                </span>
-              </div>
-              <div className="button-row">
-                <button
-                  className="icon-button"
-                  aria-label={t("admin.editNamedEvent", { name: event.title })}
-                  disabled={busy}
-                  onClick={() => edit(event)}
-                >
-                  <Pencil size={17} />
-                </button>
-                <button
-                  className="icon-button danger"
-                  aria-label={t("admin.deleteNamedEvent", {
-                    name: event.title,
-                  })}
-                  disabled={busy}
-                  onClick={() => deleteEvent(event)}
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            </div>
-            {event.vote && (
-              <div className="programme-vote-summary">
-                {event.vote.question !== event.title && (
-                  <p>{event.vote.question}</p>
-                )}
-                <div className="activity-candidate-preview">
-                  {event.vote.candidates.slice(0, 8).map((candidate) => (
-                    <Avatar
-                      key={candidate.id}
-                      name={candidate.name}
-                      avatarUrl={candidate.avatarUrl}
-                    />
-                  ))}
-                  {event.vote.candidates.length > 8 && (
-                    <span>
-                      +
-                      {new Intl.NumberFormat(locale).format(
-                        event.vote.candidates.length - 8,
-                      )}
-                    </span>
-                  )}
-                </div>
-                {event.vote.participationCount !== null && (
-                  <p className="fine-print">
-                    {t("activities.participation", {
-                      count: new Intl.NumberFormat(locale).format(
-                        event.vote.participationCount,
-                      ),
-                    })}
-                  </p>
-                )}
-                {event.vote.status === "revealed" ? (
-                  <VoteResults vote={event.vote} />
-                ) : (
-                  <button
-                    type="button"
-                    className="button secondary activity-state-button"
-                    disabled={busy}
-                    onClick={() => transition(event)}
-                  >
-                    {t(voteTransitions[event.vote.status].label)}
-                  </button>
-                )}
-              </div>
-            )}
-            {event.questions && (
-              <ActivityLink event={event} beforeNavigate={autosave.flush} />
-            )}
-          </li>
-        ))}
-      </ul>
+      <EventList
+        events={events}
+        timezone={timezone}
+        busy={busy}
+        onEdit={(event) => void edit(event)}
+        onDelete={(event) => void deleteEvent(event)}
+        onTransition={(event) => void transition(event)}
+        beforeNavigate={autosave.flush}
+      />
     </div>
   );
 }

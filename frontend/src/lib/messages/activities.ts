@@ -4,8 +4,7 @@ const en = {
   "activities.voteType": "Vote for a person",
   "activities.voteDescription":
     "Guests choose a person. You decide when to show the results.",
-  "activities.overwriteConfirm":
-    "This event changed since you started editing. Save your draft instead? Candidate and self-voting settings stay fixed after voting opens.",
+  "activities.overwrite": "Save my draft",
   "activities.question": "Vote question",
   "activities.candidates": "Who can receive votes?",
   "activities.search": "Find a person",
@@ -58,8 +57,7 @@ const fr: ActivityMessages = {
   "activities.voteType": "Vote pour une personne",
   "activities.voteDescription":
     "Les invités choisissent une personne. Tu décides quand afficher les résultats.",
-  "activities.overwriteConfirm":
-    "Cet événement a changé. Enregistrer ton brouillon à la place ? Les candidats et la règle du vote pour soi-même restent inchangés si le vote a commencé.",
+  "activities.overwrite": "Enregistrer mon brouillon",
   "activities.question": "Question du vote",
   "activities.candidates": "Pour qui peut-on voter ?",
   "activities.search": "Rechercher une personne",
@@ -110,8 +108,7 @@ const de: ActivityMessages = {
   "activities.voteType": "Für eine Person abstimmen",
   "activities.voteDescription":
     "Die Gäste wählen eine Person. Du entscheidest, wann die Ergebnisse erscheinen.",
-  "activities.overwriteConfirm":
-    "Dieser Programmpunkt wurde inzwischen geändert. Deinen Entwurf stattdessen speichern? Kandidaten und die Regel für eigene Stimmen bleiben nach Beginn der Abstimmung unverändert.",
+  "activities.overwrite": "Meinen Entwurf speichern",
   "activities.question": "Frage zur Abstimmung",
   "activities.candidates": "Wer steht zur Wahl?",
   "activities.search": "Person suchen",
@@ -163,8 +160,7 @@ const it: ActivityMessages = {
   "activities.voteType": "Vota una persona",
   "activities.voteDescription":
     "Gli invitati scelgono una persona. Tu decidi quando mostrare i risultati.",
-  "activities.overwriteConfirm":
-    "Questo evento è cambiato. Salvare la tua bozza al suo posto? I candidati e la regola sul voto per sé stessi restano invariati se la votazione è iniziata.",
+  "activities.overwrite": "Salva la mia bozza",
   "activities.question": "Domanda della votazione",
   "activities.candidates": "Chi si può votare?",
   "activities.search": "Cerca una persona",
@@ -216,8 +212,7 @@ const es: ActivityMessages = {
   "activities.voteType": "Votar por una persona",
   "activities.voteDescription":
     "Los invitados eligen a una persona. Tú decides cuándo mostrar los resultados.",
-  "activities.overwriteConfirm":
-    "Este evento ha cambiado. ¿Guardar tu borrador en su lugar? Los candidatos y la regla del voto por uno mismo no cambian si la votación ha empezado.",
+  "activities.overwrite": "Guardar mi borrador",
   "activities.question": "Pregunta de la votación",
   "activities.candidates": "¿A quién se puede votar?",
   "activities.search": "Buscar una persona",

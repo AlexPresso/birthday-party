@@ -1,0 +1,46 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer components {
+  .confirm-dialog {
+    width: min(420px, calc(100vw - 2 * var(--page-gutter)));
+    max-height: calc(100dvh - 2 * var(--page-gutter));
+    margin: auto;
+    padding: 0;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-large);
+    color: var(--text);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .confirm-dialog::backdrop {
+    background: var(--overlay);
+  }
+  .confirm-dialog-content {
+    display: grid;
+    gap: 20px;
+    padding: 24px;
+  }
+  .confirm-dialog-content > p {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .confirm-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .confirm-dialog-actions > .button {
+    flex: 1 1 120px;
+  }
+  .confirm-dialog-actions > .confirm-dialog-danger {
+    background: var(--danger);
+    color: var(--on-accent);
+  }
+  .confirm-dialog-actions > .confirm-dialog-danger:hover {
+    filter: brightness(1.08);
+  }
+}

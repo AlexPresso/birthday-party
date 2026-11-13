@@ -1,8 +1,8 @@
 export function formatDate(
   value: string,
   timezone: string,
-  time = true,
-  locale = "en",
+  time: boolean,
+  locale: string,
 ) {
   return new Intl.DateTimeFormat(locale, {
     timeZone: timezone,

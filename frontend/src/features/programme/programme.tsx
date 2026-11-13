@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useId, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -10,8 +10,7 @@ import {
 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
-import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
-import { retryRealtime, subscribeRealtime } from "@/lib/realtime-browser";
+import { useRealtimeResource } from "@/lib/use-realtime-resource";
 import { eventsSchema, type PartyEvent } from "./contracts";
 import { formatDate } from "@/lib/dates";
 import { type Party } from "@/features/party/contracts";
@@ -235,7 +234,7 @@ function ProgrammeEvent({
             </>
           )}
         </div>
-        {!event.locked && event.questions && <ActivityLink event={event} />}
+        <ActivityLink event={event} />
       </article>
     </li>
   );
@@ -255,10 +254,22 @@ export function Programme({
   const { locale, t } = useI18n();
   const [events, setEvents] = useState(initial);
   const [error, setError] = useState<string | null>(null);
-  const [connectionFailed, setConnectionFailed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const retry = useRef<() => void>(() => {});
   const savedRevision = useRef(0);
+  const { connectionFailed, retry } = useRealtimeResource({
+    topic: "programme",
+    hasInitialData: true,
+    restartKey: initial,
+    async read(signal) {
+      const revision = savedRevision.current;
+      const data = await api("/programme", eventsSchema, { signal });
+      signal.throwIfAborted();
+      // A ballot saved during the request is newer than this response.
+      if (revision === savedRevision.current) setEvents(data.items);
+      setError(null);
+    },
+    onError: (err) => setError(errorMessage(err, t)),
+  });
   const featured = events.find(
     (event) => !event.locked && event.vote?.status === "open",
   );
@@ -271,40 +282,6 @@ export function Programme({
     savedRevision.current++;
     setEvents((current) => replaceEvent(current, saved));
   }
-
-  useEffect(() => {
-    let disposed = false;
-    const refresh = createInvalidationRefresh(
-      async (signal) => {
-        const revision = savedRevision.current;
-        const data = await api("/programme", eventsSchema, {
-          signal,
-        });
-        signal.throwIfAborted();
-        if (revision === savedRevision.current) setEvents(data.items);
-        setError(null);
-      },
-      (err) => setError(errorMessage(err, t)),
-    );
-    retry.current = () => {
-      retryRealtime();
-      setBusy(true);
-      void refresh.request().finally(() => {
-        if (!disposed) setBusy(false);
-      });
-    };
-    const unsubscribe = subscribeRealtime(
-      "programme",
-      () => void refresh.request(),
-      (connected) => setConnectionFailed(!connected),
-    );
-    return () => {
-      disposed = true;
-      retry.current = () => {};
-      unsubscribe();
-      refresh.dispose();
-    };
-  }, [initial, t]);
 
   return (
     <>
@@ -344,7 +321,10 @@ export function Programme({
       {(error || connectionFailed || busy) && (
         <button
           className="button secondary programme-retry"
-          onClick={() => retry.current()}
+          onClick={() => {
+            setBusy(true);
+            void retry().finally(() => setBusy(false));
+          }}
           disabled={busy}
         >
           <RefreshCw

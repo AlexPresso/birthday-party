@@ -1,17 +1,19 @@
 import { z } from "zod";
 import { id } from "../../lib/schema.ts";
-import { mediaCategorySchema, uploadLimitsSchema } from "../media/contracts.ts";
+import {
+  mediaCategorySchema,
+  uploadLimitsSchema,
+  welcomeRevisionSchema,
+  welcomeWidgetIndexSchema,
+} from "../media/contracts.ts";
 
-const widgetText = (limit: number) =>
-  z
-    .string()
-    .refine(
-      (value) => value.trim().length > 0 && Array.from(value).length <= limit,
-    );
+// The editor and Go enforce text lengths and the number of steps and widgets;
+// responses only need the shape and the rules the interface depends on.
+const widgetText = z.string().refine((value) => value.trim().length > 0);
 
 const welcomeWidgetSchema = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("title"), text: widgetText(120) }),
-  z.strictObject({ type: z.literal("text"), text: widgetText(1000) }),
+  z.strictObject({ type: z.literal("title"), text: widgetText }),
+  z.strictObject({ type: z.literal("text"), text: widgetText }),
   z.strictObject({ type: z.literal("profile_photo") }),
   z.strictObject({ type: z.literal("enable_notifications") }),
   z.strictObject({
@@ -23,7 +25,7 @@ const welcomeWidgetSchema = z.discriminatedUnion("type", [
 const welcomeWidgets = z
   .array(welcomeWidgetSchema)
   .min(1)
-  .max(12)
+  // A step mounts a single profile editor and a single notification control.
   .refine(
     (widgets) =>
       widgets.filter((widget) => widget.type === "profile_photo").length <= 1 &&
@@ -37,13 +39,9 @@ export type WelcomeWidget = z.infer<typeof welcomeWidgetSchema>;
 
 export type WelcomeStep = z.infer<typeof welcomeStepSchema>;
 
-const welcomeRevision = z.number().int().nonnegative();
-
-const welcomeWidgetIndex = z.number().int().min(0).max(11);
-
 export const welcomeUploadContextSchema = z.object({
-  revision: welcomeRevision,
-  widgetIndex: welcomeWidgetIndex,
+  revision: welcomeRevisionSchema,
+  widgetIndex: welcomeWidgetIndexSchema,
   category: mediaCategorySchema.nullable(),
   limits: uploadLimitsSchema,
 });
@@ -53,10 +51,10 @@ export type WelcomeUploadContext = z.infer<typeof welcomeUploadContextSchema>;
 export const welcomeSchema = z
   .object({
     open: z.boolean(),
-    revision: welcomeRevision,
-    progressRevision: welcomeRevision,
+    revision: welcomeRevisionSchema,
+    progressRevision: welcomeRevisionSchema,
     step: welcomeStepSchema
-      .extend({ position: z.number().int().min(1).max(12) })
+      .extend({ position: z.number().int().positive() })
       .nullable(),
     canPrevious: z.boolean(),
     canNext: z.boolean(),
@@ -75,10 +73,10 @@ export const welcomeSchema = z
 export const adminWelcomeSchema = z
   .object({
     open: z.boolean(),
-    revision: welcomeRevision,
-    currentStep: z.number().int().min(0).max(12),
+    revision: welcomeRevisionSchema,
+    currentStep: z.number().int().nonnegative(),
     required: z.boolean(),
-    steps: z.array(welcomeStepSchema).max(12),
+    steps: z.array(welcomeStepSchema),
   })
   .refine((value) => value.currentStep <= value.steps.length);
 

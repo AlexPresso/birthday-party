@@ -24,6 +24,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useWelcome } from "./use-welcome";
 import { BrandMark } from "@/components/brand-mark";
 import { ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { WelcomeProfile } from "./welcome-profile";
 import { WelcomeMedia } from "./welcome-media";
 import { UploadProvider } from "@/features/media/upload-provider";
@@ -40,6 +41,7 @@ export function WaitingRoom({
   title: string;
 }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const { welcome, failed, refresh, accept } = useWelcome(initial);
   const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState<"previous" | "next" | "finish" | null>(
@@ -65,11 +67,6 @@ export function WaitingRoom({
     if (busy || progressRequest.current) return;
     const controller = new AbortController();
     progressRequest.current = controller;
-    let timedOut = false;
-    const deadline = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, 10000);
     setMoving(action);
     setError(null);
     try {
@@ -88,18 +85,12 @@ export function WaitingRoom({
             ?.focus();
         });
     } catch (cause) {
-      if (
-        progressRequest.current !== controller ||
-        (controller.signal.aborted && !timedOut)
-      )
+      if (progressRequest.current !== controller || controller.signal.aborted)
         return;
-      setError(
-        timedOut ? t("common.connectionFailed") : errorMessage(cause, t),
-      );
+      setError(errorMessage(cause, t));
       if (cause instanceof ApiError && cause.code === "errors.welcome_conflict")
         refresh();
     } finally {
-      clearTimeout(deadline);
       if (progressRequest.current === controller) {
         progressRequest.current = null;
         setMoving(null);
@@ -108,7 +99,11 @@ export function WaitingRoom({
   }
 
   async function logout() {
-    if (!window.confirm(t("settings.logoutConfirmation"))) return;
+    const confirmed = await confirm({
+      message: t("settings.logoutConfirmation"),
+      destructive: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     setError(null);
     try {
