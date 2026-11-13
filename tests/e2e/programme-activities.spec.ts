@@ -1,22 +1,23 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type BrowserContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  activate,
+  baseURL,
+  bootstrapHost,
+  expectNoHorizontalOverflow,
+  invite,
+  mutationHeaders,
+  newClient,
+} from "./support/party";
+import type { Guest, Invitation } from "./support/party";
+import { acceptConfirmation, declineConfirmation } from "./support/confirm";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
-
-type Guest = { id: number; name: string };
-type Invitation = { guest: Guest; invitationUrl: string };
 type Vote = {
   question: string;
   status: "draft" | "open" | "closed" | "revealed";
@@ -44,26 +45,6 @@ const eventIDs: number[] = [];
 const contexts: BrowserContext[] = [];
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
-
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
-async function activate(client: APIRequestContext, url: string) {
-  const response = await client.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: invitationToken(url) },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function invite(name: string): Promise<Invitation> {
-  const response = await host.post("/api/admin/guests", { data: { name } });
-  expect(response.status()).toBe(201);
-  return response.json();
-}
 
 async function programme(client = host): Promise<ProgrammeEvent[]> {
   const path = client === host ? "/api/admin/programme" : "/api/programme";
@@ -189,10 +170,7 @@ async function addAvatar(page: Page, invitation: Invitation) {
     drawing.fill();
     return canvas.toDataURL("image/png").split(",")[1];
   });
-  const client = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
+  const client = await newClient();
   try {
     await activate(client, invitation.invitationUrl);
     const response = await client.put("/api/profile/avatar", {
@@ -211,45 +189,8 @@ async function addAvatar(page: Page, invitation: Invitation) {
   }
 }
 
-async function expectNoOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBeTruthy();
-}
-
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    [
-      "scripts/backend.mjs",
-      "invite-admin",
-      "--name",
-      "Programme Activities Test Host",
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  await activate(host, match[0]);
+  host = await bootstrapHost("Programme Activities Test Host");
 });
 
 test.afterEach(async () => {
@@ -269,8 +210,8 @@ test("the host creates a vote directly in the programme with selected candidates
   browser,
   page,
 }) => {
-  const camille = await invite("Camille — costume");
-  const robin = await invite("Robin — costume");
+  const camille = await invite(host, "Camille — costume");
+  const robin = await invite(host, "Robin — costume");
   const avatarURL = await addAvatar(page, camille);
   const context = await browser.newContext({
     baseURL,
@@ -295,12 +236,12 @@ test("the host creates a vote directly in the programme with selected candidates
     "naturalWidth",
     256,
   );
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await form.screenshot({
-    path: "test-results/programme-vote-editor-desktop.png",
+    path: test.info().outputPath("programme-vote-editor-desktop.png"),
   });
   await editor.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await editor.setViewportSize({ width: 1440, height: 1100 });
   await expect(
     form.getByRole("button", { name: "Enregistrer l’événement", exact: true }),
@@ -322,20 +263,20 @@ test("the host creates a vote directly in the programme with selected candidates
   const eventCard = editor
     .locator(".admin-event-list > li")
     .filter({ hasText: title });
-  editor.once("dialog", (dialog) => dialog.accept());
   await eventCard
     .getByRole("button", { name: "Ouvrir le vote", exact: true })
     .click();
+  await acceptConfirmation(editor);
   await expect(
     eventCard.getByRole("button", { name: "Fermer le vote", exact: true }),
   ).toBeVisible();
   expect((await voteFrom(host, saved.id)).status).toBe("open");
   await editor.screenshot({
-    path: "test-results/programme-vote-admin-desktop.png",
+    path: test.info().outputPath("programme-vote-admin-desktop.png"),
     fullPage: true,
   });
   await editor.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
 });
 
 test("guest changes update an open vote editor without reloading settings", async ({
@@ -356,16 +297,16 @@ test("guest changes update an open vote editor without reloading settings", asyn
     exact: true,
   });
   await expect(manageProgramme).toBeVisible();
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await editor.screenshot({
-    path: "test-results/programme-admin-navigation-desktop.png",
+    path: test.info().outputPath("programme-admin-navigation-desktop.png"),
     fullPage: true,
   });
   await editor.setViewportSize({ width: 390, height: 844 });
   await expect(manageProgramme).toBeVisible();
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await editor.screenshot({
-    path: "test-results/programme-admin-navigation-mobile.png",
+    path: test.info().outputPath("programme-admin-navigation-mobile.png"),
     fullPage: true,
   });
   await manageProgramme.click();
@@ -424,10 +365,10 @@ test("guest changes update an open vote editor without reloading settings", asyn
 
   const robin = names[1];
   await openSettingsSection(editor, "guests");
-  editor.once("dialog", (dialog) => dialog.accept());
   await editor
     .getByRole("button", { name: `Retirer l’accès de ${robin}`, exact: true })
     .click();
+  await acceptConfirmation(editor);
   await openSettingsSection(editor, "programme");
   await expect(
     eventEditor.getByRole("checkbox", { name: robin, exact: true }),
@@ -448,13 +389,13 @@ test("guest changes update an open vote editor without reloading settings", asyn
     .check();
   await expect(selectedCount).toContainText("3 sélectionnés");
   await openSettingsSection(editor, "guests");
-  editor.once("dialog", (dialog) => dialog.accept());
   await editor
     .getByRole("button", {
       name: `Retirer l’accès de ${excluded}`,
       exact: true,
     })
     .click();
+  await acceptConfirmation(editor);
   await openSettingsSection(editor, "programme");
   await expect(
     eventEditor.getByRole("checkbox", { name: excluded, exact: true }),
@@ -482,9 +423,9 @@ test("guest changes update an open vote editor without reloading settings", asyn
 test("guests see a vote only after opening and unlocking, and its results only after revelation", async ({
   page,
 }) => {
-  const mila = await invite("Mila — piste de danse");
-  const camille = await invite("Camille — piste de danse");
-  const robin = await invite("Robin — piste de danse");
+  const mila = await invite(host, "Mila — piste de danse");
+  const camille = await invite(host, "Camille — piste de danse");
+  const robin = await invite(host, "Robin — piste de danse");
   const avatarURL = await addAvatar(page, camille);
   await activate(page.request, mila.invitationUrl);
   const question = "Qui nous a donné envie de danser ?";
@@ -555,21 +496,13 @@ test("guests see a vote only after opening and unlocking, and its results only a
   await expect(
     featured.locator(`.programme-vote-preview img[src="${avatarURL}"]`),
   ).toHaveJSProperty("naturalWidth", 256);
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: "test-results/programme-featured-vote-mobile.png",
+    path: test.info().outputPath("programme-featured-vote-mobile.png"),
     fullPage: true,
     animations: "disabled",
     style: "nextjs-portal { visibility: hidden; }",
   });
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.screenshot({
-    path: "test-results/programme-featured-vote-dark-mobile.png",
-    fullPage: true,
-    animations: "disabled",
-    style: "nextjs-portal { visibility: hidden; }",
-  });
-  await page.emulateMedia({ colorScheme: "light" });
   await featured
     .locator("summary")
     .filter({ hasText: /^Voter$/ })
@@ -644,17 +577,14 @@ test("guests see a vote only after opening and unlocking, and its results only a
   await expect(
     ballot.getByRole("radio", { name: camille.guest.name, exact: true }),
   ).toBeChecked();
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: "test-results/programme-vote-mobile.png",
+    path: test.info().outputPath("programme-vote-mobile.png"),
     fullPage: true,
   });
 
-  const other = await invite("Sacha — second ballot");
-  const otherClient = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
+  const other = await invite(host, "Sacha — second ballot");
+  const otherClient = await newClient();
   try {
     await activate(otherClient, other.invitationUrl);
     await castVote(otherClient, event.id, robin.guest.id);
@@ -698,20 +628,20 @@ test("guests see a vote only after opening and unlocking, and its results only a
     ]),
   );
   await page.screenshot({
-    path: "test-results/programme-vote-results-mobile.png",
+    path: test.info().outputPath("programme-vote-results-mobile.png"),
     fullPage: true,
   });
   await page.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
 });
 
 test("editing a vote event and deleting another event preserves the ballots", async ({
   browser,
   page,
 }) => {
-  const camille = await invite("Camille — souvenirs");
-  const robin = await invite("Robin — souvenirs");
-  const voter = await invite("Lou — souvenirs");
+  const camille = await invite(host, "Camille — souvenirs");
+  const robin = await invite(host, "Robin — souvenirs");
+  const voter = await invite(host, "Lou — souvenirs");
   await activate(page.request, voter.invitationUrl);
   const event = await createVote(
     "Les souvenirs de la soirée",
@@ -756,10 +686,10 @@ test("editing a vote event and deleting another event preserves the ballots", as
   expect(updated.vote?.status).toBe("open");
   expect(updated.vote?.participationCount).toBe(1);
 
-  editor.once("dialog", (dialog) => dialog.accept());
   await editor
     .getByRole("button", { name: `Supprimer ${other.title}`, exact: true })
     .click();
+  await acceptConfirmation(editor);
   await expect(editor.getByText(other.title, { exact: true })).toHaveCount(0);
   eventIDs.splice(eventIDs.indexOf(other.id), 1);
   expect((await programme()).some((item) => item.id === other.id)).toBe(false);
@@ -900,8 +830,8 @@ test("invalid event drafts remain editable and a failed autosave retries on blur
   await title.blur();
   await expect(error).toBeVisible();
   expect((await eventFrom(host, event.id)).title).toBe(event.title);
-  editor.once("dialog", (dialog) => dialog.dismiss());
   await form.getByRole("button", { name: "Fermer", exact: true }).click();
+  await declineConfirmation(editor);
   await expect(title).toHaveValue("");
 
   let updates = 0;

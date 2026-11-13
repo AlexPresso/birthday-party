@@ -1,24 +1,23 @@
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  activate,
+  baseURL,
+  bootstrapHost,
+  mutationHeaders,
+  newClient,
+} from "./support/party";
+import { canvasImage } from "./support/images";
 import { createECDH, randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type {
   Configuration,
   Party,
 } from "../../frontend/src/features/party/contracts";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 const viewport = { width: 390, height: 844 };
 type Guest = { id: number; name: string };
 type Category = { id: number; name: string; isPublic: boolean };
@@ -33,83 +32,20 @@ test.use({
   actionTimeout: 15_000,
 });
 
-function invitationToken(url: string) {
-  const value = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!value) throw new Error("The invitation URL has no token fragment.");
-  return value;
-}
-
-async function activate(client: APIRequestContext, invitationUrl: string) {
-  const response = await client.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: invitationToken(invitationUrl) },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function bootstrapHost() {
-  // Only scripts/e2e.mjs supplies both variables for its disposable database.
-  if (
-    !process.env.TEST_DATABASE_URL ||
-    process.env.DATABASE_URL !== process.env.TEST_DATABASE_URL
-  ) {
-    throw new Error("Run this fixture through npm run test:e2e.");
-  }
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Camille"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  const host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  await activate(host, match[0]);
-  return host;
-}
-
 async function fixtureImages(page: Page) {
-  const source = readFileSync("docs/design-reference-light.png").toString(
-    "base64",
-  );
-  // These crops contain only the approved mockup's illustrative photographs.
-  // They become ordinary private uploads in the disposable test database.
-  const images = await page.evaluate(async (source) => {
-    const image = new Image();
-    image.src = `data:image/png;base64,${source}`;
-    await image.decode();
-    const crops = [
-      { x: 1074, y: 266, width: 180, height: 180, size: 256 },
-      { x: 46, y: 506, width: 100, height: 100, size: 256 },
-      { x: 239, y: 504, width: 98, height: 98, size: 256 },
-      { x: 30, y: 457, width: 306, height: 310, size: 768 },
-      { x: 148, y: 272, width: 65, height: 65, size: 512 },
-    ];
-    return crops.map(({ x, y, width, height, size }) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const drawing = canvas.getContext("2d")!;
-      drawing.drawImage(image, x, y, width, height, 0, 0, size, size);
-      return canvas.toDataURL("image/png").split(",")[1];
-    });
-  }, source);
-  return images.map((image) => Buffer.from(image, "base64"));
+  // Synthetic portraits and photos drawn in the page: no real person, no file.
+  const images: Buffer[] = [];
+  for (const [size, color] of [
+    [256, "#c9772f"],
+    [256, "#6d8b69"],
+    [256, "#688b96"],
+    [768, "#91729d"],
+    [512, "#a26679"],
+  ] as const) {
+    const image = await canvasImage(page, { width: size, height: size, color });
+    images.push(image.buffer);
+  }
+  return images;
 }
 
 async function saveAvatar(
@@ -248,7 +184,7 @@ async function mockBrowserPush(page: Page, host: APIRequestContext) {
   return fixture.endpoint;
 }
 
-async function capture(page: Page, theme: "light" | "dark", route: string) {
+async function capture(page: Page, route: string) {
   await expect(page.locator(".navigation")).toBeVisible();
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -299,19 +235,19 @@ async function capture(page: Page, theme: "light" | "dark", route: string) {
   ).toBe(true);
   expect(boxes.at(-1)!.x).toBe(Math.max(...boxes.map(({ x }) => x)));
   await page.screenshot({
-    path: join("artifacts", "design-fidelity", `${theme}-${route}.png`),
+    path: test.info().outputPath(`${route}.png`),
     animations: "disabled",
     caret: "hide",
     style: "nextjs-portal { visibility: hidden !important; }",
   });
 }
 
-test("the five screens adapt to phones and desktops in both themes while preserving interactions", async ({
+test("the five screens adapt to phones and desktops in the dark theme while preserving interactions", async ({
   page,
   browser,
 }) => {
   test.setTimeout(240_000);
-  const host = await bootstrapHost();
+  const host = await bootstrapHost("Camille");
   const guests: Guest[] = [];
   const clients: APIRequestContext[] = [];
   const categoryFixtures: Category[] = [];
@@ -381,13 +317,7 @@ test("the five screens adapt to phones and desktops in both themes while preserv
       expect(response.status()).toBe(201);
       const invitation = await response.json();
       guests.push(invitation.guest);
-      const client =
-        index === 0
-          ? page.request
-          : await request.newContext({
-              baseURL,
-              extraHTTPHeaders: mutationHeaders,
-            });
+      const client = index === 0 ? page.request : await newClient();
       clients.push(client);
       await activate(client, invitation.invitationUrl);
       await saveAvatar(client, portraits[index]);
@@ -477,6 +407,7 @@ test("the five screens adapt to phones and desktops in both themes while preserv
     }
 
     endpoint = await mockBrowserPush(page, host);
+    // The single dark theme must hold on a device that prefers a light one.
     await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
     await page.goto("/parametres");
     await expect(page).toHaveURL(`${baseURL}/profil`);
@@ -512,7 +443,6 @@ test("the five screens adapt to phones and desktops in both themes while preserv
       ),
     ).toMatchObject({ prompts: 1, gestures: [true] });
 
-    mkdirSync(join("artifacts", "design-fidelity"), { recursive: true });
     const adminPage = await adminContext.newPage();
     await adminPage.goto("/parametres");
     await expect(adminPage.locator(".navigation a")).toHaveCount(5);
@@ -520,84 +450,92 @@ test("the five screens adapt to phones and desktops in both themes while preserv
       "href",
       "/parametres",
     );
-    for (const theme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-      for (const [route, label, title] of [
-        ["photos", "Médias", "Médias"],
-        ["programme", "Programme", "Programme"],
-        ["livre-d-or", "Livre d'or", "Livre d’or"],
-        ["profil", "Profil: Camille", "Profil"],
-      ]) {
-        const link = page
-          .locator(".navigation")
-          .getByRole("link", { name: label, exact: true });
-        // The Next development insight badge overlaps the first mobile tab.
-        if (route === "programme") await link.press("Enter");
-        else await link.tap();
-        await expect(page).toHaveURL(`${baseURL}/${route}`);
-        await expect(
-          page.getByRole("heading", { level: 1, name: title, exact: true }),
-        ).toBeVisible();
-        if (route === "photos" && theme === "light") {
-          const queue = page.locator(".upload-queue");
-          await expect(queue).toBeHidden();
-        }
-        if (route === "programme") {
-          await expect(
-            page.getByRole("heading", {
-              name: "Qui met l’ambiance ?",
-              exact: true,
-            }),
-          ).toBeVisible();
-          await expect(
-            page.getByRole("article", { name: "Une surprise", exact: true }),
-          ).toBeVisible();
-          await expect(
-            page.getByText("This detail remains private.", { exact: true }),
-          ).toHaveCount(0);
-        }
-        if (route === "profil") await expect(toggle).toBeChecked();
-        // Capture the resting touch state after checking keyboard navigation.
-        await page
-          .getByRole("heading", { level: 1, name: title, exact: true })
-          .tap();
-        await capture(page, theme, route);
-        if (route === "photos") {
-          const posts = page.locator(".media-feed .media-post");
-          await expect(
-            posts.locator(".media-post-actions a[download]"),
-          ).toHaveCount(await posts.count());
-          await expect(posts.getByText(/^\d+\s*\/\s*\d+\+?$/)).toHaveCount(0);
-          await expect(page.locator(".media-filmstrip")).toHaveCount(0);
-          await posts
-            .first()
-            .locator(".media-post-actions")
-            .scrollIntoViewIfNeeded();
-          await page.screenshot({
-            path: join(
-              "artifacts",
-              "design-fidelity",
-              `${theme}-media-details.png`,
-            ),
-            animations: "disabled",
-            caret: "hide",
-            style: "nextjs-portal { visibility: hidden !important; }",
-          });
-        }
-      }
-      await adminPage.emulateMedia({
-        colorScheme: theme,
-        reducedMotion: "reduce",
-      });
+    for (const [route, label, title] of [
+      ["photos", "Médias", "Médias"],
+      ["programme", "Programme", "Programme"],
+      ["livre-d-or", "Livre d'or", "Livre d’or"],
+      ["profil", "Profil: Camille", "Profil"],
+    ]) {
+      const link = page
+        .locator(".navigation")
+        .getByRole("link", { name: label, exact: true });
+      // The Next development insight badge overlaps the first mobile tab.
+      if (route === "programme") await link.press("Enter");
+      else await link.tap();
+      await expect(page).toHaveURL(`${baseURL}/${route}`);
       await expect(
-        adminPage.getByRole("heading", {
-          level: 1,
-          name: "Paramètres",
-          exact: true,
-        }),
+        page.getByRole("heading", { level: 1, name: title, exact: true }),
       ).toBeVisible();
-      await capture(adminPage, theme, "parametres");
+      if (route === "photos") {
+        const queue = page.locator(".upload-queue");
+        await expect(queue).toBeHidden();
+      }
+      if (route === "programme") {
+        await expect(
+          page.getByRole("heading", {
+            name: "Qui met l’ambiance ?",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole("article", { name: "Une surprise", exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByText("This detail remains private.", { exact: true }),
+        ).toHaveCount(0);
+      }
+      if (route === "profil") await expect(toggle).toBeChecked();
+      // Capture the resting touch state after checking keyboard navigation.
+      // Programme and Médias hide their title visually, so tap the brand row.
+      await page.getByRole("banner").locator("strong").tap();
+      await capture(page, route);
+      if (route === "photos") {
+        // The gallery opens as a mosaic: the author sits on each photo and
+        // the file actions wait behind the opened photo.
+        const tiles = page.locator(".media-grid .media-post");
+        await expect(tiles.first()).toBeVisible();
+        await expect(page.locator(".media-feed")).toHaveCount(0);
+        await expect(
+          tiles.first().locator(".media-post-author strong"),
+        ).toBeVisible();
+        await expect(
+          tiles.first().locator(".media-post-actions a[download]"),
+        ).toBeHidden();
+        const tileCount = await tiles.count();
+        await page
+          .getByRole("button", { name: "Vue en fil", exact: true })
+          .tap();
+        const posts = page.locator(".media-feed .media-post");
+        await expect(posts).toHaveCount(tileCount);
+        await expect(
+          posts.locator(".media-post-actions a[download]"),
+        ).toHaveCount(tileCount);
+        await expect(posts.getByText(/^\d+\s*\/\s*\d+\+?$/)).toHaveCount(0);
+        await expect(page.locator(".media-filmstrip")).toHaveCount(0);
+        await posts
+          .first()
+          .locator(".media-post-actions")
+          .scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: test.info().outputPath("media-details.png"),
+          animations: "disabled",
+          caret: "hide",
+          style: "nextjs-portal { visibility: hidden !important; }",
+        });
+      }
     }
+    await adminPage.emulateMedia({
+      colorScheme: "light",
+      reducedMotion: "reduce",
+    });
+    await expect(
+      adminPage.getByRole("heading", {
+        level: 1,
+        name: "Paramètres",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await capture(adminPage, "parametres");
 
     const desktop = await browser.newContext({
       baseURL,
@@ -608,78 +546,71 @@ test("the five screens adapt to phones and desktops in both themes while preserv
     try {
       const desktopPage = await desktop.newPage();
       await adminPage.setViewportSize({ width: 1440, height: 1000 });
-      for (const theme of ["light", "dark"] as const) {
-        await desktopPage.emulateMedia({ colorScheme: theme });
-        await adminPage.emulateMedia({ colorScheme: theme });
-        for (const route of ["photos", "programme", "livre-d-or", "profil"]) {
-          await desktopPage.goto(`/${route}`);
-          await expect(desktopPage.locator("h1")).toBeVisible();
-          expect(
-            (await desktopPage.locator(".main-content").boundingBox())!.width,
-          ).toBeCloseTo(1440 * 0.9);
-          await capture(desktopPage, theme, `desktop-${route}`);
-        }
-        await desktopPage.goto("/photos");
-        const posts = desktopPage.locator(".media-feed .media-post");
-        await expect(posts.nth(1)).toBeVisible();
-        const first = (await posts.nth(0).boundingBox())!;
-        const second = (await posts.nth(1).boundingBox())!;
-        expect(second.x).toBeGreaterThan(first.x + first.width);
-        expect(second.y).toBeCloseTo(first.y);
-        await desktopPage.locator(".media-view-switch button").first().click();
-        await expect(desktopPage.locator(".media-grid")).toBeVisible();
-        await capture(desktopPage, theme, "desktop-media-grid");
-        await desktopPage.locator(".media-grid .photo-tile").first().click();
-        await expect(desktopPage.getByRole("dialog")).toBeVisible();
-        await desktopPage.keyboard.press("Escape");
-        await expect(desktopPage.getByRole("dialog")).toBeHidden();
-
-        await desktopPage.goto("/programme");
-        await expect(desktopPage.locator(".programme-featured")).toBeVisible();
-        const featured = (await desktopPage
-          .locator(".programme-featured")
-          .boundingBox())!;
-        const agenda = (await desktopPage
-          .locator(".programme-agenda-item")
-          .first()
-          .boundingBox())!;
-        expect(agenda.x).toBeGreaterThan(featured.x + featured.width);
-        await desktopPage.goto("/livre-d-or");
-        const draft = desktopPage.locator(".guestbook-compose textarea");
-        await draft.fill("A draft retained while resizing.");
-        await desktopPage.setViewportSize({ width: 390, height: 844 });
-        await expect(draft).toHaveValue("A draft retained while resizing.");
-        await desktopPage.setViewportSize({ width: 1440, height: 1000 });
-        await expect(draft).toHaveValue("A draft retained while resizing.");
-
-        await adminPage.goto("/parametres");
-        await capture(adminPage, theme, "desktop-parametres");
-        await expect(adminPage.locator("#party-editor")).toBeVisible();
-        const menu = (await adminPage
-          .locator('[data-settings-screen="index"]')
-          .boundingBox())!;
-        const editor = (await adminPage
-          .locator("#party-editor")
-          .boundingBox())!;
-        expect(editor.x).toBeGreaterThan(menu.x + menu.width);
-        await capture(adminPage, theme, "desktop-party-settings");
-        await adminPage
-          .locator('a[href="/parametres?section=uploads"]')
-          .click();
-        await expect(adminPage.locator("#uploads-editor")).toBeVisible();
-        await expect(
-          adminPage.locator(".settings-index-heading"),
-        ).toBeVisible();
+      await desktopPage.emulateMedia({ colorScheme: "light" });
+      for (const route of ["photos", "programme", "livre-d-or", "profil"]) {
+        await desktopPage.goto(`/${route}`);
+        await expect(desktopPage.locator("h1")).toBeVisible();
+        expect(
+          (await desktopPage.locator(".main-content").boundingBox())!.width,
+        ).toBeCloseTo(1440 * 0.9);
+        await capture(desktopPage, `desktop-${route}`);
       }
+      await desktopPage.goto("/photos");
+      await expect(desktopPage.locator(".media-grid")).toBeVisible();
+      await capture(desktopPage, "desktop-media-grid");
+      await desktopPage.locator(".media-grid .photo-tile").first().click();
+      await expect(desktopPage.getByRole("dialog")).toBeVisible();
+      await desktopPage.keyboard.press("Escape");
+      await expect(desktopPage.getByRole("dialog")).toBeHidden();
+      await desktopPage
+        .getByRole("button", { name: "Vue en fil", exact: true })
+        .click();
+      const posts = desktopPage.locator(".media-feed .media-post");
+      await expect(posts.nth(1)).toBeVisible();
+      const first = (await posts.nth(0).boundingBox())!;
+      const second = (await posts.nth(1).boundingBox())!;
+      expect(second.x).toBeGreaterThan(first.x + first.width);
+      expect(second.y).toBeCloseTo(first.y);
+
+      await desktopPage.goto("/programme");
+      await expect(desktopPage.locator(".programme-featured")).toBeVisible();
+      const featured = (await desktopPage
+        .locator(".programme-featured")
+        .boundingBox())!;
+      const agenda = (await desktopPage
+        .locator(".programme-agenda-item")
+        .first()
+        .boundingBox())!;
+      expect(agenda.x).toBeGreaterThan(featured.x + featured.width);
+      await desktopPage.goto("/livre-d-or");
+      const draft = desktopPage.locator(".guestbook-compose textarea");
+      await draft.fill("A draft retained while resizing.");
+      await desktopPage.setViewportSize({ width: 390, height: 844 });
+      await expect(draft).toHaveValue("A draft retained while resizing.");
+      await desktopPage.setViewportSize({ width: 1440, height: 1000 });
+      await expect(draft).toHaveValue("A draft retained while resizing.");
+
+      await adminPage.goto("/parametres");
+      await capture(adminPage, "desktop-parametres");
+      await expect(adminPage.locator("#party-editor")).toBeVisible();
+      const menu = (await adminPage
+        .locator('[data-settings-screen="index"]')
+        .boundingBox())!;
+      const editor = (await adminPage.locator("#party-editor").boundingBox())!;
+      expect(editor.x).toBeGreaterThan(menu.x + menu.width);
+      await capture(adminPage, "desktop-party-settings");
+      await adminPage.locator('a[href="/parametres?section=uploads"]').click();
+      await expect(adminPage.locator("#uploads-editor")).toBeVisible();
+      await expect(adminPage.locator(".settings-index-heading")).toBeVisible();
       for (const width of [320, 768, 1024, 1920]) {
         await desktopPage.setViewportSize({ width, height: 1000 });
         await adminPage.setViewportSize({ width, height: 1000 });
         for (const route of ["photos", "programme", "livre-d-or", "profil"]) {
           await desktopPage.goto(`/${route}`);
-          await capture(desktopPage, "dark", `${width}-${route}`);
+          await capture(desktopPage, `${width}-${route}`);
         }
         await adminPage.goto("/parametres");
-        await capture(adminPage, "dark", `${width}-parametres`);
+        await capture(adminPage, `${width}-parametres`);
       }
     } finally {
       await desktop.close();

@@ -1,89 +1,33 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  baseURL,
+  bootstrapHost,
+  mutationHeaders,
+  shareSession,
+  signInGuest,
+} from "./support/party";
+import { welcomeControls, type AdminWelcome } from "./support/welcome";
+import { acceptConfirmation } from "./support/confirm";
 import { createECDH, randomBytes, randomUUID } from "node:crypto";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
-type Widget =
-  { type: "title"; text: string } | { type: "enable_notifications" };
-type WelcomeStep = { widgets: Widget[] };
-type AdminWelcome = {
-  open: boolean;
-  revision: number;
-  currentStep: number;
-  required: boolean;
-  steps: WelcomeStep[];
-};
 let host: APIRequestContext;
 let original: AdminWelcome;
+const {
+  state,
+  transition,
+  saveSteps: save,
+  setRequired: required,
+  restoreOpen: reset,
+} = welcomeControls(() => host);
 let subscriptions: { client: APIRequestContext; endpoint: string }[] = [];
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
-
-function token(url: string) {
-  const value = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!value) throw new Error("The invitation URL has no token fragment.");
-  return value;
-}
-
-async function state(): Promise<AdminWelcome> {
-  const response = await host.get("/api/admin/welcome");
-  expect(response.status()).toBe(200);
-  return response.json();
-}
-
-async function transition(action: "start" | "next" | "open") {
-  const { revision } = await state();
-  const response = await host.post("/api/admin/welcome/transition", {
-    data: { revision, action },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function save(steps: WelcomeStep[]) {
-  const { revision } = await state();
-  const response = await host.put("/api/admin/welcome", {
-    data: { revision, steps },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function required(value: boolean) {
-  const { revision } = await state();
-  const response = await host.patch("/api/admin/welcome/required", {
-    data: { revision, required: value },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function reset(steps: WelcomeStep[], isRequired = false) {
-  if (!(await state()).open) await transition("open");
-  await transition("start");
-  await save(steps);
-  await required(isRequired);
-  await transition("open");
-}
-
-async function invite(page: Page, name: string) {
-  const response = await host.post("/api/admin/guests", { data: { name } });
-  expect(response.status()).toBe(201);
-  const invitation = await response.json();
-  const accepted = await page.request.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: token(invitation.invitationUrl) },
-  });
-  expect(accepted.status()).toBe(200);
-}
 
 async function startWelcome() {
   await transition("start");
@@ -206,42 +150,7 @@ async function pushState(page: Page) {
 }
 
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    [
-      "scripts/backend.mjs",
-      "invite-admin",
-      "--name",
-      "Notifications Test Host",
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  expect(
-    (
-      await host.post("/api/invitations/accept", {
-        data: { token: token(match[0]) },
-      })
-    ).status(),
-  ).toBe(200);
+  host = await bootstrapHost("Notifications Test Host");
   original = await state();
 });
 
@@ -273,7 +182,7 @@ test("the notification widget can be reordered and saved without settings", asyn
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/parametres");
   await openSettingsSection(page, "welcome");
@@ -318,17 +227,21 @@ test("the notification widget can be reordered and saved without settings", asyn
     "enable_notifications",
   );
   await widget.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "artifacts/notifications/editor-desktop.png" });
+  await page.screenshot({
+    path: test.info().outputPath("notifications", "editor-desktop.png"),
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await widget.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "artifacts/notifications/editor-mobile.png" });
+  await page.screenshot({
+    path: test.info().outputPath("notifications", "editor-mobile.png"),
+  });
 });
 
 test("permission needs a click and failed server registration can retry the same subscription", async ({
   page,
 }) => {
   await startWelcome();
-  await invite(page, "Notification Retry Guest");
+  await signInGuest(host, page, "Notification Retry Guest");
   const fixture = await mockPush(page);
   let saves = 0;
   await page.route("**/api/notifications/subscription", async (route) => {
@@ -353,14 +266,18 @@ test("permission needs a click and failed server registration can retry the same
       async () => (await navigator.serviceWorker.ready).active?.scriptURL,
     ),
   ).toBe(`${baseURL}/sw.js`);
-  await page.screenshot({ path: "artifacts/notifications/widget-mobile.png" });
+  await page.screenshot({
+    path: test.info().outputPath("notifications", "widget-mobile.png"),
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.screenshot({ path: "artifacts/notifications/widget-desktop.png" });
+  await page.screenshot({
+    path: test.info().outputPath("notifications", "widget-desktop.png"),
+  });
   await enable.click();
   await expect(control.getByRole("alert")).toBeVisible();
   await expect(
@@ -395,7 +312,7 @@ test("an existing browser subscription is not silently assigned to another guest
   page,
 }) => {
   const fixture = await mockPush(page, "granted", true);
-  await invite(page, "First Notification Guest");
+  await signInGuest(host, page, "First Notification Guest");
   let saves = 0;
   page.on("request", (request) => {
     if (
@@ -416,14 +333,14 @@ test("an existing browser subscription is not silently assigned to another guest
   await toggle.press("Space");
   await expect(toggle).toBeChecked();
   expect(await status(page, fixture.endpoint)).toBe(true);
-  page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "Se déconnecter", exact: true })
     .click();
+  await acceptConfirmation(page);
   await expect(page).toHaveURL(/\/invitation$/);
   await expect(page.getByRole("navigation")).toHaveCount(0);
   expect((await page.request.get("/api/session")).status()).toBe(401);
-  await invite(page, "Second Notification Guest");
+  await signInGuest(host, page, "Second Notification Guest");
   await page.goto("/profil");
   await expect(toggle).toBeEnabled();
   await expect(toggle).not.toBeChecked();
@@ -435,7 +352,7 @@ test("an existing browser subscription is not silently assigned to another guest
   expect((await pushState(page)).subscriptions).toBe(0);
   await control.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: "artifacts/notifications/settings-mobile.png",
+    path: test.info().outputPath("notifications", "settings-mobile.png"),
   });
   expect(
     await page.evaluate(
@@ -445,7 +362,7 @@ test("an existing browser subscription is not silently assigned to another guest
   await page.setViewportSize({ width: 1440, height: 1000 });
   await control.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: "artifacts/notifications/settings-desktop.png",
+    path: test.info().outputPath("notifications", "settings-desktop.png"),
   });
   await toggle.click();
   await expect(toggle).toBeEnabled();
@@ -457,7 +374,7 @@ test("the profile switch stays off when notification registration fails and can 
   page,
 }) => {
   const fixture = await mockPush(page);
-  await invite(page, "Profile Notification Retry Guest");
+  await signInGuest(host, page, "Profile Notification Retry Guest");
   await page.goto("/profil");
   const control = page.locator(".notification-control");
   const toggle = control.getByRole("switch", {
@@ -500,7 +417,7 @@ for (const availability of ["denied", "unsupported", "ios"] as const) {
     page,
   }) => {
     await startWelcome();
-    await invite(page, `Notification ${availability} Guest`);
+    await signInGuest(host, page, `Notification ${availability} Guest`);
     if (availability === "denied") await mockPush(page, "denied");
     if (availability === "unsupported")
       await page.addInitScript(() => {
@@ -537,7 +454,9 @@ for (const availability of ["denied", "unsupported", "ios"] as const) {
       expect((await pushState(page)).prompts).toBe(0);
     }
     await page.screenshot({
-      path: `artifacts/notifications/${availability}-mobile.png`,
+      path: test
+        .info()
+        .outputPath("notifications", `${availability}-mobile.png`),
     });
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
     await expect(

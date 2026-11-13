@@ -1,35 +1,22 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
+import { acceptConfirmation } from "./support/confirm";
+import { reconnectRealtime } from "./support/realtime";
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  baseURL,
+  bootstrapHost,
+  invitationToken,
+  invite,
+  mutationHeaders,
+} from "./support/party";
 import { readFileSync } from "node:fs";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 let admin: APIRequestContext;
-
-function tokenFrom(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
-async function invite(name: string) {
-  const response = await admin.post("/api/admin/guests", { data: { name } });
-  expect(response.status()).toBe(201);
-  return response.json() as Promise<{
-    guest: { id: number; name: string };
-    invitationUrl: string;
-  }>;
-}
 
 async function enter(page: Page, url: string) {
   await page.goto(url);
@@ -38,7 +25,9 @@ async function enter(page: Page, url: string) {
 }
 
 async function completedMedia(client: APIRequestContext, id: number) {
-  let job;
+  let job: { status: string; errorCode?: string; photo?: { id: number } } = {
+    status: "queued",
+  };
   await expect
     .poll(
       async () => {
@@ -59,34 +48,7 @@ async function completedMedia(client: APIRequestContext, id: number) {
 }
 
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Hôte de test"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  admin = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await admin.post("/api/invitations/accept", {
-    data: { token: tokenFrom(match[0]) },
-  });
-  expect(accepted.status()).toBe(200);
+  admin = await bootstrapHost("Hôte de test");
 });
 
 test.afterAll(async () => {
@@ -120,8 +82,8 @@ test("a guest can activate once, use the tabs and profile, upload a photo and si
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Camille Test");
-  const token = tokenFrom(invitation.invitationUrl);
+  const invitation = await invite(admin, "Camille Test");
+  const token = invitationToken(invitation.invitationUrl);
   // Reading a preview must not consume the invitation.
   const preview = await page.request.post("/api/invitations/preview", {
     data: { token },
@@ -173,7 +135,7 @@ test("a guest can activate once, use the tabs and profile, upload a photo and si
   await expect(photoTile).toBeVisible();
   await expect(page.locator(".upload-queue")).toHaveCount(0);
   await page.screenshot({
-    path: "test-results/photos-mobile.png",
+    path: test.info().outputPath("photos-mobile.png"),
     fullPage: true,
     animations: "disabled",
     style: "nextjs-portal { visibility: hidden; }",
@@ -210,20 +172,12 @@ test("a guest can activate once, use the tabs and profile, upload a photo and si
   );
   await expect(page.getByLabel("Ton message", { exact: true })).toBeVisible();
   await page.screenshot({
-    path: "test-results/guestbook-mobile.png",
+    path: test.info().outputPath("guestbook-mobile.png"),
     fullPage: true,
     animations: "disabled",
     style: "nextjs-portal { visibility: hidden; }",
     caret: "initial",
   });
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.screenshot({
-    path: "test-results/guestbook-dark-mobile.png",
-    fullPage: true,
-    animations: "disabled",
-    style: "nextjs-portal { visibility: hidden; }",
-  });
-  await page.emulateMedia({ colorScheme: "light" });
 
   await page
     .getByRole("navigation")
@@ -233,7 +187,7 @@ test("a guest can activate once, use the tabs and profile, upload a photo and si
     page.getByRole("heading", { name: "Programme", exact: true }),
   ).toBeVisible();
   await page.screenshot({
-    path: "test-results/programme-mobile.png",
+    path: test.info().outputPath("programme-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -248,7 +202,7 @@ test("a guest can activate once, use the tabs and profile, upload a photo and si
   ).toBeVisible();
   expect((await page.request.get("/api/admin/guests")).status()).toBe(403);
   await page.screenshot({
-    path: "test-results/settings-mobile.png",
+    path: test.info().outputPath("settings-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -264,7 +218,7 @@ test("configured media limits appear in the gallery and block oversized files be
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Taylor Upload Limit Test");
+  const invitation = await invite(admin, "Taylor Upload Limit Test");
   await enter(page, invitation.invitationUrl);
   const response = await page.request.get("/api/photos");
   expect(response.status()).toBe(200);
@@ -308,7 +262,7 @@ test("configured media limits appear in the gallery and block oversized files be
     page.getByRole("button", { name: /^Réessayer l'envoi/ }),
   ).toHaveCount(0);
   await page.screenshot({
-    path: "test-results/media-runtime-limits-mobile.png",
+    path: test.info().outputPath("media-runtime-limits-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -324,7 +278,7 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Queue Navigation Test");
+  const invitation = await invite(admin, "Queue Navigation Test");
   await enter(page, invitation.invitationUrl);
   const image = await page.screenshot({ caret: "initial" });
   let releaseTransfer!: () => void;
@@ -404,7 +358,7 @@ test("media transfers survive tab changes and accepted jobs return after reload"
     ),
   ).toBeVisible();
   await page.screenshot({
-    path: "test-results/upload-queue-mobile.png",
+    path: test.info().outputPath("upload-queue-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -415,14 +369,14 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   await expect(row).toContainText("Enregistrement…");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
-    path: "test-results/upload-queue-desktop.png",
+    path: test.info().outputPath("upload-queue-desktop.png"),
     fullPage: true,
     caret: "initial",
   });
   await completedMedia(page.request, acceptedJob.id);
   showPending = false;
   // The mocked completion becomes visible on an explicit resync, without polling.
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await reconnectRealtime(page);
   await expect(row).toContainText("Ajouté", { timeout: 15_000 });
   await expect(queue.getByRole("progressbar")).toHaveCount(0);
   await queue
@@ -448,7 +402,7 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Upload Notice Test");
+  const invitation = await invite(admin, "Upload Notice Test");
   await enter(page, invitation.invitationUrl);
   await page.clock.install();
   const image = await page.screenshot({ caret: "initial" });
@@ -512,14 +466,11 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
     expect(bannerBounds!.y + bannerBounds!.height).toBeLessThanOrEqual(
       navigationBounds!.y - 8,
     );
-    for (const theme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme: theme });
-      await page.screenshot({
-        path: `artifacts/upload-notice/${theme}-390.png`,
-        style:
-          "*, *::before, *::after { transition: none !important; animation: none !important; } nextjs-portal { visibility: hidden; }",
-      });
-    }
+    await page.screenshot({
+      path: test.info().outputPath("upload-notice-390.png"),
+      style:
+        "*, *::before, *::after { transition: none !important; animation: none !important; } nextjs-portal { visibility: hidden; }",
+    });
     gates[0].resolve();
     const firstJob = await (await accepted).json();
     await expect(queue).toHaveAttribute("data-state", "preparing");
@@ -532,7 +483,7 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
     await expect(queue).not.toContainText("1 fichier ajouté");
     await completedMedia(page.request, firstJob.id);
     preparing = false;
-    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await reconnectRealtime(page);
     await expect(queue).toHaveAttribute("data-state", "complete");
     await expect(queue).toContainText("1 fichier ajouté");
     await expect(queue.getByRole("progressbar")).toHaveCount(0);
@@ -581,9 +532,8 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
     await closeDetails.press("Enter");
     await expect(details).toBeFocused();
     await queue.getByRole("button", { name: "Réessayer", exact: true }).click();
-    await page
-      .getByRole("heading", { level: 1, name: "Médias", exact: true })
-      .click();
+    // Move focus off the retry control; the page title is visually hidden.
+    await page.getByRole("banner").locator("strong").click();
     await expect(queue).toContainText("1 fichier ajouté");
     await expect.poll(() => started).toBe(4);
     await expect(queue).toHaveCount(0);
@@ -597,7 +547,7 @@ test("one upload progress bar counts queued files and realtime receipts without 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Aggregate Upload Progress Test");
+  const invitation = await invite(admin, "Aggregate Upload Progress Test");
   await enter(page, invitation.invitationUrl);
   const image = await page.screenshot({ caret: "initial" });
   const reception = Array.from({ length: 3 }, () =>
@@ -682,7 +632,7 @@ test("one upload progress bar counts queued files and realtime receipts without 
         .toBe(true);
       await expect(bar).toBeVisible();
       await page.screenshot({
-        path: `test-results/upload-progress-${name}.png`,
+        path: test.info().outputPath(`upload-progress-${name}.png`),
         fullPage: true,
         caret: "initial",
       });
@@ -738,7 +688,7 @@ test("one upload progress bar counts queued files and realtime receipts without 
 test("retrying a lost upload response reuses its receipt without duplicating media", async ({
   page,
 }) => {
-  const invitation = await invite("Queue Retry Test");
+  const invitation = await invite(admin, "Queue Retry Test");
   await enter(page, invitation.invitationUrl);
   const image = await page.screenshot({ caret: "initial" });
   const keys: string[] = [];
@@ -805,7 +755,7 @@ test("retrying a lost upload response reuses its receipt without duplicating med
 test("failed preparation uses a new receipt on retry and asks for the file after reload", async ({
   page,
 }) => {
-  const invitation = await invite("Queue Failed Video Test");
+  const invitation = await invite(admin, "Queue Failed Video Test");
   await enter(page, invitation.invitationUrl);
   const keys: string[] = [];
   page.on("request", (request) => {
@@ -875,7 +825,7 @@ test("a guest can upload, play, download and delete a video without loading orig
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Morgan Video Test");
+  const invitation = await invite(admin, "Morgan Video Test");
   await enter(page, invitation.invitationUrl);
   const originals: string[] = [];
   page.on("request", (request) => {
@@ -909,7 +859,7 @@ test("a guest can upload, play, download and delete a video without loading orig
   expect(originals).toEqual([]);
   await expect(page.locator(".upload-queue")).toHaveCount(0);
   await page.screenshot({
-    path: "test-results/media-video-mobile.png",
+    path: test.info().outputPath("media-video-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -967,20 +917,20 @@ test("a guest can upload, play, download and delete a video without loading orig
     readFileSync("tests/fixtures/party-video.mp4"),
   );
   await page.screenshot({
-    path: "test-results/media-player-mobile.png",
+    path: test.info().outputPath("media-player-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
-    path: "test-results/media-player-desktop.png",
+    path: test.info().outputPath("media-player-desktop.png"),
     fullPage: true,
     caret: "initial",
   });
-  page.once("dialog", (confirmation) => confirmation.accept());
   await dialog
     .getByRole("button", { name: "Supprimer le fichier", exact: true })
     .click();
+  await acceptConfirmation(page);
   await expect(dialog).toBeHidden();
   await expect(tile).toHaveCount(0);
   expect((await page.request.get(media.url)).status()).toBe(404);
@@ -994,7 +944,7 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const invitation = await invite("Noémie Anonymous Test");
+  const invitation = await invite(admin, "Noémie Anonymous Test");
   await enter(page, invitation.invitationUrl);
   await page
     .getByRole("navigation")
@@ -1047,7 +997,7 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
   await expect(entry.getByText("Anonyme", { exact: true })).toBeVisible();
   await expect(entry).not.toContainText(invitation.guest.name);
   await page.screenshot({
-    path: "test-results/guestbook-anonymous-mobile.png",
+    path: test.info().outputPath("guestbook-anonymous-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -1059,15 +1009,15 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
-    path: "test-results/guestbook-anonymous-desktop.png",
+    path: test.info().outputPath("guestbook-anonymous-desktop.png"),
     fullPage: true,
     caret: "initial",
   });
-  page.once("dialog", (confirmation) => confirmation.accept());
   await entry.locator(".entry-actions > summary").click();
   await entry
     .getByRole("button", { name: "Supprimer le message anonyme", exact: true })
     .click();
+  await acceptConfirmation(page);
   await expect(entry).toHaveCount(0);
   const remaining = await (await page.request.get("/api/guestbook")).json();
   expect(
@@ -1078,7 +1028,7 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
 test("scheduled secrets stay on the server and revocation protects media", async ({
   page,
 }) => {
-  const invitation = await invite("Alex Test");
+  const invitation = await invite(admin, "Alex Test");
   await enter(page, invitation.invitationUrl);
   const eventResponse = await admin.post("/api/admin/programme", {
     data: {
@@ -1100,7 +1050,7 @@ test("scheduled secrets stay on the server and revocation protects media", async
     page.getByText("Une surprise à découvrir", { exact: true }),
   ).toBeVisible();
   await page.screenshot({
-    path: "test-results/programme-desktop.png",
+    path: test.info().outputPath("programme-desktop.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -1179,7 +1129,7 @@ test("the host can manage party details, named invitations and scheduled events"
     ),
   ).toBeTruthy();
   await page.screenshot({
-    path: "test-results/host-settings-desktop.png",
+    path: test.info().outputPath("host-settings-desktop.png"),
     fullPage: true,
     caret: "initial",
   });

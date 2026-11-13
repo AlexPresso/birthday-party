@@ -1,18 +1,12 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import { bootstrapHost, shareSession } from "./support/party";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 const initialParty = {
   title: "Party settings test",
   location: "Test venue",
@@ -29,44 +23,14 @@ test.use({
 });
 
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Settings Test Host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  const token = new URLSearchParams(new URL(match[0]).hash.slice(1)).get(
-    "token",
-  );
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await host.post("/api/invitations/accept", {
-    data: { token },
-  });
-  expect(accepted.status()).toBe(200);
+  host = await bootstrapHost("Settings Test Host");
   previousParty = await (await host.get("/api/party")).json();
 });
 
 test.beforeEach(async ({ context }) => {
   const saved = await host.patch("/api/admin/party", { data: initialParty });
   expect(saved.status()).toBe(200);
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
 });
 
 test.afterAll(async () => {
@@ -98,6 +62,31 @@ async function returnToSettings(page: Page) {
   await expect(page).toHaveURL(/\/parametres$/);
   await openSettingsSection(page, "party");
 }
+
+// Every party autosave refreshes the server-rendered shell. Refreshes that
+// overlapped used to make the router fetch the next tab and then drop it.
+test("a tab change right after back-to-back party autosaves is not lost", async ({
+  page,
+}) => {
+  await page.goto("/parametres");
+  await openSettingsSection(page, "party");
+  await page
+    .getByLabel("Nom de la fête", { exact: true })
+    .fill("Birthday picnic");
+  await page.getByLabel("Lieu", { exact: true }).fill("Garden test venue");
+  await page
+    .getByLabel("Date de la fête", { exact: true })
+    .fill("2030-06-02T13:45");
+  await page
+    .getByLabel("Fuseau horaire de la fête", { exact: true })
+    .fill("Europe/Paris");
+  await saveParty(page);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Programme", exact: true })
+    .press("Enter");
+  await expect(page).toHaveURL(/\/programme$/);
+});
 
 test("saved party fields remain visible after tab navigation and reload without focusing them", async ({
   page,
@@ -151,7 +140,7 @@ test("saved party fields remain visible after tab navigation and reload without 
   await openSettingsSection(page, "party");
   await expectSavedFields();
   await page.screenshot({
-    path: "test-results/party-settings-mobile.png",
+    path: test.info().outputPath("party-settings-mobile.png"),
     fullPage: true,
     caret: "initial",
   });
@@ -163,7 +152,7 @@ test("saved party fields remain visible after tab navigation and reload without 
   await page.setViewportSize({ width: 1440, height: 1100 });
   await expectSavedFields();
   await page.screenshot({
-    path: "test-results/party-settings-desktop.png",
+    path: test.info().outputPath("party-settings-desktop.png"),
     fullPage: true,
     caret: "initial",
   });

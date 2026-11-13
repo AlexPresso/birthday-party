@@ -1,30 +1,20 @@
+import { test, expect, type APIRequestContext } from "@playwright/test";
 import {
-  test,
-  expect,
-  request,
-  type APIRequestContext,
-} from "@playwright/test";
-import { execFileSync } from "node:child_process";
+  baseURL,
+  bootstrapHost,
+  invitationToken,
+  newClient,
+  shareSession,
+} from "./support/party";
 import type {
   Configuration,
   Party,
 } from "../../frontend/src/features/party/contracts";
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 let host: APIRequestContext;
 
 test.use({ locale: "fr-CH", viewport: { width: 390, height: 844 } });
-
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
 
 function fallbackInvitation(): Configuration["invitation"] {
   return {
@@ -53,39 +43,7 @@ async function saveConfiguration(value: Configuration) {
 }
 
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    [
-      "scripts/backend.mjs",
-      "invite-admin",
-      "--name",
-      "Configuration Test Host",
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await host.post("/api/invitations/accept", {
-    data: { token: invitationToken(match[0]) },
-  });
-  expect(accepted.status()).toBe(200);
+  host = await bootstrapHost("Configuration Test Host");
 });
 
 test.afterAll(async () => {
@@ -94,10 +52,7 @@ test.afterAll(async () => {
 
 test("public configuration excludes upload settings and guests cannot read or change administration", async () => {
   const original = await configuration();
-  const visitor = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
+  const visitor = await newClient();
   try {
     const publicResponse = await visitor.get("/api/config");
     expect(publicResponse.status()).toBe(200);
@@ -168,7 +123,7 @@ test("admin configuration persists and updates invitation, header and upload lim
         })
       ).status(),
     ).toBe(200);
-    await context.addCookies((await host.storageState()).cookies);
+    await shareSession(context, host);
     await page.goto("/parametres");
     const form = page.getByRole("form", { name: "Configuration", exact: true });
     async function saveCurrentSection(expected: Configuration) {
@@ -286,12 +241,12 @@ test("admin configuration persists and updates invitation, header and upload lim
     ).toBe(true);
     await form.scrollIntoViewIfNeeded();
     await page.screenshot({
-      path: "test-results/configuration-mobile.png",
+      path: test.info().outputPath("configuration-mobile.png"),
       fullPage: true,
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({
-      path: "test-results/configuration-desktop.png",
+      path: test.info().outputPath("configuration-desktop.png"),
       fullPage: true,
     });
 
@@ -391,7 +346,7 @@ test("pending autosaves retain newer edits and preserve settings from other page
     await route.fulfill({ response });
   });
   try {
-    await context.addCookies((await host.storageState()).cookies);
+    await shareSession(context, host);
     await page.goto("/parametres?section=party");
     const form = page.getByRole("form", { name: "Configuration", exact: true });
     const age = form.getByLabel("Âge", { exact: true });
@@ -451,7 +406,7 @@ test("invalid and failed autosaves retain the configuration draft when returning
     return route.continue();
   });
   try {
-    await context.addCookies((await host.storageState()).cookies);
+    await shareSession(context, host);
     await page.goto("/parametres?section=party");
     const age = page.getByLabel("Âge", { exact: true });
     const back = page.getByRole("button", {

@@ -1,82 +1,23 @@
-import {
-  test,
-  expect,
-  request,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import { openSettingsSection } from "./settings-navigation";
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import { bootstrapHost, shareSession, signInGuest } from "./support/party";
+import { openSettingsSection } from "./support/settings";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 let host: APIRequestContext;
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
 
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Navigation Test Host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await host.post("/api/invitations/accept", {
-    data: { token: invitationToken(match[0]) },
-  });
-  expect(accepted.status()).toBe(200);
+  host = await bootstrapHost("Navigation Test Host");
 });
 
 test.afterAll(async () => {
   await host?.dispose();
 });
 
-async function enterGuest(page: Page, name: string) {
-  const created = await host.post("/api/admin/guests", { data: { name } });
-  expect(created.status()).toBe(201);
-  const invitation = (await created.json()) as {
-    guest: { id: number };
-    invitationUrl: string;
-  };
-  const accepted = await page.request.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: invitationToken(invitation.invitationUrl) },
-  });
-  expect(accepted.status()).toBe(200);
-  return invitation.guest;
-}
-
 test("guests open their profile from the final navigation icon and cannot access administration", async ({
   page,
 }) => {
-  await enterGuest(page, "Profile Navigation Guest");
+  await signInGuest(host, page, "Profile Navigation Guest");
   await page.goto("/photos");
   const navigation = page.getByRole("navigation");
   await expect(navigation.getByRole("link")).toHaveCount(4);
@@ -125,7 +66,7 @@ test("administrators have separate settings and personal profile controls", asyn
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.goto("/photos");
   const navigation = page.getByRole("navigation");
   await expect(navigation.getByRole("link")).toHaveCount(5);
@@ -155,15 +96,12 @@ test("administrators have separate settings and personal profile controls", asyn
   await expect(
     page.locator('a[href="/parametres?section=welcome"]'),
   ).toBeVisible();
-  for (const colorScheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme });
-    await page.screenshot({
-      path: `test-results/settings-${colorScheme}-mobile.png`,
-      fullPage: true,
-      animations: "disabled",
-      style: "nextjs-portal { visibility: hidden; }",
-    });
-  }
+  await page.screenshot({
+    path: test.info().outputPath("settings-mobile.png"),
+    fullPage: true,
+    animations: "disabled",
+    style: "nextjs-portal { visibility: hidden; }",
+  });
   await expect(page.locator(".profile-photo-editor")).toHaveCount(0);
   await expect(page.locator(".notification-control")).toHaveCount(0);
   await expect(
@@ -177,15 +115,12 @@ test("administrators have separate settings and personal profile controls", asyn
     page.getByRole("button", { name: "Se déconnecter", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".settings-page, .welcome-admin")).toHaveCount(0);
-  for (const colorScheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme });
-    await page.screenshot({
-      path: `test-results/profile-${colorScheme}-mobile.png`,
-      fullPage: true,
-      animations: "disabled",
-      style: "nextjs-portal { visibility: hidden; }",
-    });
-  }
+  await page.screenshot({
+    path: test.info().outputPath("profile-mobile.png"),
+    fullPage: true,
+    animations: "disabled",
+    style: "nextjs-portal { visibility: hidden; }",
+  });
   await expect(
     navigation.getByRole("link", { name: "Paramètres", exact: true }),
   ).toBeVisible();
@@ -195,7 +130,7 @@ test("grouped settings save edits and preserve creation drafts through browser h
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.goto("/parametres");
   for (const name of ["La fête", "Invités et accès", "Photos et vidéos"]) {
     await expect(
@@ -236,27 +171,21 @@ test("grouped settings save edits and preserve creation drafts through browser h
   ).toBeVisible();
   await expect(page.locator(".settings-page details")).toHaveCount(0);
 
-  for (const colorScheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme });
+  await page.screenshot({
+    path: test.info().outputPath("settings-autosave", "menu-390.png"),
+    fullPage: true,
+    animations: "disabled",
+    style: "nextjs-portal { visibility: hidden; }",
+  });
+
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
     await page.screenshot({
-      path: `artifacts/settings-autosave/menu-${colorScheme}-390.png`,
+      path: test.info().outputPath(`settings-menu-${width}.png`),
       fullPage: true,
       animations: "disabled",
       style: "nextjs-portal { visibility: hidden; }",
     });
-  }
-
-  for (const width of [390, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const colorScheme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme });
-      await page.screenshot({
-        path: `test-results/settings-menu-${colorScheme}-${width}.png`,
-        fullPage: true,
-        animations: "disabled",
-        style: "nextjs-portal { visibility: hidden; }",
-      });
-    }
   }
 
   const partyLink = page.locator('a[href="/parametres?section=party"]');
@@ -297,33 +226,27 @@ test("grouped settings save edits and preserve creation drafts through browser h
   await openSettingsSection(page, "party");
   await expect(partyName).toHaveValue("Saved settings navigation title");
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const colorScheme of ["light", "dark"] as const) {
-    await page.emulateMedia({ colorScheme });
+  await page.screenshot({
+    path: test.info().outputPath("settings-autosave", "party-390.png"),
+    fullPage: true,
+    animations: "disabled",
+    caret: "hide",
+    style: "nextjs-portal { visibility: hidden; }",
+  });
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
     await page.screenshot({
-      path: `artifacts/settings-autosave/party-${colorScheme}-390.png`,
+      path: test.info().outputPath(`settings-subpage-${width}.png`),
       fullPage: true,
       animations: "disabled",
       caret: "hide",
       style: "nextjs-portal { visibility: hidden; }",
     });
-  }
-  for (const width of [390, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const colorScheme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme });
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= innerWidth,
-        ),
-      ).toBe(true);
-      await page.screenshot({
-        path: `test-results/settings-subpage-${colorScheme}-${width}.png`,
-        fullPage: true,
-        animations: "disabled",
-        caret: "hide",
-        style: "nextjs-portal { visibility: hidden; }",
-      });
-    }
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -346,7 +269,7 @@ test("desktop settings retain their sidebar, save section changes and preserve d
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.setViewportSize({ width: 1440, height: 1000 });
   const originalParty = await (await host.get("/api/party")).json();
   try {
@@ -402,15 +325,12 @@ test("desktop settings retain their sidebar, save section changes and preserve d
     await expect(menu).toBeVisible();
     await expect(draft).toHaveValue("Desktop unsent guest draft");
     await expect(page.locator(".settings-screen[data-leaving]")).toHaveCount(0);
-    for (const colorScheme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme });
-      await page.screenshot({
-        path: `artifacts/settings-sidebar-${colorScheme}.png`,
-        fullPage: true,
-        animations: "disabled",
-        style: "nextjs-portal { visibility: hidden; }",
-      });
-    }
+    await page.screenshot({
+      path: test.info().outputPath("settings-sidebar.png"),
+      fullPage: true,
+      animations: "disabled",
+      style: "nextjs-portal { visibility: hidden; }",
+    });
     await page.goto("/parametres?section=welcome");
     await expect(page.locator("#welcome-editor")).toBeVisible();
     await expect(menu.locator('[aria-current="page"]')).toHaveAttribute(
@@ -428,17 +348,23 @@ test("desktop settings retain their sidebar, save section changes and preserve d
   }
 });
 
-test("settings pages slide fully left when opened and right when returning", async ({
+type SettingsSlide = {
+  screen: string;
+  from: number;
+  to: number;
+  fades: boolean;
+  duration: number;
+};
+
+test("a settings page slides in across the screen while the list drifts back and fades, and returning reverses it", async ({
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/parametres");
   await page.evaluate(() => {
-    const target = window as Window & {
-      settingsSlides?: { screen: string; transforms: string[] }[];
-    };
+    const target = window as Window & { settingsSlides?: SettingsSlide[] };
     target.settingsSlides = [];
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (keyframes, options) {
@@ -448,11 +374,19 @@ test("settings pages slide fully left when opened and right when returning", asy
         this.matches(".settings-screen") &&
         animation.effect instanceof KeyframeEffect
       ) {
+        const frames = animation.effect.getKeyframes();
+        // Horizontal offsets in pixels, whatever notation the keyframes use.
+        const offset = (frame: ComputedKeyframe) =>
+          Math.round(new DOMMatrixReadOnly(String(frame.transform)).e * 100) /
+          100;
         target.settingsSlides!.push({
           screen: this.dataset.settingsScreen!,
-          transforms: animation.effect
-            .getKeyframes()
-            .map((frame) => String(frame.transform)),
+          from: offset(frames[0]),
+          to: offset(frames[frames.length - 1]),
+          fades:
+            Number(frames[0].opacity) === 1 &&
+            Number(frames[frames.length - 1].opacity) === 0,
+          duration: Number(animation.effect.getTiming().duration),
         });
       }
       return animation;
@@ -461,18 +395,18 @@ test("settings pages slide fully left when opened and right when returning", asy
   async function slides() {
     return page.evaluate(
       () =>
-        (
-          window as Window & {
-            settingsSlides?: { screen: string; transforms: string[] }[];
-          }
-        ).settingsSlides,
+        (window as Window & { settingsSlides?: SettingsSlide[] })
+          .settingsSlides,
     );
   }
+  const width = page.viewportSize()!.width;
+  const duration = 380;
 
   await openSettingsSection(page, "party");
-  const forward = [
-    { screen: "party", transforms: ["translateX(100%)", "translateX(0px)"] },
-    { screen: "index", transforms: ["translateX(0px)", "translateX(-100%)"] },
+  // The section crosses the whole screen; the list drifts a third as far.
+  const forward: SettingsSlide[] = [
+    { screen: "party", from: width, to: 0, fades: false, duration },
+    { screen: "index", from: 0, to: -0.3 * width, fades: true, duration },
   ];
   await expect.poll(slides).toEqual(forward);
   await expect(page.locator('[data-settings-screen="index"]')).toBeHidden();
@@ -485,8 +419,8 @@ test("settings pages slide fully left when opened and right when returning", asy
     .poll(slides)
     .toEqual([
       ...forward,
-      { screen: "index", transforms: ["translateX(-100%)", "translateX(0px)"] },
-      { screen: "party", transforms: ["translateX(0px)", "translateX(100%)"] },
+      { screen: "index", from: -width, to: 0, fades: false, duration },
+      { screen: "party", from: 0, to: 0.3 * width, fades: true, duration },
     ]);
   await expect(page.locator('[data-settings-screen="party"]')).toBeHidden();
 });
@@ -495,7 +429,7 @@ test("settings navigation respects reduced motion", async ({
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/parametres");
   await page.evaluate(() => {
@@ -531,46 +465,45 @@ test("settings navigation respects reduced motion", async ({
   ).toBe(0);
 });
 
-test("icon navigation follows the system theme on phones and desktops", async ({
+test("icon navigation keeps the dark theme and its touch targets on phones and desktops", async ({
   page,
 }) => {
-  await enterGuest(page, "Theme Navigation Guest");
+  await signInGuest(host, page, "Theme Navigation Guest");
+  // The single dark theme does not follow a light device preference.
+  await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/photos");
   const navigation = page.getByRole("navigation");
   await expect(navigation).toBeVisible();
 
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const colorScheme of ["light", "dark"] as const) {
-      await page.emulateMedia({ colorScheme });
-      await expect(page.locator("body")).toHaveCSS(
-        "background-color",
-        "rgb(16, 15, 14)",
-      );
-      await expect(
-        navigation.getByRole("link", { name: "Médias", exact: true }),
-      ).toHaveAttribute("aria-current", "page");
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= window.innerWidth,
-        ),
-      ).toBe(true);
-      const bounds = await navigation.boundingBox();
-      expect(bounds).not.toBeNull();
-      expect(bounds!.y).toBeGreaterThan(780);
-      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(900);
-      for (const link of await navigation.getByRole("link").all()) {
-        const target = await link.boundingBox();
-        expect(target!.width).toBeGreaterThanOrEqual(44);
-        expect(target!.height).toBeGreaterThanOrEqual(44);
-      }
-      await page.screenshot({
-        path: `test-results/navigation-${colorScheme}-${width}.png`,
-        fullPage: true,
-        animations: "disabled",
-        style: "nextjs-portal { visibility: hidden; }",
-      });
+    await expect(page.locator("body")).toHaveCSS(
+      "background-color",
+      "rgb(16, 15, 14)",
+    );
+    await expect(
+      navigation.getByRole("link", { name: "Médias", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const bounds = await navigation.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.y).toBeGreaterThan(780);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(900);
+    for (const link of await navigation.getByRole("link").all()) {
+      const target = await link.boundingBox();
+      expect(target!.width).toBeGreaterThanOrEqual(44);
+      expect(target!.height).toBeGreaterThanOrEqual(44);
     }
+    await page.screenshot({
+      path: test.info().outputPath(`navigation-${width}.png`),
+      fullPage: true,
+      animations: "disabled",
+      style: "nextjs-portal { visibility: hidden; }",
+    });
   }
   await navigation
     .getByRole("link", { name: "Profil: Theme Navigation Guest", exact: true })
@@ -581,7 +514,7 @@ test("icon navigation follows the system theme on phones and desktops", async ({
 test("a slow tab shows immediate feedback and does not block another tab", async ({
   page,
 }) => {
-  await enterGuest(page, "Pending Navigation Guest");
+  await signInGuest(host, page, "Pending Navigation Guest");
   let releaseResponse!: () => void;
   const responseHeld = new Promise<void>((resolve) => {
     releaseResponse = resolve;
@@ -630,14 +563,14 @@ test("a slow tab shows immediate feedback and does not block another tab", async
       page.getByRole("heading", { name: "Programme", exact: true }),
     ).toHaveCount(0);
     await page.screenshot({
-      path: "test-results/navigation-feedback-mobile.png",
+      path: test.info().outputPath("navigation-feedback-mobile.png"),
       fullPage: true,
       caret: "initial",
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await expectNavigationFeedback();
     await page.screenshot({
-      path: "test-results/navigation-feedback-desktop.png",
+      path: test.info().outputPath("navigation-feedback-desktop.png"),
       fullPage: true,
       caret: "initial",
     });
@@ -657,7 +590,7 @@ test("a slow tab shows immediate feedback and does not block another tab", async
 test("returning to the programme fetches host changes without a manual refresh", async ({
   page,
 }) => {
-  await enterGuest(page, "Fresh Programme Guest");
+  await signInGuest(host, page, "Fresh Programme Guest");
   const initialEvent = {
     title: "Navigation test gathering",
     description: "Original gathering details",
@@ -723,7 +656,7 @@ test("a revoked guest returns to the invitation when revisiting a tab without re
       await socket.close({ code: 1013, reason: "Connection unavailable" });
     },
   );
-  const guest = await enterGuest(page, "Revoked Navigation Guest");
+  const guest = await signInGuest(host, page, "Revoked Navigation Guest");
   await page.goto("/programme");
   await expect(
     page.getByRole("heading", { name: "Programme", exact: true }),
