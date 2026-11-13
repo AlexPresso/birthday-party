@@ -53,7 +53,7 @@ func (s *Store) CreateGuest(ctx context.Context, name string, issue func() (iden
 	if count >= limit {
 		return identity.Guest{}, identity.ErrLimitReached
 	}
-	guest := identity.Guest{Name: name, Role: "guest", Active: true}
+	guest := identity.Guest{Name: name, Role: identity.RoleGuest, Active: true}
 	if err := tx.QueryRowContext(ctx, "INSERT INTO guests(name,role) VALUES($1,'guest') RETURNING id", name).Scan(&guest.ID); err != nil {
 		return identity.Guest{}, err
 	}
@@ -77,7 +77,7 @@ func (s *Store) Revoke(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, "UPDATE guests SET active=0 WHERE id=$1", id)
+	result, err := tx.ExecContext(ctx, "UPDATE guests SET active=FALSE WHERE id=$1", id)
 	if err := changed(result, err); err != nil {
 		return err
 	}

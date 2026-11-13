@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: {
       capable: true,
       title: title || t("birthday.fallback"),
-      statusBarStyle: "default",
+      statusBarStyle: "black-translucent",
     },
     icons: {
       icon: "/icons/app.svg",
@@ -28,11 +28,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf8f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#131016" },
-  ],
-  colorScheme: "light dark",
+  viewportFit: "cover",
+  themeColor: "#100f0e",
+  colorScheme: "dark",
 };
 
 export default async function RootLayout({
@@ -46,7 +44,14 @@ export default async function RootLayout({
       <head>
         <link
           rel="preload"
-          href="/fonts/inter-latin.woff2"
+          href="/fonts/figtree-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/unbounded-latin.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"

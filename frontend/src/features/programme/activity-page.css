@@ -1,0 +1,20 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  /* The way back to the programme, shared by the activity pages. */
+  .activity-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    margin: -12px 0 16px;
+    font-weight: 600;
+  }
+
+  @media (min-width: 960px) {
+    .activity-back {
+      margin-bottom: 22px;
+    }
+  }
+}

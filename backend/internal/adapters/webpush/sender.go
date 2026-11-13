@@ -61,8 +61,8 @@ func (s *Sender) Send(ctx context.Context, pending notifications.Pending, ttl ti
 		return notifications.DiscardDelivery
 	}
 	payload, err := json.Marshal(struct {
-		Type   string `json:"type"`
-		Locale string `json:"locale"`
+		Type   notifications.Kind `json:"type"`
+		Locale string             `json:"locale"`
 	}{Type: pending.Kind, Locale: pending.Locale})
 	if err != nil {
 		return notifications.DiscardDelivery
@@ -81,12 +81,23 @@ func (s *Sender) Send(ctx context.Context, pending notifications.Pending, ttl ti
 	if err != nil || response == nil {
 		return notifications.RetryDelivery
 	}
-	status := response.StatusCode
-	if status == http.StatusNotFound || status == http.StatusGone {
+	return deliveryFor(response.StatusCode)
+}
+
+// deliveryFor classifies a push service response. Only a 2xx status confirms
+// acceptance, and 404 or 410 mean the subscription no longer exists. Redirects
+// are never followed, so repeating the request cannot succeed. Every other
+// status, including a rejected request, is a failed attempt; the outbox bounds
+// how often and how long those are retried before the message is dropped.
+func deliveryFor(status int) notifications.Delivery {
+	switch {
+	case status >= 200 && status < 300:
+		return notifications.Delivered
+	case status == http.StatusNotFound || status == http.StatusGone:
 		return notifications.RemoveSubscription
-	}
-	if status == 0 || status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || status >= 500 {
+	case status >= 300 && status < 400:
+		return notifications.DiscardDelivery
+	default:
 		return notifications.RetryDelivery
 	}
-	return notifications.Delivered
 }

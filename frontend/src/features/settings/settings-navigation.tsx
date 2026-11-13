@@ -102,9 +102,7 @@ function SettingsPages({
   const { t } = useI18n();
   const searchParams = useSearchParams();
   const section = searchParams.get("section");
-  const requested =
-    pages.find((page) => page.id === (section === "age" ? "party" : section))
-      ?.id ?? "index";
+  const requested = pages.find((page) => page.id === section)?.id ?? "index";
   const [active, setActive] = useState<SettingsSection | "index">(requested);
   const desktop = useSyncExternalStore(
     subscribeDesktop,
@@ -206,10 +204,11 @@ function SettingsPages({
     );
     if (!incoming || !outgoing) return;
     const returning = selected === "index";
-    window.scrollTo({
-      top: returning ? (window.history.state?.settingsScroll ?? 0) : 0,
-      behavior: "instant",
-    });
+    const scrolledBefore = window.scrollY;
+    const scrollTarget = returning
+      ? (window.history.state?.settingsScroll ?? 0)
+      : 0;
+    window.scrollTo({ top: scrollTarget, behavior: "instant" });
     const focus = returning
       ? incoming.querySelector<HTMLElement>(
           `a[href="/parametres?section=${from}"]`,
@@ -226,27 +225,29 @@ function SettingsPages({
     // inert and hidden from assistive technology while the new screen is active.
     outgoing.hidden = false;
     outgoing.dataset.leaving = "true";
-    const options = { duration: 300, easing: "cubic-bezier(0.22, 0.68, 0, 1)" };
+    // The page has just scrolled; hold the departing screen where it was.
+    outgoing.style.top = `${scrollTarget - scrolledBefore}px`;
+    // The new screen crosses the whole viewport while the old one drifts a
+    // third of the way and fades, so the two never read as overlapping pages.
+    const distance = window.innerWidth * (returning ? -1 : 1);
+    const options = { duration: 380, easing: "cubic-bezier(0.32, 0.72, 0, 1)" };
     const entrance = incoming.animate(
       [
-        {
-          transform: `translateX(${returning ? "-100%" : "100%"})`,
-        },
+        { transform: `translateX(${distance}px)` },
         { transform: "translateX(0)" },
       ],
       options,
     );
     const departure = outgoing.animate(
       [
-        { transform: "translateX(0)" },
-        {
-          transform: `translateX(${returning ? "100%" : "-100%"})`,
-        },
+        { transform: "translateX(0)", opacity: 1 },
+        { transform: `translateX(${distance * -0.3}px)`, opacity: 0 },
       ],
       options,
     );
     function finish() {
       outgoing!.hidden = outgoing!.inert;
+      outgoing!.style.top = "";
       delete outgoing!.dataset.leaving;
     }
     departure.onfinish = finish;
@@ -277,17 +278,18 @@ function SettingsPages({
           active={selected === page.id}
           id={page.id}
         >
+          {/* Outside the heading so it can stay pinned while the title scrolls away. */}
+          <button
+            type="button"
+            className="icon-button settings-back"
+            onClick={back}
+            disabled={leaving || requested !== active}
+            aria-label={t("settings.back")}
+            title={t("settings.back")}
+          >
+            <ArrowLeft size={22} aria-hidden="true" />
+          </button>
           <header className="settings-subpage-heading">
-            <button
-              type="button"
-              className="icon-button settings-back"
-              onClick={back}
-              disabled={leaving || requested !== active}
-              aria-label={t("settings.back")}
-              title={t("settings.back")}
-            >
-              <ArrowLeft size={24} aria-hidden="true" />
-            </button>
             <PanelHeading tabIndex={-1} data-settings-title>
               {page.title}
             </PanelHeading>

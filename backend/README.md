@@ -23,6 +23,7 @@ on SQL, HTTP handlers, media libraries or infrastructure implementations.
   operations, including authorization rechecks and the established lock order.
 - `internal/adapters/avatar` normalizes profile images.
 - `internal/adapters/mediafiles` owns private media storage and image/video processing.
+- `internal/adapters/preview` encodes thumbnails and avatars as opaque JPEGs.
 - `internal/adapters/webpush` delivers notifications through the restricted
   HTTPS transport in `internal/adapters/pushtransport`.
 
@@ -31,9 +32,10 @@ transactions remain inside adapters; the core receives no SQL transaction handle
 Welcome transitions and notification enqueueing share one transaction through a
 callback between the two PostgreSQL adapters. Realtime signals follow commits.
 
-Migrations remain in `internal/app/migrations` with their existing checksums.
-Database bootstrap and the legacy SQLite import remain at the outer application
-boundary. See [code organization](../docs/architecture.md) for ownership, dependency
+The schema lives in `internal/app/migrations`, starting from one baseline file.
+Database bootstrap remains at the outer application boundary. `internal/timestamp`
+and `internal/locale` hold the two conventions every feature shares: how instants
+are written and which languages are supported. See [code organization](../docs/architecture.md) for ownership, dependency
 rules and the testing strategy.
 
 Go changes use the project-local [Go Style Guide](../.agents/skills/go-style-guide/SKILL.md).
@@ -42,7 +44,7 @@ architecture. The skill's upstream commit and license are included in the reposi
 
 ## Run
 
-From `backend/`, with Go 1.26 or newer and `DATABASE_URL` pointing to PostgreSQL:
+From `backend/`, with Go 1.27.2 or newer and `DATABASE_URL` pointing to PostgreSQL:
 
 Video uploads also require `ffmpeg` and `ffprobe` on `PATH` for validation and
 JPEG thumbnails. The Docker image includes them. For local
@@ -64,19 +66,19 @@ From the repository root, the Node launcher also provides `npm run dev` and
 Environment variables are read from the process, not automatically from `.env`.
 See [.env.example](.env.example). Defaults are:
 
-| Variable                 | Default                     | Purpose                                                                                    |
-| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------ |
-| `LISTEN_ADDR`            | `127.0.0.1:8080`            | API listening address                                                                      |
-| `PUBLIC_URL`             | `http://localhost:3000`     | Exact browser origin and invitation base URL                                               |
-| `VAPID_SUBJECT`          | HTTPS `PUBLIC_URL`          | Optional Web Push contact URI (`mailto:` or HTTPS); local HTTP uses a reserved placeholder |
-| `DATABASE_URL`           | Required                    | PostgreSQL connection URL; standard PG environment variables are also supported            |
-| `DATA_DIR`               | `./data`                    | Private media, thumbnails and durable pending inputs                                       |
-| `COOKIE_SECURE`          | Determined by `PUBLIC_URL`  | HTTPS requires `true`; local HTTP uses `false`                                             |
-| `PRINT_ADMIN_INVITATION` | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup                                   |
-| `MAX_IMAGE_SIZE_MB`      | `15`                        | Initial image upload limit in MiB, integer 1–1024, imported once                            |
-| `MAX_VIDEO_SIZE_MB`      | `100`                       | Initial video upload limit in MiB, integer 1–1024, imported once                            |
-| `BIRTHDAY_AGE`           | `30`                        | Initial birthday age, integer 1–150, imported once                                         |
-| `INVITATION_TITLE`, `INVITATION_DESCRIPTION` | Localized defaults | Initial public invitation text; optional `_EN`, `_FR`, `_DE`, `_IT`, `_ES` overrides |
+| Variable                                     | Default                     | Purpose                                                                                      |
+| -------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
+| `LISTEN_ADDR`                                | `127.0.0.1:8080`            | API listening address                                                                        |
+| `PUBLIC_URL`                                 | `http://localhost:3000`     | Exact browser origin and invitation base URL                                                 |
+| `VAPID_SUBJECT`                              | HTTPS `PUBLIC_URL`          | Optional Web Push contact URI (`mailto:` or HTTPS); local HTTP uses a reserved placeholder   |
+| `DATABASE_URL`                               | Required                    | PostgreSQL connection URL; standard PG environment variables are also supported              |
+| `DATA_DIR`                                   | `./data`                    | Private media, thumbnails and durable pending inputs                                         |
+| `COOKIE_SECURE`                              | Derived from `PUBLIC_URL`   | Optional: `true` for an HTTPS `PUBLIC_URL`, `false` for HTTP; `false` with HTTPS is rejected |
+| `PRINT_ADMIN_INVITATION`                     | `false` (`true` in Compose) | Print a fresh administrator invitation at server startup                                     |
+| `MAX_IMAGE_SIZE_MB`                          | `15`                        | Initial image upload limit in MiB, integer 1–1024, imported once                             |
+| `MAX_VIDEO_SIZE_MB`                          | `100`                       | Initial video upload limit in MiB, integer 1–1024, imported once                             |
+| `BIRTHDAY_AGE`                               | `30`                        | Initial birthday age, integer 1–150, imported once                                           |
+| `INVITATION_TITLE`, `INVITATION_DESCRIPTION` | Localized defaults          | Initial public invitation text; optional `_EN`, `_FR`, `_DE`, `_IT`, `_ES` overrides         |
 
 On initial import, missing or empty upload limits use their defaults and invalid
 values stop startup. Once settings are saved, legacy environment values are ignored.
@@ -138,8 +140,6 @@ HTTP request logs never include these tokens.
   and media uploads. Titles and texts are optional widget types, with limits of
   120 and 1000 Unicode code points respectively. Multiple upload widgets can
   choose separate destinations; at most one profile editor is allowed per step.
-  Migration 0007 preserves legacy content/order/progress and increments the
-  revision for converted steps. Previously accepted uploads still finish.
 - Only while a `profile_photo` widget is current may a waiting guest read their
   own profile and save, remove or view their photo. Other guests' avatars and
   party content remain locked.
@@ -150,7 +150,7 @@ HTTP request logs never include these tokens.
   own queue, without browsing media. Acceptance rechecks the guest progress revision
   and widget index and captures its destination; accepted jobs finish there after
   the step changes. Retries cannot switch widgets, including ones sharing a destination.
-  Migration 0008 stores guest progress and assigns separate revision tokens, so
+  Guest progress has its own revision tokens, so
   host unlocks do not invalidate transfers. Guest navigation or restarting the
   welcome invalidates the previous context; already accepted jobs keep processing.
 - The `enable_notifications` widget has no settings and appears at most once per
@@ -158,11 +158,12 @@ HTTP request logs never include these tokens.
   step; full-access guests and administrators can also subscribe from Profile.
   Configuration, own status and removal require a session but no full-app access.
   Permission is checked again before saving, and each guest has at most 10 devices.
-  Migration 0009 stores VAPID keys, session-bound subscriptions and a durable
+  PostgreSQL stores VAPID keys, session-bound subscriptions and a durable
   outbox. Keys are generated once, so a restart does not invalidate subscriptions.
   Host unlock/open commands queue a generic notification without waiting for an
   external push service. A separate worker coalesces pending updates and retries
-  transient failures within a bounded window. Logout/revocation removes session
+  failed attempts within a bounded window; only a 2xx answer counts as delivered.
+  Logout/revocation removes session
   subscriptions; delivery also checks guest activity and session expiry.
   Only event type and supported locale enter the payload. The service worker
   translates generic text and opens `/attente`; it never receives private content.
@@ -178,10 +179,14 @@ HTTP request logs never include these tokens.
 - Once full access is open, active guests can see shared photos, videos and
   messages. Only their author or a host can delete them, subject to category
   visibility. Every file request, including thumbnails, checks the current session,
-  welcome access and category visibility; private media responses are not cached.
+  welcome access and category visibility. Photos, thumbnails, videos and avatars
+  are sent with `Cache-Control: private, no-cache` and a strong `ETag`: a browser
+  may keep them but revalidates every use, and a `304` is only answered after the
+  same checks as a full response. JSON responses stay `no-store`.
 - Guests can save or remove their own profile photo. JPEG, PNG and WebP inputs
-  use the configured image byte limit and 40-megapixel limit. A single bounded
-  processor applies orientation, center-crops and stores a metadata-free 256×256
+  use the configured image byte limit and 40-megapixel limit. The upload is
+  received under the shared reception limit; then a single bounded
+  decoder applies orientation, center-crops and stores a metadata-free 256×256
   JPEG (at most 128 KiB) in PostgreSQL; the original is discarded. Replacements
   are atomic, and versioned image URLs require current session and welcome access.
   Anonymous guestbook posts never expose a profile photo or other author details.
@@ -197,13 +202,24 @@ HTTP request logs never include these tokens.
   Confirmed invalid uploads fail and discard input; submitting the file again
   uses a new upload ID. Infrastructure failures retain input and retry, including
   missing video tools, cancellation and storage failures. Unknown video command
-  failures also retry conservatively rather than risk losing the original;
-  these jobs remain queued until processing succeeds or the cause is resolved.
-  Retrying jobs go behind older waiting jobs so one failure does not prevent
-  other guests' media from being processed.
+  failures also retry conservatively rather than risk losing the original.
+  Retries wait 30 seconds, then 2, 5 and 15 minutes. After five attempts the job
+  fails with `video_processing_failed` or `photo_upload_failed` and its input is
+  discarded, so one file cannot occupy the workers forever. A waiting retry
+  goes behind other jobs so one failure does not prevent other guests' media
+  from being processed.
 - Startup recovers interrupted processing. A dedicated PostgreSQL advisory lock
   permits one media-worker process per application schema; CLI invitation commands
   do not start workers. Files remain on one persistent local filesystem.
+  Workers are woken when a request commits work and otherwise check their queue
+  every five seconds. A database error is logged and retried with a jittered
+  delay of up to 30 seconds; only losing the advisory-lock connection stops the
+  process, because another process may then own the queues.
+- Ordinary requests have 30 seconds to arrive and 60 seconds to be answered.
+  Uploads and media downloads replace those deadlines with a two-minute allowance
+  plus one second per 64 KiB, enough for a 1024 MiB video on a slow connection.
+  PostgreSQL connections limit statements to 30 seconds, lock waits to 10 seconds
+  and idle transactions to 60 seconds.
 - Thumbnails are JPEG, at most 720px on the longest side. Phone EXIF orientation is
   applied. Originals are retained unchanged, including embedded metadata, and
   remain accessible only to authenticated guests with access to their category.
@@ -224,19 +240,17 @@ HTTP request logs never include these tokens.
   photo/video originals and their thumbnails. Both share permissions, survive
   recovery and are deleted together. Lists are paginated
   at 24 items by default, maximum 48. Hosts can manage up to 500 guest identities
-  and 200 programme entries. These are initial explicit bounds, not performance
-  claims.
-- PostgreSQL migrations are embedded SQL files in `internal/app/migrations`.
+  and 200 programme entries. A vote offers at most 200 options, guests' write-ins
+  included. These are initial explicit bounds, not performance claims.
+- PostgreSQL migrations are embedded SQL files in `internal/app/migrations`,
+  starting with `0001_baseline.sql`, which creates the initial schema. Later files
+  change it: `0002_vote_options.sql` gives votes their options and write-ins.
   Startup validates names and checksums and applies pending files transactionally
   under an advisory lock. Add the next `NNNN_description.sql` for every schema
-  change; never edit an applied migration. See [database changes](../docs/database.md).
-- Startup imports an existing `DATA_DIR/birthday.sqlite` into an empty PostgreSQL
-  database once, preserving identifiers, tokens, anonymity and media references.
-  The SQLite source is read-only and kept intact. An occupied destination without
-  an import marker stops startup rather than merging two datasets implicitly.
+  change; never edit an applied migration. A database created before the baseline
+  must be recreated. See [database changes](../docs/database.md).
 - Guestbook posts can be anonymous. Their owner remains in PostgreSQL for deletion
   permissions, but no API response includes that identity, even for hosts.
-  Legacy named entries retain their attribution when imported.
 - Dates are normalized to UTC. The party starts with `Europe/Zurich` as its
   explicit, editable IANA timezone and an empty title on new databases. Existing
   titles remain unchanged; the frontend supplies a localized title when needed.

@@ -39,6 +39,9 @@ func testApp(t *testing.T) *App {
 	return a
 }
 
+// stamp renders an instant the way API clients send and receive it.
+func stamp(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+
 func request(t *testing.T, a *App, method, path string, value any, cookie *http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
 	var body io.Reader

@@ -4,6 +4,11 @@ The application has one Next.js frontend and one Go service. Go owns persistence
 authorization and business rules. Next.js renders pages and manages browser
 interactions. The public contract remains in [api.md](api.md).
 
+Browsers use one origin. In local development and Compose, Next.js proxies
+`/api/*` to Go. In production on Kubernetes, the Helm chart's Ingress routes
+`/api`, including uploads and the realtime WebSocket, straight to the Go Service;
+Next.js still calls Go server-side through `API_INTERNAL_URL`.
+
 ## Frontend
 
 `frontend/src/app` contains routes, layouts and server rendering entry points.
@@ -73,13 +78,17 @@ SQL drivers, HTTP handlers, image libraries or FFmpeg:
 | `party`         | Party details, timezone validation and date normalization                 |
 | `media`         | Gallery permissions, upload destinations and durable processing workflows |
 | `notifications` | Subscription validation and durable delivery decisions                    |
+| `timestamp`     | The one text format for instants exchanged with the API                   |
+| `locale`        | The supported interface languages                                         |
 
 The adapters provide the concrete infrastructure:
 
 | Location                               | Responsibility                                                      |
 | -------------------------------------- | ------------------------------------------------------------------- |
 | `internal/adapters/postgres/<feature>` | SQL, row/advisory locks and complete atomic persistence operations  |
+| `internal/adapters/postgres/access`    | Also the shared "lock the guest and require a live session" helpers |
 | `internal/adapters/avatar`             | Bounded profile image decoding and normalization                    |
+| `internal/adapters/preview`            | Flattening onto the theme background and JPEG encoding of previews  |
 | `internal/adapters/mediafiles`         | Private file storage, media inspection, image processing and FFmpeg |
 | `internal/adapters/webpush`            | Web Push signing, payload serialization and delivery                |
 | `internal/adapters/pushtransport`      | Restricted outbound HTTPS, DNS validation and connection limits     |
@@ -113,10 +122,11 @@ host transition and its durable notification outbox update commit together.
 Realtime invalidations are emitted only after a successful commit. No database
 or network operation is added to a pure rule to make that coordination work.
 
-Migration files remain in `backend/internal/app/migrations`. An organization
-change must preserve applied SQL bytes, names and checksums. Schema changes use
-new numbered migrations. Database bootstrap and the one-time SQLite import also
-remain in `app`; ordinary feature SQL belongs in PostgreSQL adapters.
+Migration files remain in `backend/internal/app/migrations`, starting from a
+single baseline schema. An organization change must preserve applied SQL bytes,
+names and checksums. Schema changes use new numbered migrations. Database
+bootstrap also remains in `app`; ordinary feature SQL belongs in PostgreSQL
+adapters.
 
 Core tests use in-memory ports for validation, policy and workflow failures.
 Adapter tests cover processing and transport behavior. HTTP/database integration
@@ -126,11 +136,11 @@ changes keep dependencies pointing toward the core.
 
 Programme activities are individual typed events with stable IDs. A vote's
 configuration and event metadata are saved atomically. Its internal vote extension
-retains the candidate and ballot records; one event has at most one extension.
+retains the option and ballot records; one event has at most one extension.
 The vote event separates host configuration and state transitions
 from guest ballots. Its PostgreSQL adapter coordinates authorization, event
 availability, vote closure and ballot replacement atomically. Public views expose
-only the viewer's choice and revealed aggregate results. Reuse the programme
+only the viewer's choice and each option's live count. Reuse the programme
 invalidation topic and existing avatar component; adding a new activity means
 adding its explicit type, rules, adapter behavior and UI, not a plugin runtime.
 Activities may expose a dedicated `/programme/[id]` page. The App Router selects

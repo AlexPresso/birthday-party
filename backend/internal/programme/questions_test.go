@@ -7,10 +7,11 @@ import (
 
 func TestQuestionResolutionPreservesTheTwoJokerBudget(t *testing.T) {
 	for _, tc := range []struct {
-		name, current, next string
-		used                int
-		revision            int64
-		want                error
+		name          string
+		current, next QuestionStatus
+		used          int
+		revision      int64
+		want          error
 	}{
 		{"first joker", "pending", "joker", 0, 4, nil},
 		{"second joker", "pending", "joker", 1, 4, nil},

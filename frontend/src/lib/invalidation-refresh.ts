@@ -13,14 +13,10 @@ export function createInvalidationRefresh(
     while (dirty && !disposed) {
       dirty = false;
       controller = new AbortController();
-      const current = controller;
-      const deadline = setTimeout(() => current.abort(), 10000);
       try {
-        await read(current.signal);
+        await read(controller.signal);
       } catch (error) {
         if (!disposed) onError(error);
-      } finally {
-        clearTimeout(deadline);
       }
     }
   }

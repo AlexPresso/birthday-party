@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"birthday-party/backend/internal/timestamp"
 )
 
 type Party struct {
@@ -13,19 +15,6 @@ type Party struct {
 	Timezone string  `json:"timezone"`
 	Date     *string `json:"date"`
 	Location string  `json:"location"`
-}
-
-func normalizeTime(value **string) bool {
-	if *value == nil {
-		return true
-	}
-	parsed, err := time.Parse(time.RFC3339, **value)
-	if err != nil || parsed.Year() < 2000 || parsed.Year() > 2200 {
-		return false
-	}
-	normalized := parsed.UTC().Format(time.RFC3339Nano)
-	*value = &normalized
-	return true
 }
 
 type Error string
@@ -69,8 +58,10 @@ func Normalize(input Party) (Party, error) {
 	if _, err := time.LoadLocation(input.Timezone); err != nil {
 		return input, ErrUnknownTimezone
 	}
-	if !normalizeTime(&input.Date) {
+	date, ok := timestamp.Normalize(input.Date)
+	if !ok {
 		return input, ErrInvalidDate
 	}
+	input.Date = date
 	return input, nil
 }

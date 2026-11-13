@@ -1,11 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, KeyRound, Cake, Link2Off } from "lucide-react";
+import { ArrowRight, KeyRound, Link2Off } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { previewSchema, sessionSchema } from "./contracts";
+import { BrandMark } from "@/components/brand-mark";
+import { Snow } from "@/components/snow";
 import { ErrorNotice } from "@/components/ui";
 import { useI18n } from "@/lib/i18n-context";
+import "./invitation.css";
 
 export function Invitation({
   age,
@@ -99,17 +102,22 @@ export function Invitation({
 
   return (
     <main className="invitation-page">
+      <Snow count={70} />
       <div className="invitation-card">
-        <div className="invitation-emblem" aria-hidden="true">
-          <span>{age}</span>
-          <Cake size={24} />
+        <div className="brand">
+          <BrandMark />
+          {title && <strong>{title}</strong>}
         </div>
-        {title && <p className="eyebrow">{title}</p>}
+        <div
+          className={`invitation-ring${age > 99 ? " invitation-ring-long" : ""}`}
+          aria-hidden="true"
+        >
+          <span>{age}</span>
+        </div>
         <h1>
           {name ? t("invitation.hello", { name }) : t("invitation.welcome")}
         </h1>
         {description && <p className="invitation-intro">{description}</p>}
-        <div className="invitation-divider" />
         {loading ? (
           <p className="loading-inline" role="status">
             <span className="spinner" />
@@ -118,19 +126,29 @@ export function Invitation({
         ) : name ? (
           <>
             <p className="muted">{t("invitation.noAccount")}</p>
-            <button
-              className="button primary wide"
-              onClick={enter}
-              disabled={busy}
-            >
-              {busy ? <span className="spinner" /> : <ArrowRight size={19} />}{" "}
-              {busy ? t("invitation.entering") : t("invitation.enter")}
-            </button>
-            <p className="fine-print">
-              {t("invitation.session")}
-              <br />
-              {t("invitation.privateLink")}
-            </p>
+            <div className="invitation-actions">
+              <button
+                className="invitation-enter"
+                onClick={enter}
+                disabled={busy}
+              >
+                <span>
+                  {busy ? t("invitation.entering") : t("invitation.enter")}
+                </span>
+                <span className="invitation-enter-icon" aria-hidden="true">
+                  {busy ? (
+                    <span className="spinner" />
+                  ) : (
+                    <ArrowRight size={22} strokeWidth={2.25} />
+                  )}
+                </span>
+              </button>
+              <p className="fine-print">
+                {t("invitation.session")}
+                <br />
+                {t("invitation.privateLink")}
+              </p>
+            </div>
           </>
         ) : (
           <div className="invitation-help">

@@ -1,13 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowUp, Check, Ticket } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
-import { createInvalidationRefresh } from "@/lib/invalidation-refresh";
-import { retryRealtime, subscribeRealtime } from "@/lib/realtime-browser";
+import { useRealtimeResource } from "@/lib/use-realtime-resource";
 import { ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import {
   eventsSchema,
   questionRoundSchema,
@@ -15,6 +15,7 @@ import {
   type QuestionRound,
 } from "./contracts";
 import { QuestionComposer } from "./question-composer";
+import "./activity-page.css";
 import "./questions.css";
 
 type ActivityHeading = Pick<PartyEvent, "id" | "title" | "description">;
@@ -46,6 +47,7 @@ export function QuestionActivity({
   isAdmin: boolean;
 }) {
   const { t, locale } = useI18n();
+  const confirm = useConfirm();
   const tabId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const [heading, setHeading] = useState(event);
@@ -54,61 +56,49 @@ export function QuestionActivity({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [connectionFailed, setConnectionFailed] = useState(false);
   const mutation = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  const reload = useRef<() => void>(() => {});
   const path = `/programme/${event.id}/questions`;
   const adminPath = `/admin/programme/${event.id}/questions`;
   const number = new Intl.NumberFormat(locale);
 
-  useEffect(() => {
-    const refresh = createInvalidationRefresh(
-      async (signal) => {
-        const current = generation.current;
-        const [result, events] = await Promise.all([
-          api(path, questionRoundSchema, { signal }),
-          api(isAdmin ? "/admin/programme" : "/programme", eventsSchema, {
-            signal,
-          }),
-        ]);
-        signal.throwIfAborted();
-        const latest = events.items.find((item) => item.id === event.id);
-        if (!latest || latest.locked) {
-          window.location.replace("/programme");
-          return;
-        }
-        if (current === generation.current && !mutation.current) {
-          setRound(result);
-          setHeading({
-            id: latest.id,
-            title: latest.title,
-            description: latest.description,
-          });
-        }
-      },
-      (err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          window.location.replace("/programme");
-          return;
-        }
-        setError(errorMessage(err, t));
-      },
-    );
-    reload.current = () => void refresh.request();
-    const unsubscribe = subscribeRealtime(
-      "programme",
-      reload.current,
-      (connected) => setConnectionFailed(!connected),
-    );
-    void refresh.request();
-    return () => {
-      reload.current = () => {};
-      unsubscribe();
-      refresh.dispose();
-      mutation.current?.abort();
-    };
-  }, [event.id, isAdmin, path, t]);
+  const { connectionFailed, refresh, retry } = useRealtimeResource({
+    topic: "programme",
+    hasInitialData: true,
+    async read(signal) {
+      const current = generation.current;
+      const [result, events] = await Promise.all([
+        api(path, questionRoundSchema, { signal }),
+        api(isAdmin ? "/admin/programme" : "/programme", eventsSchema, {
+          signal,
+        }),
+      ]);
+      signal.throwIfAborted();
+      const latest = events.items.find((item) => item.id === event.id);
+      if (!latest || latest.locked) {
+        window.location.replace("/programme");
+        return;
+      }
+      // A mutation started or finished during the request is newer.
+      if (current === generation.current && !mutation.current) {
+        setRound(result);
+        setHeading({
+          id: latest.id,
+          title: latest.title,
+          description: latest.description,
+        });
+      }
+    },
+    onError(err) {
+      if (err instanceof ApiError && err.status === 404) {
+        window.location.replace("/programme");
+        return;
+      }
+      setError(errorMessage(err, t));
+    },
+  });
+
+  useEffect(() => () => mutation.current?.abort(), []);
 
   async function mutate(url: string, method: "POST" | "PUT", input: object) {
     if (mutation.current) return false;
@@ -135,22 +125,28 @@ export function QuestionActivity({
       mutation.current = null;
       if (!controller.signal.aborted) {
         setBusy(false);
-        reload.current();
+        void refresh();
       }
     }
   }
 
-  function transition() {
-    if (round.status === "open" && !window.confirm(t("questions.closeConfirm")))
+  async function transition() {
+    if (
+      round.status === "open" &&
+      !(await confirm({ message: t("questions.closeConfirm") }))
+    )
       return;
-    void mutate(`${adminPath}/state`, "POST", {
+    await mutate(`${adminPath}/state`, "POST", {
       status: round.status === "draft" ? "open" : "closed",
       revision: round.revision,
     });
   }
 
   async function resolve(questionId: number, status: "answered" | "joker") {
-    if (status === "joker" && !window.confirm(t("questions.jokerConfirm")))
+    if (
+      status === "joker" &&
+      !(await confirm({ message: t("questions.jokerConfirm") }))
+    )
       return;
     if (
       await mutate(`${adminPath}/resolve`, "PUT", {
@@ -171,7 +167,7 @@ export function QuestionActivity({
 
   return (
     <div className="question-page">
-      <Link className="question-back" href="/programme">
+      <Link className="activity-back" href="/programme">
         <ArrowLeft size={21} aria-hidden="true" />
         {t("nav.programme")}
       </Link>
@@ -216,8 +212,7 @@ export function QuestionActivity({
             disabled={busy}
             onClick={() => {
               setError(null);
-              retryRealtime();
-              reload.current();
+              void retry();
             }}
           >
             {t("common.retry")}
@@ -389,7 +384,7 @@ export function QuestionActivity({
                   type="button"
                   className="button secondary"
                   disabled={busy}
-                  onClick={transition}
+                  onClick={() => void transition()}
                 >
                   {t(
                     round.status === "draft"

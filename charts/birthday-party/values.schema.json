@@ -8,11 +8,12 @@
     "backend",
     "postgresql",
     "externalDatabase",
-    "ingress"
+    "ingress",
+    "networkPolicy"
   ],
   "properties": {
     "publicUrl": { "type": "string", "pattern": "^https?://[^/?#@\\s]+$" },
-    "imageTag": { "type": "string", "minLength": 1 },
+    "imageTag": { "type": "string" },
     "nameOverride": { "$ref": "#/definitions/optionalName" },
     "fullnameOverride": { "$ref": "#/definitions/optionalName" },
     "imagePullSecrets": {
@@ -36,6 +37,10 @@
         "image": { "$ref": "#/definitions/image" },
         "printAdminInvitation": { "type": "boolean" },
         "vapidSubject": { "type": "string" },
+        "goMemoryLimit": {
+          "type": "string",
+          "pattern": "^([0-9]+(B|KiB|MiB|GiB|TiB))?$"
+        },
         "persistence": { "$ref": "#/definitions/persistence" },
         "resources": { "type": "object" }
       }
@@ -62,7 +67,8 @@
       "type": "object",
       "properties": {
         "existingSecret": { "type": "string" },
-        "urlKey": { "type": "string", "minLength": 1 }
+        "urlKey": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
       }
     },
     "ingress": {
@@ -82,6 +88,14 @@
             "secretName": { "type": "string" }
           }
         }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "required": ["enabled", "ingressFrom"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingressFrom": { "type": "array", "items": { "type": "object" } }
       }
     },
     "nodeSelector": {

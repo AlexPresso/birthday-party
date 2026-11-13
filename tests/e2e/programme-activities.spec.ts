@@ -1,89 +1,38 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
+  type Browser,
   type BrowserContext,
   type Page,
+  type Request,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
-
-type Guest = { id: number; name: string };
-type Invitation = { guest: Guest; invitationUrl: string };
-type Vote = {
-  question: string;
-  status: "draft" | "open" | "closed" | "revealed";
-  candidates: Guest[];
-  allowSelfVote: boolean;
-  myCandidateId: number | null;
-  participationCount: number | null;
-  results: { candidateId: number; votes: number }[] | null;
-};
-type ProgrammeEvent = {
-  id: number;
-  type: "event" | "vote";
-  revision: number;
-  title: string;
-  description: string;
-  teaser: string;
-  startsAt: string | null;
-  unlockAt: string | null;
-  locked: boolean;
-  vote: Vote | null;
-};
+import {
+  activate,
+  baseURL,
+  bootstrapHost,
+  expectNoHorizontalOverflow,
+  invite,
+} from "./support/party";
+import { acceptConfirmation, declineConfirmation } from "./support/confirm";
+import {
+  addAvatar,
+  castVote,
+  createVote,
+  eventFrom,
+  optionOf,
+  programme,
+  setVoteStatus,
+  voteFrom,
+  type ProgrammeEvent,
+} from "./support/votes";
 
 let host: APIRequestContext;
 const eventIDs: number[] = [];
 const contexts: BrowserContext[] = [];
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
-
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
-async function activate(client: APIRequestContext, url: string) {
-  const response = await client.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: invitationToken(url) },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function invite(name: string): Promise<Invitation> {
-  const response = await host.post("/api/admin/guests", { data: { name } });
-  expect(response.status()).toBe(201);
-  return response.json();
-}
-
-async function programme(client = host): Promise<ProgrammeEvent[]> {
-  const path = client === host ? "/api/admin/programme" : "/api/programme";
-  const response = await client.get(path);
-  expect(response.status()).toBe(200);
-  return (await response.json()).items;
-}
-
-async function eventFrom(client: APIRequestContext, id: number) {
-  const event = (await programme(client)).find((item) => item.id === id);
-  if (!event) throw new Error(`Programme event ${id} was not returned.`);
-  return event;
-}
-
-async function voteFrom(client: APIRequestContext, id: number) {
-  const event = await eventFrom(client, id);
-  if (!event.vote)
-    throw new Error(`Programme event ${id} has no visible vote.`);
-  return event.vote;
-}
 
 async function createEvent(title: string): Promise<ProgrammeEvent> {
   const response = await host.post("/api/admin/programme", {
@@ -103,153 +52,39 @@ async function createEvent(title: string): Promise<ProgrammeEvent> {
   return event;
 }
 
-async function createVote(
-  title: string,
-  question: string,
-  candidates: Guest[],
-  unlockAt: string | null = null,
-): Promise<ProgrammeEvent> {
-  const response = await host.post("/api/admin/programme", {
-    data: {
-      type: "vote",
-      title,
-      description: "Choisis la personne qui t’a le plus fait sourire ce soir.",
-      teaser: "Un vote se prépare",
-      startsAt: null,
-      unlockAt,
-      vote: {
-        question,
-        candidateIds: candidates.map((guest) => guest.id),
-        allowSelfVote: false,
-      },
-    },
+/** Opens the host's settings in a desktop window of its own. */
+async function hostSettings(browser: Browser) {
+  const context = await browser.newContext({
+    baseURL,
+    storageState: await host.storageState(),
+    locale: "fr-CH",
+    viewport: { width: 1440, height: 1100 },
   });
-  expect(response.status()).toBe(201);
-  const event = await response.json();
-  eventIDs.push(event.id);
-  return event;
-}
-
-async function changeStatus(
-  eventID: number,
-  status: "open" | "closed" | "revealed",
-) {
-  const event = await eventFrom(host, eventID);
-  const response = await host.post(
-    `/api/admin/programme/${eventID}/vote/state`,
-    {
-      data: { status, revision: event.revision },
-    },
-  );
-  expect(response.status()).toBe(200);
-}
-
-async function castVote(
-  client: APIRequestContext,
-  eventID: number,
-  candidateId: number,
-) {
-  const response = await client.put(`/api/programme/${eventID}/vote`, {
-    headers: mutationHeaders,
-    data: { candidateId },
-  });
-  expect(response.status()).toBe(200);
+  contexts.push(context);
+  const editor = await context.newPage();
+  await editor.goto("/parametres");
+  await openSettingsSection(editor, "programme");
+  return editor;
 }
 
 async function startVoteEditor(page: Page, title: string, question: string) {
   await page
     .getByRole("button", { name: "Ajouter un événement", exact: true })
     .click();
-  await page.getByRole("button", { name: /^Vote pour une personne/ }).click();
+  await page.getByRole("button", { name: /^Vote Les invités votent/ }).click();
   const form = page.locator(".event-editor");
   await form.locator("#event-title").fill(title);
   await form.getByLabel("Question du vote", { exact: true }).fill(question);
   return form;
 }
 
-async function addAvatar(page: Page, invitation: Invitation) {
-  // Synthetic portraits keep screenshots recognizable without using guest data.
-  const image = await page.evaluate(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 256;
-    const drawing = canvas.getContext("2d")!;
-    drawing.fillStyle = "#80748c";
-    drawing.fillRect(0, 0, 256, 256);
-    drawing.fillStyle = "#3b3043";
-    drawing.beginPath();
-    drawing.ellipse(128, 256, 90, 96, 0, 0, Math.PI * 2);
-    drawing.fill();
-    drawing.fillStyle = "#edc3a4";
-    drawing.beginPath();
-    drawing.ellipse(128, 104, 48, 57, 0, 0, Math.PI * 2);
-    drawing.fill();
-    drawing.fillStyle = "#45362f";
-    drawing.beginPath();
-    drawing.ellipse(123, 66, 51, 26, -0.2, 0, Math.PI * 2);
-    drawing.fill();
-    return canvas.toDataURL("image/png").split(",")[1];
-  });
-  const client = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  try {
-    await activate(client, invitation.invitationUrl);
-    const response = await client.put("/api/profile/avatar", {
-      multipart: {
-        file: {
-          name: "candidate.png",
-          mimeType: "image/png",
-          buffer: Buffer.from(image, "base64"),
-        },
-      },
-    });
-    expect(response.status()).toBe(200);
-    return (await response.json()).guest.avatarUrl as string;
-  } finally {
-    await client.dispose();
-  }
-}
-
-async function expectNoOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBeTruthy();
+/** The card of a saved event in the host's list. */
+function eventCard(page: Page, title: string) {
+  return page.locator(".admin-event-list > li").filter({ hasText: title });
 }
 
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    [
-      "scripts/backend.mjs",
-      "invite-admin",
-      "--name",
-      "Programme Activities Test Host",
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  await activate(host, match[0]);
+  host = await bootstrapHost("Programme Activities Test Host");
 });
 
 test.afterEach(async () => {
@@ -265,29 +100,23 @@ test.afterAll(async () => {
   await host?.dispose();
 });
 
-test("the host creates a vote directly in the programme with selected candidates and profile photos", async ({
+test("the host creates a vote for guests with selected candidates and profile photos, then opens and closes it", async ({
   browser,
   page,
 }) => {
-  const camille = await invite("Camille — costume");
-  const robin = await invite("Robin — costume");
+  const camille = await invite(host, "Camille — costume");
+  const robin = await invite(host, "Robin — costume");
   const avatarURL = await addAvatar(page, camille);
-  const context = await browser.newContext({
-    baseURL,
-    storageState: await host.storageState(),
-    locale: "fr-CH",
-    viewport: { width: 1440, height: 1100 },
-  });
-  contexts.push(context);
-  const editor = await context.newPage();
-  await editor.goto("/parametres");
-  await openSettingsSection(editor, "programme");
+  const editor = await hostSettings(browser);
   const title = "Les costumes de la soirée";
   const question = "Qui a le mieux réussi son déguisement ?";
   const form = await startVoteEditor(editor, title, question);
   await form
     .getByLabel("Détails", { exact: true })
     .fill("Un vote pour départager les déguisements.");
+  await expect(
+    form.getByRole("radio", { name: "Invités", exact: true }),
+  ).toBeChecked();
   for (const guest of [camille.guest, robin.guest]) {
     await form.getByRole("checkbox", { name: guest.name, exact: true }).check();
   }
@@ -295,77 +124,272 @@ test("the host creates a vote directly in the programme with selected candidates
     "naturalWidth",
     256,
   );
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await form.screenshot({
-    path: "test-results/programme-vote-editor-desktop.png",
+    path: test.info().outputPath("programme-vote-editor-desktop.png"),
   });
   await editor.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await editor.setViewportSize({ width: 1440, height: 1100 });
   await expect(
     form.getByRole("button", { name: "Enregistrer l’événement", exact: true }),
   ).toHaveCount(0);
   await expect
     .poll(async () =>
-      (await programme()).some((event) => event.title === title),
+      (await programme(host, true)).some((event) => event.title === title),
     )
     .toBe(true);
   await expect(editor.getByText(title, { exact: true })).toBeVisible();
-  const saved = (await programme()).find((event) => event.title === title)!;
+  const saved = (await programme(host, true)).find(
+    (event) => event.title === title,
+  )!;
   eventIDs.push(saved.id);
   expect(saved.type).toBe("vote");
-  expect(saved.vote?.status).toBe("draft");
-  expect(saved.vote?.results).toBeNull();
-  expect(saved.vote?.candidates.map((guest) => guest.id).sort()).toEqual(
+  expect(saved.vote).toMatchObject({
+    status: "draft",
+    choices: "guests",
+    allowSelfVote: false,
+    allowWriteIns: false,
+    myOptionId: null,
+  });
+  expect(saved.vote?.options.map((option) => option.guestId).sort()).toEqual(
     [camille.guest.id, robin.guest.id].sort(),
   );
-  const eventCard = editor
-    .locator(".admin-event-list > li")
-    .filter({ hasText: title });
-  editor.once("dialog", (dialog) => dialog.accept());
-  await eventCard
+  expect(saved.vote?.options.every((option) => option.votes === 0)).toBe(true);
+
+  const card = eventCard(editor, title);
+  await expect(card.getByText("Brouillon", { exact: true })).toBeVisible();
+  await card
     .getByRole("button", { name: "Ouvrir le vote", exact: true })
     .click();
+  await acceptConfirmation(
+    editor,
+    "Ouvrir le vote ? Les choix et leurs règles ne pourront plus changer.",
+  );
   await expect(
-    eventCard.getByRole("button", { name: "Fermer le vote", exact: true }),
+    card.getByRole("button", { name: "Fermer le vote", exact: true }),
   ).toBeVisible();
-  expect((await voteFrom(host, saved.id)).status).toBe("open");
+  expect((await voteFrom(host, saved.id, true)).status).toBe("open");
+  // The source and the candidates are fixed once the vote has opened.
+  await expect(form.getByRole("radio")).toHaveCount(0);
+  await expect(form.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    form.getByText("Le vote a commencé. Tu peux encore corriger la question.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await editor.screenshot({
-    path: "test-results/programme-vote-admin-desktop.png",
+    path: test.info().outputPath("programme-vote-admin-desktop.png"),
     fullPage: true,
   });
   await editor.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
+  await editor.setViewportSize({ width: 1440, height: 1100 });
+
+  // Closing is the last step: nothing is left to reveal.
+  await card
+    .getByRole("button", { name: "Fermer le vote", exact: true })
+    .click();
+  await acceptConfirmation(
+    editor,
+    "Fermer le vote ? Les invités ne pourront plus voter ni changer leur choix.",
+  );
+  await expect(card.getByText("Vote terminé", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: /vote/i })).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: /révéler/i })).toHaveCount(0);
+  expect((await voteFrom(host, saved.id, true)).status).toBe("closed");
+  const closed = await eventFrom(host, saved.id, true);
+  for (const status of ["revealed", "open", "draft"]) {
+    const response = await host.post(
+      `/api/admin/programme/${saved.id}/vote/state`,
+      { data: { status, revision: closed.revision } },
+    );
+    expect(response.status(), status).toBeGreaterThanOrEqual(400);
+  }
+  await card.getByRole("link", { name: "Voir le vote", exact: true }).click();
+  await expect(editor).toHaveURL(`/programme/${saved.id}`);
+  await expect(
+    editor.getByRole("heading", { level: 1, name: question, exact: true }),
+  ).toBeVisible();
+});
+
+test("the host prepares a vote on custom choices and may let guests add theirs", async ({
+  browser,
+}) => {
+  const editor = await hostSettings(browser);
+  const title = "Le repas de minuit";
+  const question = "Qu’est-ce qu’on mange à minuit ?";
+  const form = await startVoteEditor(editor, title, question);
+  const error = editor
+    .locator('[data-settings-screen="programme"]')
+    .getByRole("alert");
+  await form.getByRole("radio", { name: "Choix libres", exact: true }).check();
+  await expect(form.getByRole("checkbox")).toHaveCount(1);
+  await expect(error).toHaveText(
+    "Ajoute au moins 2 choix, ou laisse les invités en ajouter.",
+  );
+
+  const add = form.getByRole("button", {
+    name: "Ajouter un choix",
+    exact: true,
+  });
+  const choice = (row: number) =>
+    form.getByLabel(`Choix ${row}`, { exact: true });
+  await add.click();
+  await expect(choice(1)).toBeFocused();
+  await choice(1).fill("Pizza");
+  await add.click();
+  await choice(2).fill(" pizza ");
+  await add.click();
+  await choice(3).blur();
+  await expect(error).toHaveText(
+    "Remplis chaque choix ou retire les lignes vides.",
+  );
+  await form
+    .getByRole("button", { name: "Retirer le choix 3", exact: true })
+    .click();
+  await expect(add).toBeFocused();
+  await expect(error).toHaveText("Chaque choix doit être différent.");
+  expect(
+    (await programme(host, true)).some((event) => event.title === title),
+  ).toBe(false);
+
+  // The rows stay in the host's order although the server sorts by name.
+  await choice(2).fill("Raclette");
+  await add.click();
+  await choice(3).fill("Burgers");
+  await choice(3).blur();
+  await expect
+    .poll(async () =>
+      (await programme(host, true))
+        .find((event) => event.title === title)
+        ?.vote?.options.map((option) => option.label),
+    )
+    .toEqual(["Burgers", "Pizza", "Raclette"]);
+  await expect(error).toHaveCount(0);
+  const saved = (await programme(host, true)).find(
+    (event) => event.title === title,
+  )!;
+  eventIDs.push(saved.id);
+  expect(saved.vote).toMatchObject({
+    status: "draft",
+    choices: "custom",
+    allowSelfVote: false,
+    allowWriteIns: false,
+  });
+  expect(
+    saved.vote?.options.every(
+      (option) =>
+        option.guestId === null && option.avatarUrl === null && !option.writeIn,
+    ),
+  ).toBe(true);
+  // The saved vote came back in another order: the rows do not move and the
+  // editor reports neither unsaved changes nor a conflict.
+  await expect(editor.locator(".programme-save-status")).toHaveText(
+    "Le programme est enregistré.",
+  );
+  await expect(choice(1)).toHaveValue("Pizza");
+  await expect(choice(2)).toHaveValue("Raclette");
+  await expect(choice(3)).toHaveValue("Burgers");
+  await expect(
+    form.getByRole("button", {
+      name: "Enregistrer mon brouillon",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  let saves = 0;
+  const countSave = (request: Request) => {
+    if (request.method() === "PUT") saves++;
+  };
+  editor.on("request", countSave);
+  await choice(1).focus();
+  await choice(1).blur();
+  await form.getByLabel("Question du vote", { exact: true }).focus();
+  await form.getByLabel("Question du vote", { exact: true }).blur();
+  // Long enough for an autosave to start, had the draft looked changed.
+  await editor.waitForTimeout(300);
+  editor.off("request", countSave);
+  expect(saves).toBe(0);
+  await expect(error).toHaveCount(0);
+
+  await form
+    .getByRole("checkbox", {
+      name: "Les invités peuvent ajouter un choix",
+      exact: true,
+    })
+    .check();
+  await expect
+    .poll(async () => (await voteFrom(host, saved.id, true)).allowWriteIns)
+    .toBe(true);
+  // With write-ins, a vote may start from a single choice.
+  for (const row of [3, 2]) {
+    await form
+      .getByRole("button", { name: `Retirer le choix ${row}`, exact: true })
+      .click();
+  }
+  await expect
+    .poll(async () =>
+      (await voteFrom(host, saved.id, true)).options.map(
+        (option) => option.label,
+      ),
+    )
+    .toEqual(["Pizza"]);
+  await expect(error).toHaveCount(0);
+  await expectNoHorizontalOverflow(editor);
+  await form.screenshot({
+    path: test.info().outputPath("programme-custom-vote-editor-desktop.png"),
+  });
+  await editor.setViewportSize({ width: 320, height: 740 });
+  await expectNoHorizontalOverflow(editor);
+  await editor.setViewportSize({ width: 1440, height: 1100 });
+
+  const card = eventCard(editor, title);
+  await card
+    .getByRole("button", { name: "Ouvrir le vote", exact: true })
+    .click();
+  await acceptConfirmation(editor);
+  await expect(
+    card.getByRole("button", { name: "Fermer le vote", exact: true }),
+  ).toBeVisible();
+  await expect(choice(1)).toHaveCount(0);
+  await expect(form.getByRole("radio")).toHaveCount(0);
+  // The question can still be corrected; the choices stay as they were.
+  await form
+    .getByLabel("Question du vote", { exact: true })
+    .fill("On mange quoi à minuit ?");
+  await form.getByLabel("Question du vote", { exact: true }).blur();
+  await expect
+    .poll(async () => (await voteFrom(host, saved.id, true)).question)
+    .toBe("On mange quoi à minuit ?");
+  expect(await voteFrom(host, saved.id, true)).toMatchObject({
+    status: "open",
+    choices: "custom",
+    allowWriteIns: true,
+    options: [{ label: "Pizza", writeIn: false, votes: 0 }],
+  });
 });
 
 test("guest changes update an open vote editor without reloading settings", async ({
   browser,
 }) => {
   await createEvent("Les retrouvailles");
-  const context = await browser.newContext({
-    baseURL,
-    storageState: await host.storageState(),
-    locale: "fr-CH",
-    viewport: { width: 1440, height: 1100 },
-  });
-  contexts.push(context);
-  const editor = await context.newPage();
+  const editor = await hostSettings(browser);
   await editor.goto("/programme");
   const manageProgramme = editor.getByRole("link", {
     name: "Gérer le programme",
     exact: true,
   });
   await expect(manageProgramme).toBeVisible();
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await editor.screenshot({
-    path: "test-results/programme-admin-navigation-desktop.png",
+    path: test.info().outputPath("programme-admin-navigation-desktop.png"),
     fullPage: true,
   });
   await editor.setViewportSize({ width: 390, height: 844 });
   await expect(manageProgramme).toBeVisible();
-  await expectNoOverflow(editor);
+  await expectNoHorizontalOverflow(editor);
   await editor.screenshot({
-    path: "test-results/programme-admin-navigation-mobile.png",
+    path: test.info().outputPath("programme-admin-navigation-mobile.png"),
     fullPage: true,
   });
   await manageProgramme.click();
@@ -381,9 +405,9 @@ test("guest changes update an open vote editor without reloading settings", asyn
   const title = "Un vote préparé ensemble";
   const question = "Qui a proposé la meilleure idée ?";
   const eventEditor = await startVoteEditor(editor, "", "");
-  expect((await programme()).some((event) => event.title === title)).toBe(
-    false,
-  );
+  expect(
+    (await programme(host, true)).some((event) => event.title === title),
+  ).toBe(false);
 
   await openSettingsSection(editor, "guests");
   const names = ["Camille — nouveau candidat", "Robin — nouveau candidat"];
@@ -416,18 +440,20 @@ test("guest changes update an open vote editor without reloading settings", asyn
   await expect(selectedCount).toContainText("2 sélectionnés");
   await expect
     .poll(async () =>
-      (await programme()).some((event) => event.title === title),
+      (await programme(host, true)).some((event) => event.title === title),
     )
     .toBe(true);
-  const saved = (await programme()).find((event) => event.title === title)!;
+  const saved = (await programme(host, true)).find(
+    (event) => event.title === title,
+  )!;
   eventIDs.push(saved.id);
 
   const robin = names[1];
   await openSettingsSection(editor, "guests");
-  editor.once("dialog", (dialog) => dialog.accept());
   await editor
     .getByRole("button", { name: `Retirer l’accès de ${robin}`, exact: true })
     .click();
+  await acceptConfirmation(editor);
   await openSettingsSection(editor, "programme");
   await expect(
     eventEditor.getByRole("checkbox", { name: robin, exact: true }),
@@ -448,13 +474,13 @@ test("guest changes update an open vote editor without reloading settings", asyn
     .check();
   await expect(selectedCount).toContainText("3 sélectionnés");
   await openSettingsSection(editor, "guests");
-  editor.once("dialog", (dialog) => dialog.accept());
   await editor
     .getByRole("button", {
       name: `Retirer l’accès de ${excluded}`,
       exact: true,
     })
     .click();
+  await acceptConfirmation(editor);
   await openSettingsSection(editor, "programme");
   await expect(
     eventEditor.getByRole("checkbox", { name: excluded, exact: true }),
@@ -469,268 +495,40 @@ test("guest changes update an open vote editor without reloading settings", asyn
     .fill(`${question} `);
   await eventEditor.getByLabel("Question du vote", { exact: true }).blur();
   await expect
-    .poll(async () => (await eventFrom(host, saved.id)).vote?.candidates.length)
+    .poll(async () => (await voteFrom(host, saved.id, true)).options.length)
     .toBe(2);
   await expect(editor.getByText(title, { exact: true })).toBeVisible();
-  const updated = await eventFrom(host, saved.id);
-  expect(updated.vote?.question).toBe(question);
-  expect(
-    updated.vote?.candidates.map((candidate) => candidate.name).sort(),
-  ).toEqual([...names].sort());
-});
-
-test("guests see a vote only after opening and unlocking, and its results only after revelation", async ({
-  page,
-}) => {
-  const mila = await invite("Mila — piste de danse");
-  const camille = await invite("Camille — piste de danse");
-  const robin = await invite("Robin — piste de danse");
-  const avatarURL = await addAvatar(page, camille);
-  await activate(page.request, mila.invitationUrl);
-  const question = "Qui nous a donné envie de danser ?";
-  const event = await createVote(
-    "Sur la piste de danse",
-    question,
-    [mila.guest, camille.guest, robin.guest],
-    new Date(Date.now() + 86_400_000).toISOString(),
+  const updated = await voteFrom(host, saved.id, true);
+  expect(updated.question).toBe(question);
+  expect(updated.options.map((option) => option.label).sort()).toEqual(
+    [...names].sort(),
   );
-  let realtimeReady = false;
-  page.on("websocket", (socket) => {
-    if (new URL(socket.url()).pathname !== "/api/realtime") return;
-    socket.on("framereceived", ({ payload }) => {
-      if (JSON.parse(payload.toString()).type === "ready") realtimeReady = true;
-    });
-  });
-  await page.goto("/programme");
-  await expect.poll(() => realtimeReady).toBe(true);
-  await expect(
-    page.getByRole("link", { name: "Gérer le programme", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: question, exact: true }),
-  ).toHaveCount(0);
-  expect(
-    (await programme(page.request)).some((item) => item.id === event.id),
-  ).toBe(false);
-
-  await changeStatus(event.id, "open");
-  await expect(page.getByText(event.teaser, { exact: true })).toBeVisible();
-  expect(await eventFrom(page.request, event.id)).toMatchObject({
-    title: event.teaser,
-    description: "",
-    locked: true,
-    vote: null,
-  });
-  await expect(page.getByText(question, { exact: true })).toHaveCount(0);
-  await expect(page.getByText(camille.guest.name, { exact: true })).toHaveCount(
-    0,
-  );
-  const current = await eventFrom(host, event.id);
-  const unlocked = await host.put(`/api/admin/programme/${event.id}`, {
-    data: {
-      type: current.type,
-      revision: current.revision,
-      title: current.title,
-      description: current.description,
-      teaser: current.teaser,
-      startsAt: current.startsAt,
-      unlockAt: null,
-      vote: {
-        question,
-        candidateIds: [mila.guest.id, camille.guest.id, robin.guest.id],
-        allowSelfVote: false,
-      },
-    },
-  });
-  expect(unlocked.status()).toBe(200);
-  const ballot = page.getByRole("region", { name: question, exact: true });
-  await expect(
-    page.getByRole("heading", { name: question, exact: true }),
-  ).toBeVisible();
-  const featured = page.getByRole("article", {
-    name: event.title,
-    exact: true,
-  });
-  await expect(ballot).not.toBeVisible();
-  await expect(
-    featured.locator(`.programme-vote-preview img[src="${avatarURL}"]`),
-  ).toHaveJSProperty("naturalWidth", 256);
-  await expectNoOverflow(page);
-  await page.screenshot({
-    path: "test-results/programme-featured-vote-mobile.png",
-    fullPage: true,
-    animations: "disabled",
-    style: "nextjs-portal { visibility: hidden; }",
-  });
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.screenshot({
-    path: "test-results/programme-featured-vote-dark-mobile.png",
-    fullPage: true,
-    animations: "disabled",
-    style: "nextjs-portal { visibility: hidden; }",
-  });
-  await page.emulateMedia({ colorScheme: "light" });
-  await featured
-    .locator("summary")
-    .filter({ hasText: /^Voter$/ })
-    .click();
-  await expect(
-    ballot.getByRole("radio", { name: mila.guest.name, exact: true }),
-  ).toBeDisabled();
-  await expect(ballot.locator(`img[src="${avatarURL}"]`)).toHaveJSProperty(
-    "naturalWidth",
-    256,
-  );
-  await ballot
-    .getByRole("searchbox", { name: "Rechercher une personne", exact: true })
-    .fill("Robin");
-  await expect(
-    ballot.getByRole("radio", { name: camille.guest.name, exact: true }),
-  ).toHaveCount(0);
-  await ballot.getByText(robin.guest.name, { exact: true }).click();
-  await expect(
-    ballot.getByRole("radio", { name: robin.guest.name, exact: true }),
-  ).toBeChecked();
-  expect((await voteFrom(page.request, event.id)).myCandidateId).toBeNull();
-  await featured
-    .locator("summary")
-    .filter({ hasText: /^Masquer le vote$/ })
-    .click();
-  await expect(ballot).not.toBeVisible();
-  await createEvent("Un autre rendez-vous");
-  await expect(
-    page.getByRole("heading", { name: "Un autre rendez-vous", exact: true }),
-  ).toBeVisible();
-  await featured
-    .locator("summary")
-    .filter({ hasText: /^Voter$/ })
-    .click();
-  await expect(
-    ballot.getByRole("radio", { name: robin.guest.name, exact: true }),
-  ).toBeChecked();
-  await ballot
-    .getByRole("button", {
-      name: `Voter pour ${robin.guest.name}`,
-      exact: true,
-    })
-    .click();
-  await expect(
-    ballot.getByText(`Ton vote pour ${robin.guest.name} est enregistré.`, {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await ballot
-    .getByRole("searchbox", { name: "Rechercher une personne", exact: true })
-    .fill("");
-  await ballot
-    .getByRole("radio", { name: camille.guest.name, exact: true })
-    .press("Space");
-  await ballot
-    .getByRole("button", {
-      name: `Voter pour ${camille.guest.name}`,
-      exact: true,
-    })
-    .click();
-  await expect(
-    ballot.getByText(`Ton vote pour ${camille.guest.name} est enregistré.`, {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await page.reload();
-  await featured
-    .locator("summary")
-    .filter({ hasText: /^Modifier mon vote$/ })
-    .click();
-  await expect(
-    ballot.getByRole("radio", { name: camille.guest.name, exact: true }),
-  ).toBeChecked();
-  await expectNoOverflow(page);
-  await page.screenshot({
-    path: "test-results/programme-vote-mobile.png",
-    fullPage: true,
-  });
-
-  const other = await invite("Sacha — second ballot");
-  const otherClient = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  try {
-    await activate(otherClient, other.invitationUrl);
-    await castVote(otherClient, event.id, robin.guest.id);
-  } finally {
-    await otherClient.dispose();
-  }
-  expect((await voteFrom(host, event.id)).results).toBeNull();
-  expect((await voteFrom(host, event.id)).participationCount).toBe(2);
-  await changeStatus(event.id, "closed");
-  await expect(
-    page
-      .getByRole("article")
-      .filter({ hasText: event.title })
-      .getByText("Vote fermé", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    ballot.getByRole("button", { name: /^Voter pour / }),
-  ).toHaveCount(0);
-  await expect(
-    ballot.getByRole("list", { name: "Résultats", exact: true }),
-  ).toHaveCount(0);
-  const unrevealed = await voteFrom(page.request, event.id);
-  expect(unrevealed.results).toBeNull();
-  expect(unrevealed.participationCount).toBeNull();
-
-  await changeStatus(event.id, "revealed");
-  const results = ballot.getByRole("list", { name: "Résultats", exact: true });
-  await expect(results).toBeVisible();
-  for (const name of [camille.guest.name, robin.guest.name]) {
-    await expect(
-      results.getByRole("listitem").filter({ hasText: name }),
-    ).toContainText("1 voix");
-  }
-  const revealed = await voteFrom(page.request, event.id);
-  expect(revealed.participationCount).toBe(2);
-  expect(revealed.results).toEqual(
-    expect.arrayContaining([
-      { candidateId: camille.guest.id, votes: 1 },
-      { candidateId: robin.guest.id, votes: 1 },
-      { candidateId: mila.guest.id, votes: 0 },
-    ]),
-  );
-  await page.screenshot({
-    path: "test-results/programme-vote-results-mobile.png",
-    fullPage: true,
-  });
-  await page.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(page);
 });
 
 test("editing a vote event and deleting another event preserves the ballots", async ({
   browser,
   page,
 }) => {
-  const camille = await invite("Camille — souvenirs");
-  const robin = await invite("Robin — souvenirs");
-  const voter = await invite("Lou — souvenirs");
+  const camille = await invite(host, "Camille — souvenirs");
+  const robin = await invite(host, "Robin — souvenirs");
+  const voter = await invite(host, "Lou — souvenirs");
   await activate(page.request, voter.invitationUrl);
-  const event = await createVote(
-    "Les souvenirs de la soirée",
-    "Qui a raconté la meilleure anecdote ?",
-    [camille.guest, robin.guest],
-  );
-  await changeStatus(event.id, "open");
-  await castVote(page.request, event.id, camille.guest.id);
-  const other = await createEvent("La pause avant le gâteau");
-  const context = await browser.newContext({
-    baseURL,
-    storageState: await host.storageState(),
-    locale: "fr-CH",
-    viewport: { width: 1440, height: 1100 },
+  const event = await createVote(host, {
+    title: "Les souvenirs de la soirée",
+    question: "Qui a raconté la meilleure anecdote ?",
+    source: { candidates: [camille.guest, robin.guest] },
   });
-  contexts.push(context);
-  const editor = await context.newPage();
-  await editor.goto("/parametres");
-  await openSettingsSection(editor, "programme");
+  eventIDs.push(event.id);
+  await setVoteStatus(host, event.id, "open");
+  const choice = optionOf(
+    await voteFrom(page.request, event.id),
+    camille.guest.name,
+  );
+  expect((await castVote(page.request, event.id, choice.id)).status()).toBe(
+    200,
+  );
+  const other = await createEvent("La pause avant le gâteau");
+  const editor = await hostSettings(browser);
   await editor
     .getByRole("button", { name: `Modifier ${event.title}`, exact: true })
     .click();
@@ -747,41 +545,46 @@ test("editing a vote event and deleting another event preserves the ballots", as
   ).toHaveCount(0);
   await form.getByLabel("Question du vote", { exact: true }).blur();
   await expect
-    .poll(async () => (await eventFrom(host, event.id)).vote?.question)
+    .poll(async () => (await voteFrom(host, event.id, true)).question)
     .toBe(question);
   await expect(editor.getByText(title, { exact: true })).toBeVisible();
-  const updated = await eventFrom(host, event.id);
+  const updated = await eventFrom(host, event.id, true);
   expect(updated.description).toBe("On repense aux histoires de ce soir.");
-  expect(updated.vote?.question).toBe(question);
-  expect(updated.vote?.status).toBe("open");
-  expect(updated.vote?.participationCount).toBe(1);
+  expect(updated.vote).toMatchObject({ question, status: "open" });
+  expect(optionOf(updated.vote!, camille.guest.name)).toMatchObject({
+    id: choice.id,
+    votes: 1,
+  });
+  await expect(
+    eventCard(editor, title).getByText("Votes reçus : 1", { exact: true }),
+  ).toBeVisible();
 
-  editor.once("dialog", (dialog) => dialog.accept());
   await editor
     .getByRole("button", { name: `Supprimer ${other.title}`, exact: true })
     .click();
+  await acceptConfirmation(editor);
   await expect(editor.getByText(other.title, { exact: true })).toHaveCount(0);
   eventIDs.splice(eventIDs.indexOf(other.id), 1);
-  expect((await programme()).some((item) => item.id === other.id)).toBe(false);
-  expect((await voteFrom(page.request, event.id)).myCandidateId).toBe(
-    camille.guest.id,
-  );
-  expect((await voteFrom(host, event.id)).participationCount).toBe(1);
+  expect(
+    (await programme(host, true)).some((item) => item.id === other.id),
+  ).toBe(false);
+  expect((await voteFrom(page.request, event.id)).myOptionId).toBe(choice.id);
   await page.goto("/programme");
   await expect(
     page.getByRole("heading", { name: question, exact: true }),
   ).toBeVisible();
   await page
     .getByRole("article", { name: title, exact: true })
-    .locator("summary")
-    .filter({ hasText: /^Modifier mon vote$/ })
+    .getByRole("link", { name: "Voter", exact: true })
     .click();
-  await expect(
-    page.getByRole("heading", { name: title, exact: true }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(`/programme/${event.id}`);
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
   await expect(
     page.getByRole("radio", { name: camille.guest.name, exact: true }),
   ).toBeChecked();
+  // Leave before the vote is deleted: its page would navigate during teardown.
+  await page.locator(".activity-back").click();
+  await expect(page).toHaveURL("/programme");
 });
 
 test("event autosave creates once and preserves edits typed during the first request", async ({
@@ -845,7 +648,7 @@ test("event autosave creates once and preserves edits typed during the first req
     await expect(editor).toHaveURL(/\/parametres$/);
     await expect
       .poll(async () => {
-        const event = (await programme()).find(
+        const event = (await programme(host, true)).find(
           (item) => item.id === eventIDs.at(-1),
         );
         return (
@@ -899,9 +702,9 @@ test("invalid event drafts remain editable and a failed autosave retries on blur
   await title.fill("");
   await title.blur();
   await expect(error).toBeVisible();
-  expect((await eventFrom(host, event.id)).title).toBe(event.title);
-  editor.once("dialog", (dialog) => dialog.dismiss());
+  expect((await eventFrom(host, event.id, true)).title).toBe(event.title);
   await form.getByRole("button", { name: "Fermer", exact: true }).click();
+  await declineConfirmation(editor);
   await expect(title).toHaveValue("");
 
   let updates = 0;
@@ -922,11 +725,11 @@ test("invalid event drafts remain editable and a failed autosave retries on blur
   await expect.poll(() => updates).toBe(1);
   await expect(error).toBeVisible();
   await expect(title).toHaveValue("Le titre conservé après une erreur");
-  expect((await eventFrom(host, event.id)).title).toBe(event.title);
+  expect((await eventFrom(host, event.id, true)).title).toBe(event.title);
   await title.focus();
   await title.blur();
   await expect
-    .poll(async () => (await eventFrom(host, event.id)).title)
+    .poll(async () => (await eventFrom(host, event.id, true)).title)
     .toBe("Le titre conservé après une erreur");
   await expect(error).toHaveCount(0);
   await expect(form).toBeVisible();

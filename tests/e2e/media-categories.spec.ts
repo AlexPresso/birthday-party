@@ -1,55 +1,31 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
+import { acceptConfirmation } from "./support/confirm";
+import { reconnectRealtime } from "./support/realtime";
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  baseURL,
+  bootstrapHost,
+  expectNoHorizontalOverflow,
+  invite,
+  mutationHeaders,
+  shareSession,
+} from "./support/party";
+import { canvasImage } from "./support/images";
+import {
+  bodyOf,
+  step,
+  titleOf,
+  welcomeControls,
+  type WelcomeStep as Step,
+} from "./support/welcome";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 type Category = { id: number; name: string; isPublic: boolean };
-type Widget =
-  | { type: "title"; text: string }
-  | { type: "text"; text: string }
-  | { type: "profile_photo" }
-  | { type: "media_upload"; mediaUpload: { categoryId: number | null } };
-type Step = { widgets: Widget[] };
 
-function step(
-  title: string,
-  body: string,
-  action: "profile_photo" | "media_upload" | null = null,
-  categoryId: number | null = null,
-): Step {
-  const widgets: Widget[] = [
-    { type: "title", text: title },
-    { type: "text", text: body },
-  ];
-  if (action === "profile_photo") widgets.push({ type: action });
-  if (action === "media_upload")
-    widgets.push({ type: action, mediaUpload: { categoryId } });
-  return { widgets };
-}
-
-function titleOf(step: Step) {
-  return step.widgets.find((widget) => widget.type === "title")!.text;
-}
-function bodyOf(step: Step) {
-  return step.widgets.find((widget) => widget.type === "text")!.text;
-}
-type Welcome = {
-  open: boolean;
-  revision: number;
-  currentStep: number;
-  required: boolean;
-  steps: Step[];
-};
 type Photo = {
   id: number;
   categoryId: number | null;
@@ -70,53 +46,14 @@ type Job = {
 let host: APIRequestContext;
 let previousSteps: Step[];
 let previouslyRequired = false;
+const {
+  state: welcome,
+  transition,
+  saveSteps,
+  restoreOpen,
+} = welcomeControls(() => host);
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
-
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
-async function welcome(): Promise<Welcome> {
-  const response = await host.get("/api/admin/welcome");
-  expect(response.status()).toBe(200);
-  return response.json();
-}
-
-async function transition(action: "start" | "next" | "open") {
-  const { revision } = await welcome();
-  const response = await host.post("/api/admin/welcome/transition", {
-    data: { revision, action },
-  });
-  expect(response.status()).toBe(200);
-  return response.json() as Promise<Welcome>;
-}
-
-async function saveSteps(steps: Step[]) {
-  const { revision } = await welcome();
-  const response = await host.put("/api/admin/welcome", {
-    data: { revision, steps },
-  });
-  expect(response.status()).toBe(200);
-  return response.json() as Promise<Welcome>;
-}
-
-async function restoreOpen(steps: Step[], required = false) {
-  if (!(await welcome()).open) await transition("open");
-  await transition("start");
-  await saveSteps(steps);
-  const { revision } = await welcome();
-  expect(
-    (
-      await host.patch("/api/admin/welcome/required", {
-        data: { revision, required },
-      })
-    ).status(),
-  ).toBe(200);
-  await transition("open");
-}
 
 async function createCategory(name: string, isPublic: boolean) {
   const response = await host.post("/api/admin/media-categories", {
@@ -127,12 +64,7 @@ async function createCategory(name: string, isPublic: boolean) {
 }
 
 async function enterWaiting(page: Page, name: string) {
-  const created = await host.post("/api/admin/guests", { data: { name } });
-  expect(created.status()).toBe(201);
-  const invitation = (await created.json()) as {
-    guest: { id: number; name: string };
-    invitationUrl: string;
-  };
+  const invitation = await invite(host, name);
   await page.goto(invitation.invitationUrl);
   await page.getByRole("button", { name: "Entrer", exact: true }).click();
   await expect(page).toHaveURL(/\/attente$/);
@@ -170,23 +102,8 @@ async function progressRevision(page: Page) {
     .progressRevision as number;
 }
 
-async function testImage(page: Page, name: string, color = "#91729d") {
-  const data = await page.evaluate((background) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 480;
-    canvas.height = 320;
-    const drawing = canvas.getContext("2d")!;
-    drawing.fillStyle = background;
-    drawing.fillRect(0, 0, 480, 320);
-    drawing.fillStyle = "#efd8b5";
-    drawing.beginPath();
-    drawing.arc(180, 130, 75, 0, Math.PI * 2);
-    drawing.fill();
-    drawing.fillStyle = "#302235";
-    drawing.fillRect(265, 150, 120, 110);
-    return canvas.toDataURL("image/png").split(",")[1];
-  }, color);
-  return { name, mimeType: "image/png", buffer: Buffer.from(data, "base64") };
+function testImage(page: Page, name: string, color = "#91729d") {
+  return canvasImage(page, { name, color });
 }
 
 async function upload(
@@ -247,48 +164,8 @@ async function categoryPhotos(
   return (await response.json()).items as Photo[];
 }
 
-async function expectNoOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
-}
-
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    [
-      "scripts/backend.mjs",
-      "invite-admin",
-      "--name",
-      "Media Category Test Host",
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await host.post("/api/invitations/accept", {
-    data: { token: invitationToken(match[0]) },
-  });
-  expect(accepted.status()).toBe(200);
+  host = await bootstrapHost("Media Category Test Host");
   const previousState = await welcome();
   previousSteps = previousState.steps;
   previouslyRequired = previousState.required;
@@ -509,18 +386,18 @@ test("several media widgets keep separate destinations and queues alongside a pr
   );
   await expect(profile.locator(".avatar img")).toBeVisible();
   await page.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: "test-results/welcome-widgets-guest-mobile-320.png",
+    path: test.info().outputPath("welcome-widgets-guest-mobile-320.png"),
     fullPage: true,
   });
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.screenshot({
-    path: "test-results/welcome-widgets-guest-desktop.png",
+    path: test.info().outputPath("welcome-widgets-guest-desktop.png"),
     fullPage: true,
   });
   preparing.delete(privateJob.filename);
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await reconnectRealtime(page);
   await expect(media.nth(0).locator(".upload-queue")).toContainText(
     "1 fichier ajouté",
   );
@@ -542,14 +419,14 @@ test("several media widgets keep separate destinations and queues alongside a pr
     page.waitForResponse(
       (response) => new URL(response.url()).pathname === "/api/welcome",
     ),
-    page.evaluate(() => window.dispatchEvent(new Event("focus"))),
+    reconnectRealtime(page),
   ]);
   await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,
   );
   preparing.delete(mainJob.filename);
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await reconnectRealtime(page);
   await media
     .nth(1)
     .getByRole("button", { name: "Masquer le détail", exact: true })
@@ -583,15 +460,16 @@ test("the host creates private and public categories and saves each welcome uplo
   page,
   context,
 }) => {
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/parametres");
   await openSettingsSection(page, "categories");
+  // Beside the desktop sidebar, an editor's title is a second-level heading.
   await expect(
     page.getByRole("heading", {
       name: "Catégories et visibilité",
       exact: true,
-      level: 1,
+      level: 2,
     }),
   ).toBeVisible();
   const categoryName = page.getByLabel("Nom de la catégorie", { exact: true });
@@ -721,13 +599,13 @@ test("the host creates private and public categories and saves each welcome uplo
     .click();
   await page.locator(".welcome-admin").scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: "test-results/media-categories-editor-desktop.png",
+    path: test.info().outputPath("media-categories-editor-desktop.png"),
     fullPage: true,
   });
   await page.setViewportSize({ width: 320, height: 740 });
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: "test-results/media-categories-editor-mobile-320.png",
+    path: test.info().outputPath("media-categories-editor-mobile-320.png"),
     fullPage: true,
   });
 });
@@ -798,9 +676,9 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   await expect(page.locator(".upload-queue")).toContainText(
     "table-portrait-private.png",
   );
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: "test-results/media-categories-welcome-mobile-390.png",
+    path: test.info().outputPath("media-categories-welcome-mobile-390.png"),
     fullPage: true,
   });
   for (const path of [
@@ -870,7 +748,6 @@ test("a private welcome upload survives reload and stays inaccessible until the 
   });
   try {
     const hostPage = await hostContext.newPage();
-    hostPage.on("dialog", (dialog) => void dialog.accept());
     await hostPage.goto("/parametres");
     await openSettingsSection(hostPage, "categories");
     const published = hostPage.waitForResponse(
@@ -881,6 +758,7 @@ test("a private welcome upload survives reload and stays inaccessible until the 
     await hostPage
       .getByRole("button", { name: `Publier ${category.name}`, exact: true })
       .click();
+    await acceptConfirmation(hostPage);
     expect((await published).status()).toBe(200);
     await expect(
       hostPage.getByRole("button", {
@@ -948,10 +826,10 @@ test("welcome uploads keep their public or main destination and the gallery filt
   expect(mainJob.welcomeRevision).toBe(secondRevision);
   expect(mainJob.welcomeWidgetIndex).toBe(2);
   expect((await ready(page.request, mainJob.id)).photo).toBeNull();
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
-    path: "test-results/media-categories-welcome-desktop.png",
+    path: test.info().outputPath("media-categories-welcome-desktop.png"),
     fullPage: true,
   });
   await transition("open");
@@ -987,13 +865,13 @@ test("welcome uploads keep their public or main destination and the gallery filt
   ).toHaveCount(0);
   const namedItems = await categoryPhotos(page.request, category.id);
   expect(namedItems.map((item) => item.id)).toEqual([named.id]);
-  await expect(page.locator(".media-feed .media-post-author")).toContainText(
-    "Alex Public Upload Test",
-  );
+  // The gallery opens as a mosaic with the author in a pill on the photo.
   const grid = page.getByRole("button", { name: "Vue en grille", exact: true });
   const feed = page.getByRole("button", { name: "Vue en fil", exact: true });
-  await grid.press("Enter");
   await expect(grid).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".media-grid .media-post-author")).toContainText(
+    "Alex Public Upload Test",
+  );
   await expect(page.locator(".media-grid .photo-tile")).toHaveCount(1);
   await page.locator(".media-grid .photo-tile").press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -1001,6 +879,14 @@ test("welcome uploads keep their public or main destination and the gallery filt
   await expect(page.locator(".media-grid .photo-tile")).toBeFocused();
   await feed.press("Enter");
   await expect(feed).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".media-feed .photo-tile")).toHaveCount(1);
+  await expect(page.locator(".media-feed .media-post-author")).toContainText(
+    "Alex Public Upload Test",
+  );
+  await grid.press("Enter");
+  await expect(grid).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".media-grid .photo-tile")).toHaveCount(1);
+  await feed.press("Enter");
   await expect(page.locator(".media-feed .photo-tile")).toHaveCount(1);
   // Uploads chosen from the gallery retain the selected category as well.
   const galleryJob = await upload(page, "dance-gallery.png", "#6d8b69");
@@ -1022,7 +908,7 @@ test("welcome uploads keep their public or main destination and the gallery filt
     page.locator(`.photo-tile img[src="${galleryPhoto.thumbnailUrl}"]`),
   ).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expectNoOverflow(page);
+  await expectNoHorizontalOverflow(page);
   const addButton = page.getByRole("button", {
     name: "Ajouter des médias",
     exact: true,
@@ -1035,7 +921,7 @@ test("welcome uploads keep their public or main destination and the gallery filt
     /Photos : JPEG, PNG, WebP, [\d\s]+ Mo max\..*Vidéos : MP4, MOV, WebM, [\d\s]+ Mo et 5 minutes max\./,
   );
   await page.screenshot({
-    path: "test-results/media-categories-gallery-mobile.png",
+    path: test.info().outputPath("media-categories-gallery-mobile.png"),
     fullPage: true,
   });
 });

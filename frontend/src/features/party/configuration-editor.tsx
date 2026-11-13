@@ -2,10 +2,10 @@
 
 import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useRouter } from "next/navigation";
 import { ErrorNotice } from "@/components/ui";
 import { errorMessage } from "@/lib/api";
 import { useAutosave } from "@/lib/autosave";
+import { useRouteRefresh } from "@/lib/use-route-refresh";
 import { useI18n } from "@/lib/i18n-context";
 import { locales } from "@/lib/locale";
 import type { Configuration } from "./contracts";
@@ -50,7 +50,7 @@ function CopyField({
   };
 
   return (
-    <div className="configuration-copy-field">
+    <div>
       <label htmlFor={`${id}-mode`}>
         {t(
           type === "title"
@@ -106,7 +106,7 @@ export function ConfigurationEditor({
   onSave: (patch: Partial<Configuration>) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const router = useRouter();
+  const refreshRoute = useRouteRefresh();
   const id = useId();
   const form = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +167,7 @@ export function ConfigurationEditor({
       lastSaved.current = snapshot;
       setSavedRevision(revision);
       setSaved(true);
-      router.refresh();
+      refreshRoute();
       return true;
     } catch (err) {
       setError(errorMessage(err, t));
@@ -208,7 +208,7 @@ export function ConfigurationEditor({
     >
       <fieldset className="configuration-fields">
         {section === "age" && (
-          <div className="configuration-field">
+          <div>
             <label htmlFor={`${id}-age`}>{t("configuration.age")}</label>
             <input
               id={`${id}-age`}
@@ -228,7 +228,7 @@ export function ConfigurationEditor({
             <p className="fine-print" id={`${id}-upload-limits`}>
               {t("configuration.uploadHint")}
             </p>
-            <div className="configuration-field">
+            <div>
               <label htmlFor={`${id}-images`}>
                 {t("configuration.images")}
               </label>
@@ -245,7 +245,7 @@ export function ConfigurationEditor({
                 aria-describedby={`${id}-upload-limits`}
               />
             </div>
-            <div className="configuration-field">
+            <div>
               <label htmlFor={`${id}-videos`}>
                 {t("configuration.videos")}
               </label>

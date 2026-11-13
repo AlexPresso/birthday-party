@@ -167,7 +167,7 @@ func TestServiceIssuesPrivateHashedInvitationsAndBoundsGuests(t *testing.T) {
 	if guest.Name != "Camille" || repository.createdName != guest.Name || repository.guestLimit != 500 || !ValidToken(token) {
 		t.Fatal("guest creation lost normalization, capacity or invitation encoding")
 	}
-	if repository.credential.TokenHash != HashToken(token) || !repository.credential.ExpiresAt.Equal(now.Add(InvitationTTL)) || issued.ExpiresAt != now.Add(InvitationTTL).Format(time.RFC3339Nano) {
+	if repository.credential.TokenHash != HashToken(token) || !repository.credential.ExpiresAt.Equal(now.Add(InvitationTTL)) || issued.ExpiresAt != "2026-10-24T18:00:00Z" {
 		t.Fatal("invitation persistence lost the digest or expiry")
 	}
 	if err := service.Revoke(t.Context(), guest.ID, guest.ID); !errors.Is(err, ErrSelfRevoke) || repository.revoked {

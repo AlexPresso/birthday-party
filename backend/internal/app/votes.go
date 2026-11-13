@@ -1,81 +1,89 @@
 package app
 
 import (
-	"errors"
 	"net/http"
 
 	"birthday-party/backend/internal/access"
-	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/programme"
 )
 
-func programmeActor(r *http.Request, guest identity.Guest) programme.Actor {
-	cookie, _ := r.Cookie(cookieName)
-	return programme.Actor{GuestID: guest.ID, SessionHash: identity.HashToken(cookie.Value)}
-}
-
-func (a *App) transitionVote(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) transitionVote(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	eventID, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	var input struct {
-		Status   string `json:"status"`
-		Revision int64  `json:"revision"`
+		Status   programme.VoteStatus `json:"status"`
+		Revision int64                `json:"revision"`
 	}
 	if !decode(w, r, &input) {
 		return
 	}
-	event, err := a.programme.Transition(r.Context(), programmeActor(r, guest), eventID, input.Status, input.Revision)
+	event, err := a.programme.Transition(r.Context(), programmeActor(viewer), eventID, input.Status, input.Revision)
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
 	a.programmeChanged()
-	respond(w, 200, event)
+	respond(w, http.StatusOK, event)
 }
 
-func (a *App) castVote(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) castVote(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	eventID, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	var input struct {
-		CandidateID int64 `json:"candidateId"`
+		OptionID int64 `json:"optionId"`
 	}
 	if !decode(w, r, &input) {
 		return
 	}
-	event, err := a.programme.Vote(r.Context(), programmeActor(r, guest), eventID, input.CandidateID)
+	event, err := a.programme.Vote(r.Context(), programmeActor(viewer), eventID, input.OptionID)
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
 	a.realtime.notify(0, realtimeProgramme)
-	respond(w, 200, event)
+	respond(w, http.StatusOK, event)
 }
 
-func failVote(w http.ResponseWriter, err error) {
-	var rejected access.Error
-	if errors.As(err, &rejected) {
-		status := http.StatusUnauthorized
-		if rejected == access.ErrAdmin {
-			status = http.StatusForbidden
-		}
-		if rejected == access.ErrWelcome {
-			status = http.StatusLocked
-		}
-		fail(w, status, string(rejected))
+// castWriteIn votes for the label the guest typed, adding it to the options
+// when no option carries it yet.
+func (a *App) castWriteIn(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
+	eventID, ok := pathID(w, r)
+	if !ok {
 		return
 	}
-	var invalid programme.ActivityError
-	if errors.As(err, &invalid) {
-		status := http.StatusBadRequest
-		if invalid == programme.ErrActivityConflict || invalid == programme.ErrVoteClosed || invalid == programme.ErrQuestionsClosed || invalid == programme.ErrQuestionLimit || invalid == programme.ErrNoJokers {
-			status = http.StatusConflict
-		}
-		fail(w, status, string(invalid))
+	var input struct {
+		Label string `json:"label"`
+	}
+	if !decode(w, r, &input) {
 		return
 	}
-	failProgramme(w, err)
+	event, err := a.programme.WriteIn(r.Context(), programmeActor(viewer), eventID, input.Label)
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	a.realtime.notify(0, realtimeProgramme)
+	respond(w, http.StatusOK, event)
+}
+
+func (a *App) removeVoteOption(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
+	eventID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	optionID, ok := pathValueID(w, r, "optionId")
+	if !ok {
+		return
+	}
+	event, err := a.programme.RemoveOption(r.Context(), programmeActor(viewer), eventID, optionID)
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	a.realtime.notify(0, realtimeProgramme)
+	respond(w, http.StatusOK, event)
 }

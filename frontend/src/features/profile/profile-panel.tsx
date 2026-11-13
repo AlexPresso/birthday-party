@@ -5,6 +5,7 @@ import { remove, errorMessage, returnToInvitation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import type { Guest } from "@/features/guests/contracts";
 import { ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
 import { ProfilePhotoEditor } from "./profile-photo-editor";
 import { NotificationControl } from "@/features/notifications/notification-control";
@@ -18,6 +19,7 @@ export function ProfilePanel({
   imageBytes: number;
 }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photo, setPhoto] = useState({
@@ -28,7 +30,11 @@ export function ProfilePanel({
     setPhoto({ source: guest.avatarUrl, url: guest.avatarUrl });
   }
   async function logout() {
-    if (!window.confirm(t("settings.logoutConfirmation"))) return;
+    const confirmed = await confirm({
+      message: t("settings.logoutConfirmation"),
+      destructive: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     setError(null);
     try {

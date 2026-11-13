@@ -1,4 +1,7 @@
+import { globalErrorMessages } from "./global-error.ts";
+
 const en = {
+  ...globalErrorMessages.en,
   "birthday.title": "Turning {age}",
   "birthday.titleOne": "Turning {age}",
   "birthday.description":
@@ -16,10 +19,11 @@ const en = {
   "page.settings": "Settings",
   "page.profile": "Profile",
   "shell.skip": "Skip to content",
-  "invitation.hello": "Hi {name}!",
+  "invitation.hello": "{name}, you’re invited.",
   "invitation.welcome": "Welcome!",
   "invitation.checking": "Checking your invitation…",
-  "invitation.noAccount": "No account or password needed.",
+  "invitation.noAccount":
+    "Your personal link is all you need: no account, no password.",
   "invitation.entering": "Signing in…",
   "invitation.enter": "Enter",
   "invitation.session": "You'll stay signed in on this browser.",
@@ -30,13 +34,12 @@ const en = {
     "Open the link from the host. It lets you in without creating an account or choosing a password.",
   "invitation.footer": "For invited guests only.",
   "common.loading": "Loading…",
-  "common.retry": "Try again",
+  "common.confirm": "Confirm",
+  "common.cancel": "Cancel",
   "common.connectionFailed":
     "Can't connect. Check your connection and try again.",
   "common.invalidResponse": "Couldn't load the details. Try again.",
   "common.actionFailed": "That didn't work. Try again.",
-  "error.title": "Can't load the page",
-  "error.description": "Try again in a moment.",
   "error.partyTitle": "The page didn't load",
   "error.partyDescription": "Try again in a moment.",
   "notFound.title": "This page doesn't exist.",
@@ -48,6 +51,7 @@ type CommonMessageKey = keyof typeof en;
 export const commonMessages = {
   en,
   fr: {
+    ...globalErrorMessages.fr,
     "birthday.title": "Les {age} ans",
     "birthday.titleOne": "{age} an",
     "birthday.description":
@@ -65,11 +69,11 @@ export const commonMessages = {
     "page.settings": "Paramètres",
     "page.profile": "Profil",
     "shell.skip": "Aller au contenu",
-    "invitation.hello": "Salut {name} !",
+    "invitation.hello": "{name}, tu es de la fête.",
     "invitation.welcome": "Bienvenue !",
     "invitation.checking": "Vérification de ton invitation…",
     "invitation.noAccount":
-      "Pas de compte à créer ni de mot de passe à retenir.",
+      "Ton lien personnel suffit pour entrer : pas de compte, pas de mot de passe.",
     "invitation.entering": "Connexion…",
     "invitation.enter": "Entrer",
     "invitation.session": "Tu resteras connecté sur ce navigateur.",
@@ -80,20 +84,20 @@ export const commonMessages = {
       "Ouvre le lien que l’organisateur t’a envoyé. Tu peux entrer sans créer de compte ni choisir de mot de passe.",
     "invitation.footer": "Accès réservé aux invités.",
     "common.loading": "Chargement…",
-    "common.retry": "Réessayer",
+    "common.confirm": "Confirmer",
+    "common.cancel": "Annuler",
     "common.connectionFailed":
       "Connexion impossible. Vérifie ton réseau puis réessaie.",
     "common.invalidResponse":
       "Les informations n’ont pas pu être chargées. Réessaie.",
     "common.actionFailed": "Ça n’a pas fonctionné. Réessaie.",
-    "error.title": "Impossible de charger la page",
-    "error.description": "Réessaie dans un instant.",
     "error.partyTitle": "La page n’a pas chargé",
     "error.partyDescription": "Réessaie dans un instant.",
     "notFound.title": "Cette page n’existe pas.",
     "notFound.return": "Retrouver la fête",
   },
   de: {
+    ...globalErrorMessages.de,
     "birthday.title": "Der {age}. Geburtstag",
     "birthday.titleOne": "Der {age}. Geburtstag",
     "birthday.description":
@@ -111,10 +115,11 @@ export const commonMessages = {
     "page.settings": "Einstellungen",
     "page.profile": "Profil",
     "shell.skip": "Zum Inhalt springen",
-    "invitation.hello": "Hallo {name}!",
+    "invitation.hello": "{name}, du bist dabei.",
     "invitation.welcome": "Willkommen!",
     "invitation.checking": "Deine Einladung wird geprüft…",
-    "invitation.noAccount": "Du brauchst kein Konto und kein Passwort.",
+    "invitation.noAccount":
+      "Dein persönlicher Link genügt: kein Konto, kein Passwort.",
     "invitation.entering": "Anmeldung läuft…",
     "invitation.enter": "Reinkommen",
     "invitation.session": "Du bleibst in diesem Browser angemeldet.",
@@ -125,20 +130,20 @@ export const commonMessages = {
       "Öffne den Link, den du vom Gastgeber bekommen hast. Du brauchst kein Konto und kein Passwort.",
     "invitation.footer": "Zugang nur für eingeladene Gäste.",
     "common.loading": "Wird geladen…",
-    "common.retry": "Erneut versuchen",
+    "common.confirm": "Bestätigen",
+    "common.cancel": "Abbrechen",
     "common.connectionFailed":
       "Keine Verbindung. Prüfe deine Internetverbindung und versuche es erneut.",
     "common.invalidResponse":
       "Das Laden hat nicht geklappt. Versuche es erneut.",
     "common.actionFailed": "Das hat nicht geklappt. Versuche es erneut.",
-    "error.title": "Die Seite konnte nicht geladen werden",
-    "error.description": "Versuche es gleich noch einmal.",
     "error.partyTitle": "Die Seite konnte nicht geladen werden",
     "error.partyDescription": "Versuche es gleich noch einmal.",
     "notFound.title": "Diese Seite gibt es nicht.",
     "notFound.return": "Zurück zur Feier",
   },
   it: {
+    ...globalErrorMessages.it,
     "birthday.title": "I {age} anni",
     "birthday.titleOne": "Il {age}° compleanno",
     "birthday.description":
@@ -156,10 +161,11 @@ export const commonMessages = {
     "page.settings": "Impostazioni",
     "page.profile": "Profilo",
     "shell.skip": "Vai al contenuto",
-    "invitation.hello": "Ciao {name}!",
+    "invitation.hello": "{name}, sei dei nostri.",
     "invitation.welcome": "Benvenuto!",
     "invitation.checking": "Verifica dell’invito…",
-    "invitation.noAccount": "Non servono un account o una password.",
+    "invitation.noAccount":
+      "Ti basta il tuo link personale: niente account, niente password.",
     "invitation.entering": "Accesso in corso…",
     "invitation.enter": "Entra",
     "invitation.session": "Resterai connesso su questo browser.",
@@ -170,19 +176,19 @@ export const commonMessages = {
       "Apri il link che ti ha mandato chi organizza la festa. Puoi entrare senza creare un account o scegliere una password.",
     "invitation.footer": "Accesso riservato agli invitati.",
     "common.loading": "Caricamento…",
-    "common.retry": "Riprova",
+    "common.confirm": "Conferma",
+    "common.cancel": "Annulla",
     "common.connectionFailed":
       "Connessione non disponibile. Controlla la rete e riprova.",
     "common.invalidResponse": "I dati non si caricano. Riprova.",
     "common.actionFailed": "Non ha funzionato. Riprova.",
-    "error.title": "Impossibile caricare la pagina",
-    "error.description": "Riprova tra un momento.",
     "error.partyTitle": "La pagina non si carica",
     "error.partyDescription": "Riprova tra un momento.",
     "notFound.title": "Questa pagina non esiste.",
     "notFound.return": "Torna alla festa",
   },
   es: {
+    ...globalErrorMessages.es,
     "birthday.title": "Los {age} años",
     "birthday.titleOne": "Cumple {age} año",
     "birthday.description":
@@ -200,11 +206,11 @@ export const commonMessages = {
     "page.settings": "Ajustes",
     "page.profile": "Perfil",
     "shell.skip": "Ir al contenido",
-    "invitation.hello": "¡Hola, {name}!",
+    "invitation.hello": "{name}, estás en la fiesta.",
     "invitation.welcome": "¡Te damos la bienvenida!",
     "invitation.checking": "Comprobando tu invitación…",
     "invitation.noAccount":
-      "No necesitas crear una cuenta ni elegir una contraseña.",
+      "Te basta con tu enlace personal: sin cuenta ni contraseña.",
     "invitation.entering": "Entrando…",
     "invitation.enter": "Entrar",
     "invitation.session": "Tu sesión seguirá abierta en este navegador.",
@@ -215,14 +221,13 @@ export const commonMessages = {
       "Abre el enlace que te ha enviado quien organiza la fiesta. Puedes entrar sin crear una cuenta ni elegir una contraseña.",
     "invitation.footer": "Acceso solo para invitados.",
     "common.loading": "Cargando…",
-    "common.retry": "Volver a intentar",
+    "common.confirm": "Confirmar",
+    "common.cancel": "Cancelar",
     "common.connectionFailed":
       "No se puede conectar. Comprueba tu conexión e inténtalo de nuevo.",
     "common.invalidResponse":
       "No se han podido cargar los datos. Inténtalo de nuevo.",
     "common.actionFailed": "No ha funcionado. Inténtalo de nuevo.",
-    "error.title": "No se puede cargar la página",
-    "error.description": "Inténtalo de nuevo en un momento.",
     "error.partyTitle": "La página no se ha cargado",
     "error.partyDescription": "Inténtalo de nuevo en un momento.",
     "notFound.title": "Esta página no existe.",

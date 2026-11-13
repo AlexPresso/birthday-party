@@ -23,6 +23,4 @@ export const entriesSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export type Entry = z.infer<typeof entrySchema>;
-
 export type EntryPage = z.infer<typeof entriesSchema>;

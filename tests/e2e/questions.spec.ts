@@ -1,50 +1,17 @@
-﻿import {
-  test,
-  expect,
-  request,
-  type APIRequestContext,
-} from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import { openSettingsSection } from "./settings-navigation";
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import {
+  baseURL,
+  bootstrapHost,
+  invitationToken,
+  mutationHeaders,
+} from "./support/party";
+import { openSettingsSection } from "./support/settings";
+import { acceptConfirmation } from "./support/confirm";
 
-const baseURL = "http://localhost:3300";
-const headers = { "X-Requested-With": "birthday-party", Origin: baseURL };
 let host: APIRequestContext;
 
-function token(url: string) {
-  const value = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!value) throw new Error("Invitation token is missing");
-  return value;
-}
-
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Question Test Host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120000,
-    },
-  );
-  const invitation = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  )?.[0];
-  if (!invitation) throw new Error("Host invitation was not returned");
-  host = await request.newContext({ baseURL, extraHTTPHeaders: headers });
-  expect(
-    (
-      await host.post("/api/invitations/accept", {
-        data: { token: token(invitation) },
-      })
-    ).status(),
-  ).toBe(200);
+  host = await bootstrapHost("Question Test Host");
 });
 
 test.afterAll(async () => {
@@ -64,8 +31,8 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
   expect(
     (
       await page.request.post("/api/invitations/accept", {
-        headers,
-        data: { token: token(invitation.invitationUrl) },
+        headers: mutationHeaders,
+        data: { token: invitationToken(invitation.invitationUrl) },
       })
     ).status(),
   ).toBe(200);
@@ -78,7 +45,6 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
   let eventId: number | undefined;
   try {
     const editor = await context.newPage();
-    editor.on("dialog", (dialog) => dialog.accept());
     await editor.goto("/parametres");
     await openSettingsSection(editor, "programme");
     await editor
@@ -281,29 +247,20 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
     await page.evaluate(() => document.fonts.ready);
     await editor.evaluate(() => document.fonts.ready);
     await page.screenshot({
-      path: "artifacts/questions-guest-light.png",
+      path: test.info().outputPath("questions-guest.png"),
       fullPage: true,
     });
     await editor.screenshot({
-      path: "artifacts/questions-host-desktop.png",
+      path: test.info().outputPath("questions-host-desktop.png"),
       fullPage: true,
     });
-    await editor.emulateMedia({ colorScheme: "dark" });
-    await editor.screenshot({
-      path: "artifacts/questions-host-desktop-dark.png",
-      fullPage: true,
-    });
-    await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
-    await page.screenshot({
-      path: "artifacts/questions-guest-dark.png",
-      fullPage: true,
-    });
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await launch.click();
     await sheet
       .getByLabel("Ta question anonyme", { exact: true })
       .fill("Une autre question en cours de rédaction");
     await page.screenshot({
-      path: "artifacts/questions-sheet-dark.png",
+      path: test.info().outputPath("questions-sheet.png"),
       fullPage: true,
     });
     await editor
@@ -314,6 +271,7 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
       await card
         .getByRole("button", { name: "Utiliser un joker", exact: true })
         .click();
+      await acceptConfirmation(editor);
       await expect(card).toHaveCount(0);
     }
     await expect(
@@ -360,6 +318,7 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
     await editor
       .getByRole("button", { name: "Fermer les questions", exact: true })
       .click();
+    await acceptConfirmation(editor);
     await expect(
       sheet.getByLabel("Ta question anonyme", { exact: true }),
     ).toBeDisabled();
@@ -375,7 +334,7 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
       }),
     ).toBeVisible();
     await expect(launch).toHaveCount(0);
-    await page.locator(".question-back").click();
+    await page.locator(".activity-back").click();
     await expect(page).toHaveURL("/programme");
     await page.goBack();
     await expect(page).toHaveURL(activityURL);
@@ -422,8 +381,8 @@ test("direct activity links respect authentication and scheduled availability", 
     expect(
       (
         await page.request.post("/api/invitations/accept", {
-          headers,
-          data: { token: token(invitation.invitationUrl) },
+          headers: mutationHeaders,
+          data: { token: invitationToken(invitation.invitationUrl) },
         })
       ).status(),
     ).toBe(200);

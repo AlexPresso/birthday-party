@@ -1,7 +1,10 @@
 import { getParty } from "@/features/party/server";
 import { getSession } from "@/features/guests/server";
 import { getBirthdayConfig } from "@/features/party/birthday-config";
+import { BrandMark } from "@/components/brand-mark";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { Navigation } from "@/components/navigation";
+import { Snow } from "@/components/snow";
 import { getI18n } from "@/lib/server-i18n";
 import { UploadProvider } from "@/features/media/upload-provider";
 import { UploadQueue } from "@/features/media/upload-queue";
@@ -26,11 +29,10 @@ export default async function PartyLayout({
       <a className="skip-link" href="#content">
         {t("shell.skip")}
       </a>
+      <Snow count={26} />
       <header className="app-header">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            {age}
-          </span>
+          <BrandMark />
           <div>
             <strong>
               {party.title ||
@@ -43,9 +45,11 @@ export default async function PartyLayout({
         </div>
       </header>
       <UploadProvider>
-        <main id="content" className="main-content">
-          {children}
-        </main>
+        <ConfirmProvider>
+          <main id="content" className="main-content">
+            {children}
+          </main>
+        </ConfirmProvider>
         <UploadQueue />
         <Navigation
           isAdmin={guest.role === "admin"}

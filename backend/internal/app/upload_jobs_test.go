@@ -16,6 +16,7 @@ import (
 	"time"
 
 	guestidentity "birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/media"
 )
 
 // Existing media tests exercise the eventual result; queue tests below also check acceptance.
@@ -50,21 +51,7 @@ func completeTestUpload(t *testing.T, a *App, cookie *http.Cookie, response *htt
 	if completed.Status != "failed" || completed.ErrorCode == nil {
 		t.Fatalf("upload did not complete: %s", result.Body.String())
 	}
-	code := *completed.ErrorCode
-	statusCode := 415
-	switch code {
-	case "video_too_long", "video_dimensions_too_large", "photo_dimensions_too_large":
-		statusCode = 413
-	case "video_processing_failed":
-		statusCode = 422
-	case "album_full":
-		statusCode = 409
-	case "access_revoked":
-		statusCode = 401
-	case "photo_unavailable":
-		statusCode = 404
-	}
-	fail(final, statusCode, code)
+	fail(final, *completed.ErrorCode)
 	return final
 }
 
@@ -103,7 +90,7 @@ func parseJob(t *testing.T, response *httptest.ResponseRecorder) UploadJob {
 	return job
 }
 
-func waitForUpload(t *testing.T, a *App, cookie *http.Cookie, id int64, want string) UploadJob {
+func waitForUpload(t *testing.T, a *App, cookie *http.Cookie, id int64, want media.Status) UploadJob {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
@@ -217,7 +204,7 @@ func TestUploadQueueQuotaRevocationFailureAndCleanup(t *testing.T) {
 	if err != nil || len(files) != 1 {
 		t.Fatalf("queue quota leaked raw inputs: %v %v", files, err)
 	}
-	if _, err = a.db.Exec("UPDATE guests SET active=0 WHERE id=$1", identity.ID); err != nil {
+	if _, err = a.db.Exec("UPDATE guests SET active=FALSE WHERE id=$1", identity.ID); err != nil {
 		t.Fatal(err)
 	}
 	pending, err := a.claimUpload(context.Background())
@@ -230,7 +217,7 @@ func TestUploadQueueQuotaRevocationFailureAndCleanup(t *testing.T) {
 		t.Fatalf("revoked upload completed: %+v %v", completed, err)
 	}
 	assertMediaFiles(t, a, 0)
-	if _, err = a.db.Exec("UPDATE upload_jobs SET updated_at=$1", stamp(a.now().Add(-25*time.Hour))); err != nil {
+	if _, err = a.db.Exec("UPDATE upload_jobs SET updated_at=$1", a.now().Add(-25*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if err = a.cleanUploadHistory(context.Background()); err != nil {
@@ -320,6 +307,7 @@ CREATE CONSTRAINT TRIGGER reject_photo_commit AFTER INSERT ON photos DEFERRABLE 
 	if _, err = a.db.Exec("DROP TRIGGER reject_photo_commit ON photos; DROP FUNCTION reject_photo_commit()"); err != nil {
 		t.Fatal(err)
 	}
+	advanceClock(a, time.Minute)
 	job, err = a.claimUpload(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -371,8 +359,8 @@ func TestUploadIDsAndConcurrentRetries(t *testing.T) {
 func TestUploadHistoryRemainsBoundedWithoutHidingActiveJobs(t *testing.T) {
 	a := testApp(t)
 	host, identity := admin(t, a)
-	_, err := a.db.Exec(`INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at)
-SELECT $1,'11111111-1111-4111-8111-'||lpad(n::text,12,'0'),CASE WHEN n<=100 THEN 'queued' ELSE 'ready' END,'file.png','image','png','test-'||n,1,$2,$2 FROM generate_series(1,160) AS n`, identity.ID, stamp(a.now()))
+	_, err := a.db.Exec(`INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,available_at)
+SELECT $1,'11111111-1111-4111-8111-'||lpad(n::text,12,'0'),CASE WHEN n<=100 THEN 'queued' ELSE 'ready' END,'file.png','image','png','test-'||n,1,$2,$2,$2 FROM generate_series(1,160) AS n`, identity.ID, a.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -479,8 +467,8 @@ func TestStartupRecoveryWaitsForAnUploadCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	var id int64
-	err = tx.QueryRow(`INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at)
-VALUES($1,'11111111-1111-4111-8111-111111111111','queued','photo.png','image','png',$2,$3,$4,$4) RETURNING id`, identity.ID, key, len(data), stamp(a.now())).Scan(&id)
+	err = tx.QueryRow(`INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,available_at)
+VALUES($1,'11111111-1111-4111-8111-111111111111','queued','photo.png','image','png',$2,$3,$4,$4,$4) RETURNING id`, identity.ID, key, len(data), a.now()).Scan(&id)
 	if err != nil {
 		t.Fatal(err)
 	}

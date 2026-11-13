@@ -11,20 +11,22 @@ export function ErrorNotice({ message }: { message: string | null }) {
 }
 
 export function PageHeading({
-  eyebrow,
   title,
   description,
+  inHeader = false,
   children,
 }: {
-  eyebrow?: string;
   title: string;
   description?: string;
+  /** Hide the title visually and lift its companions into the app header row. */
+  inHeader?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <header className="page-heading">
+    <header
+      className={`page-heading${inHeader ? " page-heading-in-header" : ""}`}
+    >
       <div>
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         {description && <p className="muted">{description}</p>}
       </div>
@@ -37,12 +39,10 @@ export function EmptyState({
   icon,
   title,
   children,
-  action,
 }: {
   icon: ReactNode;
   title: string;
   children: ReactNode;
-  action?: ReactNode;
 }) {
   return (
     <div className="empty-state">
@@ -51,7 +51,6 @@ export function EmptyState({
       </div>
       <h2>{title}</h2>
       <div className="muted">{children}</div>
-      {action}
     </div>
   );
 }

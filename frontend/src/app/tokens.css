@@ -1,79 +1,53 @@
+/*
+ * The app has a single dark theme. Change --accent to restyle it for another
+ * party; filled accent surfaces always carry dark text (--on-accent).
+ */
 :root {
-  color-scheme: light;
-  --background: #faf8f6;
-  --surface: #fcfaf8;
-  --surface-muted: #f4eff3;
-  --surface-raised: #eee7ef;
-  --text: #2f1033;
-  --muted: #79657f;
-  --accent: #744c6c;
-  --accent-hover: #64425d;
-  --accent-text: #6f4768;
-  --on-accent: #fff9fd;
-  --accent-soft: #f1e7f4;
-  --featured-background: #f1e8f4;
+  color-scheme: dark;
+  --background: #100f0e;
+  --surface: #1b1917;
+  --surface-muted: #161412;
+  --surface-raised: #292623;
+  --text: #f5f1ea;
+  --muted: #a29b92;
+  --accent: #ff6a1f;
+  --accent-hover: #ff8242;
+  --accent-text: #ff8a4c;
+  --on-accent: #100f0e;
+  --accent-soft: #33211a;
+  --highlight: #ffb547;
+  --highlight-pale: #ffe2b0;
+  --accent-gradient: linear-gradient(135deg, var(--highlight), var(--accent));
+  --featured-background: #1b1917;
   --featured-border: transparent;
-  --nav-active: #f1e7f7;
-  --profile-ring: #d8c9f3;
-  --button-fill: linear-gradient(180deg, #795471, #6d4967);
-  --border: #e1d8df;
-  --border-strong: #b9a6b9;
-  --input-background: #fcfaf8;
-  --placeholder: #7d6e81;
-  --danger: #c72a50;
-  --danger-soft: #f9e9ef;
-  --danger-border: #dfb7c4;
-  --success: #3d6b50;
-  --success-soft: #e8f1e9;
-  --warning: #8a612e;
-  --warning-soft: #f6ecd9;
-  --shadow: 0 16px 44px #34253612;
-  --nav-background: #faf8f6;
-  --overlay: #140e1cc9;
-  --media-background: #100d13;
+  --nav-active: var(--accent);
+  --profile-ring: var(--accent);
+  --button-fill: var(--accent);
+  --border: #33302c;
+  --border-strong: #57514a;
+  --input-background: #1b1917;
+  --placeholder: #8f887f;
+  --danger: #ff6b81;
+  --danger-soft: #3a2226;
+  --danger-border: #74434c;
+  --success: #9fd8b4;
+  --success-soft: #1f3328;
+  --shadow: 0 16px 44px #00000055;
+  --nav-background: #1b1917;
+  --overlay: #0a0908d9;
+  --media-background: #0a0908;
   --media-text: #ffffff;
-  --media-overlay: #151218b8;
+  --media-overlay: #100f0eb8;
   --media-border: #ffffff59;
-  --radius: 14px;
-  --radius-small: 10px;
+  --radius: 18px;
+  /* Thin bars, drop indicators and checkboxes. */
+  --radius-tiny: 4px;
+  --radius-small: 12px;
+  --radius-large: 24px;
+  --radius-pill: 999px;
   --page-gutter: 20px;
-  --avatar-neutral-background: #dedddd;
-  --avatar-neutral-foreground: #a3a2a5;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --background: #131016;
-    --surface: #211b28;
-    --surface-muted: #1b171f;
-    --surface-raised: #2c2333;
-    --text: #f6eef9;
-    --muted: #c5b1ce;
-    --accent: #c28bd4;
-    --accent-hover: #d4b6e3;
-    --accent-text: #d3b1e3;
-    --on-accent: #211627;
-    --accent-soft: #3d2648;
-    --featured-background: #2b2033;
-    --featured-border: #3a2d43;
-    --nav-active: #3d2648;
-    --profile-ring: #c28bd4;
-    --button-fill: linear-gradient(180deg, #c898d9, #bd85d0);
-    --border: #3b3043;
-    --border-strong: #6b5479;
-    --input-background: #211b28;
-    --placeholder: #a998b4;
-    --danger: #ff527c;
-    --danger-soft: #3a2531;
-    --danger-border: #74505d;
-    --success: #bbd7c4;
-    --success-soft: #263a31;
-    --warning: #e2c29a;
-    --warning-soft: #3b3024;
-    --shadow: 0 16px 44px #00000033;
-    --nav-background: #131016;
-    --avatar-neutral-background: #4c4753;
-    --avatar-neutral-foreground: #98939f;
-  }
+  --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Unbounded", "Figtree", "Segoe UI", system-ui, sans-serif;
+  --avatar-neutral-background: #45403b;
+  --avatar-neutral-foreground: #a29b92;
 }

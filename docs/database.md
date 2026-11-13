@@ -25,6 +25,55 @@ standard PostgreSQL `PGUSER`, `PGPASSWORD` and `PGDATABASE` environment defaults
 The separate `birthday-party-dev` Compose project keeps local development records
 paired with `backend/data`, independently of the deployed application's media volume.
 
+## Schema
+
+`backend/internal/app/migrations/0001_baseline.sql` creates the initial schema.
+It replaced the earlier migration history, so a database created before the
+baseline is refused at startup ("applied migration has changed"): drop it, or its
+Compose volume, and let the backend create a fresh one. Later files change the
+schema in order; read them together for its current shape.
+
+`0002_vote_options.sql` lets a vote offer guests or labels written by the host,
+with optional write-ins from guests:
+
+- `programme_votes` gains `choices` (`guests` or `custom`) and
+  `allow_write_ins`. Two checks keep `allow_self_vote` for `guests` votes and
+  `allow_write_ins` for `custom` ones. The `revealed` status disappears: counts
+  are visible as soon as the vote is, so existing revealed votes become `closed`.
+- `programme_vote_options` replaces `programme_vote_candidates`. A row is either
+  a guest or a label of 1 to 80 characters, never both. `write_in` marks a label
+  added by a guest. A unique index on `(activity_id, lower(label))` makes labels
+  unique per vote whatever their case, so the database decides which labels are
+  the same; `lower` follows the database's collation.
+- `programme_ballots.option_id` replaces `candidate_id`. Its composite foreign
+  key keeps a ballot on an option of its own vote and removes it with the
+  option. The primary key `(activity_id, guest_id)` finds a voter's ballot; the
+  index on `(activity_id, option_id)` counts the votes of each option.
+
+Existing candidates become guest options in their saved order and every ballot
+follows its candidate.
+
+Conventions for new tables and columns:
+
+- Flags are `BOOLEAN`; instants are `TIMESTAMPTZ`. The API renders instants as
+  RFC 3339 UTC strings through `internal/timestamp`, at microsecond precision.
+- Small closed sets (roles, statuses, kinds) are `TEXT` with a `CHECK`
+  constraint; the Go feature package declares the matching typed constants.
+- Generated identifiers use `GENERATED ALWAYS AS IDENTITY`.
+- Add an index for a query that needs one; the baseline comments explain the
+  non-obvious ones, such as the partial indexes of the upload queue.
+
+## Connection settings
+
+The backend opens every pooled connection with a 30-second `statement_timeout`,
+a 10-second `lock_timeout` and a 60-second
+`idle_in_transaction_session_timeout`. They bound runaway statements, lock queues
+and abandoned transactions; an idle session is never affected, so the connection
+holding the worker advisory lock stays open. Override a value by adding it to
+`DATABASE_URL`, for example `?statement_timeout=120s`. Migrations run under the
+same limits: a statement that needs longer must start with
+`SET LOCAL statement_timeout = ...` in its migration file.
+
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
@@ -48,27 +97,6 @@ transaction; for example, do not use `CREATE INDEX CONCURRENTLY` here.
 Correct a deployed schema with a new forward migration. Automatic destructive
 rollbacks are deliberately absent. Back up records and media before a release
 that changes stored data.
-
-## Existing SQLite installations
-
-On startup, the backend detects `DATA_DIR/birthday.sqlite`. If no import marker
-exists, it reads one consistent SQLite snapshot and copies it into an empty
-PostgreSQL database in a transaction. It accepts legacy schema versions 1 and 2,
-preserves guest IDs, invitation/session hashes, anonymity and media filenames,
-and advances PostgreSQL identity sequences. The source file is never removed.
-
-Stop the old backend before upgrading so it cannot write to SQLite during the
-transition. Back up the complete old media volume, including SQLite/WAL files.
-Then rebuild and start the new stack:
-
-```powershell
-docker compose up -d --build
-```
-
-The import marker prevents replay on later starts. If PostgreSQL already contains
-application data without that marker, startup stops; resolve the two datasets
-explicitly instead of merging them automatically. Restoring the old SQLite file
-does not restore changes made later in PostgreSQL.
 
 ## Consistent backups
 

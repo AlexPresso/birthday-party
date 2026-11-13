@@ -24,7 +24,7 @@ func (f *Files) Prepare(ctx context.Context, job media.Pending) (media.Output, e
 	}
 	defer os.RemoveAll(workDir)
 	var prepared preparedMedia
-	if job.Kind == "video" {
+	if job.Kind == media.KindVideo {
 		prepared, err = prepareVideo(ctx, inputPath, workDir, job.Format)
 	} else {
 		input, openErr := os.Open(inputPath)

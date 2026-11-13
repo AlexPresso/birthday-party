@@ -1,18 +1,12 @@
-import { openSettingsSection } from "./settings-navigation";
+import { openSettingsSection } from "./support/settings";
 import {
-  test,
-  expect,
-  request,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
-import { execFileSync } from "node:child_process";
+  acceptConfirmation,
+  confirmation,
+  declineConfirmation,
+} from "./support/confirm";
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import { activate, baseURL, bootstrapHost, invite } from "./support/party";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 const unlockAt = new Date(
   Date.UTC(new Date().getUTCFullYear() + 1, 10, 23, 17),
 ).toISOString();
@@ -29,6 +23,7 @@ const languages = [
       "Ce lien est invalide ou a expiré. Demande un nouveau lien à l’organisateur.",
     tabs: ["Programme", "Médias", "Livre d'or"],
     mediaInput: "Ajouter des médias",
+    uploadDetails: "Détail des envois",
     uploadError:
       "Choisis une photo JPEG, PNG ou WebP, ou une vidéo MP4, MOV ou WebM. Convertis d’abord les fichiers HEIC en JPEG.",
     surprise: "Surprise",
@@ -40,6 +35,8 @@ const languages = [
     settings: "Paramètres",
     profile: "Profil",
     signOut: "Se déconnecter",
+    cancel: "Annuler",
+    confirm: "Confirmer",
     logout:
       "Te déconnecter de cet appareil ? Il te faudra un nouveau lien de l’organisateur pour revenir.",
   },
@@ -52,6 +49,7 @@ const languages = [
       "This link is invalid or has expired. Ask the host for a new invitation.",
     tabs: ["Schedule", "Media", "Guestbook"],
     mediaInput: "Add media",
+    uploadDetails: "Upload details",
     uploadError:
       "Choose a JPEG, PNG or WebP photo, or an MP4, MOV or WebM video. Convert HEIC files to JPEG first.",
     surprise: "Surprise",
@@ -63,6 +61,8 @@ const languages = [
     settings: "Settings",
     profile: "Profile",
     signOut: "Sign out",
+    cancel: "Cancel",
+    confirm: "Confirm",
     logout:
       "Sign out of this device? You’ll need a new link from the host to get back in.",
   },
@@ -75,6 +75,7 @@ const languages = [
       "Dieser Link ist ungültig oder abgelaufen. Bitte den Gastgeber um eine neue Einladung.",
     tabs: ["Programm", "Medien", "Gästebuch"],
     mediaInput: "Medien hinzufügen",
+    uploadDetails: "Upload-Details",
     uploadError:
       "Wähle ein Foto im Format JPEG, PNG oder WebP oder ein Video im Format MP4, MOV oder WebM. Wandle HEIC-Dateien zuerst in JPEG um.",
     surprise: "Überraschung",
@@ -86,6 +87,8 @@ const languages = [
     settings: "Einstellungen",
     profile: "Profil",
     signOut: "Abmelden",
+    cancel: "Abbrechen",
+    confirm: "Bestätigen",
     logout:
       "Von diesem Gerät abmelden? Du brauchst danach einen neuen Link vom Gastgeber, um dich wieder anzumelden.",
   },
@@ -98,6 +101,7 @@ const languages = [
       "Questo link non è valido o è scaduto. Chiedi un nuovo invito a chi organizza.",
     tabs: ["Programma", "Media", "Dediche"],
     mediaInput: "Aggiungi foto e video",
+    uploadDetails: "Dettagli degli invii",
     uploadError:
       "Scegli una foto JPEG, PNG o WebP, oppure un video MP4, MOV o WebM. Converti prima i file HEIC in JPEG.",
     surprise: "Sorpresa",
@@ -109,6 +113,8 @@ const languages = [
     settings: "Impostazioni",
     profile: "Profilo",
     signOut: "Esci",
+    cancel: "Annulla",
+    confirm: "Conferma",
     logout:
       "Uscire da questo dispositivo? Per rientrare ti servirà un nuovo link dell’organizzatore.",
   },
@@ -121,6 +127,7 @@ const languages = [
       "Este enlace no es válido o ha caducado. Pide una nueva invitación a quien organiza.",
     tabs: ["Programa", "Multimedia", "Dedicatorias"],
     mediaInput: "Añadir fotos y vídeos",
+    uploadDetails: "Detalles de los envíos",
     uploadError:
       "Elige una foto JPEG, PNG o WebP, o un vídeo MP4, MOV o WebM. Convierte primero los archivos HEIC a JPEG.",
     surprise: "Sorpresa",
@@ -132,66 +139,15 @@ const languages = [
     settings: "Ajustes",
     profile: "Perfil",
     signOut: "Cerrar sesión",
+    cancel: "Cancelar",
+    confirm: "Confirmar",
     logout:
       "¿Cerrar sesión en este dispositivo? Necesitarás un nuevo enlace del organizador para volver.",
   },
 ] as const;
 
-function tokenFrom(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
-async function createGuest(name: string) {
-  const response = await host.post("/api/admin/guests", { data: { name } });
-  expect(response.status()).toBe(201);
-  return response.json() as Promise<{
-    guest: { id: number; name: string };
-    invitationUrl: string;
-  }>;
-}
-
-async function signIn(page: Page, invitationUrl: string) {
-  const response = await page.request.post("/api/invitations/accept", {
-    data: { token: tokenFrom(invitationUrl) },
-    headers: mutationHeaders,
-  });
-  expect(response.status()).toBe(200);
-}
-
 test.beforeAll(async () => {
-  if (!process.env.BIRTHDAY_E2E_DATA_DIR)
-    throw new Error("The isolated E2E data directory is required.");
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Localization test host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-        PRINT_ADMIN_INVITATION: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await host.post("/api/invitations/accept", {
-    data: { token: tokenFrom(match[0]) },
-  });
-  expect(accepted.status()).toBe(200);
+  host = await bootstrapHost("Localization test host");
   const event = await host.post("/api/admin/programme", {
     data: {
       title: "LOCALIZATION-HIDDEN-TITLE",
@@ -230,12 +186,14 @@ for (const language of languages) {
       await expect(
         page.getByRole("heading", { name: language.welcome, exact: true }),
       ).toBeVisible();
-      await expect(page.locator(".invitation-card > .eyebrow")).toHaveCount(0);
+      await expect(
+        page.locator(".invitation-card > .brand strong"),
+      ).toHaveCount(0);
       await expect(page.locator(".invitation-intro")).toHaveCount(0);
       await expect(page.locator('meta[name="description"]')).toHaveCount(0);
       if (language.lang === "fr") {
         await page.screenshot({
-          path: "test-results/invitation-mobile.png",
+          path: test.info().outputPath("invitation-mobile.png"),
           fullPage: true,
           caret: "initial",
         });
@@ -265,8 +223,8 @@ for (const language of languages) {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       const name = `Invité Élise ${language.lang}`;
-      const invitation = await createGuest(name);
-      await signIn(page, invitation.invitationUrl);
+      const invitation = await invite(host, name);
+      await activate(page.request, invitation.invitationUrl);
       await page.goto("/photos");
       const navigation = page.getByRole("navigation");
       const labels = [...language.tabs, `${language.profile}: ${name}`];
@@ -290,6 +248,13 @@ for (const language of languages) {
         mimeType: "text/plain",
         buffer: Buffer.from("Upload validation fixture"),
       });
+      // The banner reports the failure; each file's reason sits in its details.
+      const queue = page.locator(".upload-queue");
+      await expect(queue).toBeVisible();
+      await expect(queue).toHaveAttribute("data-state", "error");
+      await queue
+        .getByRole("button", { name: language.uploadDetails, exact: true })
+        .click();
       await expect(
         page.getByText(language.uploadError, { exact: true }),
       ).toBeVisible();
@@ -390,14 +355,15 @@ for (const language of languages) {
       await expect(
         page.getByRole("heading", { name, exact: true }),
       ).toBeVisible();
-      const dialog = page.waitForEvent("dialog");
-      const click = page
+      await page
         .getByRole("button", { name: language.signOut, exact: true })
         .click();
-      const confirmation = await dialog;
-      expect(confirmation.message()).toBe(language.logout);
-      await confirmation.dismiss();
-      await click;
+      for (const name of [language.cancel, language.confirm]) {
+        await expect(
+          confirmation(page).getByRole("button", { name, exact: true }),
+        ).toBeVisible();
+      }
+      await declineConfirmation(page, language.logout);
       expect((await page.request.get("/api/session")).status()).toBe(200);
       await page.setViewportSize({ width: 320, height: 740 });
       expect(
@@ -430,7 +396,7 @@ test("falls back to English when the phone language is unsupported", async ({
 test("translates host forms and confirmation dialogs in German", async ({
   browser,
 }) => {
-  const invitation = await createGuest("Invité François");
+  const invitation = await invite(host, "Invité François");
   const context = await browser.newContext({
     baseURL,
     storageState: await host.storageState(),
@@ -448,35 +414,36 @@ test("translates host forms and confirmation dialogs in German", async ({
     await expect(
       page.getByLabel("Name der Feier", { exact: true }),
     ).toBeVisible();
-    await page
-      .getByLabel("Zeitzone der Feier", { exact: true })
-      .fill("Invalid/Zone");
-    await page
-      .getByRole("button", { name: "Feier speichern", exact: true })
-      .click();
-    await expect(
-      page
-        .getByRole("alert")
-        .filter({ hasText: "Gib eine gültige Zeitzone ein" }),
-    ).toHaveText("Gib eine gültige Zeitzone ein, zum Beispiel Europe/Zurich.");
+    // Settings save when a field loses focus; there is no save button.
+    const timezone = page.getByLabel("Zeitzone der Feier", { exact: true });
+    const savedTimezone = await timezone.inputValue();
+    await timezone.fill("Invalid/Zone");
+    await timezone.blur();
+    const timezoneError = page
+      .getByRole("alert")
+      .filter({ hasText: "Gib eine gültige Zeitzone ein" });
+    await expect(timezoneError).toHaveText(
+      "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Zurich.",
+    );
+    // An invalid draft keeps the editor open, so restore it before leaving.
+    await timezone.fill(savedTimezone);
+    await timezone.blur();
+    await expect(timezoneError).toHaveCount(0);
 
     await openSettingsSection(page, "guests");
     await expect(
       page.getByLabel("Vorname des Gastes", { exact: true }),
     ).toBeVisible();
-    const dialog = page.waitForEvent("dialog");
-    const click = page
+    await page
       .getByRole("button", {
         name: "Zugang für Invité François entfernen",
         exact: true,
       })
       .click();
-    const confirmation = await dialog;
-    expect(confirmation.message()).toBe(
+    await declineConfirmation(
+      page,
       "Zugang für Invité François entfernen? Die Person wird auf allen Geräten abgemeldet. Ihre Fotos, Videos und Nachrichten bleiben erhalten.",
     );
-    await confirmation.dismiss();
-    await click;
     const guests = await (await host.get("/api/admin/guests")).json();
     expect(
       guests.items.find(
@@ -495,12 +462,6 @@ test("translates host forms and confirmation dialogs in German", async ({
     await expect(
       page.getByLabel("Hinweis vor der Freigabe", { exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", {
-        name: "Programmpunkt speichern",
-        exact: true,
-      }),
-    ).toBeVisible();
     await page.setViewportSize({ width: 320, height: 740 });
     expect(
       await page.evaluate(
@@ -508,22 +469,43 @@ test("translates host forms and confirmation dialogs in German", async ({
       ),
     ).toBeTruthy();
     await page.screenshot({
-      path: "test-results/localization-host-german-mobile.png",
+      path: test.info().outputPath("localization-host-german-mobile.png"),
       fullPage: true,
       caret: "initial",
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({
-      path: "test-results/localization-host-german-desktop.png",
+      path: test.info().outputPath("localization-host-german-desktop.png"),
       fullPage: true,
       caret: "initial",
     });
-    await page
-      .getByRole("button", { name: "Bearbeitung abbrechen", exact: true })
-      .click();
+    // An untitled draft cannot be saved: closing it asks before discarding.
+    const teaser = page.getByLabel("Hinweis vor der Freigabe", { exact: true });
+    await teaser.fill("Bald mehr");
+    await teaser.blur();
+    await expect(
+      page
+        .locator('[data-settings-screen="programme"]')
+        .getByRole("alert")
+        .filter({ hasText: "Gib einen Titel" }),
+    ).toBeVisible();
+    const close = page.getByRole("button", { name: "Schließen", exact: true });
+    await close.click();
+    await declineConfirmation(page, "Ungespeicherte Änderungen verwerfen?");
+    await expect(
+      page.getByLabel("Hinweis vor der Freigabe", { exact: true }),
+    ).toHaveValue("Bald mehr");
+    await close.click();
+    await acceptConfirmation(page, "Ungespeicherte Änderungen verwerfen?");
     await expect(
       page.getByLabel("Titel des Programmpunkts", { exact: true }),
     ).toHaveCount(0);
+    const events = await (await host.get("/api/admin/programme")).json();
+    expect(
+      events.items.some(
+        (event: { teaser: string }) => event.teaser === "Bald mehr",
+      ),
+    ).toBe(false);
   } finally {
     await context.close();
   }

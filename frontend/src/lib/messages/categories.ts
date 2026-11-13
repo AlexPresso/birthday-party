@@ -25,7 +25,6 @@ const en = {
     "These photos and videos are visible to guests once the app opens.",
   "categories.destination": "Uploads go to: {name}",
   "categories.privateReady": "Received by the host",
-  "categories.mediaAction": "Send photos and videos",
   "categories.uploadDestination": "Upload destination",
   "categories.manageHint":
     "Create categories and change their visibility below, under Media categories.",
@@ -62,7 +61,6 @@ const fr: CategoryMessages = {
     "Ces photos et vidéos seront visibles par les invités à l’ouverture de l’application.",
   "categories.destination": "Destination des envois : {name}",
   "categories.privateReady": "Reçu par l’organisateur",
-  "categories.mediaAction": "Envoyer des photos et vidéos",
   "categories.uploadDestination": "Destination des envois",
   "categories.manageHint":
     "Crée les catégories et choisis leur visibilité plus bas, dans Catégories de médias.",
@@ -98,7 +96,6 @@ const de: CategoryMessages = {
     "Diese Fotos und Videos sind für Gäste sichtbar, sobald die App geöffnet wird.",
   "categories.destination": "Ziel für Uploads: {name}",
   "categories.privateReady": "Beim Gastgeber angekommen",
-  "categories.mediaAction": "Fotos und Videos senden",
   "categories.uploadDestination": "Ziel für Uploads",
   "categories.manageHint":
     "Erstelle Kategorien und ändere ihre Sichtbarkeit unten unter Medienkategorien.",
@@ -134,7 +131,6 @@ const it: CategoryMessages = {
     "Queste foto e questi video saranno visibili agli invitati quando l’app sarà aperta.",
   "categories.destination": "Destinazione dei caricamenti: {name}",
   "categories.privateReady": "Ricevuto da chi organizza",
-  "categories.mediaAction": "Invia foto e video",
   "categories.uploadDestination": "Destinazione dei caricamenti",
   "categories.manageHint":
     "Crea categorie e scegli la loro visibilità più in basso, in Categorie di foto e video.",
@@ -170,7 +166,6 @@ const es: CategoryMessages = {
     "Los invitados podrán ver estas fotos y vídeos cuando se abra la aplicación.",
   "categories.destination": "Destino de los archivos: {name}",
   "categories.privateReady": "Recibido por quien organiza",
-  "categories.mediaAction": "Enviar fotos y vídeos",
   "categories.uploadDestination": "Destino de los archivos",
   "categories.manageHint":
     "Crea categorías y cambia su visibilidad más abajo, en Categorías de fotos y vídeos.",

@@ -181,7 +181,7 @@ func TestConfigurationSaveRejectsSessionExpiringWhileWaitingForLocks(t *testing.
 			a.now = func() time.Time { return time.Unix(current.Load(), 0) }
 			host, guest := admin(t, a)
 			expires := current.Load() + 1
-			if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", expires, identity.HashToken(host.Value)); err != nil {
+			if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", time.Unix(expires, 0), identity.HashToken(host.Value)); err != nil {
 				t.Fatal(err)
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -295,7 +295,7 @@ func TestConfigurationRechecksAdministratorDuringSave(t *testing.T) {
 				case "logout":
 					status(t, request(t, a, "POST", "/api/logout", nil, host), 204)
 				case "revoke":
-					_, err = a.db.Exec("UPDATE guests SET active=0 WHERE id=$1", guest.ID)
+					_, err = a.db.Exec("UPDATE guests SET active=FALSE WHERE id=$1", guest.ID)
 				case "demote":
 					_, err = a.db.Exec("UPDATE guests SET role='guest' WHERE id=$1", guest.ID)
 				}

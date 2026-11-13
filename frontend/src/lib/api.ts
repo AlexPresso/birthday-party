@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { MessageKey, Translator } from "./i18n";
+import "./zod-config.ts";
 
 export class ApiError extends Error {
   code: string;
@@ -37,82 +38,120 @@ export function responseError(body: unknown, t: Translator) {
   return t(responseCode(body) as MessageKey);
 }
 
-export async function readResponse<T>(
+function parseResponse<T>(
   response: Response,
+  body: unknown,
   schema: z.ZodType<T>,
-): Promise<T> {
-  const body: unknown = await response.json().catch(() => null);
+): T {
   if (!response.ok) throw new ApiError(responseCode(body), response.status);
   const parsed = schema.safeParse(body);
   if (!parsed.success) throw new ApiError("common.invalidResponse");
   return parsed.data;
 }
 
-async function fetchResponse(path: string, options: RequestInit) {
+export async function readResponse<T>(
+  response: Response,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const body: unknown = await response.json().catch(() => null);
+  return parseResponse(response, body, schema);
+}
+
+type RequestOptions = {
+  method?: string;
+  body?: unknown;
+  /** The caller's own cancellation: it rejects with the abort, not an ApiError. */
+  signal?: AbortSignal;
+  /**
+   * Milliseconds before the request fails as a connection error; 0 disables.
+   * Multipart uploads have no default because their duration follows the file.
+   */
+  timeout?: number;
+};
+
+const defaultTimeout = 15_000;
+
+function anySignal(signals: AbortSignal[]) {
+  if (typeof AbortSignal.any === "function") return AbortSignal.any(signals);
+  // Safari before 17.4: forward the first abort by hand.
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener("abort", () => controller.abort(signal.reason), {
+      signal: controller.signal,
+    });
+  }
+  return controller.signal;
+}
+
+/** Sends one browser request and reads its JSON body within the deadline. */
+async function send(path: string, options: RequestOptions = {}) {
+  const { body, signal: cancellation } = options;
+  const multipart = body instanceof FormData;
+  const timeout = options.timeout ?? (multipart ? 0 : defaultTimeout);
+  const deadline = new AbortController();
+  const timer =
+    timeout > 0 ? setTimeout(() => deadline.abort(), timeout) : undefined;
   try {
-    return await fetch(path, options);
+    const response = await fetch(`/api${path}`, {
+      method: options.method ?? "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: cancellation
+        ? anySignal([cancellation, deadline.signal])
+        : deadline.signal,
+      headers: {
+        "X-Requested-With": "birthday-party",
+        ...(body !== undefined && !multipart
+          ? { "Content-Type": "application/json" }
+          : {}),
+      },
+      body: multipart
+        ? body
+        : body !== undefined
+          ? JSON.stringify(body)
+          : undefined,
+    });
+    // A connection can also stall after the headers, while the body arrives.
+    const payload: unknown = await response.json().catch(() => null);
+    cancellation?.throwIfAborted();
+    if (deadline.signal.aborted) throw new ApiError("common.connectionFailed");
+    if (response.status === 401 && !path.startsWith("/invitations"))
+      returnToInvitation();
+    if (response.status === 423) returnToWelcome();
+    return { response, payload };
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError")
-      throw error;
+    // Only the caller's cancellation stays an abort. The deadline and network
+    // failures both mean the request did not get through.
+    if (cancellation?.aborted || error instanceof ApiError) throw error;
     throw new ApiError("common.connectionFailed");
+  } finally {
+    clearTimeout(timer);
+    // Also detaches the hand-forwarded listeners from the caller's signal.
+    deadline.abort();
   }
 }
 
 export async function api<T>(
   path: string,
   schema: z.ZodType<T>,
-  options?: { method?: string; body?: unknown; signal?: AbortSignal },
+  options?: RequestOptions,
 ) {
-  const body = options?.body;
-  const multipart = body instanceof FormData;
-  const response = await fetchResponse(`/api${path}`, {
-    method: options?.method || "GET",
-    credentials: "same-origin",
-    cache: "no-store",
-    signal: options?.signal,
-    headers: {
-      "X-Requested-With": "birthday-party",
-      ...(options?.body !== undefined && !multipart
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body: multipart
-      ? body
-      : body !== undefined
-        ? JSON.stringify(body)
-        : undefined,
-  });
-  if (response.status === 401 && !path.startsWith("/invitations"))
-    returnToInvitation();
-  if (response.status === 423) returnToWelcome();
-  return readResponse(response, schema);
+  const { response, payload } = await send(path, options);
+  return parseResponse(response, payload, schema);
 }
 
+/** Sends a request whose successful response has no body to validate. */
 export async function remove(
   path: string,
   method = "DELETE",
-  options?: { body?: unknown; signal?: AbortSignal },
+  options?: Omit<RequestOptions, "method">,
 ) {
-  const response = await fetchResponse(`/api${path}`, {
-    method,
-    credentials: "same-origin",
-    signal: options?.signal,
-    headers: {
-      "X-Requested-With": "birthday-party",
-      ...(options?.body !== undefined
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body:
-      options?.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
-  if (response.status === 401) returnToInvitation();
-  if (response.status === 423) returnToWelcome();
-  if (!response.ok)
-    throw new ApiError(
-      responseCode(await response.json().catch(() => null)),
-      response.status,
-    );
+  const { response, payload } = await send(path, { ...options, method });
+  if (!response.ok) throw new ApiError(responseCode(payload), response.status);
 }
 
 export function errorMessage(error: unknown, t: Translator) {

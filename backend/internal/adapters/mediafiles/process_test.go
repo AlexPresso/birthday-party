@@ -167,7 +167,7 @@ func TestRemovePublishedSkipsEmptyNames(t *testing.T) {
 	}
 }
 
-func stagedMedia(t *testing.T, data []byte, kind, format string) (*Files, media.Pending) {
+func stagedMedia(t *testing.T, data []byte, kind media.Kind, format string) (*Files, media.Pending) {
 	t.Helper()
 	root := t.TempDir()
 	for _, directory := range []string{"uploads", "photos", "tmp"} {

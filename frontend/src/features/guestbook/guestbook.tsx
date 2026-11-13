@@ -15,6 +15,7 @@ import { entrySchema, entriesSchema, type EntryPage } from "./contracts";
 import { formatDate } from "@/lib/dates";
 import { type Guest } from "@/features/guests/contracts";
 import { PageHeading, ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
 import "./guestbook.css";
 
@@ -30,6 +31,7 @@ export function Guestbook({
   age: number;
 }) {
   const { locale, t } = useI18n();
+  const confirm = useConfirm();
   const numbers = new Intl.NumberFormat(locale);
   const [entries, setEntries] = useState(initial.items);
   const [cursor, setCursor] = useState(initial.nextCursor);
@@ -93,7 +95,11 @@ export function Guestbook({
     }
   }
   async function deleteEntry(id: number) {
-    if (!window.confirm(t("guestbook.deleteConfirm"))) return;
+    const confirmed = await confirm({
+      message: t("guestbook.deleteConfirm"),
+      destructive: true,
+    });
+    if (!confirmed) return;
     setRemoving(id);
     setError(null);
     try {
@@ -188,10 +194,7 @@ export function Guestbook({
             {notice}
           </p>
         </section>
-        <section
-          className="guestbook-entries"
-          aria-label={t("guestbook.entries")}
-        >
+        <section aria-label={t("guestbook.entries")}>
           <ErrorNotice message={error} />
           {entries.length === 0 ? (
             <div className="guestbook-empty">

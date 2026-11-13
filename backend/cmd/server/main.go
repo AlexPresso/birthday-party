@@ -16,6 +16,8 @@ import (
 	"birthday-party/backend/internal/app"
 )
 
+const shutdownTimeout = 10 * time.Second
+
 func main() {
 	if err := run(); err != nil {
 		log.Print(err)
@@ -41,7 +43,7 @@ func run() error {
 	}
 	defer application.Close()
 	if command == "migrate" {
-		fmt.Println("Database migrations and legacy import completed.")
+		fmt.Println("Database migrations completed.")
 		return nil
 	}
 	if command == "invite-admin" {
@@ -67,7 +69,7 @@ func run() error {
 	}
 	defer listener.Close()
 	if err := application.StartWorkers(ctx); err != nil {
-		return fmt.Errorf("start media workers: %w", err)
+		return fmt.Errorf("start background workers: %w", err)
 	}
 	var invitationURL string
 	if config.PrintAdminInvitation {
@@ -78,7 +80,7 @@ func run() error {
 			return fmt.Errorf("create startup administrator invitation: %w", err)
 		}
 	}
-	server := &http.Server{Addr: config.ListenAddr, Handler: application.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Minute, WriteTimeout: 10 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := application.HTTPServer()
 	serverErrors := make(chan error, 1)
 	go func() { serverErrors <- server.Serve(listener) }()
 	log.Printf("Birthday API listening on %s", listener.Addr())
@@ -87,18 +89,19 @@ func run() error {
 	}
 	select {
 	case err := <-serverErrors:
-		if err == http.ErrServerClosed {
+		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
 		return err
 	case err := <-application.WorkerErrors():
-		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = server.Shutdown(shutdown)
-		return fmt.Errorf("media workers stopped: %w", err)
+		return errors.Join(fmt.Errorf("background workers stopped: %w", err), shutdown(server))
 	case <-ctx.Done():
-		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		return server.Shutdown(shutdown)
+		return shutdown(server)
 	}
+}
+
+func shutdown(server *http.Server) error {
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	return server.Shutdown(ctx)
 }

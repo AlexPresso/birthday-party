@@ -60,7 +60,6 @@ test("welcome responses distinguish waiting, the current step and full access", 
     { ...waiting, open: true, canFinish: true },
     { ...waiting, open: true, canNext: true },
     { ...waiting, step: { ...step, position: 0 } },
-    { ...waiting, step: { ...step, position: 13 } },
     { ...waiting, step: { ...step, widgets: [] } },
     { ...waiting, step: { ...step, title: "Legacy title" } },
   ])
@@ -110,12 +109,23 @@ test("welcome responses distinguish waiting, the current step and full access", 
     }).success,
     true,
   );
+  // Go owns the number of steps: a raised limit must not blank the page.
+  assert.equal(
+    welcomeSchema.safeParse({ ...waiting, step: { ...step, position: 13 } })
+      .success,
+    true,
+  );
   assert.equal(
     adminWelcomeSchema.safeParse({
       ...admin,
       steps: Array(13).fill(admin.steps[0]),
     }).success,
+    true,
+  );
+  assert.equal(
+    adminWelcomeSchema.safeParse({ ...admin, currentStep: 2 }).success,
     false,
+    "the current step must exist",
   );
 });
 
@@ -154,8 +164,6 @@ test("welcome steps preserve ordered typed widgets without fixed title or body f
     [{ type: "title" }],
     [{ type: "title", text: " " }],
     [{ type: "text", text: "" }],
-    [{ type: "title", text: "🎂".repeat(121) }],
-    [{ type: "text", text: "🎂".repeat(1001) }],
     [{ type: "profile_photo", text: "Unused" }],
     [{ type: "profile_photo", mediaUpload: null }],
     [{ type: "title", text: "A title", mediaUpload: null }],
@@ -163,7 +171,6 @@ test("welcome steps preserve ordered typed widgets without fixed title or body f
     [{ type: "enable_notifications" }, { type: "enable_notifications" }],
     [{ type: "enable_notifications", text: "Unused settings" }],
     [{ type: "enable_notifications", mediaUpload: null }],
-    Array(13).fill({ type: "text", text: "Too many widgets" }),
   ]) {
     assert.equal(
       welcomeSchema.safeParse({
@@ -180,8 +187,9 @@ test("welcome steps preserve ordered typed widgets without fixed title or body f
   for (const widgets of [
     [{ type: "profile_photo" }],
     [{ type: "enable_notifications" }],
-    [{ type: "title", text: "🎂".repeat(120) }],
-    Array(12).fill({ type: "text", text: "🎂".repeat(1000) }),
+    // Lengths and counts beyond the editor's limits belong to Go.
+    [{ type: "title", text: "🎂".repeat(121) }],
+    Array(13).fill({ type: "text", text: "🎂".repeat(1001) }),
   ])
     assert.equal(
       adminWelcomeSchema.safeParse({ ...admin, steps: [{ widgets }] }).success,
@@ -278,7 +286,7 @@ test("media widgets require a typed destination and reject unrelated parameters"
   }
 });
 
-test("categories require explicit visibility and bounded names and collections", () => {
+test("categories require explicit visibility and a name, without frontend ceilings", () => {
   const category = { id: 1, name: "For later", isPublic: false };
   assert.deepEqual(mediaCategorySchema.parse(category), category);
   assert.equal(
@@ -286,7 +294,7 @@ test("categories require explicit visibility and bounded names and collections",
     true,
   );
   assert.equal(
-    mediaCategorySchema.safeParse({ ...category, name: "🎂".repeat(80) })
+    mediaCategorySchema.safeParse({ ...category, name: "🎂".repeat(81) })
       .success,
     true,
   );
@@ -295,17 +303,15 @@ test("categories require explicit visibility and bounded names and collections",
     { ...category, isPublic: "false" },
     { ...category, id: 0 },
     { ...category, name: "" },
-    { ...category, name: "🎂".repeat(81) },
   ])
     assert.equal(mediaCategorySchema.safeParse(invalid).success, false);
   assert.equal(
-    mediaCategoriesSchema.safeParse({ items: Array(100).fill(category) })
+    mediaCategoriesSchema.safeParse({ items: Array(101).fill(category) })
       .success,
     true,
   );
   assert.equal(
-    mediaCategoriesSchema.safeParse({ items: Array(101).fill(category) })
-      .success,
+    mediaCategoriesSchema.safeParse({ items: [category, { id: 2 }] }).success,
     false,
   );
 });
@@ -353,7 +359,7 @@ test("welcome upload context identifies the current destination and effective li
     { ...context, revision: -1 },
     { ...context, widgetIndex: undefined },
     { ...context, widgetIndex: -1 },
-    { ...context, widgetIndex: 12 },
+    { ...context, widgetIndex: 0.5 },
     { ...context, widgetIndex: "0" },
     { ...context, category: undefined },
     { ...context, limits: undefined },
@@ -443,7 +449,7 @@ test("upload responses distinguish accepted work, completed media and failed pre
       status: "ready",
       categoryId: 12,
       welcomeRevision: 4,
-      welcomeWidgetIndex: 11,
+      welcomeWidgetIndex: 12,
       photo: null,
     }).success,
     true,
@@ -460,7 +466,6 @@ test("upload responses distinguish accepted work, completed media and failed pre
     { ...job, welcomeRevision: -1 },
     { ...job, welcomeWidgetIndex: undefined },
     { ...job, welcomeWidgetIndex: -1 },
-    { ...job, welcomeWidgetIndex: 12 },
     { ...job, welcomeWidgetIndex: 0.5 },
     { ...job, welcomeWidgetIndex: 0, welcomeRevision: null },
     { ...job, errorCode: "unreadable_video" },
@@ -468,11 +473,12 @@ test("upload responses distinguish accepted work, completed media and failed pre
   ])
     assert.equal(uploadSchema.safeParse(invalid).success, false);
   assert.equal(
-    uploadsSchema.safeParse({ items: Array(150).fill(job) }).success,
+    uploadsSchema.safeParse({ items: Array(151).fill(job) }).success,
     true,
   );
   assert.equal(
-    uploadsSchema.safeParse({ items: Array(151).fill(job) }).success,
+    uploadsSchema.safeParse({ items: [job, { ...job, status: "done" }] })
+      .success,
     false,
   );
 });

@@ -1,5 +1,8 @@
 .git
+.github
 .idea
+.claude
+.agents
 **/node_modules
 **/.next
 **/.cache
@@ -8,6 +11,11 @@
 test-results
 playwright-report
 artifacts
+# Root-level folders that no image needs. frontend/tests stays: the frontend
+# build runs its runtime smoke test.
+charts
+docs
+tests
 .env
 .env.*
 **/.env

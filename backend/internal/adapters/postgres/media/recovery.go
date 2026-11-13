@@ -52,10 +52,10 @@ func (s *Store) Recover(ctx context.Context, now time.Time, clean func(media.Inv
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtext(current_schema()),73003)"); err != nil {
+	if _, err = tx.ExecContext(ctx, quotaLock); err != nil {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, "UPDATE upload_jobs SET status='queued',updated_at=$1 WHERE status='processing' RETURNING guest_id", stamp(now))
+	rows, err := tx.QueryContext(ctx, "UPDATE upload_jobs SET status='queued',updated_at=$1 WHERE status='processing' RETURNING guest_id", now)
 	if err != nil {
 		return nil, err
 	}

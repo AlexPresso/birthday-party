@@ -1,34 +1,57 @@
-.media-picker {
-  min-width: 0;
-}
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
 
-.media-picker input[hidden] {
-  display: none;
-}
+@layer features {
+  .photo-privacy {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+  .photo-privacy svg {
+    margin-top: 2px;
+  }
+  @media (max-width: 760px) {
+    .photo-privacy {
+      font-size: 12px;
+      line-height: 1.7;
+      margin-top: -11px;
+    }
+  }
+  .media-picker {
+    min-width: 0;
+  }
 
-.media-picker .upload-button {
-  max-width: 100%;
-  min-height: 47px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
+  .media-picker input[hidden] {
+    display: none;
+  }
 
-.media-picker-guidance > .fine-print {
-  margin: 10px 0 0;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.media-picker .photo-privacy {
-  margin: 10px 0 0;
-  max-width: 60ch;
-  font-size: 12px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 760px) {
   .media-picker .upload-button {
-    width: 100%;
+    max-width: 100%;
+    min-height: 47px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .media-picker-guidance > .fine-print {
+    margin: 10px 0 0;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .media-picker .photo-privacy {
+    margin: 10px 0 0;
+    max-width: 60ch;
+    font-size: 12px;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 760px) {
+    .media-picker .upload-button {
+      width: 100%;
+    }
   }
 }

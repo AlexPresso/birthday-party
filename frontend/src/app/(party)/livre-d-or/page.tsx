@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { Guestbook } from "@/features/guestbook/guestbook";
 import { serverApi } from "@/lib/server-api";
 import { getSession } from "@/features/guests/server";
@@ -16,11 +17,13 @@ export default async function GuestbookPage() {
     getBirthdayConfig(),
   ]);
   return (
-    <Guestbook
-      initial={initial}
-      guest={guest}
-      timezone={party.timezone}
-      age={age}
-    />
+    <PageTransition>
+      <Guestbook
+        initial={initial}
+        guest={guest}
+        timezone={party.timezone}
+        age={age}
+      />
+    </PageTransition>
   );
 }

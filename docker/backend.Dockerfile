@@ -1,11 +1,13 @@
-FROM golang:1.27.2-alpine AS build
+# Exact base versions keep rebuilds reproducible; update them deliberately.
+# The Go version matches the toolchain used by CI (.github/workflows/tests.yml).
+FROM golang:1.27.2-alpine3.24 AS build
 WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /server ./cmd/server
 
-FROM alpine:3.22
+FROM alpine:3.22.8
 RUN apk add --no-cache ca-certificates ffmpeg \
     && addgroup -S -g 10001 app \
     && adduser -S -D -H -u 10001 -G app app \

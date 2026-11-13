@@ -41,30 +41,40 @@ type Request struct {
 	TargetGuestID int64
 }
 
+// Viewer is an authorized guest and the digest of the session that proved their
+// identity. Write transactions recheck that session under their own locks.
+type Viewer struct {
+	Guest       identity.Guest
+	SessionHash string `json:"-"`
+}
+
 type Repository interface {
 	Session(context.Context, string, time.Time) (Snapshot, error)
-	Realtime(context.Context, string, int64, time.Time) (int64, bool, error)
+	// Realtime returns when the session expires and whether it has full app access.
+	Realtime(context.Context, string, int64, time.Time) (time.Time, bool, error)
 }
 
 type Service struct{ repository Repository }
 
 func New(repository Repository) *Service { return &Service{repository: repository} }
 
-func (s *Service) Authorize(ctx context.Context, token string, request Request, now time.Time) (identity.Guest, error) {
+// Authorize resolves a session token and checks the requested capability.
+func (s *Service) Authorize(ctx context.Context, token string, request Request, now time.Time) (Viewer, error) {
 	if !identity.ValidToken(token) {
-		return identity.Guest{}, ErrInvitation
+		return Viewer{}, ErrInvitation
 	}
-	snapshot, err := s.repository.Session(ctx, identity.HashToken(token), now)
+	sessionHash := identity.HashToken(token)
+	snapshot, err := s.repository.Session(ctx, sessionHash, now)
 	if err != nil {
-		return identity.Guest{}, err
+		return Viewer{}, err
 	}
 	if err = Check(snapshot, request); err != nil {
-		return identity.Guest{}, err
+		return Viewer{}, err
 	}
-	return snapshot.Guest, nil
+	return Viewer{Guest: snapshot.Guest, SessionHash: sessionHash}, nil
 }
 
-func (s *Service) Realtime(ctx context.Context, sessionHash string, guestID int64, now time.Time) (int64, bool, error) {
+func (s *Service) Realtime(ctx context.Context, sessionHash string, guestID int64, now time.Time) (time.Time, bool, error) {
 	return s.repository.Realtime(ctx, sessionHash, guestID, now)
 }
 
@@ -73,10 +83,10 @@ func Check(snapshot Snapshot, request Request) error {
 	if !guest.Active {
 		return ErrExpired
 	}
-	if request.Admin && guest.Role != "admin" {
+	if request.Admin && !guest.IsAdmin() {
 		return ErrAdmin
 	}
-	if request.Scope == Session || guest.Role == "admin" || snapshot.Open {
+	if request.Scope == Session || guest.IsAdmin() || snapshot.Open {
 		return nil
 	}
 	selfProfile := request.Scope == Profile && snapshot.ProfileWidget && (request.TargetGuestID == 0 || request.TargetGuestID == guest.ID)

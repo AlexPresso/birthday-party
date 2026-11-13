@@ -2,32 +2,36 @@
   "name": "birthday-party",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
-    "start": "next start --hostname 0.0.0.0",
+    "start": "node startup.mjs",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test": "node --test tests/*.test.ts",
     "test:runtime": "node --test tests/runtime-proxy-smoke.mjs"
   },
   "dependencies": {
-    "next": "16.4.0",
+    "lucide-react": "^0.577.0",
+    "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "lucide-react": "^0.577.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.9.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "16.4.0",
-    "prettier": "^3.0.0"
+    "eslint-config-next": "16.4.6",
+    "prettier": "^3.0.0",
+    "typescript": "^5.9.0"
   }
 }

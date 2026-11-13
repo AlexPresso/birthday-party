@@ -25,6 +25,7 @@ class Socket {
 function harness() {
   const sockets: Socket[] = [];
   let visible = true;
+  let online = true;
   let resume = () => {};
   let watches = 0;
   let stopped = 0;
@@ -35,7 +36,8 @@ function harness() {
       sockets.push(socket);
       return socket as unknown as WebSocket;
     },
-    available: () => visible,
+    visible: () => visible,
+    online: () => online,
     onExpired: () => expired++,
     watch: (callback) => {
       watches++;
@@ -47,10 +49,16 @@ function harness() {
   return {
     client,
     sockets,
-    availability(value: boolean) {
+    visibility(value: boolean) {
       visible = value;
       resume();
     },
+    connectivity(value: boolean) {
+      online = value;
+      resume();
+    },
+    // Browsers also report focus when a visible page regains attention.
+    focus: () => resume(),
     counts: () => ({ watches, stopped, expired }),
   };
 }
@@ -180,18 +188,116 @@ test("visibility and connectivity changes resynchronize and release hidden socke
     () => {},
   );
   app.sockets[0].receive({ type: "ready" });
-  app.availability(false);
+  app.visibility(false);
   assert.equal(app.sockets[0].closes, 1);
   t.mock.timers.tick(120000);
   assert.equal(app.sockets.length, 1);
   assert.equal(reads, 2);
-  app.availability(true);
+  app.visibility(true);
   assert.equal(app.sockets.length, 2);
   assert.equal(reads, 3, "returning checks the session even if upgrade fails");
+  app.focus();
+  assert.equal(reads, 3, "a second resume event waits for the handshake");
   app.sockets[1].receive({ type: "ready" });
   assert.equal(reads, 4);
+  app.focus();
+  app.visibility(true);
+  app.connectivity(true);
+  assert.equal(reads, 4, "a live socket has already delivered every signal");
   app.client.retry();
   assert.equal(app.sockets.length, 2);
+  stop();
+});
+
+test("a hidden page pauses silently while a lost network is reported", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const app = harness();
+  const connected: boolean[] = [];
+  const stop = app.client.subscribe(
+    "welcome",
+    () => {},
+    (value) => connected.push(value),
+  );
+  app.sockets[0].receive({ type: "ready" });
+  app.visibility(false);
+  assert.equal(app.sockets[0].closes, 1);
+  assert.deepEqual(connected, [true], "a deliberate pause is not a failure");
+  app.visibility(true);
+  app.sockets[1].receive({ type: "ready" });
+  assert.deepEqual(connected, [true, true]);
+  app.connectivity(false);
+  assert.equal(app.sockets[1].closes, 1);
+  assert.deepEqual(connected, [true, true, false]);
+  app.visibility(false);
+  assert.deepEqual(connected, [true, true, false]);
+  app.visibility(true);
+  assert.equal(app.sockets.length, 2, "an offline page does not reconnect");
+  assert.deepEqual(connected, [true, true, false, false]);
+  app.connectivity(true);
+  app.sockets[2].receive({ type: "ready" });
+  assert.equal(connected.at(-1), true);
+  stop();
+});
+
+test("server-rendered resources wait for the handshake instead of reading twice", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const app = harness();
+  const reads = { rendered: 0, empty: 0, late: 0 };
+  const stopRendered = app.client.subscribe(
+    "programme",
+    () => reads.rendered++,
+    () => {},
+    { hasInitialData: true },
+  );
+  const stopEmpty = app.client.subscribe(
+    "uploads",
+    () => reads.empty++,
+    () => {},
+  );
+  assert.equal(app.sockets.length, 1);
+  assert.deepEqual(reads, { rendered: 0, empty: 1, late: 0 });
+  app.sockets[0].receive({ type: "ready" });
+  assert.deepEqual(reads, { rendered: 1, empty: 2, late: 0 });
+  // No handshake follows on a live socket, and signals sent before this
+  // subscription were missed, so a late subscriber reads immediately.
+  const connected: boolean[] = [];
+  const stopLate = app.client.subscribe(
+    "programme",
+    () => reads.late++,
+    (value) => connected.push(value),
+    { hasInitialData: true },
+  );
+  assert.deepEqual(reads, { rendered: 1, empty: 2, late: 1 });
+  assert.deepEqual(connected, [true]);
+  app.sockets[0].end();
+  assert.deepEqual(reads, { rendered: 2, empty: 3, late: 2 });
+  t.mock.timers.tick(750);
+  app.sockets[1].receive({ type: "ready" });
+  assert.deepEqual(reads, { rendered: 3, empty: 4, late: 3 });
+  stopLate();
+  stopEmpty();
+  stopRendered();
+});
+
+test("a failed handshake still gives server-rendered resources one read", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const app = harness();
+  let reads = 0;
+  const stop = app.client.subscribe(
+    "programme",
+    () => reads++,
+    () => {},
+    { hasInitialData: true },
+  );
+  assert.equal(reads, 0);
+  app.sockets[0].end();
+  assert.equal(reads, 1, "the page may have been restored from history");
+  t.mock.timers.tick(750);
+  app.sockets[1].end();
+  t.mock.timers.tick(1500);
+  t.mock.timers.tick(10000);
+  assert.equal(app.sockets.length, 3);
+  assert.equal(reads, 1, "retries do not read again");
   stop();
 });
 
@@ -207,8 +313,8 @@ test("session expiry redirects once and never reconnects or refreshes protected 
   app.sockets[0].receive({ type: "ready" });
   app.sockets[0].end(4401);
   app.client.retry();
-  app.availability(false);
-  app.availability(true);
+  app.visibility(false);
+  app.visibility(true);
   const stopLate = app.client.subscribe(
     "uploads",
     () => reads++,

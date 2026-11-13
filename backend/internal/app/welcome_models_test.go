@@ -9,6 +9,7 @@ type welcomeState = welcome.State
 type welcomeView = welcome.View
 type welcomeStep = welcome.Step
 type welcomeWidget = welcome.Widget
+type welcomeWidgetType = welcome.WidgetType
 type welcomeMediaUpload = welcome.MediaUpload
 
 const welcomeSelect = pgwelcome.Select

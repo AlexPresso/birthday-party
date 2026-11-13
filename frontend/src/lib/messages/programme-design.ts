@@ -4,7 +4,6 @@ const en = {
   "programme.vote": "Vote",
   "programme.changeVote": "Change my vote",
   "programme.viewVote": "View vote",
-  "programme.hideVote": "Hide vote",
   "programme.unlockTime": "Available at {time}",
 };
 
@@ -16,9 +15,8 @@ export const programmeDesignMessages = {
     "programme.agenda": "Les rendez-vous",
     "programme.noTime": "Horaire non défini",
     "programme.vote": "Voter",
-    "programme.changeVote": "Modifier mon vote",
+    "programme.changeVote": "Changer mon vote",
     "programme.viewVote": "Voir le vote",
-    "programme.hideVote": "Masquer le vote",
     "programme.unlockTime": "À découvrir à {time}",
   },
   de: {
@@ -27,7 +25,6 @@ export const programmeDesignMessages = {
     "programme.vote": "Abstimmen",
     "programme.changeVote": "Meine Stimme ändern",
     "programme.viewVote": "Abstimmung ansehen",
-    "programme.hideVote": "Abstimmung ausblenden",
     "programme.unlockTime": "Ab {time} verfügbar",
   },
   it: {
@@ -36,7 +33,6 @@ export const programmeDesignMessages = {
     "programme.vote": "Vota",
     "programme.changeVote": "Cambia il mio voto",
     "programme.viewVote": "Vedi il voto",
-    "programme.hideVote": "Nascondi il voto",
     "programme.unlockTime": "Da scoprire alle {time}",
   },
   es: {
@@ -45,7 +41,6 @@ export const programmeDesignMessages = {
     "programme.vote": "Votar",
     "programme.changeVote": "Cambiar mi voto",
     "programme.viewVote": "Ver la votación",
-    "programme.hideVote": "Ocultar la votación",
     "programme.unlockTime": "Disponible a las {time}",
   },
 } satisfies Record<"en" | "fr" | "de" | "it" | "es", ProgrammeDesignMessages>;

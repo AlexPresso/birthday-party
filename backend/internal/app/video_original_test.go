@@ -19,7 +19,7 @@ func assertMediaDownload(t *testing.T, a *App, cookie *http.Cookie, photo Photo,
 	for _, method := range []string{"GET", "HEAD"} {
 		response := request(t, a, method, path, nil, cookie)
 		status(t, response, 200)
-		if response.Header().Get("Content-Type") != mime || response.Header().Get("Content-Disposition") != disposition || response.Header().Get("Content-Length") != strconv.Itoa(len(original)) || response.Header().Get("Cache-Control") != "private, no-store" {
+		if response.Header().Get("Content-Type") != mime || response.Header().Get("Content-Disposition") != disposition || response.Header().Get("Content-Length") != strconv.Itoa(len(original)) || response.Header().Get("Cache-Control") != "private, no-cache" {
 			t.Fatalf("incorrect %s download headers: %v", method, response.Header())
 		}
 		if method == "GET" && !bytes.Equal(response.Body.Bytes(), original) {

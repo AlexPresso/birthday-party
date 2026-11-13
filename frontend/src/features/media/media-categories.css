@@ -1,112 +1,114 @@
-.media-categories-admin {
-  margin: 24px 0;
-  padding: 24px;
-}
-.media-categories-admin h2,
-.media-category-list .fine-print {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.media-categories-admin > .muted {
-  max-width: 70ch;
-  margin: 12px 0 22px;
-  line-height: 1.6;
-}
-.media-category-create-row {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-}
-.media-category-create-row input {
-  flex: 1;
-  min-width: 0;
-}
-.media-category-visibility {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  margin: 10px 0 0;
-}
-.media-category-visibility input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--accent);
-}
-.media-category-list {
-  list-style: none;
-  padding: 0;
-  margin: 20px 0 0;
-}
-.media-category-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  padding: 16px 0;
-  border-top: 1px solid var(--border);
-}
-.media-category-list li > div {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.media-category-list .fine-print {
-  margin-top: 6px;
-}
-.media-category-list button {
-  max-width: 55%;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-.welcome-media-settings select {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  min-height: 47px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-small);
-  background: var(--input-background);
-  color: var(--text);
-  font: inherit;
-  font-size: 16px;
-  text-overflow: ellipsis;
-}
-.welcome-media-settings select:hover {
-  border-color: var(--border-strong);
-}
-.welcome-media-settings select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-.welcome-media-settings select:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.welcome-media-settings .fine-print {
-  margin: 12px 0 0;
-}
-.welcome-action-card + .welcome-action-card {
-  margin-top: 10px;
-}
-@media (max-width: 600px) {
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
   .media-categories-admin {
-    padding: 20px;
+    margin: 24px 0;
+    padding: 24px;
+  }
+  .media-categories-admin h2,
+  .media-category-list .fine-print {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .media-categories-admin > .muted {
+    max-width: 70ch;
+    margin: 12px 0 22px;
+    line-height: 1.6;
   }
   .media-category-create-row {
-    flex-direction: column;
-  }
-  .media-category-create-row .button {
-    align-self: flex-start;
-  }
-  .media-category-list li {
-    align-items: flex-start;
-    flex-direction: column;
+    display: flex;
+    align-items: stretch;
     gap: 12px;
   }
+  .media-category-create-row input {
+    flex: 1;
+    min-width: 0;
+  }
+  .media-category-visibility {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    margin: 10px 0 0;
+  }
+  .media-category-visibility input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .media-category-list {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0;
+  }
+  .media-category-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+  }
+  .media-category-list li > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .media-category-list .fine-print {
+    margin-top: 6px;
+  }
   .media-category-list button {
-    max-width: 100%;
+    max-width: 55%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .welcome-media-settings select {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 47px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--input-background);
+    color: var(--text);
+    font: inherit;
+    font-size: 16px;
+    text-overflow: ellipsis;
+  }
+  .welcome-media-settings select:hover {
+    border-color: var(--border-strong);
+  }
+  .welcome-media-settings select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .welcome-media-settings select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .welcome-media-settings .fine-print {
+    margin: 12px 0 0;
+  }
+  @media (max-width: 600px) {
+    .media-categories-admin {
+      padding: 20px;
+    }
+    .media-category-create-row {
+      flex-direction: column;
+    }
+    .media-category-create-row .button {
+      align-self: flex-start;
+    }
+    .media-category-list li {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .media-category-list button {
+      max-width: 100%;
+    }
   }
 }

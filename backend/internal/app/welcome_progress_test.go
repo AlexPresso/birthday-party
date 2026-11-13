@@ -179,54 +179,6 @@ func TestRequiredWelcomeAppliesToLateGuestsAndPersistsCompletion(t *testing.T) {
 	}
 }
 
-func TestGuestWelcomeProgressMigrationPreservesActiveStepsAndUploadTokens(t *testing.T) {
-	db := testDatabase(t)
-	files := migrationFiles(t)
-	delete(files, "migrations/0008_guest_welcome_progress.sql")
-	delete(files, "migrations/0009_notifications.sql")
-	delete(files, "migrations/0010_programme_activities.sql")
-	delete(files, "migrations/0011_programme_activity_events.sql")
-	delete(files, "migrations/0012_product_configuration.sql")
-	delete(files, "migrations/0013_question_activities.sql")
-	if err := applyMigrations(t.Context(), db, files); err != nil {
-		t.Fatal(err)
-	}
-	for _, statement := range []string{
-		`INSERT INTO guests(id,name,role) VALUES(1,'Present guest','guest'),(2,'Future guest','guest')`,
-		`INSERT INTO sessions(token_hash,guest_id,created_at,expires_at) VALUES('test-session',1,1,9999999999)`,
-		`UPDATE welcome SET is_open=false,revision=15,current_step=2,steps='[{"widgets":[{"type":"text","text":"First"}]},{"widgets":[{"type":"media_upload","mediaUpload":{"categoryId":null}}]}]'::jsonb`,
-		`INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,welcome_revision,welcome_widget_index) VALUES(1,'accepted-id','queued','image.png','image','png','accepted-key',100,'2026-10-17T12:00:00Z','2026-10-17T12:00:00Z',18,0)`,
-	} {
-		if _, err := db.Exec(statement); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for range 2 {
-		if err := migrate(t.Context(), db); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var count int
-	var position int
-	var generation, revision int64
-	if err := db.QueryRow("SELECT generation,position,revision FROM guest_welcome_progress WHERE guest_id=1").Scan(&generation, &position, &revision); err != nil {
-		t.Fatal(err)
-	}
-	if generation != 1 || position != 2 || revision <= 18 {
-		t.Fatalf("migration lost progress or reused an accepted upload token: generation=%d position=%d revision=%d", generation, position, revision)
-	}
-	if err := db.QueryRow("SELECT COUNT(*) FROM guest_welcome_progress").Scan(&count); err != nil || count != 1 {
-		t.Fatalf("migration enrolled guests without sessions: count=%d error=%v", count, err)
-	}
-	var preserved bool
-	if err := db.QueryRow("SELECT status='queued' AND welcome_revision=18 AND welcome_widget_index=0 AND storage_key='accepted-key' FROM upload_jobs").Scan(&preserved); err != nil || !preserved {
-		t.Fatalf("migration changed an accepted upload: preserved=%v error=%v", preserved, err)
-	}
-	if _, err := db.Exec("UPDATE welcome SET is_open=true WHERE id=1"); err != nil {
-		t.Fatalf("opening cannot retain the unlocked boundary: %v", err)
-	}
-}
-
 func TestOptionalWelcomeLateArrivalAndRequiredToggle(t *testing.T) {
 	a := testApp(t)
 	host, _ := admin(t, a)

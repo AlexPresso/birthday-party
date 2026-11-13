@@ -15,7 +15,7 @@ type repositoryStub struct {
 	accept      func(context.Context, int64, string, string, Received, Destination, func() error) (Upload, bool, error)
 	publish     func(context.Context, Pending, Output) (bool, error)
 	ready       func(context.Context, int64) (bool, error)
-	requeue     func(context.Context, Pending, time.Time) (bool, error)
+	requeue     func(context.Context, Pending, time.Time, time.Time) (bool, error)
 	fail        func(context.Context, Pending, string, time.Time) (bool, error)
 	photoFile   func(context.Context, identity.Guest, int64) (File, error)
 	deletePhoto func(context.Context, identity.Guest, int64) (File, error)
@@ -28,8 +28,8 @@ func (r repositoryStub) Publish(ctx context.Context, job Pending, output Output)
 	return r.publish(ctx, job, output)
 }
 func (r repositoryStub) Ready(ctx context.Context, id int64) (bool, error) { return r.ready(ctx, id) }
-func (r repositoryStub) Requeue(ctx context.Context, job Pending, now time.Time) (bool, error) {
-	return r.requeue(ctx, job, now)
+func (r repositoryStub) Requeue(ctx context.Context, job Pending, now, available time.Time) (bool, error) {
+	return r.requeue(ctx, job, now, available)
 }
 func (r repositoryStub) Fail(ctx context.Context, job Pending, code string, now time.Time) (bool, error) {
 	return r.fail(ctx, job, code, now)
@@ -135,7 +135,7 @@ func TestProcessingPreservesRetryableInputsAndCommitOutcomes(t *testing.T) {
 					return test.commitAttempted, test.publishErr
 				},
 				ready: func(context.Context, int64) (bool, error) { return test.ready, nil },
-				requeue: func(ctx context.Context, actual Pending, _ time.Time) (bool, error) {
+				requeue: func(ctx context.Context, actual Pending, _, _ time.Time) (bool, error) {
 					requeues++
 					if _, ok := ctx.Deadline(); !ok || actual.Attempt != job.Attempt {
 						t.Fatal("retry needs bounded attempt update")
@@ -151,9 +151,7 @@ func TestProcessingPreservesRetryableInputsAndCommitOutcomes(t *testing.T) {
 				},
 			}
 			s := New(repo, files, time.Now, func(int64) { notifications++ }, func(string, ...any) {})
-			if err := s.Process(t.Context(), job); err != nil {
-				t.Fatal(err)
-			}
+			s.Process(t.Context(), job)
 			published := test.prepareErr == nil && test.publishErr == nil
 			shouldRemove := published || test.ready || test.terminal
 			if (len(files.removedInputs) == 1) != shouldRemove {
@@ -176,16 +174,60 @@ func TestProcessingPreservesRetryableInputsAndCommitOutcomes(t *testing.T) {
 	}
 }
 
-func TestFailureRecordingRetainsInputWhenDatabaseIsUnavailable(t *testing.T) {
-	failure := errors.New("database unavailable")
-	files := &filesStub{prepare: func(context.Context, Pending) (Output, error) { return Output{}, &Error{Code: "unreadable_video"} }}
-	repo := repositoryStub{fail: func(context.Context, Pending, string, time.Time) (bool, error) { return false, failure }}
-	s := New(repo, files, time.Now, func(int64) { t.Fatal("uncommitted failure announced") }, func(string, ...any) {})
-	if err := s.Process(t.Context(), Pending{ID: 1, Key: "input"}); !errors.Is(err, failure) {
-		t.Fatalf("lost failure: %v", err)
+func TestOutcomeIsRecordedOnceTheDatabaseReturns(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		prepareErr error
+		terminal   bool
+	}{
+		{"confirmed invalid media", &Error{Code: "unreadable_video"}, true},
+		{"processor infrastructure failure", errors.New("processor unavailable"), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			files := &filesStub{prepare: func(context.Context, Pending) (Output, error) { return Output{}, test.prepareErr }}
+			updates, notifications := 0, 0
+			update := func() (bool, error) {
+				updates++
+				if updates < 3 {
+					if len(files.removedInputs) != 0 || notifications != 0 {
+						t.Fatal("unrecorded outcome was announced or lost its input")
+					}
+					return false, errors.New("database unavailable")
+				}
+				return true, nil
+			}
+			repo := repositoryStub{
+				ready:   func(context.Context, int64) (bool, error) { return false, nil },
+				requeue: func(context.Context, Pending, time.Time, time.Time) (bool, error) { return update() },
+				fail:    func(context.Context, Pending, string, time.Time) (bool, error) { return update() },
+			}
+			s := New(repo, files, time.Now, func(int64) { notifications++ }, func(string, ...any) {})
+			s.recordRetry = time.Millisecond
+			s.Process(t.Context(), Pending{ID: 1, Key: "input"})
+			if updates != 3 || notifications != 1 {
+				t.Fatalf("updates=%d notifications=%d", updates, notifications)
+			}
+			if (len(files.removedInputs) == 1) != test.terminal {
+				t.Fatalf("input removals=%d", len(files.removedInputs))
+			}
+		})
 	}
-	if len(files.removedInputs) != 0 {
-		t.Fatal("database failure removed retryable input")
+}
+
+func TestStoppedWorkerLeavesUnrecordedOutcomeToRecovery(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	files := &filesStub{prepare: func(context.Context, Pending) (Output, error) { return Output{}, &Error{Code: "unreadable_video"} }}
+	updates := 0
+	repo := repositoryStub{fail: func(context.Context, Pending, string, time.Time) (bool, error) {
+		updates++
+		cancel()
+		return false, errors.New("database unavailable")
+	}}
+	s := New(repo, files, time.Now, func(int64) { t.Fatal("uncommitted failure announced") }, func(string, ...any) {})
+	s.recordRetry = time.Hour
+	s.Process(ctx, Pending{ID: 1, Key: "input"})
+	if updates != 1 || len(files.removedInputs) != 0 {
+		t.Fatalf("updates=%d input removals=%d", updates, len(files.removedInputs))
 	}
 }
 
@@ -193,20 +235,20 @@ func TestWelcomeUploadRequiresStableSelectedWidgetAndDestination(t *testing.T) {
 	revision, index, category := int64(8), int64(1), int64(3)
 	view := welcome.View{ProgressRevision: revision, Step: &welcome.VisibleStep{Widgets: []welcome.Widget{{Type: "text", Text: "Instruction"}, {Type: "media_upload", MediaUpload: &welcome.MediaUpload{CategoryID: &category}}}}}
 	destination := Destination{WelcomeRevision: &revision, WelcomeWidgetIndex: &index}
-	if err := AuthorizeDestination("guest", view, &destination); err != nil || !SameOptionalID(destination.CategoryID, &category) {
+	if err := AuthorizeDestination(identity.Guest{Role: identity.RoleGuest}, view, &destination); err != nil || !SameOptionalID(destination.CategoryID, &category) {
 		t.Fatalf("selected destination: %+v %v", destination, err)
 	}
 	changed := revision + 1
 	destination.WelcomeRevision = &changed
 	var failure *Error
-	if err := AuthorizeDestination("guest", view, &destination); !errors.As(err, &failure) || failure.Code != "welcome_conflict" {
+	if err := AuthorizeDestination(identity.Guest{Role: identity.RoleGuest}, view, &destination); !errors.As(err, &failure) || failure.Code != "welcome_conflict" {
 		t.Fatalf("stale revision accepted: %v", err)
 	}
 	destination = Destination{}
-	if err := AuthorizeDestination("guest", view, &destination); !errors.As(err, &failure) || failure.Code != "invalid_body" {
+	if err := AuthorizeDestination(identity.Guest{Role: identity.RoleGuest}, view, &destination); !errors.As(err, &failure) || failure.Code != "invalid_body" {
 		t.Fatalf("widget upload became ordinary upload: %v", err)
 	}
-	if err := AuthorizeDestination("admin", view, &destination); err != nil {
+	if err := AuthorizeDestination(identity.Guest{Role: identity.RoleAdmin}, view, &destination); err != nil {
 		t.Fatalf("administrator access blocked: %v", err)
 	}
 }
@@ -237,5 +279,63 @@ func TestGuestCannotDeleteAnotherGuestsMedia(t *testing.T) {
 	var failure *Error
 	if err := s.DeletePhoto(t.Context(), identity.Guest{ID: 4, Role: "guest"}, 1); !errors.As(err, &failure) || failure.Code != "photo_delete_forbidden" {
 		t.Fatalf("deletion permission: %v", err)
+	}
+}
+
+func TestFailingUploadWaitsLongerThenFailsAfterTheLastAttempt(t *testing.T) {
+	now := time.Date(2026, 10, 17, 18, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name      string
+		job       Pending
+		cancelled bool
+		wantDelay time.Duration
+		wantCode  string
+		prepared  bool
+	}{
+		{name: "first failure", job: Pending{Attempts: 1, Kind: KindImage}, wantDelay: 30 * time.Second, prepared: true},
+		{name: "later failure", job: Pending{Attempts: MaxAttempts - 1, Kind: KindImage}, wantDelay: 15 * time.Minute, prepared: true},
+		{name: "last image attempt", job: Pending{Attempts: MaxAttempts, Kind: KindImage}, wantCode: "photo_upload_failed", prepared: true},
+		{name: "last video attempt", job: Pending{Attempts: MaxAttempts, Kind: KindVideo}, wantCode: "video_processing_failed", prepared: true},
+		{name: "attempts lost without an outcome", job: Pending{Attempts: MaxAttempts + 1, Kind: KindVideo}, wantCode: "video_processing_failed"},
+		{name: "interrupted worker retries promptly", job: Pending{Attempts: MaxAttempts, Kind: KindImage}, cancelled: true, prepared: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			test.job.ID, test.job.Key = 3, "input"
+			prepared, requeued, failed := false, false, ""
+			files := &filesStub{prepare: func(context.Context, Pending) (Output, error) {
+				prepared = true
+				if test.cancelled {
+					cancel()
+				}
+				return Output{}, errors.New("storage unavailable")
+			}}
+			repo := repositoryStub{
+				ready: func(context.Context, int64) (bool, error) { return false, nil },
+				requeue: func(_ context.Context, _ Pending, _, available time.Time) (bool, error) {
+					requeued = true
+					if delay := available.Sub(now); delay != test.wantDelay {
+						t.Fatalf("retry delay=%v, want %v", delay, test.wantDelay)
+					}
+					return true, nil
+				},
+				fail: func(_ context.Context, _ Pending, code string, _ time.Time) (bool, error) {
+					failed = code
+					return true, nil
+				},
+			}
+			s := New(repo, files, func() time.Time { return now }, func(int64) {}, func(string, ...any) {})
+			s.Process(ctx, test.job)
+			if prepared != test.prepared {
+				t.Fatalf("prepared=%v, want %v", prepared, test.prepared)
+			}
+			if failed != test.wantCode || requeued != (test.wantCode == "") {
+				t.Fatalf("failed=%q requeued=%v", failed, requeued)
+			}
+			if (len(files.removedInputs) == 1) != (test.wantCode != "") {
+				t.Fatalf("input removals=%d", len(files.removedInputs))
+			}
+		})
 	}
 }

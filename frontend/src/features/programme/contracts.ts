@@ -2,38 +2,57 @@ import { z } from "zod";
 import { id, instant } from "../../lib/schema.ts";
 import { authorSchema } from "../guests/contracts.ts";
 
+// Responses are checked for their shape and for the invariants the interface
+// relies on. Length and count ceilings stay with Go and the forms, so raising
+// a backend limit cannot blank a page.
+const voteOptionSchema = z.object({
+  id,
+  label: z.string().min(1),
+  /** The guest this option stands for; a custom choice has none. */
+  guestId: id.nullable(),
+  avatarUrl: authorSchema.shape.avatarUrl,
+  /** False once the guest behind the option has lost access. */
+  active: z.boolean(),
+  /** Added by a guest while the vote was open. */
+  writeIn: z.boolean(),
+  votes: z.number().int().nonnegative(),
+});
+
 export const voteSchema = z
   .object({
-    question: z
-      .string()
-      .min(1)
-      .refine((value) => [...value].length <= 240),
-    status: z.enum(["draft", "open", "closed", "revealed"]),
+    question: z.string().min(1),
+    status: z.enum(["draft", "open", "closed"]),
+    choices: z.enum(["guests", "custom"]),
     allowSelfVote: z.boolean(),
-    candidates: z
-      .array(authorSchema.extend({ active: z.boolean() }))
-      .min(2)
-      .max(200),
-    myCandidateId: id.nullable(),
+    allowWriteIns: z.boolean(),
+    /** In the server's order: most votes first. */
+    options: z.array(voteOptionSchema),
+    myOptionId: id.nullable(),
     canVote: z.boolean(),
-    participationCount: z.number().int().nonnegative().nullable(),
-    results: z
-      .array(
-        z.object({ candidateId: id, votes: z.number().int().nonnegative() }),
-      )
-      .max(200)
-      .nullable(),
   })
   .superRefine((vote, ctx) => {
-    const ids = new Set(vote.candidates.map((candidate) => candidate.id));
+    const ids = new Set(vote.options.map((option) => option.id));
     if (
-      ids.size !== vote.candidates.length ||
-      (vote.myCandidateId !== null && !ids.has(vote.myCandidateId))
+      ids.size !== vote.options.length ||
+      (vote.myOptionId !== null && !ids.has(vote.myOptionId))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Vote options must be distinct and contain the saved choice",
+      });
+    }
+    const forGuests = vote.choices === "guests";
+    if (
+      vote.options.some(
+        (option) =>
+          (option.guestId !== null) !== forGuests ||
+          (option.writeIn && forGuests),
+      )
     ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "Vote candidates must be distinct and contain the saved choice",
+          "A guest vote lists guests only and a custom vote text choices only",
       });
     }
     if (vote.canVote && vote.status !== "open") {
@@ -42,47 +61,25 @@ export const voteSchema = z
         message: "Only an open vote accepts ballots",
       });
     }
-    if ((vote.status === "revealed") !== (vote.results !== null)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Results are available only after revelation",
-      });
-    }
-    if (
-      vote.results &&
-      (vote.results.length !== ids.size ||
-        new Set(vote.results.map((result) => result.candidateId)).size !==
-          ids.size ||
-        vote.results.some((result) => !ids.has(result.candidateId)))
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Results must cover each candidate once",
-      });
-    }
   });
 
-export const questionSummarySchema = z.object({
+const questionSummarySchema = z.object({
   status: z.enum(["draft", "open", "closed"]),
+  // The activity page draws exactly two joker tickets.
   jokersUsed: z.number().int().min(0).max(2),
-  questionCount: z.number().int().min(0).max(200),
+  questionCount: z.number().int().nonnegative(),
 });
 export const questionRoundSchema = questionSummarySchema.extend({
   revision: z.number().int().positive(),
-  items: z
-    .array(
-      z.object({
-        id,
-        body: z
-          .string()
-          .min(1)
-          .refine((body) => [...body].length <= 1000),
-        status: z.enum(["pending", "answered", "joker"]),
-        votes: z.number().int().nonnegative(),
-        upvoted: z.boolean(),
-      }),
-    )
-    .max(200),
+  items: z.array(
+    z.object({
+      id,
+      body: z.string().min(1),
+      status: z.enum(["pending", "answered", "joker"]),
+      votes: z.number().int().nonnegative(),
+      upvoted: z.boolean(),
+    }),
+  ),
 });
 export type QuestionRound = z.infer<typeof questionRoundSchema>;
 
@@ -129,3 +126,6 @@ export const eventsSchema = z.object({ items: z.array(eventSchema) });
 
 export type PartyEvent = z.infer<typeof eventSchema>;
 export type Vote = z.infer<typeof voteSchema>;
+export type VoteOption = Vote["options"][number];
+/** A vote event whose voting details the viewer may read. */
+export type VoteEvent = PartyEvent & { vote: Vote };

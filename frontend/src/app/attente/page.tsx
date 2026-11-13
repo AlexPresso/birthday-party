@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { WaitingRoom } from "@/features/welcome/waiting-room";
 import { getBirthdayConfig } from "@/features/party/birthday-config";
 import { getSession } from "@/features/guests/server";
@@ -12,13 +13,15 @@ export async function generateMetadata() {
 }
 
 export default async function WaitingPage() {
-  const [{ guest }, welcome, { age, title }] = await Promise.all([
+  const [{ guest }, welcome, { title }] = await Promise.all([
     getSession(),
     getWelcome(),
     getBirthdayConfig(),
   ]);
   if (guest.role === "admin" || welcome.open) redirect("/photos");
   return (
-    <WaitingRoom guest={guest} initial={welcome} age={age} title={title} />
+    <ConfirmProvider>
+      <WaitingRoom guest={guest} initial={welcome} title={title} />
+    </ConfirmProvider>
   );
 }

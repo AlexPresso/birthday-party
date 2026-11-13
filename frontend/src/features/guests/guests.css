@@ -1,0 +1,125 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  .invite-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  .invite-form > div {
+    flex: 1;
+    min-width: 0;
+  }
+  .invite-form > button {
+    flex-shrink: 0;
+  }
+  .invite-form + p {
+    margin: 12px 0 0;
+  }
+  .invitation-result {
+    border: 1px solid var(--border-strong);
+    padding: 18px;
+    border-radius: var(--radius-small);
+    margin: 22px 0;
+    background: var(--accent-soft);
+  }
+  .invitation-result .section-row {
+    margin-bottom: 12px;
+  }
+  .invitation-result input {
+    font-size: 12px;
+  }
+  .invitation-result > .fine-print {
+    margin: 12px 0 0;
+  }
+  .guest-list-heading {
+    margin-top: 28px;
+    margin-bottom: 12px;
+  }
+  .guest-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .guest-list > li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  .guest-list-name {
+    flex: 1;
+    min-width: 0;
+  }
+  .guest-list-name strong {
+    display: block;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .guest-list-name .fine-print {
+    display: block;
+    font-size: 11px;
+  }
+  .guest-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .guest-actions .text-button {
+    font-size: 12px;
+  }
+  @media (max-width: 1050px) and (min-width: 761px) {
+    .invite-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+  @media (max-width: 760px) {
+    .invite-form {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 14px;
+    }
+    .invite-form > button {
+      width: 100%;
+    }
+    .guest-actions {
+      gap: 3px;
+    }
+    .guest-actions .text-button {
+      font-size: 10px;
+      gap: 5px;
+    }
+    .guest-list > li {
+      gap: 8px;
+    }
+    .guest-list .avatar {
+      height: 30px;
+      width: 30px;
+      font-size: 12px;
+    }
+    .guest-list-name strong {
+      font-size: 12px;
+    }
+    .guest-list-name .fine-print {
+      font-size: 10px;
+    }
+    .guest-actions .icon-button {
+      min-width: 35px;
+    }
+    .invitation-result {
+      padding: 15px;
+    }
+    .invitation-result .form-actions {
+      align-items: flex-start;
+    }
+  }
+  @media (max-width: 360px) {
+    .guest-actions .text-button > span {
+      max-width: 53px;
+      line-height: 1.3;
+    }
+  }
+}

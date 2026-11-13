@@ -4,6 +4,7 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Images, Plus } from "lucide-react";
 import type { UploadLimits } from "./contracts";
 import { useI18n } from "@/lib/i18n-context";
+import { mediaAccept } from "@/lib/media-types";
 import { useUploads, type UploadDestination } from "./upload-provider";
 import { ErrorNotice } from "@/components/ui";
 import "./media-picker.css";
@@ -52,7 +53,7 @@ export function MediaPicker({
         hidden
         type="file"
         multiple
-        accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+        accept={mediaAccept}
         aria-label={t("photos.add")}
         aria-describedby={guidanceId}
         tabIndex={-1}

@@ -6,7 +6,9 @@ import { useI18n } from "@/lib/i18n-context";
 import { formatDate } from "@/lib/dates";
 import { invitationSchema, newGuestSchema, type Guest } from "./contracts";
 import { ErrorNotice } from "@/components/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
+import "./guests.css";
 
 export function GuestManager({
   guests,
@@ -20,6 +22,7 @@ export function GuestManager({
   timezone: string;
 }) {
   const { locale, t } = useI18n();
+  const confirm = useConfirm();
   const activeGuestCount = guests.filter((guest) => guest.active).length;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -68,8 +71,11 @@ export function GuestManager({
     }
   }
   async function revoke(guest: Guest) {
-    if (!window.confirm(t("admin.revokeConfirmation", { name: guest.name })))
-      return;
+    const confirmed = await confirm({
+      message: t("admin.revokeConfirmation", { name: guest.name }),
+      destructive: true,
+    });
+    if (!confirmed) return;
     setBusy(`revoke-${guest.id}`);
     setError(null);
     try {

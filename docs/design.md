@@ -5,12 +5,14 @@ new decision; do not revisit the rejected directions without a reason.
 
 ## Confirmed
 
-- A friendly app for a 30th birthday party.
+- A friendly app for a birthday party: first used for a 30th, and meant to be
+  reused by other hosts.
 - A Next.js frontend with a Go backend.
 - Bottom navigation in order: `Programme`, `Médias`, `Livre d'or`, then
   `Paramètres` only for administrators, and `Profil` last for everyone with app
-  access. Show only icons and the circular profile photo; translate accessible
-  names and tooltips in the supported languages.
+  access. Show icons and the circular profile photo; only the current tab also
+  shows its label. Translate accessible names and tooltips in the supported
+  languages.
 - Events and other content that become available later.
 - A guestbook with named messages and an optional anonymous posting checkbox.
 - Invite-only access through personal activation links and pre-created profiles.
@@ -18,36 +20,43 @@ new decision; do not revisit the rejected directions without a reason.
 - Interface language follows the phone/browser's preferred supported language:
   French, English, German, Italian or Spanish, with English as the fallback.
 
-## Selected direction: cream and dark plum
+## Selected direction: "K · Neige", dark with one orange accent
 
-The user approved a photo-led interface with familiar social-app navigation,
-an icon-only bottom bar and a compact agenda. See the approved
-[light mockup](design-reference-light.png) and
-[dark mockup](design-reference-dark.png). These replace the earlier four-tab
-reference and timeline layout. The approved screens are the visual authority:
-replace the previous component layouts instead of layering cosmetic changes on
-top of them. Match their hierarchy, compact rows, photo proportions and spacing.
-The later settings revision replaces its accordion list with the grouped,
-sliding subpages described below while retaining these themes.
-Use `gpt-taste` to translate its layout and hierarchy into an accessible interface.
-The reference is a visual concept; its photographs and messages are illustrative,
-not actual event content and must not be seeded into the production application.
+On 2026-11-12 the host chose a single dark theme, meant to suit any party so
+other hosts can reuse the app. It replaces the cream and dark plum themes. Every
+reference image in this folder was drawn in those previous colors: use them for
+layout only. Photographs, names and messages in any mockup are
+illustrative and must not be seeded into the application.
 
-Follow the device's light or dark preference. The light theme uses warm cream
-(`#FAF8F6`), aubergine text (`#2F1033`), muted plum actions (`#744C6C`) and soft
-lilac selections (`#F1E7F7`). The dark theme uses a near-black plum background
-(`#131016`), slightly lighter surfaces (`#211B28`),
-fine plum borders (`#3B3043`), light text (`#F6EEF9`), readable secondary text
-(`#C5B1CE`), and mauve accents (`#C28BD4`). Primary buttons use dark text on mauve.
-Use the locally bundled Inter variable font, bold page titles, compact readable
-sections, modest rounded corners and consistent outline icons. Primary buttons
-have the reference's subtle plum or mauve shading. Keep font files and their
-license under `frontend/public/fonts/`; do not request fonts from guests' browsers
-through an external service.
+- **Theme.** Dark only; do not follow the device's light preference. Background
+  `#100F0E`, surfaces `#1B1917` and `#292623`, borders `#33302C`, text `#F5F1EA`,
+  secondary text `#A29B92`.
+- **Accent.** Orange `#FF6A1F`, with amber `#FFB547` for times and the ring
+  gradient. A filled accent always carries dark text, so another party can swap
+  `--accent` in `frontend/src/app/tokens.css` without losing contrast. Use the
+  accent for the one main action on a screen and for the current tab.
+- **Type.** Unbounded for page titles, the age, times and the featured vote
+  question; Figtree for everything else. Do not use italics or uppercase,
+  letter-spaced labels for emphasis.
+- **Shapes.** Pill buttons, round icon buttons, 18px cards, 24px featured cards
+  and photos. Cards sit on a surface color without a border; an outlined dashed
+  card means locked or empty.
+- **Snow.** Fine pale flakes fall slowly behind the top of each page and fade
+  out before the content. It is decoration only: it never overlaps text, and it
+  is still under reduced motion.
+- **Tab changes.** Pressing a dock tab slides the page towards that tab (48px,
+  with a short fade) while the dock stays put and its orange pill glides to
+  the new tab. This uses React's `<ViewTransition>` through
+  `components/page-transition.tsx`, wrapped around each party page, and the
+  direction each dock link declares. Browser back, refreshes and in-page
+  updates do not slide. Under reduced motion the page swaps instantly.
+- **Fonts.** Keep font files and their licenses under `frontend/public/fonts/`;
+  do not request fonts from guests' browsers through an external service.
 
 The birthday identity comes from the actual participants and content. The earlier
-scrapbook, photobooth, garden, illustrated-pop and anthracite proposals were not
-selected. Keep decoration restrained and let the app's tasks lead the layout.
+scrapbook, photobooth, garden, illustrated-pop, anthracite, editorial, poster,
+ticket and chalet proposals were not selected. Keep decoration restrained and
+let the app's tasks lead the layout.
 Do not invent party details, guest contributions, dates, or activity counts.
 
 ## Layout and visual language
@@ -55,34 +64,36 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Design for guests using phones, then adapt deliberately for larger screens.
 - On PC, center the party shell at 90% width without a fixed pixel cap, with
   wider internal gutters on tablets and PCs. Above
-  960px, media feeds use two columns and the compact gallery uses four; the
+  960px, the media list view uses two columns and the mosaic uses four; the
   guestbook places its composer beside a single reading column. Profile identity
   and controls sit side by side. An open featured vote sits beside the agenda,
   preserving event order and ballot state. Settings use a persistent vertical
   sidebar and an editor to its right above 960px, following Instagram's desktop
   settings layout. Settings editors fill the remaining width and the welcome builder
-  uses its existing columns. Keep the icon navigation in a
-  centered bottom dock on desktop, with the upload banner above it. Phones retain
-  the approved single-column layouts and edge-to-edge bottom navigation. Use CSS
-  breakpoints without duplicating mounted controls or requests.
+  uses its existing columns. Keep the navigation in a centered floating dock on
+  every screen size, with the upload banner above it. Phones retain the
+  single-column layouts. Use CSS breakpoints without duplicating mounted
+  controls or requests.
 - Keep headings and content aligned to a shared page gutter. Center empty states
   and the waiting greeting; align forms, messages and authored step content for
   reading. Use quiet borders to separate content rather than enclosing every row.
 - Use 44px or larger touch targets, accessible translated names and visible focus.
-  The bottom bar has calendar, images and open-book icons, an administrator-only
+  The dock has calendar, images and open-book icons, an administrator-only
   settings gear, then the circular avatar at the far right. Use an initial when
-  no photo is available. Do not repeat the profile link in the header. Center
-  the bottom bar at a comfortable width on larger screens.
-- Place Add beside the heading, with circular category covers below it. Load
+  no photo is available. Do not repeat the profile link in the header.
+- Put the round add button at the right of the brand row, with circular
+  category covers below it; the selected category wears an accent ring. Load
   covers through the authorized category response. Use initials for empty
-  categories. The feed shows an author row, an edge-to-edge square preview, a
-  download action for each independent media item. Do not add per-item sequence
-  counters or a thumbnail strip that suggests a grouped carousel. Keep grid/feed controls flat.
-  Put existing file actions in the author's overflow menu. Keep upload limits
+  categories. The mosaic is the default view and opening a photo gives its
+  actions. The list view shows an author row, a rounded square preview and a
+  download action for each independent media item, with the other file actions
+  in the author's overflow menu. Do not add per-item sequence counters or a
+  thumbnail strip that suggests a grouped carousel. Keep the view switch flat.
+  Keep upload limits
   in the accessible Add description and validation, without a technical paragraph
   above the feed. Follow the approved [upload component](upload-reference.png):
   a compact banner with a 40px preview, a single thin progress bar and a sent/total
-  count. Float it 12px above the bottom navigation, with 20px side gutters,
+  count. Float it 12px above the dock, with 20px side gutters,
   throughout the party tabs. Keep welcome widget queues inline and independent.
   An explicit click expands file details, errors and retry/removal controls.
   Keep sending and server preparation distinct. Only when every file is ready,
@@ -93,9 +104,9 @@ Do not invent party details, guest contributions, dates, or activity counts.
   retryable. Persist bounded dismissed upload IDs in session storage so completed
   banners do not reappear after reload. Respect reduced motion and never fetch
   private media merely to decorate a queue.
-- Put the first available open vote in a compact accent card with its real
-  question, candidate avatars and a Vote action. Keep the ballot behind a
-  disclosure, retaining selections while it is collapsed. Present the remaining
+- Put the first available open vote in a compact card with its real question,
+  its three leading options (avatars for guests, short labels for free-text
+  choices) and a Vote action that opens the vote's own page. Present the remaining
   programme as agenda rows with a time column and fine dividers. Show only the
   authorized teaser and unlock information for locked events.
 - Question activities ("Sans filtre") have their own page at `/programme/[id]`,
@@ -103,7 +114,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
   [activity mockup](questions-reference.png): a Programme back link, large title,
   short rules and two ticket icons with the server's remaining joker count.
   Use tabs for pending, answered and skipped questions, keep the server's vote
-  ordering and highlight the first pending question in soft lilac. Upvote buttons
+  ordering and highlight the first pending question with the accent tint. Upvote buttons
   show their count and selected state. On PC, use the 90% shell with the list on
   the left and an anonymous composer on the right. On mobile, a primary action
   opens the composer in a bottom sheet; preserve its draft on dismissal, resize
@@ -135,8 +146,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
   Switching sections saves the outgoing editor and preserves drafts and browser
   history. A save failure keeps the current editor visible. Do not slide the
   desktop sidebar or show a back-to-menu button there. On mobile, each row opens
-  its own page with a full horizontal slide from right to left and a back arrow.
-  Returning slides from left to right. Use
+  its own page: it slides in across the whole screen from the right while the
+  list drifts back and fades, and returning reverses it. Every settings title
+  is plain text on the page; only the round back button stays pinned while
+  scrolling. Use
   `/parametres?section=…` for direct links and browser history. Keep visited
   editors mounted so returning to the list preserves drafts, and restore focus
   to the originating row. Respect reduced motion and keep inactive pages inert.
@@ -148,14 +161,14 @@ Do not invent party details, guest contributions, dates, or activity counts.
   values; serialize those writes. Creation, deletion and vote/welcome transitions
   remain explicit actions. The party-details row uses the birthday cake icon.
   Invitation languages use one scope selector with retained drafts.
-  Match the reference's compact rows, with an icon, label, saved value on the
+  Use compact rows, with an icon, label, saved value on the
   right when relevant, and a chevron. Keep longer descriptions accessible without
   adding a second visible line to every row. Show actual saved age and upload
   limits in the list; preserve the three groups and sliding subpages.
 - Media is the first destination after authentication when full access is open.
   During the host-led welcome, guests see a separate waiting screen without tabs.
   Use a personalized welcome heading while waiting, then show the current
-  host-authored step in the existing plum theme. Do not add a separate greeting.
+  host-authored step in the app theme. Do not add a separate greeting.
   Before the first unlock, show the waiting screen without a Start button.
   Automatically show step one when the host unlocks it. Later unlocks leave
   guests on their current step. Show Next only when the following step is
@@ -215,8 +228,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
   Reuse the control in Profile so guests can enable or disable notifications later.
   Notifications contain generic translated copy and open the guest's current
   welcome position; they must not move the guest to another step.
-- Use the same readable sans-serif family for headings and body content.
-- Use a coherent color palette with strong text contrast and a clear action color.
+- Keep strong text contrast and a single action color, as described above.
 - Establish a small spacing scale and consistent alignment. Group related content
   closely and give major sections breathing room.
 - Let photos and useful event information lead. Add personal details where they
@@ -255,20 +267,25 @@ Do not invent party details, guest contributions, dates, or activity counts.
 
 - Activities are individual events in the programme. From Add event, hosts choose
   an ordinary event or a vote, then complete one form containing the schedule and
-  the settings for that type. Keep opening, closing and revealing a vote directly
+  the settings for that type. Keep opening and closing a vote directly
   on its event controls. The Programme management shortcut opens the matching
   settings section. Preserve drafts and event identity when refreshing or editing.
-- The first activity is voting for a guest. Show the question followed by a
-  searchable portrait grid, with a name beneath each photo and initial fallbacks.
-  Center portraits and names within consistent touch targets. Use a check and a
-  mauve outline to mark the selected candidate, then require an explicit vote
-  action. Show the saved choice and allow changing it until closure; retain an
-  unsent selection after a connection failure or unrelated refresh.
-- Hosts choose candidates and whether self-voting is allowed while preparing the
-  draft. Opening, closing and revealing results are separate actions. Show
-  participation counts to the host without revealing individual choices. Guests
-  see aggregate candidate counts only after revelation, including ties and a
-  clear empty result when nobody voted. Keep the existing navigation order.
+- A vote has its own page at `/programme/[id]`, with a Programme back link and
+  the question as its title. Every option is always listed, most votes first,
+  with its live count and a thin bar showing its share of the leading option.
+  A guest option shows the profile photo large enough to recognise the person
+  (72px on phones, 88px from 960px) with an initial fallback; a free-text option
+  shows its text only. Use a check and an accent outline to mark the selection,
+  then require an explicit vote action fixed above the dock. Mark the viewer's
+  saved choice in words, allow changing it until closure, and retain an unsent
+  selection through refreshes, reorders and connection failures. When the host
+  allows it, a labelled field under the list lets a guest type a new choice.
+  A closed vote is read-only and marks its leading option or options, with a
+  clear empty result when nobody voted.
+- While preparing the draft, hosts choose the source of the options: guests,
+  with the self-vote setting, or free-text choices, with a checkbox letting
+  guests add their own. Opening and closing are the only transitions. Hosts can
+  remove an option a guest added. Never show who voted for what, to anyone.
 - Distinguish upcoming, available, and completed experiences with text as well as color.
 - An upcoming reveal can offer a hint when the host wants one; do not expose
   content that is intended to remain hidden.
@@ -282,8 +299,18 @@ Do not invent party details, guest contributions, dates, or activity counts.
 
 ## Identity, guestbook and settings
 
-- The invitation badge pairs the configured age with a small cake icon with candles.
-- The app header shows the configured age and party name.
+- The invitation shows the configured age inside a large ring with the accent
+  gradient, under the snowfall.
+- Every screen starts with the same brand row: the mark (a small cluster of
+  lights) followed by the party name. The age appears only on the invitation.
+- Programme and Médias have no visible page title; the dock's current tab names
+  the screen. Keep their `h1` for assistive technology and place the party date
+  or the round add button at the right of the brand row. Other screens keep a
+  visible title.
+- The media gallery opens as a mosaic that follows each photo's proportions,
+  with the author's avatar and name in a pill on the photo. The list view stays
+  available from the view switch.
+- In the featured vote, the leading options and the vote button share one row.
 - An invitation opens a personal welcome and an explicit `Entrer` action.
   Activation is a deliberate action; link previews must not consume invitations.
 - Explain invalid, expired and already used invitations, with a clear route back

@@ -1,0 +1,131 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "birthday-party.fullname" . }}-frontend
+  labels:
+    {{- include "birthday-party.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "birthday-party.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Without "from", any source may reach this port only.
+    - ports:
+        - protocol: TCP
+          port: 3000
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  egress:
+    # Server rendering calls the backend through API_INTERNAL_URL.
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "birthday-party.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: 8080
+    # DNS, wherever the cluster resolver runs.
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "birthday-party.fullname" . }}-backend
+  labels:
+    {{- include "birthday-party.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "birthday-party.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        - podSelector:
+            matchLabels:
+              {{- include "birthday-party.selectorLabels" $ | nindent 14 }}
+              app.kubernetes.io/component: frontend
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if .Values.postgresql.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "birthday-party.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- else }}
+    # The chart does not know the external database address; open its port only.
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.externalDatabase.port }}
+    {{- end }}
+    # Web Push services, reached over HTTPS on public addresses only.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fc00::/7
+              - fe80::/10
+      ports:
+        - protocol: TCP
+          port: 443
+{{- if .Values.postgresql.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "birthday-party.fullname" . }}-postgresql
+  labels:
+    {{- include "birthday-party.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "birthday-party.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
+  # Egress is listed without rules: PostgreSQL opens no outbound connection.
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "birthday-party.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: 5432
+{{- end }}
+{{- end }}

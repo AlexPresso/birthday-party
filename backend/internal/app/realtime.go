@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"birthday-party/backend/internal/access"
-	"birthday-party/backend/internal/identity"
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
@@ -136,32 +135,31 @@ func (a *App) realtimeHTTP(w http.ResponseWriter, r *http.Request) {
 	// origin, including scheme and port, rather than accepting wildcard hosts.
 	origins := r.Header.Values("Origin")
 	if len(origins) != 1 || origins[0] != a.config.PublicURL {
-		fail(w, 403, "request_forbidden")
+		fail(w, "request_forbidden")
 		return
 	}
 	if r.URL.RawQuery != "" {
-		fail(w, 400, "invalid_body")
+		fail(w, "invalid_body")
 		return
 	}
 	a.auth(false, a.connectRealtime)(w, r)
 }
 
-func (a *App) realtimeAccess(ctx context.Context, client *realtimeClient) (int64, bool, error) {
+func (a *App) realtimeAccess(ctx context.Context, client *realtimeClient) (time.Time, bool, error) {
 	query, cancel := context.WithTimeout(ctx, workerQueryTimeout)
 	defer cancel()
 	return a.access.Realtime(query, client.session, client.guestID, a.now())
 }
 
-func (a *App) connectRealtime(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
-	cookie, _ := r.Cookie(cookieName)
+func (a *App) connectRealtime(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	// The upgraded connection has its own lifetime. App.Close cancels and waits
 	// for every registered handler, including upgrades still in progress.
 	ctx, cancel := context.WithCancel(context.Background())
-	client := &realtimeClient{guestID: guest.ID, session: identity.HashToken(cookie.Value), wake: make(chan struct{}, 1), stop: make(chan websocket.StatusCode, 1), cancel: cancel}
+	client := &realtimeClient{guestID: viewer.Guest.ID, session: viewer.SessionHash, wake: make(chan struct{}, 1), stop: make(chan websocket.StatusCode, 1), cancel: cancel}
 	if !a.realtime.subscribe(client) {
 		cancel()
 		w.Header().Set("Retry-After", "5")
-		fail(w, 429, "too_many_attempts")
+		fail(w, "too_many_attempts")
 		return
 	}
 	defer a.realtime.unsubscribe(client)
@@ -181,7 +179,7 @@ func (a *App) connectRealtime(w http.ResponseWriter, r *http.Request, guest iden
 	if !writeRealtime(ctx, connection, realtimeMessage{Type: "ready"}) {
 		return
 	}
-	expiry := time.NewTimer(max(0, time.Unix(expires, 0).Sub(a.now())))
+	expiry := time.NewTimer(max(0, expires.Sub(a.now())))
 	defer expiry.Stop()
 	heartbeat := time.NewTicker(realtimeHeartbeat)
 	defer heartbeat.Stop()

@@ -7,16 +7,18 @@ import (
 
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/programme"
+	"birthday-party/backend/internal/timestamp"
 )
 
-// Three bounded queries share a snapshot of event content, candidates and ballots.
+// Two bounded queries share a snapshot of event content, options and ballots.
 func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guestID int64, admin bool, now time.Time) ([]programme.Event, error) {
 	ordered := []*programme.Event{}
 	byVoteID := map[int64]*programme.Event{}
 	voteIDs := []int64{}
 	rows, err := tx.QueryContext(ctx, `SELECT e.id,e.title,e.description,e.teaser,e.starts_at,e.unlock_at,
  COALESCE(a.id,0),COALESCE(a.type,'event'),COALESCE(a.revision,1),
- COALESCE(v.question,''),COALESCE(v.status,''),COALESCE(v.allow_self_vote,FALSE),
+ COALESCE(v.question,''),COALESCE(v.status,''),COALESCE(v.choices,''),
+ COALESCE(v.allow_self_vote,FALSE),COALESCE(v.allow_write_ins,FALSE),
  COALESCE(q.status,''),COALESCE(q.jokers_used,0),
  (SELECT COUNT(*) FROM programme_questions WHERE activity_id=q.activity_id)
  FROM events e LEFT JOIN programme_activities a ON a.event_id=e.id
@@ -30,21 +32,22 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
 	for rows.Next() {
 		event := &programme.Event{}
 		var voteID int64
+		var startsAt, unlockAt *time.Time
 		questions := &programme.QuestionSummary{}
-		vote := &programme.Vote{Candidates: []programme.Candidate{}, Results: []programme.VoteResult{}}
-		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.Teaser, &event.StartsAt, &event.UnlockAt,
-			&voteID, &event.Type, &event.Revision, &vote.Question, &vote.Status, &vote.AllowSelfVote,
+		vote := &programme.Vote{Options: []programme.VoteOption{}}
+		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.Teaser, &startsAt, &unlockAt,
+			&voteID, &event.Type, &event.Revision,
+			&vote.Question, &vote.Status, &vote.Choices, &vote.AllowSelfVote, &vote.AllowWriteIns,
 			&questions.Status, &questions.JokersUsed, &questions.QuestionCount); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		event.StartsAt, event.UnlockAt = timestamp.FormatOptional(startsAt), timestamp.FormatOptional(unlockAt)
 		*event = event.View(now, admin)
-		if event.Type == "questions" && (!event.Locked || admin) {
+		if event.Type == programme.TypeQuestions && (!event.Locked || admin) {
 			event.Questions = questions
 		}
-		if event.Type == "vote" && (!event.Locked || admin) {
-			count := 0
-			vote.ParticipationCount = &count
+		if event.Type == programme.TypeVote && (!event.Locked || admin) {
 			event.Vote = vote
 			byVoteID[voteID] = event
 			voteIDs = append(voteIDs, voteID)
@@ -57,66 +60,50 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
 	}
 	rows.Close()
 	if len(voteIDs) > 0 {
-		if err := readCandidates(ctx, tx, voteIDs, byVoteID); err != nil {
-			return nil, err
-		}
-		if err := readBallots(ctx, tx, voteIDs, guestID, byVoteID); err != nil {
+		if err := readOptions(ctx, tx, voteIDs, guestID, byVoteID); err != nil {
 			return nil, err
 		}
 	}
 	items := make([]programme.Event, 0, len(ordered))
 	for _, event := range ordered {
-		items = append(items, event.VoteView(guestID, admin))
+		items = append(items, event.VoteView(guestID))
 	}
 	return items, nil
 }
 
-func readCandidates(ctx context.Context, tx *sql.Tx, ids []int64, byID map[int64]*programme.Event) error {
-	rows, err := tx.QueryContext(ctx, `SELECT c.activity_id,g.id,g.name,g.active,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END
- FROM programme_vote_candidates c JOIN guests g ON g.id=c.guest_id
- WHERE c.activity_id=ANY($1) ORDER BY c.activity_id,c.position`, ids)
+// readOptions fills each vote with its options, most voted first, and with
+// the viewer's own choice. Voters are only ever counted.
+func readOptions(ctx context.Context, tx *sql.Tx, voteIDs []int64, guestID int64, byVoteID map[int64]*programme.Event) error {
+	rows, err := tx.QueryContext(ctx, `SELECT o.activity_id,o.id,COALESCE(o.label,g.name),o.guest_id,COALESCE(g.active,TRUE),
+ CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END,
+ o.write_in,COALESCE(b.votes,0),COALESCE(b.own,FALSE)
+ FROM programme_vote_options o
+ LEFT JOIN guests g ON g.id=o.guest_id
+ LEFT JOIN (
+  SELECT activity_id,option_id,COUNT(*) AS votes,BOOL_OR(guest_id=$2) AS own
+  FROM programme_ballots WHERE activity_id=ANY($1) GROUP BY activity_id,option_id
+ ) b ON b.activity_id=o.activity_id AND b.option_id=o.id
+ WHERE o.activity_id=ANY($1)
+ ORDER BY o.activity_id,COALESCE(b.votes,0) DESC,lower(COALESCE(o.label,g.name)),o.id`, voteIDs, guestID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, version int64
-		var candidate programme.Candidate
-		if err := rows.Scan(&id, &candidate.ID, &candidate.Name, &candidate.Active, &version); err != nil {
-			return err
-		}
-		candidate.AvatarURL = identity.AvatarURL(candidate.ID, version)
-		vote := byID[id].Vote
-		vote.Candidates = append(vote.Candidates, candidate)
-		vote.Results = append(vote.Results, programme.VoteResult{CandidateID: candidate.ID})
-	}
-	return rows.Err()
-}
-
-func readBallots(ctx context.Context, tx *sql.Tx, ids []int64, guestID int64, byID map[int64]*programme.Event) error {
-	rows, err := tx.QueryContext(ctx, `SELECT activity_id,candidate_id,COUNT(*),BOOL_OR(guest_id=$2)
- FROM programme_ballots WHERE activity_id=ANY($1) GROUP BY activity_id,candidate_id`, ids, guestID)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id, candidateID int64
-		var count int
+		var voteID, avatarVersion int64
+		var option programme.VoteOption
 		var own bool
-		if err := rows.Scan(&id, &candidateID, &count, &own); err != nil {
+		if err := rows.Scan(&voteID, &option.ID, &option.Label, &option.GuestID, &option.Active,
+			&avatarVersion, &option.WriteIn, &option.Votes, &own); err != nil {
 			return err
 		}
-		vote := byID[id].Vote
-		*vote.ParticipationCount += count
-		if own {
-			vote.MyCandidateID = &candidateID
+		if option.GuestID != nil {
+			option.AvatarURL = identity.AvatarURL(*option.GuestID, avatarVersion)
 		}
-		for i := range vote.Results {
-			if vote.Results[i].CandidateID == candidateID {
-				vote.Results[i].Votes = count
-				break
-			}
+		vote := byVoteID[voteID].Vote
+		vote.Options = append(vote.Options, option)
+		if own {
+			vote.MyOptionID = &option.ID
 		}
 	}
 	return rows.Err()

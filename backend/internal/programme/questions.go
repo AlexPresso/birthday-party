@@ -16,19 +16,37 @@ const (
 	ErrNoJokers        ActivityError = "no_jokers_left"
 )
 
+// RoundStatus is the host-controlled phase of a question round.
+type RoundStatus string
+
+const (
+	RoundDraft  RoundStatus = "draft"
+	RoundOpen   RoundStatus = "open"
+	RoundClosed RoundStatus = "closed"
+)
+
+// QuestionStatus records how the host resolved a question; resolutions are terminal.
+type QuestionStatus string
+
+const (
+	QuestionPending  QuestionStatus = "pending"
+	QuestionAnswered QuestionStatus = "answered"
+	QuestionJoker    QuestionStatus = "joker"
+)
+
 type QuestionSummary struct {
-	Status        string `json:"status"`
-	JokersUsed    int    `json:"jokersUsed"`
-	QuestionCount int    `json:"questionCount"`
+	Status        RoundStatus `json:"status"`
+	JokersUsed    int         `json:"jokersUsed"`
+	QuestionCount int         `json:"questionCount"`
 }
 
 // Question deliberately excludes author and voter identities from every audience.
 type Question struct {
-	ID      int64  `json:"id"`
-	Body    string `json:"body"`
-	Status  string `json:"status"`
-	Votes   int    `json:"votes"`
-	Upvoted bool   `json:"upvoted"`
+	ID      int64          `json:"id"`
+	Body    string         `json:"body"`
+	Status  QuestionStatus `json:"status"`
+	Votes   int            `json:"votes"`
+	Upvoted bool           `json:"upvoted"`
 }
 
 type QuestionRound struct {
@@ -37,24 +55,24 @@ type QuestionRound struct {
 	Items    []Question `json:"items"`
 }
 
-func (round QuestionRound) CheckTransition(status string, revision int64) error {
+func (round QuestionRound) CheckTransition(status RoundStatus, revision int64) error {
 	if revision != round.Revision {
 		return ErrActivityConflict
 	}
-	if round.Status == "draft" && status == "open" || round.Status == "open" && status == "closed" {
+	if round.Status == RoundDraft && status == RoundOpen || round.Status == RoundOpen && status == RoundClosed {
 		return nil
 	}
 	return ErrActivityConflict
 }
 
-func (round QuestionRound) CheckResolution(current, next string, revision int64) error {
-	if revision != round.Revision || round.Status == "draft" || current != "pending" {
+func (round QuestionRound) CheckResolution(current, next QuestionStatus, revision int64) error {
+	if revision != round.Revision || round.Status == RoundDraft || current != QuestionPending {
 		return ErrActivityConflict
 	}
-	if next != "answered" && next != "joker" {
+	if next != QuestionAnswered && next != QuestionJoker {
 		return ErrInvalidQuestion
 	}
-	if next == "joker" && round.JokersUsed >= JokerLimit {
+	if next == QuestionJoker && round.JokersUsed >= JokerLimit {
 		return ErrNoJokers
 	}
 	return nil
@@ -64,8 +82,8 @@ type QuestionRepository interface {
 	ReadQuestions(context.Context, Actor, int64, bool) (QuestionRound, error)
 	AddQuestion(context.Context, Actor, int64, string, int) (QuestionRound, error)
 	UpvoteQuestion(context.Context, Actor, int64, int64, bool) (QuestionRound, error)
-	TransitionQuestions(context.Context, Actor, int64, string, int64) (QuestionRound, error)
-	ResolveQuestion(context.Context, Actor, int64, int64, string, int64) (QuestionRound, error)
+	TransitionQuestions(context.Context, Actor, int64, RoundStatus, int64) (QuestionRound, error)
+	ResolveQuestion(context.Context, Actor, int64, int64, QuestionStatus, int64) (QuestionRound, error)
 }
 
 type QuestionService struct{ repository QuestionRepository }
@@ -86,9 +104,9 @@ func (s *QuestionService) Add(ctx context.Context, actor Actor, id int64, body s
 func (s *QuestionService) Upvote(ctx context.Context, actor Actor, id, questionID int64, upvoted bool) (QuestionRound, error) {
 	return s.repository.UpvoteQuestion(ctx, actor, id, questionID, upvoted)
 }
-func (s *QuestionService) Transition(ctx context.Context, actor Actor, id int64, status string, revision int64) (QuestionRound, error) {
+func (s *QuestionService) Transition(ctx context.Context, actor Actor, id int64, status RoundStatus, revision int64) (QuestionRound, error) {
 	return s.repository.TransitionQuestions(ctx, actor, id, status, revision)
 }
-func (s *QuestionService) Resolve(ctx context.Context, actor Actor, id, questionID int64, status string, revision int64) (QuestionRound, error) {
+func (s *QuestionService) Resolve(ctx context.Context, actor Actor, id, questionID int64, status QuestionStatus, revision int64) (QuestionRound, error) {
 	return s.repository.ResolveQuestion(ctx, actor, id, questionID, status, revision)
 }

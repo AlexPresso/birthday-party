@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	pgaccess "birthday-party/backend/internal/adapters/postgres/access"
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/profile"
@@ -22,31 +23,25 @@ func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: n
 var _ profile.Repository = (*Store)(nil)
 
 func (s *Store) Save(ctx context.Context, guestID int64, sessionHash string, data []byte) (identity.Guest, error) {
-	var guest identity.Guest
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return guest, err
+		return identity.Guest{}, err
 	}
 	defer tx.Rollback()
 	// Follow media acceptance's guest-then-welcome lock order. Recheck the
 	// session too, because logout, revocation or closing access can finish
 	// while an image is being received and decoded.
-	err = tx.QueryRowContext(ctx, "SELECT id,name,role,active FROM guests WHERE id=$1 FOR UPDATE", guestID).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active)
+	guest, session, err := pgaccess.LockGuestSession(ctx, tx, guestID, sessionHash, pgaccess.GuestForUpdate)
 	if err != nil {
 		return guest, err
 	}
 	if !guest.Active {
 		return guest, profile.ErrRevoked
 	}
-	var sessionGuestID int64
-	// A request may have waited on the guest lock long enough for its session to
-	// expire. Evaluate the clock only after acquiring that lock.
-	err = tx.QueryRowContext(ctx, "SELECT guest_id FROM sessions WHERE token_hash=$1 AND guest_id=$2 AND expires_at>$3 FOR SHARE", sessionHash, guestID, s.now().Unix()).Scan(&sessionGuestID)
-	if errors.Is(err, sql.ErrNoRows) {
+	// A request may have waited on these locks long enough for its session to
+	// expire. Evaluate the clock only after acquiring them.
+	if !session.ValidAt(s.now()) {
 		return guest, profile.ErrExpired
-	}
-	if err != nil {
-		return guest, err
 	}
 	view, err := pgwelcome.CurrentGuest(ctx, tx, guestID)
 	if err != nil {

@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import { Programme } from "@/features/programme/programme";
 import { serverApi } from "@/lib/server-api";
 import { getParty } from "@/features/party/server";
@@ -14,11 +15,12 @@ export default async function ProgrammePage() {
     getSession(),
   ]);
   return (
-    <Programme
-      initial={events.items}
-      party={party}
-      guestId={session.guest.id}
-      isAdmin={session.guest.role === "admin"}
-    />
+    <PageTransition>
+      <Programme
+        initial={events.items}
+        party={party}
+        isAdmin={session.guest.role === "admin"}
+      />
+    </PageTransition>
   );
 }

@@ -1,187 +1,193 @@
-.welcome-page {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 0 32px 32px;
-}
-.welcome-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  min-height: 96px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-}
-.welcome-header .brand {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.welcome-header .text-button {
-  flex-shrink: 0;
-}
-.welcome-content {
-  width: 100%;
-  max-width: 620px;
-  margin: auto;
-  padding-block: clamp(32px, 7vh, 72px);
-}
-.welcome-stage {
-  padding: clamp(24px, 4vw, 40px);
-}
-.welcome-intro {
-  padding-block: 8px;
-  text-align: center;
-}
-.welcome-intro .welcome-body {
-  max-width: 36ch;
-  margin: 18px auto 0;
-}
-.welcome-cake {
-  display: block;
-  color: var(--accent);
-  margin: 0 auto 24px;
-}
-.welcome-step-number {
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.welcome-stage h1 {
-  font-size: clamp(28px, 5vw, 36px);
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-  overflow-wrap: anywhere;
-}
-.welcome-body {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  margin: 20px 0 0;
-  font-size: 16px;
-  line-height: 1.7;
-}
-.welcome-widgets {
-  display: grid;
-  gap: 24px;
-}
-.welcome-widgets > * {
-  min-width: 0;
-  margin: 0;
-}
-.welcome-widget-title {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.welcome-widgets h2.welcome-widget-title {
-  font-size: clamp(24px, 4vw, 30px);
-  line-height: 1.25;
-}
-.welcome-widgets > .welcome-profile,
-.welcome-widgets > .welcome-media {
-  margin-top: 0;
-}
-.welcome-widgets > .welcome-profile:first-child,
-.welcome-widgets > .welcome-media:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-.welcome-follow-up {
-  max-width: 48ch;
-  margin: 18px auto 0;
-  text-align: center;
-  font-size: 14px;
-  line-height: 1.6;
-}
-.welcome-follow-up:empty {
-  margin-top: 0;
-}
-.welcome-navigation {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
-}
-.welcome-navigation > .button {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 48px;
-  white-space: normal;
-}
-.welcome-navigation > .welcome-finish {
-  flex-basis: 100%;
-}
-.welcome-stage #welcome-heading:focus,
-.welcome-step-number:focus {
-  outline-offset: 6px;
-}
-.welcome-connection {
-  margin-top: 24px;
-}
-.welcome-connection > .button {
-  display: flex;
-  margin: 12px auto 0;
-}
-.welcome-profile,
-.welcome-media {
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
-}
-.welcome-media .upload-queue {
-  padding: 16px;
-  margin-bottom: 0;
-}
-.welcome-media .upload-item {
-  gap: 10px;
-}
-.welcome-media .photo-privacy {
-  line-height: 1.6;
-}
-.welcome-media .media-picker > .fine-print {
-  margin: 12px 0;
-}
-.welcome-profile-identity {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-.welcome-profile-identity strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.welcome-profile .profile-photo-editor {
-  padding: 0;
-  border: 0;
-}
-.welcome-profile > p:last-child {
-  margin-bottom: 0;
-}
-@media (max-width: 600px) {
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
   .welcome-page {
-    padding: 0 18px 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 32px 32px;
   }
   .welcome-header {
-    min-height: 82px;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 18px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    min-height: 96px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
   }
   .welcome-header .brand {
-    flex: 1 1 180px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .welcome-header .text-button {
+    flex-shrink: 0;
   }
   .welcome-content {
-    padding-block: 28px;
+    width: 100%;
+    max-width: 620px;
+    margin: auto;
+    padding-block: clamp(32px, 7vh, 72px);
   }
   .welcome-stage {
-    padding: 28px 22px;
+    padding: clamp(24px, 4vw, 40px);
+  }
+  .welcome-intro {
+    padding-block: 8px;
+    text-align: center;
+  }
+  .welcome-intro .welcome-body {
+    max-width: 36ch;
+    margin: 18px auto 0;
+  }
+  .welcome-cake {
+    display: block;
+    color: var(--accent);
+    margin: 0 auto 24px;
+  }
+  .welcome-step-number {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .welcome-stage h1 {
+    font-size: clamp(28px, 5vw, 36px);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+  .welcome-body {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    margin: 20px 0 0;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  .welcome-widgets {
+    display: grid;
+    gap: 24px;
+  }
+  .welcome-widgets > * {
+    min-width: 0;
+    margin: 0;
+  }
+  .welcome-widget-title {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .welcome-widgets h2.welcome-widget-title {
+    font-size: clamp(24px, 4vw, 30px);
+    line-height: 1.25;
+  }
+  .welcome-widgets > .welcome-profile,
+  .welcome-widgets > .welcome-media {
+    margin-top: 0;
+  }
+  .welcome-widgets > .welcome-profile:first-child,
+  .welcome-widgets > .welcome-media:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .welcome-follow-up {
+    max-width: 48ch;
+    margin: 18px auto 0;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .welcome-follow-up:empty {
+    margin-top: 0;
+  }
+  .welcome-navigation {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .welcome-navigation > .button {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 48px;
+    white-space: normal;
+  }
+  .welcome-navigation > .welcome-finish {
+    flex-basis: 100%;
+  }
+  .welcome-stage #welcome-heading:focus,
+  .welcome-step-number:focus {
+    outline-offset: 6px;
+  }
+  .welcome-connection {
+    margin-top: 24px;
+  }
+  .welcome-connection > .button {
+    display: flex;
+    margin: 12px auto 0;
+  }
+  .welcome-profile,
+  .welcome-media {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .welcome-media .upload-queue {
+    padding: 16px;
+    margin-bottom: 0;
+  }
+  .welcome-media .upload-item {
+    gap: 10px;
+  }
+  /* One class more than the picker's own rule, whichever file loads first. */
+  .welcome-media .media-picker .photo-privacy {
+    line-height: 1.6;
+  }
+  .welcome-media .media-picker > .fine-print {
+    margin: 12px 0;
+  }
+  .welcome-profile-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .welcome-profile-identity strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .welcome-profile .profile-photo-editor {
+    padding: 0;
+    border: 0;
+  }
+  .welcome-profile > p:last-child {
+    margin-bottom: 0;
+  }
+  @media (max-width: 600px) {
+    .welcome-page {
+      padding: 0 18px 20px;
+    }
+    .welcome-header {
+      min-height: 82px;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 18px 0;
+    }
+    .welcome-header .brand {
+      flex: 1 1 180px;
+    }
+    .welcome-content {
+      padding-block: 28px;
+    }
+    .welcome-stage {
+      padding: 28px 22px;
+    }
   }
 }

@@ -1,11 +1,12 @@
 package app
 
 import (
-	"birthday-party/backend/internal/identity"
-	"birthday-party/backend/internal/media"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"birthday-party/backend/internal/access"
+	"birthday-party/backend/internal/media"
 )
 
 type mediaCategoryResponse struct {
@@ -13,10 +14,10 @@ type mediaCategoryResponse struct {
 	CoverThumbnailURL *string `json:"coverThumbnailUrl"`
 }
 
-func (a *App) listMediaCategories(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
-	categories, err := a.media.Categories(r.Context(), guest.Role == "admin")
+func (a *App) listMediaCategories(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
+	categories, err := a.media.Categories(r.Context(), viewer.Guest.IsAdmin())
 	if err != nil {
-		failUpload(w, err)
+		failError(w, err)
 		return
 	}
 	items := make([]mediaCategoryResponse, len(categories))
@@ -27,10 +28,10 @@ func (a *App) listMediaCategories(w http.ResponseWriter, r *http.Request, guest 
 			items[i].CoverThumbnailURL = &thumbnail
 		}
 	}
-	respond(w, 200, map[string]any{"items": items})
+	respond(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (a *App) saveMediaCategory(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) saveMediaCategory(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
 	var input struct {
 		Name     string `json:"name"`
 		IsPublic *bool  `json:"isPublic"`
@@ -39,7 +40,7 @@ func (a *App) saveMediaCategory(w http.ResponseWriter, r *http.Request, _ identi
 		return
 	}
 	if input.IsPublic == nil {
-		fail(w, 400, "invalid_media_category")
+		fail(w, "invalid_media_category")
 		return
 	}
 	category := media.Category{Name: input.Name, IsPublic: *input.IsPublic}
@@ -54,7 +55,7 @@ func (a *App) saveMediaCategory(w http.ResponseWriter, r *http.Request, _ identi
 	}
 	saved, err := a.media.SaveCategory(r.Context(), category)
 	if err != nil {
-		failUpload(w, err)
+		failError(w, err)
 		return
 	}
 	if category.ID != 0 {

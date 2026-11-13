@@ -5,52 +5,20 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  baseURL,
+  bootstrapHost,
+  mutationHeaders,
+  signInGuest,
+} from "./support/party";
+import { canvasImage } from "./support/images";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 let host: APIRequestContext;
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
 
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Profile Test Host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  const accepted = await host.post("/api/invitations/accept", {
-    data: { token: invitationToken(match[0]) },
-  });
-  expect(accepted.status()).toBe(200);
+  host = await bootstrapHost("Profile Test Host");
 });
 
 test.afterAll(async () => {
@@ -58,46 +26,20 @@ test.afterAll(async () => {
 });
 
 async function enterGuest(page: Page, name: string) {
-  const created = await host.post("/api/admin/guests", { data: { name } });
-  expect(created.status()).toBe(201);
-  const invitation = (await created.json()) as {
-    guest: { id: number; name: string };
-    invitationUrl: string;
-  };
-  const accepted = await page.request.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: invitationToken(invitation.invitationUrl) },
-  });
-  expect(accepted.status()).toBe(200);
+  const guest = await signInGuest(host, page, name);
   await page.goto("/profil");
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
-  return invitation.guest;
+  return guest;
 }
 
-async function profileImage(page: Page, color = "#60917e") {
-  // A local, synthetic landscape image also exercises the square avatar crop.
-  const data = await page.evaluate((background) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 384;
-    canvas.height = 256;
-    const drawing = canvas.getContext("2d")!;
-    drawing.fillStyle = background;
-    drawing.fillRect(0, 0, canvas.width, canvas.height);
-    drawing.fillStyle = "#eed3bb";
-    drawing.beginPath();
-    drawing.arc(192, 100, 48, 0, Math.PI * 2);
-    drawing.fill();
-    drawing.fillStyle = "#393347";
-    drawing.beginPath();
-    drawing.ellipse(192, 249, 92, 88, 0, 0, Math.PI * 2);
-    drawing.fill();
-    return canvas.toDataURL("image/png").split(",")[1];
-  }, color);
-  return {
+function profileImage(page: Page, color = "#60917e") {
+  // A landscape image also exercises the square avatar crop.
+  return canvasImage(page, {
     name: "profile-test.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(data, "base64"),
-  };
+    width: 384,
+    height: 256,
+    color,
+  });
 }
 
 async function savePhoto(page: Page, trigger: () => Promise<void>) {
@@ -207,7 +149,7 @@ test("choosing a profile photo uploads it immediately and persists replacements 
   await page.reload();
   await expect(card.locator(".avatar img")).toHaveAttribute("src", firstURL);
   await page.screenshot({
-    path: "test-results/profile-settings-mobile.png",
+    path: test.info().outputPath("profile-settings-mobile.png"),
     fullPage: true,
   });
   await page.setViewportSize({ width: 320, height: 740 });
@@ -218,7 +160,7 @@ test("choosing a profile photo uploads it immediately and persists replacements 
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
-    path: "test-results/profile-settings-desktop.png",
+    path: test.info().outputPath("profile-settings-desktop.png"),
     fullPage: true,
   });
 

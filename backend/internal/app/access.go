@@ -1,33 +1,36 @@
 package app
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 
 	"birthday-party/backend/internal/access"
-	"birthday-party/backend/internal/identity"
 )
 
 const cookieName = "birthday_session"
 
-func (a *App) auth(admin bool, next func(http.ResponseWriter, *http.Request, identity.Guest)) http.HandlerFunc {
+// handler serves a request for an authorized viewer.
+type handler func(http.ResponseWriter, *http.Request, access.Viewer)
+
+func (a *App) auth(admin bool, next handler) http.HandlerFunc {
 	return a.authorize(admin, access.Session, next)
 }
 
-func (a *App) authContent(next func(http.ResponseWriter, *http.Request, identity.Guest)) http.HandlerFunc {
+func (a *App) authContent(next handler) http.HandlerFunc {
 	return a.authorize(false, access.Party, next)
 }
 
-func (a *App) authProfile(next func(http.ResponseWriter, *http.Request, identity.Guest)) http.HandlerFunc {
+func (a *App) authProfile(next handler) http.HandlerFunc {
 	return a.authorize(false, access.Profile, next)
 }
 
-func (a *App) authorize(admin bool, scope access.Scope, next func(http.ResponseWriter, *http.Request, identity.Guest)) http.HandlerFunc {
+// authorize resolves the session cookie once per request and passes the viewer,
+// including the session digest that write transactions recheck, to next.
+func (a *App) authorize(admin bool, scope access.Scope, next handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
-			fail(w, 401, "invitation_required")
+			fail(w, string(access.ErrInvitation))
 			return
 		}
 		var targetID int64
@@ -37,23 +40,11 @@ func (a *App) authorize(admin bool, scope access.Scope, next func(http.ResponseW
 				targetID = -1
 			}
 		}
-		guest, err := a.access.Authorize(r.Context(), cookie.Value, access.Request{Admin: admin, Scope: scope, TargetGuestID: targetID}, a.now())
+		viewer, err := a.access.Authorize(r.Context(), cookie.Value, access.Request{Admin: admin, Scope: scope, TargetGuestID: targetID}, a.now())
 		if err != nil {
-			var rejected access.Error
-			if !errors.As(err, &rejected) {
-				internal(w, err)
-				return
-			}
-			status := http.StatusUnauthorized
-			switch rejected {
-			case access.ErrAdmin:
-				status = http.StatusForbidden
-			case access.ErrWelcome:
-				status = http.StatusLocked
-			}
-			fail(w, status, string(rejected))
+			failError(w, err)
 			return
 		}
-		next(w, r, guest)
+		next(w, r, viewer)
 	}
 }

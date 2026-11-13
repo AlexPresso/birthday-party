@@ -20,3 +20,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
+
+{{/* Image reference: component tag, then imageTag, then the chart appVersion. */}}
+{{- define "birthday-party.image" -}}
+{{- printf "%s:%s" .image.repository (.image.tag | default .root.Values.imageTag | default .root.Chart.AppVersion) -}}
+{{- end -}}

@@ -1,8 +1,10 @@
 # API contract
 
-The browser uses same-origin `/api/*`. Next.js proxies these requests to the Go
-service. JSON uses camelCase. IDs are positive integers. Timestamps are RFC3339
-UTC strings; optional timestamps are `null`. Errors contain a stable machine-readable
+The browser uses same-origin `/api/*`. In production the Ingress sends these
+requests straight to the Go service; in local development and Compose Next.js
+proxies them. JSON uses camelCase. IDs are positive integers. Timestamps are RFC3339
+UTC strings with at most microsecond precision; optional timestamps are `null`.
+Errors contain a stable machine-readable
 `code` and an English fallback `error`: `{ "code": "...", "error": "..." }`.
 The frontend translates error codes into the viewer's language; the backend does
 not negotiate locale. Names and other authored content are returned unchanged.
@@ -86,11 +88,11 @@ single Go process; durable upload and push-notification workers remain server-si
 Age is an integer from 1 to 150. Upload sizes are integer MiB from 1 to 1024,
 defaulting to 15 for images and 100 for videos. Titles accept up to 200 Unicode
 codepoints and descriptions up to 2000. All five locale objects are required.
-New saves enforce these text lengths; imported legacy text is preserved even
-when longer. Text is trimmed; null inherits the shared copy or translated default, while an
+New saves enforce these text lengths; text imported from the environment is
+preserved even when longer. Text is trimmed; null inherits the shared copy or translated default, while an
 empty string hides the text. A locale override wins over shared copy.
 
-Migration `0012_product_configuration.sql` adds persistent configuration.
+Configuration is stored in PostgreSQL.
 Startup imports existing age, invitation copy and upload-limit environment
 values only when no configuration is saved. Later starts preserve saved values.
 Changes apply on subsequent reads without restart. An incoming upload uses a
@@ -110,17 +112,20 @@ Configuration responses use `no-store`. The frontend proxy permits 1024 MiB plus
   an active session and full app access; administrators bypass the welcome gate.
   During a `profile_photo` welcome step, guests may also read their own avatar.
   A missing photo or obsolete version returns 404. HEAD is also authenticated.
+  The response can be revalidated; see [media caching](#media-caching).
 
 Images accept JPEG, PNG and WebP, with the same saved image size limit and
 40-megapixel input limits as the gallery. Go inspects the file, applies EXIF
 orientation, crops the center to a 256×256 square and encodes a JPEG without
-original metadata. Originals are discarded. One profile image is processed at a
-time; a busy processor returns 429 and the client retains the selection for retry.
+original metadata. Originals are discarded. The upload is received first; only
+decoding is exclusive. One profile image is decoded at a time; a busy decoder
+returns 429 with `Retry-After` and the client retains the selection for retry.
 
 The normalized JPEG is at most 128 KiB and stored in PostgreSQL alongside the
 profile. This small bound allows atomic replacement/removal without coordinating
-database commits with a file store. The version changes on replacement/removal;
-all responses use `no-store`, so old image URLs cannot bypass current permissions.
+database commits with a file store. The version changes on replacement/removal,
+and every request, including a revalidation, checks current permissions, so old
+image URLs cannot bypass them.
 Until a guest finishes the welcome, a selected step containing a `profile_photo`
 widget permits them to read their own profile and save, remove or view their own photo.
 Other guests' photos remain locked. An upload rechecks session, active identity
@@ -222,17 +227,10 @@ finished as soon as the host opens access. Widget submissions are optional;
 advancing does not require saving a profile photo or uploading media.
 
 Steps and progress are stored in PostgreSQL. Host-authored text is not translated.
-Migration `0007_welcome_widgets.sql` converts each legacy step to its title widget,
-nonempty body text widget and optional profile/media widget, in that order.
-It preserves authored content, destinations and progress, and increments the
-revision when existing steps are converted to invalidate old in-flight welcome
-requests. Accepted jobs keep their destination and finish normally. Their new
-`welcomeWidgetIndex` field is null; newly accepted welcome jobs always capture it.
 New widget types need explicit validation, permissions and presentation.
-Migration `0008_guest_welcome_progress.sql` adds the global requirement, run
-generation and per-guest progress. Guests with sessions in an existing closed
-welcome retain its current position. A database sequence produces progress tokens
-above legacy welcome/upload revisions; already accepted uploads remain valid.
+A database sequence produces the progress tokens. An accepted welcome upload
+records both its `welcomeRevision` and `welcomeWidgetIndex`; ordinary uploads
+have neither.
 
 The `profile_photo` widget reuses the profile endpoints and image limits. The
 guest can preview, save, replace or remove their photo on `/attente`. Saving does
@@ -320,8 +318,8 @@ during the welcome. Browser permission alone is insufficient: the interface show
 enabled only after the subscription is stored successfully. Retries can reuse a
 browser subscription after an interrupted server save.
 
-Migration `0009` adds persistent VAPID signing keys, private session subscriptions
-and a durable notification outbox. Keys are generated once and survive restarts.
+PostgreSQL stores the VAPID signing keys, private session subscriptions and a
+durable notification outbox. Keys are generated once and survive restarts.
 `VAPID_SUBJECT` optionally sets a contact URI; HTTPS deployments default to their
 configured public origin. Subscriptions are removed when the session is deleted,
 and delivery rechecks session expiry and guest activity.
@@ -330,7 +328,11 @@ Host `next` and `open` transitions enqueue notifications in the same transaction
 as the welcome update. This includes administrators who explicitly opt in from
 settings. Delivery runs separately from the request, with one latest pending
 welcome notification per subscription, at most five attempts and a 15-minute
-lifetime. Expired push endpoints are removed. Payloads contain only an explicit event type
+lifetime. Only a 2xx answer from the push service counts as delivered; any other
+answer or a transport failure is a failed attempt, and a redirect is dropped
+because redirects are never followed. Expired push endpoints (404 or 410) are
+removed. The worker is woken when a transition commits and otherwise checks the
+outbox every five seconds. Payloads contain only an explicit event type
 (`welcome_step` or `welcome_open`) and the selected supported locale. The service
 worker displays generic translated text; it never includes names, private content,
 future instructions or tokens. Clicking opens same-origin `/attente`, where the
@@ -409,8 +411,24 @@ visibility applies to existing files and queued results. Guest upload acknowledg
 and history keep `photo: null` for private results, without usable media URLs.
 Making a category public reveals its existing contributions after full app access
 opens. Main-gallery media remains visible to all guests with full access.
-Migration `0006_media_categories.sql` adds nullable destinations to existing media
-and jobs, keeping them in the main gallery and preserving welcome state unchanged.
+
+### Media caching
+
+Photo, thumbnail, video and avatar responses carry `Cache-Control: private,
+no-cache` and a strong `ETag`; stored photos and videos also send
+`Last-Modified`. The browser may keep the bytes but must revalidate before every
+reuse. A conditional request (`If-None-Match` or `If-Modified-Since`) passes the
+same session, welcome and category checks as a full request and only then
+receives `304 Not Modified`. A logged-out, revoked or no longer authorized
+viewer gets the usual 401, 423 or 404 with `no-store` and no validator. `Range`
+and `If-Range` keep working for video. The validator identifies one stored file
+or one avatar image: the original and its thumbnail differ, `?download=1` shares
+the original's, and a replaced avatar gets a new one. JSON responses and all
+errors stay `no-store`.
+
+Requests on these routes, and uploads, are given time in proportion to the bytes
+they move (a two-minute allowance plus one second per 64 KiB), so a 1024 MiB
+video survives a slow connection. All other routes keep short deadlines.
 
 Images accept JPEG, PNG and WebP, up to 40 megapixels decoded.
 Videos accept MP4, MOV and WebM, up to 5 minutes and 4K input.
@@ -439,11 +457,17 @@ chosen gallery; `photo` is null while access is closed, the category is private,
 or that media was deleted. The captured category and optional welcome revision
 and widget index survive worker restarts. Failed jobs expose
 a translated error code; retry by sending the file again with a fresh upload ID.
+A file whose content is invalid fails at once with the matching code. A failure
+unrelated to the content (storage, a missing tool, an interrupted database)
+keeps the job `queued` and retries it after 30 seconds, 2, 5 and 15 minutes.
+After the fifth attempt the job becomes `failed` with `video_processing_failed`
+for a video or `photo_upload_failed` for an image, and its input is discarded.
 Reusing an existing upload ID returns the same job instead of adding another file,
 after validating its original destination, revision, widget index and current permissions.
 
 Two background workers prepare queued files; up to four request bodies are read
-at a time independently. The durable queue allows 100 active jobs per guest,
+at a time independently. An accepted upload wakes the workers at once; they also
+check the queue every five seconds. The durable queue allows 100 active jobs per guest,
 1000 globally and 10 GiB of pending input. Capacity failures return 409
 `upload_queue_full`; two busy processors alone do not reject an upload.
 Terminal job history expires after 24 hours, while ready media remains in the gallery.
@@ -466,11 +490,10 @@ settings for that type; there is no nested activity collection.
 
 A missing type creates an ordinary `event`; omitting type on update preserves
 its existing type. Types cannot change after creation. Ordinary events have
-`vote: null` and `revision: 1`. Creating a vote requires
-`vote: { question, candidateIds, allowSelfVote }`. Event metadata, vote settings
-and candidates are saved in one transaction. Invalid settings leave no partial
-event. Creation is limited to 200 programme events across all types. Reads can
-retain up to 2,400 existing records produced by the legacy activity migration.
+`vote: null` and `revision: 1`. Creating a vote requires the `vote` settings
+described under [Vote events](#vote-events). Event metadata, vote settings and
+options are saved in one transaction. Invalid settings leave no partial event.
+The programme is limited to 200 events across all types.
 
 For guests, a locked published event returns the public teaser as `title`, or an
 empty title when no teaser is set, an empty `description`, `vote: null` and `questions: null`.
@@ -538,61 +561,121 @@ settings editor and renderer. The first interactive type is `vote`:
 ```typescript
 type Vote = {
   question: string;
-  status: "draft" | "open" | "closed" | "revealed";
-  allowSelfVote: boolean;
-  candidates: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-    active: boolean;
-  }[];
-  myCandidateId: number | null;
+  status: "draft" | "open" | "closed";
+  choices: "guests" | "custom";
+  allowSelfVote: boolean; // meaningful for "guests" only; false otherwise
+  allowWriteIns: boolean; // meaningful for "custom" only; false otherwise
+  options: VoteOption[]; // votes descending, then label (case-insensitive), then id
+  myOptionId: number | null; // the viewer's own choice only
   canVote: boolean;
-  participationCount: number | null;
-  results: { candidateId: number; votes: number }[] | null;
+};
+
+type VoteOption = {
+  id: number; // stable option id
+  label: string; // guest name or the custom text, unchanged
+  guestId: number | null; // set for "guests" options
+  avatarUrl: string | null; // authenticated avatar URL for guest options
+  active: boolean; // false for a revoked guest; custom options are always true
+  writeIn: boolean; // created by a guest
+  votes: number; // live count, visible to everyone who sees the vote
 };
 ```
 
-- `POST /api/admin/programme/{id}/vote/state { status, revision }` -> `Event`.
-- `PUT /api/programme/{id}/vote { candidateId }` -> `Event` for the signed-in voter.
+The options of a vote come from one source, chosen when the vote is created:
+`guests` offers active guests picked by the host, `custom` offers labels typed
+by the host. A `custom` vote may also let guests add a choice (`allowWriteIns`).
 
-Questions contain 1-240 characters after trimming. Select 2-200 distinct active
-guests as candidates. Voting for oneself defaults to disabled. Candidate selection
-and the self-vote setting can change only while the vote is a draft; the question
-and event metadata remain editable. Transitions are `draft` -> `open` -> `closed`
--> `revealed`. Closing and revealing are separate actions. The current revision
-is required for every edit to an existing vote event, including metadata-only
-updates with an omitted type or vote. Omitting vote on such an update preserves
-its settings. Host edits and transitions increment the revision; guest votes do
-not. Stale edits fail without changing metadata, settings or ballots.
+Create and edit (`POST /api/admin/programme`, `PUT /api/admin/programme/{id}`)
+take these `vote` settings:
+
+```typescript
+vote: {
+  question: string; // 1–240 characters after trimming
+  choices: "guests" | "custom";
+  candidateIds?: number[]; // "guests": 2–200 distinct active guests
+  labels?: string[]; // "custom": 0–200 distinct labels, 1–80 characters after trimming
+  allowSelfVote: boolean; // must be false for "custom"
+  allowWriteIns: boolean; // must be false for "guests"
+}
+```
+
+A `custom` vote needs at least 2 labels, or `allowWriteIns: true`; it may then
+start with one label or none. Labels are stored trimmed, as typed. They are
+compared case-insensitively after trimming, and duplicates are rejected.
+`candidateIds` belongs to `guests` and `labels` to `custom`; sending the other
+list non-empty is invalid. Invalid settings return `invalid_activity`, a label
+of the wrong length `invalid_vote_label`, and an unknown or revoked candidate
+`invalid_vote_option`.
+
+`choices`, the option list, `allowSelfVote` and `allowWriteIns` can change only
+while the vote is a draft; the question and event metadata stay editable. Once
+the vote is open, an edit must repeat the same settings: the same candidates in
+any order, or every label of the host. Labels of current write-ins may be
+included and are ignored; anything else returns `activity_conflict`. Saving a
+draft replaces its options, so option IDs are stable from the opening onwards.
+
+The current revision is required for every edit to an existing vote event,
+including metadata-only updates with an omitted type or vote. Omitting vote on
+such an update preserves its settings. Host edits and transitions increment the
+revision; guest votes, write-ins and the removal of a write-in do not. Stale
+edits fail without changing metadata, settings or ballots.
+
+- `POST /api/admin/programme/{id}/vote/state { status: "open" | "closed", revision }` -> `Event`.
+  Transitions are `draft` -> `open` -> `closed`. Opening a `guests` vote needs
+  at least 2 active candidates (`invalid_vote_option` otherwise).
+- `PUT /api/programme/{id}/vote { optionId }` -> `Event`. Votes for an existing
+  option.
+- `POST /api/programme/{id}/vote/options { label }` -> `Event` (200). Write-in:
+  only for an open `custom` vote with `allowWriteIns`. The label has 1–80
+  characters after trimming. If an option already carries it, whatever the case,
+  the viewer's vote goes to that option; otherwise the option is created with
+  the spelling typed and receives the vote. Both happen in one transaction, so
+  two guests typing the same new label create one option with two votes. A vote
+  has at most 200 options, write-ins included.
+- `DELETE /api/admin/programme/{id}/vote/options/{optionId}` -> `Event`. Removes
+  a write-in option and its votes, while the vote is open or closed. An option
+  of the host returns `activity_conflict`; an option that is unknown or belongs
+  to another vote returns `invalid_vote_option`.
 
 Each guest has one stored choice per vote event and can replace it while voting
-is open. The server derives the voter from the current session and atomically
-checks access, event availability, vote state and candidate eligibility before
-saving. Returning to the page restores the recorded choice. Revoked candidates
-remain in the saved list and historical results with `active: false`, but cannot
-receive new votes. Candidate portraits use authenticated profile photo URLs.
+is open, with either route. The server derives the voter from the current
+session and atomically checks access, event availability, vote state and option
+eligibility before saving. Nobody can vote for the option of a revoked guest,
+which stays listed with `active: false` and the votes it received. A guest
+cannot vote for their own option unless `allowSelfVote` is set. A write-in
+option that loses its last vote disappears in the same transaction; options of
+the host stay, even without votes.
 
-Only the admin endpoint exposes participation counts before revelation. Results
-remain `null` for everyone, including administrators, until the host reveals them.
-Responses never contain other voters' identities or individual choices;
-`myCandidateId` is only the viewer's own choice. PostgreSQL retains voter IDs to
-enforce uniqueness and allow replacing a vote.
+Every viewer who can see the vote receives all its options with their live
+counts, while it is open and after it closes; the total is the sum of
+`options[].votes`. Administrators receive the same `Vote` as guests, on both
+programme endpoints, plus drafts on the admin one. Responses never contain other
+voters' identities or individual choices; `myOptionId` is only the viewer's own
+choice, and `guestId` names the guest an option stands for, never a voter.
+`canVote` is true while the vote is open and offers the viewer an eligible
+option or accepts write-ins. PostgreSQL retains voter IDs to enforce uniqueness
+and allow replacing a vote.
 
-Changes publish the shared `programme` invalidation after commit. Clients refresh
-through authorized HTTP requests without polling. These events require full app
-access and do not grant access during the welcome sequence.
+Draft votes are omitted from the guest programme and a locked event hides its
+vote entirely; both return 404 to a guest who tries to vote. Changes publish the
+shared `programme` invalidation after commit. Clients refresh through authorized
+HTTP requests without polling. These events require full app access and do not
+grant access during the welcome sequence.
 
-Migration `0011_programme_activity_events.sql` turns each legacy nested activity
-into an event. The first activity retains its parent event ID; additional ones
-receive copies of its authored metadata and schedule. Existing settings, status,
-candidate order, revisions and ballots survive. Ordinary events remain unchanged.
 A database constraint prevents multiple activity records belonging to one event.
-The former nested activity and ordering routes are removed.
 
-Vote errors retain the codes `invalid_activity`, `activity_conflict`,
-`vote_closed`, `invalid_vote_candidate` and `self_vote_forbidden`, alongside
-existing event, access and not-found errors.
+Vote errors, alongside existing event, access and not-found errors:
+
+| Code                  | Status | Meaning                                                                |
+| --------------------- | ------ | ---------------------------------------------------------------------- |
+| `invalid_activity`    | 400    | Invalid question, source, option count, duplicate or flag combination  |
+| `invalid_vote_label`  | 400    | A label or write-in without 1–80 characters after trimming             |
+| `invalid_vote_option` | 400    | Unknown, inactive or foreign option                                    |
+| `self_vote_forbidden` | 400    | The viewer's own option while self-votes are off                       |
+| `write_ins_disabled`  | 403    | Write-in on a `guests` vote or a `custom` vote that does not allow it  |
+| `vote_closed`         | 409    | Vote or write-in after the vote closed                                 |
+| `vote_option_limit`   | 409    | A new write-in when the vote already has 200 options                   |
+| `activity_conflict`   | 409    | Stale revision, frozen setting, bad transition, removing a host option |
 
 ## Guestbook
 
@@ -607,7 +690,7 @@ to every viewer, including the original author and administrators. Their owner I
 remains private in the database so the author can still delete the entry.
 `canDelete` reflects the current viewer's permission: only the author or an
 administrator can delete an entry. The frontend uses this flag without needing
-the private identity. Existing entries keep their names after migration.
+the private identity.
 
 ## Host controls
 

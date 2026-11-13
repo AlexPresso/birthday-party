@@ -1,4 +1,4 @@
-﻿import test from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
 import { uploadProxyBodyLimit } from "../runtime/upload-limits.ts";
 import { configurationSchema } from "../src/features/party/contracts.ts";
