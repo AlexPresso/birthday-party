@@ -1,0 +1,88 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  /* Titles are authored and can be long: tabs wrap instead of scrolling. */
+  .information-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 720px;
+    margin-bottom: 16px;
+  }
+  .information-tabs [role="tab"] {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 8px 18px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: left;
+    overflow-wrap: anywhere;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+  }
+  @media (hover: hover) {
+    .information-tabs [role="tab"]:not([aria-selected="true"]):hover {
+      background: var(--surface-raised);
+    }
+  }
+  /* The selected tab is filled and heavier, so color is not its only mark. */
+  .information-tabs [role="tab"][aria-selected="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 800;
+  }
+  .information-tabs [role="tab"]:focus-visible {
+    outline-offset: 3px;
+  }
+  .information-panel {
+    min-width: 0;
+    max-width: 720px;
+    padding: 20px;
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .information-panel:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .information-panel > h2 {
+    margin-bottom: 12px;
+    overflow-wrap: anywhere;
+  }
+  /* The text is shown as typed: line breaks and blank lines are kept. */
+  .information-text {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .information-text a {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .information-text a:focus-visible {
+    outline-offset: 2px;
+    border-radius: var(--radius-tiny);
+  }
+  @media (hover: hover) {
+    .information-text a:hover {
+      color: var(--accent-hover);
+    }
+  }
+  @media (min-width: 960px) {
+    .information-panel {
+      padding: 28px;
+    }
+  }
+}

@@ -7,6 +7,7 @@ import {
   Cake,
   Mail,
   DoorOpen,
+  Info,
   Upload,
   ChevronRight,
 } from "lucide-react";
@@ -27,6 +28,8 @@ import { WelcomeAdmin } from "../welcome/welcome-admin";
 import { MediaCategoriesAdmin } from "../media/media-categories-admin";
 import type { AdminWelcome } from "../welcome/contracts";
 import type { MediaCategory } from "../media/contracts";
+import { InformationEditor } from "../information/information-editor";
+import type { AdminInformation } from "../information/contracts";
 import {
   SettingsNavigation,
   type SettingsSection,
@@ -54,6 +57,12 @@ const groups = [
         title: "adminWelcome.title",
         description: "settings.welcomeDescription",
         Icon: DoorOpen,
+      },
+      {
+        section: "information",
+        title: "page.information",
+        description: "information.settingsDescription",
+        Icon: Info,
       },
     ],
   },
@@ -100,6 +109,7 @@ export function AdminPanel({
   events,
   configuration: initialConfiguration,
   welcome,
+  information,
   categories: initialCategories,
 }: {
   guest: Guest;
@@ -108,10 +118,14 @@ export function AdminPanel({
   events: PartyEvent[];
   configuration: Configuration;
   welcome: AdminWelcome;
+  information: AdminInformation;
   categories: MediaCategory[];
 }) {
   const { t, locale } = useI18n();
   const [party, setParty] = useState(initialParty);
+  const [informationEnabled, setInformationEnabled] = useState(
+    information.enabled,
+  );
   const [guests, setGuests] = useState(initialGuests);
   const [categories, setCategories] = useState(initialCategories);
   const [configuration, setConfiguration] = useState(initialConfiguration);
@@ -151,6 +165,8 @@ export function AdminPanel({
             t("configuration.sizeValue", { size: number.format(size) }),
           )
           .join(" / ");
+      case "information":
+        return t(informationEnabled ? "information.on" : "information.off");
       default:
         return null;
     }
@@ -204,6 +220,13 @@ export function AdminPanel({
         );
       case "welcome":
         return <WelcomeAdmin initial={welcome} categories={categories} />;
+      case "information":
+        return (
+          <InformationEditor
+            initial={information}
+            onSaved={({ enabled }) => setInformationEnabled(enabled)}
+          />
+        );
       case "categories":
         return (
           <MediaCategoriesAdmin

@@ -1,6 +1,7 @@
 import { getParty } from "@/features/party/server";
 import { getSession } from "@/features/guests/server";
 import { getBirthdayConfig } from "@/features/party/birthday-config";
+import { getInformation } from "@/features/information/server";
 import { BrandMark } from "@/components/brand-mark";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { Navigation } from "@/components/navigation";
@@ -17,12 +18,14 @@ export default async function PartyLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [{ guest }, party, { age, title }, { locale, t }] = await Promise.all([
-    getSession(),
-    getParty(),
-    getBirthdayConfig(),
-    getI18n(),
-  ]);
+  const [{ guest }, party, { age, title }, { locale, t }, information] =
+    await Promise.all([
+      getSession(),
+      getParty(),
+      getBirthdayConfig(),
+      getI18n(),
+      getInformation(),
+    ]);
   return (
     <div className="app-shell">
       {guest.role === "guest" && <GuestAccessMonitor />}
@@ -53,6 +56,7 @@ export default async function PartyLayout({
         <UploadQueue />
         <Navigation
           isAdmin={guest.role === "admin"}
+          hasInformation={information.enabled}
           guestName={guest.name}
           avatarUrl={guest.avatarUrl}
         />

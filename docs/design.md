@@ -8,7 +8,8 @@ new decision; do not revisit the rejected directions without a reason.
 - A friendly app for a birthday party: first used for a 30th, and meant to be
   reused by other hosts.
 - A Next.js frontend with a Go backend.
-- Bottom navigation in order: `Programme`, `Médias`, `Livre d'or`, then
+- Bottom navigation in order: `Programme`, `Médias`, `Livre d'or`, `Infos`
+  only while the host shows the information page, then
   `Paramètres` only for administrators, and `Profil` last for everyone with app
   access. Show icons and the circular profile photo; only the current tab also
   shows its label. Translate accessible names and tooltips in the supported

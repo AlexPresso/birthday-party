@@ -5,17 +5,34 @@ import {
   Image as ImageIcon,
   CalendarDays,
   BookOpen,
+  Info,
   Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
+import type { MessageKey } from "@/lib/i18n";
 import { Avatar } from "./avatar";
 
-const tabs = [
+type Tab = {
+  href: string;
+  label: MessageKey;
+  /** The accessible name, when the dock label is a shortened form of it. */
+  name?: MessageKey;
+  Icon: LucideIcon;
+};
+
+const tabs: readonly Tab[] = [
   { href: "/programme", label: "nav.programme", Icon: CalendarDays },
   { href: "/photos", label: "nav.photos", Icon: ImageIcon },
   { href: "/livre-d-or", label: "nav.guestbook", Icon: BookOpen },
+  {
+    href: "/informations",
+    label: "nav.information",
+    name: "page.information",
+    Icon: Info,
+  },
   { href: "/parametres", label: "nav.settings", Icon: Settings },
-] as const;
+];
 
 function NavigationPending() {
   const { pending } = useLinkStatus();
@@ -30,17 +47,24 @@ function NavigationPending() {
 
 export function Navigation({
   isAdmin,
+  hasInformation,
   guestName,
   avatarUrl,
 }: {
   isAdmin: boolean;
+  /** The host shows the information page and it has at least one tab. */
+  hasInformation: boolean;
   guestName: string;
   avatarUrl: string | null;
 }) {
   const pathname = usePathname();
   const { t } = useI18n();
-  const visibleTabs = tabs.filter(
-    ({ href }) => href !== "/parametres" || isAdmin,
+  const visibleTabs = tabs.filter(({ href }) =>
+    href === "/parametres"
+      ? isAdmin
+      : href === "/informations"
+        ? hasInformation
+        : true,
   );
   const isCurrent = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
@@ -60,12 +84,12 @@ export function Navigation({
       aria-label={t("nav.label")}
       data-tabs={visibleTabs.length + 1}
     >
-      {visibleTabs.map(({ href, label, Icon }, index) => (
+      {visibleTabs.map(({ href, label, name = label, Icon }, index) => (
         <Link
           key={href}
           href={href}
-          aria-label={t(label)}
-          title={t(label)}
+          aria-label={t(name)}
+          title={t(name)}
           aria-current={isCurrent(href) ? "page" : undefined}
           transitionTypes={direction(index)}
         >
@@ -73,9 +97,10 @@ export function Navigation({
           {isCurrent(href) && (
             <span className="navigation-indicator" aria-hidden="true" />
           )}
+          {/* Named after the route: the information tab comes and goes. */}
           <span
             className="navigation-content"
-            style={{ viewTransitionName: `nav-tab-${index}` }}
+            style={{ viewTransitionName: `nav-tab-${href.slice(1)}` }}
           >
             <Icon size={24} strokeWidth={2} aria-hidden="true" />
             {/* Shown by CSS for the current tab only; the link keeps its aria-label. */}

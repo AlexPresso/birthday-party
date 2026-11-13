@@ -7,6 +7,7 @@ export type SettingsSection =
   | "guests"
   | "invitation"
   | "welcome"
+  | "information"
   | "categories"
   | "uploads";
 

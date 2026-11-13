@@ -8,6 +8,7 @@ import { serverApi } from "@/lib/server-api";
 import { guestsSchema } from "@/features/guests/contracts";
 import { eventsSchema } from "@/features/programme/contracts";
 import { adminWelcomeSchema } from "@/features/welcome/contracts";
+import { adminInformationSchema } from "@/features/information/contracts";
 import { mediaCategoriesSchema } from "@/features/media/contracts";
 import { getI18n } from "@/lib/server-i18n";
 export async function generateMetadata() {
@@ -18,15 +19,23 @@ export default async function SettingsPage() {
   const { guest } = await getSession();
   if (guest.role !== "admin") redirect("/profil");
 
-  const [party, guests, events, welcome, categories, configuration] =
-    await Promise.all([
-      getParty(),
-      serverApi("/admin/guests", guestsSchema),
-      serverApi("/admin/programme", eventsSchema),
-      serverApi("/admin/welcome", adminWelcomeSchema),
-      serverApi("/media-categories", mediaCategoriesSchema),
-      serverApi("/admin/config", configurationSchema),
-    ]);
+  const [
+    party,
+    guests,
+    events,
+    welcome,
+    information,
+    categories,
+    configuration,
+  ] = await Promise.all([
+    getParty(),
+    serverApi("/admin/guests", guestsSchema),
+    serverApi("/admin/programme", eventsSchema),
+    serverApi("/admin/welcome", adminWelcomeSchema),
+    serverApi("/admin/information", adminInformationSchema),
+    serverApi("/media-categories", mediaCategoriesSchema),
+    serverApi("/admin/config", configurationSchema),
+  ]);
   return (
     <PageTransition>
       <AdminPanel
@@ -36,6 +45,7 @@ export default async function SettingsPage() {
         events={events.items}
         configuration={configuration}
         welcome={welcome}
+        information={information}
         categories={categories.items}
       />
     </PageTransition>

@@ -76,6 +76,12 @@ Guests leave a message, signed or anonymous. An anonymous message hides its
 author from the other guests and from the host, and the author can still
 delete it.
 
+### Practical information
+
+When the host turns it on, an **Info** tab gathers what guests need to know,
+sorted into sections of the host's choosing: how to get there, where to sleep,
+who to call. Addresses, e-mails and phone numbers in the text can be tapped.
+
 ### In the guest's language
 
 The app follows the phone's language: French, English, German, Italian or
@@ -90,6 +96,7 @@ The host is a guest with one more tab, **Settings**. From there you:
   app sends no email and no text message, so you pass the links on yourself;
 - write the text of the invitation page, in several languages if you like;
 - build the schedule, with its surprises, votes and question games;
+- write an information page, split into tabs, and show it when it is ready;
 - create media categories and decide whether guests can see each of them;
 - choose how large a photo or a video may be.
 

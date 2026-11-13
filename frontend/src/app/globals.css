@@ -557,13 +557,16 @@
   .navigation-pending[data-pending] {
     opacity: 1;
   }
-  /* Five tabs need a tighter dock to keep the current tab's label on phones. */
+  /*
+   * Five tabs need a tighter dock to keep the current tab's label on phones.
+   * Six tabs, for a host who shows the information page, need it as well.
+   */
   @media (max-width: 420px) {
-    .navigation[data-tabs="5"] {
+    .navigation:is([data-tabs="5"], [data-tabs="6"]) {
       width: calc(100% - 32px);
       gap: 2px;
     }
-    .navigation[data-tabs="5"] a {
+    .navigation:is([data-tabs="5"], [data-tabs="6"]) a {
       min-width: 44px;
       padding: 0 10px;
       gap: 6px;
@@ -572,8 +575,9 @@
     .navigation[data-tabs="5"] a[aria-current="page"] {
       padding: 0 14px 0 12px;
     }
-    .navigation[data-tabs="5"] .navigation-profile,
-    .navigation[data-tabs="5"] .navigation-profile[aria-current="page"] {
+    .navigation:is([data-tabs="5"], [data-tabs="6"]) .navigation-profile,
+    .navigation:is([data-tabs="5"], [data-tabs="6"])
+      .navigation-profile[aria-current="page"] {
       padding: 0;
     }
     .navigation[data-tabs="5"] .navigation-label {
@@ -582,8 +586,55 @@
       text-overflow: ellipsis;
     }
   }
+  /*
+   * The current tab spells out its name only where the longest label of the
+   * five languages fits: from 375px with four tabs, 373px with five and 521px
+   * with six. Below that the icon stands alone, so no item leaves the dock.
+   */
+  @media (max-width: 379px) {
+    /* A slightly tighter pill keeps the label of five tabs on 375px phones. */
+    .navigation[data-tabs="5"] a[aria-current="page"] {
+      padding: 0 12px 0 10px;
+    }
+  }
+  @media (max-width: 374px) {
+    .navigation[data-tabs="4"] a[aria-current="page"]:not(.navigation-profile) {
+      padding: 0 12px;
+    }
+    .navigation[data-tabs="4"] a[aria-current="page"] .navigation-label {
+      display: none;
+    }
+  }
+  @media (max-width: 372px) {
+    .navigation[data-tabs="5"] a[aria-current="page"]:not(.navigation-profile) {
+      padding: 0 12px;
+    }
+    .navigation[data-tabs="5"] a[aria-current="page"] .navigation-label {
+      display: none;
+    }
+  }
+  @media (max-width: 520px) {
+    .navigation[data-tabs="6"] a[aria-current="page"]:not(.navigation-profile) {
+      padding: 0 12px;
+    }
+    .navigation[data-tabs="6"] a[aria-current="page"] .navigation-label {
+      display: none;
+    }
+  }
+  /* Past the tight phone dock, five and six tabs need more of the width. */
+  @media (min-width: 421px) and (max-width: 760px) {
+    .navigation[data-tabs="5"] {
+      width: min(420px, calc(100% - 32px));
+    }
+  }
+  @media (min-width: 521px) and (max-width: 760px) {
+    .navigation[data-tabs="6"] {
+      width: min(480px, calc(100% - 48px));
+    }
+  }
   @media (max-width: 350px) {
-    .navigation {
+    .navigation,
+    .navigation[data-tabs="6"] {
       width: calc(100% - 24px);
     }
     .navigation[data-tabs] a[aria-current="page"] {
