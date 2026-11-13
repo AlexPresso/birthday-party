@@ -128,7 +128,10 @@ test("every backend error code has a translation and the same English fallback",
     new URL("../../backend/internal/app/errors.go", import.meta.url),
     "utf8",
   );
-  const codes = [...source.matchAll(/"([a-z_]+)":\s+("(?:[^"\\]|\\.)*")/g)];
+  // Each entry of the Go table reads: "code": {http.StatusX, "English fallback"},
+  const codes = [
+    ...source.matchAll(/"([a-z_]+)":\s+\{http\.\w+,\s+("(?:[^"\\]|\\.)*")\}/g),
+  ];
   assert.ok(codes.length > 0, "backend error catalog is empty");
   for (const [, code, encodedMessage] of codes) {
     const key = code as keyof typeof errorMessages.en;

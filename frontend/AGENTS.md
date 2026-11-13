@@ -197,6 +197,11 @@ stays an abort. Ask for confirmation with `useConfirm()` from
 `components/confirm-dialog.tsx`, never `window.confirm`: browsers suppress native
 dialogs in background tabs. Never open a dialog from an automatic save; a
 programme conflict is resolved by the explicit "save my draft" action.
+After an autosave, refresh the server-rendered route with `useRouteRefresh()`
+from `lib/use-route-refresh.ts`, not `router.refresh()` directly: overlapping
+refreshes make the router drop the next tab change and can remount the page.
+Show a validation error below the fields it concerns, never above a control the
+host may be about to press.
 
 ### Sessions
 
