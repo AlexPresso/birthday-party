@@ -9,5 +9,9 @@ export function latestWelcome(
   if (!previous || next.progressRevision > previous.progressRevision)
     return next;
   if (next.progressRevision < previous.progressRevision) return previous;
-  return next.revision > previous.revision ? next : previous;
+  if (next.revision !== previous.revision)
+    return next.revision > previous.revision ? next : previous;
+  // Accepting or withdrawing the rules changes neither revision: the later
+  // answer wins, and the signal sent after that commit corrects a stale read.
+  return next.rulesAccepted === previous.rulesAccepted ? previous : next;
 }

@@ -203,8 +203,13 @@ Do not invent party details, guest contributions, dates, or activity counts.
   Preserve each widget's content, settings and focus while reordering. Keep each
   step's draft together when moving steps. Stack areas on phones and keep the
   palette reachable; use columns only when the available width supports them.
-  A step supports up to 12 widgets, including at most one profile-photo widget
-  and one notification widget.
+  A step supports up to 12 widgets, including at most one profile-photo widget,
+  one notification widget and one rules widget.
+- The rules widget shows each rule as its own checkbox row with a large touch
+  target; the host types them one per line. While a rule is unticked, hide Next
+  and Enter the app and say that every rule must be ticked to continue. Keep
+  partial ticks through live updates, show an accepted list fully ticked, and
+  let the guest untick. Never tick a rule for the guest.
   Widget settings belong beside the affected content. Profile photo has no
   parameters; media upload chooses its destination. Keep future settings specific
   to a real widget rather than exposing a generic JSON editor.

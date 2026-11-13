@@ -8,16 +8,17 @@ import {
   Bell,
   GripVertical,
   Images,
+  ListChecks,
   Plus,
   Trash2,
   Type,
   AlignLeft,
 } from "lucide-react";
 import type { MediaCategory } from "@/features/media/contracts";
-import type { WelcomeWidget } from "./contracts";
+import { singleWidgetTypes, type WelcomeWidget } from "./contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { moveItem } from "@/lib/reorder";
-import type { StepDraft, WidgetDraft } from "./editor-model";
+import { cleanRules, type StepDraft, type WidgetDraft } from "./editor-model";
 import { useWelcomeDrag } from "./use-welcome-drag";
 import "./welcome-widget-editor.css";
 
@@ -27,6 +28,7 @@ const types = [
   "profile_photo",
   "media_upload",
   "enable_notifications",
+  "rules",
 ] as const;
 const labels = {
   title: "widgets.title",
@@ -34,6 +36,7 @@ const labels = {
   profile_photo: "widgets.profilePhoto",
   media_upload: "widgets.mediaUpload",
   enable_notifications: "notifications.widget",
+  rules: "widgets.rules",
 } as const;
 const icons = {
   title: Type,
@@ -41,6 +44,7 @@ const icons = {
   profile_photo: Camera,
   media_upload: Images,
   enable_notifications: Bell,
+  rules: ListChecks,
 };
 
 export function focusWidget(key: number) {
@@ -68,15 +72,15 @@ export function WelcomeWidgetEditor({
   const list = useRef<HTMLOListElement>(null);
   const [announcement, setAnnouncement] = useState("");
   const number = (value: number) => new Intl.NumberFormat(locale).format(value);
-  function canAdd(type: WelcomeWidget["type"]) {
+  // Some widgets can only be in a step once.
+  function alreadyAdded(type: WelcomeWidget["type"]) {
     return (
-      !disabled &&
-      step.widgets.length < 12 &&
-      !(
-        (type === "profile_photo" || type === "enable_notifications") &&
-        step.widgets.some((widget) => widget.type === type)
-      )
+      singleWidgetTypes.includes(type) &&
+      step.widgets.some((widget) => widget.type === type)
     );
+  }
+  function canAdd(type: WelcomeWidget["type"]) {
+    return !disabled && step.widgets.length < 12 && !alreadyAdded(type);
   }
   function add(type: WelcomeWidget["type"], index: number) {
     if (!canAdd(type)) return;
@@ -86,7 +90,9 @@ export function WelcomeWidgetEditor({
         ? { key, type, text: "" }
         : type === "media_upload"
           ? { key, type, mediaUpload: { categoryId: null } }
-          : { key, type };
+          : type === "rules"
+            ? { key, type, rules: [] }
+            : { key, type };
     const updated = [...step.widgets];
     updated.splice(index, 0, widget);
     onChange(updated);
@@ -189,11 +195,9 @@ export function WelcomeWidgetEditor({
                   <Icon size={18} aria-hidden="true" />
                   <span>
                     {t(labels[type])}
-                    {(type === "profile_photo" ||
-                      type === "enable_notifications") &&
-                      step.widgets.some((widget) => widget.type === type) && (
-                        <small>{t("widgets.profileAdded")}</small>
-                      )}
+                    {alreadyAdded(type) && (
+                      <small>{t("widgets.profileAdded")}</small>
+                    )}
                   </span>
                   <Plus size={16} aria-hidden="true" />
                 </button>
@@ -368,6 +372,40 @@ export function WelcomeWidgetEditor({
                     <p className="fine-print">
                       {t("notifications.widgetHint")}
                     </p>
+                  )}
+                  {widget.type === "rules" && (
+                    <>
+                      <label htmlFor={fieldId}>
+                        {t("widgets.rulesField", { number: number(index + 1) })}
+                      </label>
+                      <textarea
+                        id={fieldId}
+                        value={widget.rules.join("\n")}
+                        disabled={disabled}
+                        rows={5}
+                        maxLength={5000}
+                        required
+                        aria-describedby={`${fieldId}-count ${fieldId}-hint`}
+                        onChange={(event) =>
+                          update({
+                            ...widget,
+                            rules: event.target.value.split("\n"),
+                          })
+                        }
+                      />
+                      <p
+                        className="fine-print welcome-character-count"
+                        id={`${fieldId}-count`}
+                      >
+                        {number(cleanRules(widget.rules).length)} / {number(12)}
+                      </p>
+                      <p
+                        className="fine-print welcome-rules-hint"
+                        id={`${fieldId}-hint`}
+                      >
+                        {t("widgets.rulesHint")}
+                      </p>
+                    </>
                   )}
                   {widget.type === "media_upload" && (
                     <div className="welcome-media-settings">

@@ -11,6 +11,7 @@ const waiting: Welcome = {
   canPrevious: false,
   canNext: false,
   canFinish: false,
+  rulesAccepted: false,
 };
 
 test("welcome updates unlock controls without replacing identical state", () => {
@@ -33,6 +34,20 @@ test("a guest navigation response takes precedence over an older concurrent read
   assert.equal(latestWelcome(moved, unlocked), moved);
   const fresh = { ...moved, revision: 5, canNext: true };
   assert.equal(latestWelcome(moved, fresh), fresh);
+});
+
+test("accepting or withdrawing the rules replaces a view with the same revisions", () => {
+  const pending: Welcome = {
+    ...waiting,
+    step: { position: 1, widgets: [{ type: "rules", rules: ["Be kind."] }] },
+  };
+  const accepted = { ...pending, rulesAccepted: true, canNext: true };
+  assert.equal(latestWelcome(pending, accepted), accepted);
+  assert.equal(latestWelcome(accepted, { ...accepted }), accepted);
+  assert.equal(latestWelcome(accepted, pending), pending);
+  // A read from before a host unlock stays older, whatever it says.
+  const unlocked = { ...accepted, revision: 4 };
+  assert.equal(latestWelcome(unlocked, pending), unlocked);
 });
 
 test("finished and restarted guest progress cannot be replaced by stale views", () => {

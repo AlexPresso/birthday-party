@@ -103,7 +103,8 @@ The host is a guest with one more tab, **Settings**. From there you:
 
 Before the party opens, you can walk guests through a few steps that you
 compose yourself: a title, a few words, a profile photo, a place to drop photos
-and videos, an invitation to turn on notifications.
+and videos, an invitation to turn on notifications, or a list of house rules
+that each guest ticks before moving on.
 
 You unlock the steps one at a time when you are ready, and each guest moves
 through them at their own pace. A step can collect photos into a category only

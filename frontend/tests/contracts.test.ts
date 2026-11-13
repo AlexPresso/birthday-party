@@ -32,6 +32,7 @@ const waitingWelcome = {
   canPrevious: false,
   canNext: false,
   canFinish: false,
+  rulesAccepted: false,
 };
 
 test("welcome responses distinguish waiting, the current step and full access", () => {
@@ -55,6 +56,8 @@ test("welcome responses distinguish waiting, the current step and full access", 
     { ...waiting, progressRevision: -1 },
     { ...waiting, progressRevision: undefined },
     { ...waiting, canNext: undefined },
+    { ...waiting, rulesAccepted: undefined },
+    { ...waiting, rulesAccepted: "true" },
     { ...waiting, canPrevious: true },
     { ...waiting, step, canPrevious: true },
     { ...waiting, open: true, canFinish: true },
@@ -138,6 +141,7 @@ test("welcome steps preserve ordered typed widgets without fixed title or body f
       { type: "title", text: "Then a photo" },
       { type: "media_upload", mediaUpload: { categoryId: 4 } },
       { type: "media_upload", mediaUpload: { categoryId: null } },
+      { type: "rules", rules: ["Phones stay in pockets.", "Be kind."] },
     ],
   };
   const welcome = {
@@ -171,6 +175,16 @@ test("welcome steps preserve ordered typed widgets without fixed title or body f
     [{ type: "enable_notifications" }, { type: "enable_notifications" }],
     [{ type: "enable_notifications", text: "Unused settings" }],
     [{ type: "enable_notifications", mediaUpload: null }],
+    [{ type: "rules" }],
+    [{ type: "rules", rules: [] }],
+    [{ type: "rules", rules: "Be kind." }],
+    [{ type: "rules", rules: ["Be kind.", " "] }],
+    [{ type: "rules", rules: ["Be kind."], text: "Unused" }],
+    [{ type: "text", text: "Be kind.", rules: ["Be kind."] }],
+    [
+      { type: "rules", rules: ["Be kind."] },
+      { type: "rules", rules: ["Have fun."] },
+    ],
   ]) {
     assert.equal(
       welcomeSchema.safeParse({
@@ -190,11 +204,23 @@ test("welcome steps preserve ordered typed widgets without fixed title or body f
     // Lengths and counts beyond the editor's limits belong to Go.
     [{ type: "title", text: "🎂".repeat(121) }],
     Array(13).fill({ type: "text", text: "🎂".repeat(1001) }),
+    [{ type: "rules", rules: Array(13).fill("🎂".repeat(201)) }],
   ])
     assert.equal(
       adminWelcomeSchema.safeParse({ ...admin, steps: [{ widgets }] }).success,
       true,
     );
+});
+
+test("the guest view says whether the current step's rules are accepted", () => {
+  const step = {
+    position: 1,
+    widgets: [{ type: "rules", rules: ["Be kind."] }],
+  };
+  for (const rulesAccepted of [false, true]) {
+    const welcome = { ...waitingWelcome, step, rulesAccepted };
+    assert.equal(welcomeSchema.parse(welcome).rulesAccepted, rulesAccepted);
+  }
 });
 
 test("notification contracts require a public application key and persisted success", () => {

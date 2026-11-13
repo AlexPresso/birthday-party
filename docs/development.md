@@ -150,6 +150,7 @@ start, and the app's own settings win from then on.
 | Upload queue        | 100 files in progress per guest, 1,000 in total              |
 | Media categories    | 100                                                          |
 | Welcome             | 12 steps of up to 12 blocks                                  |
+| Welcome rules       | 12 rules of 200 characters, one list per step                |
 | Vote                | 2 to 200 guests, or up to 200 choices of 80 characters       |
 | No Filter           | 200 questions of 1,000 characters, two jokers                |
 | Invitation link     | single use, valid for 7 days                                 |

@@ -6,6 +6,10 @@ const en = {
   "widgets.text": "Text",
   "widgets.profilePhoto": "Profile photo",
   "widgets.mediaUpload": "Photos and videos",
+  "widgets.rules": "Rules",
+  "widgets.rulesField": "Widget {number} rules",
+  "widgets.rulesHint":
+    "One rule per line, up to 12 rules of 200 characters. Guests tick each one before they continue.",
   "widgets.add": "Add {name} widget",
   "widgets.dragNew": "Drag {name} widget into the step",
   "widgets.canvas": "Step widgets",
@@ -28,6 +32,8 @@ const en = {
     "Guests can choose or change their profile photo here. No settings needed.",
   "widgets.invalidText":
     "Fill in each title and text. Titles allow 120 characters; texts allow 1000.",
+  "widgets.invalidRules":
+    "Write at least one rule, one per line. Up to 12 rules of 200 characters each.",
   "widgets.emptyError": "Add at least one widget to each step.",
 };
 
@@ -41,6 +47,10 @@ const fr: WidgetMessages = {
   "widgets.text": "Texte",
   "widgets.profilePhoto": "Photo de profil",
   "widgets.mediaUpload": "Photos et vidéos",
+  "widgets.rules": "Règles",
+  "widgets.rulesField": "Règles du widget {number}",
+  "widgets.rulesHint":
+    "Une règle par ligne, jusqu’à 12 règles de 200 caractères. Les invités cochent chaque règle avant de continuer.",
   "widgets.add": "Ajouter le widget {name}",
   "widgets.dragNew": "Glisser le widget {name} dans l’étape",
   "widgets.canvas": "Widgets de l’étape",
@@ -63,6 +73,8 @@ const fr: WidgetMessages = {
     "Les invités peuvent choisir ou changer leur photo de profil ici. Aucun réglage nécessaire.",
   "widgets.invalidText":
     "Remplis chaque titre et chaque texte. Les titres peuvent avoir 120 caractères, les textes 1000.",
+  "widgets.invalidRules":
+    "Écris au moins une règle, une par ligne. Jusqu’à 12 règles de 200 caractères chacune.",
   "widgets.emptyError": "Ajoute au moins un widget dans chaque étape.",
 };
 
@@ -74,6 +86,10 @@ const de: WidgetMessages = {
   "widgets.text": "Text",
   "widgets.profilePhoto": "Profilfoto",
   "widgets.mediaUpload": "Fotos und Videos",
+  "widgets.rules": "Regeln",
+  "widgets.rulesField": "Regeln von Widget {number}",
+  "widgets.rulesHint":
+    "Eine Regel pro Zeile, bis zu 12 Regeln mit je 200 Zeichen. Gäste haken jede Regel ab, bevor sie weitergehen.",
   "widgets.add": "Widget {name} hinzufügen",
   "widgets.dragNew": "Widget {name} in den Schritt ziehen",
   "widgets.canvas": "Widgets des Schritts",
@@ -96,6 +112,8 @@ const de: WidgetMessages = {
     "Gäste können hier ihr Profilfoto auswählen oder ändern. Keine Einstellungen nötig.",
   "widgets.invalidText":
     "Fülle jeden Titel und Text aus. Titel dürfen 120 Zeichen haben, Texte 1000.",
+  "widgets.invalidRules":
+    "Schreibe mindestens eine Regel, eine pro Zeile. Bis zu 12 Regeln mit je 200 Zeichen.",
   "widgets.emptyError": "Füge jedem Schritt mindestens ein Widget hinzu.",
 };
 
@@ -107,6 +125,10 @@ const it: WidgetMessages = {
   "widgets.text": "Testo",
   "widgets.profilePhoto": "Foto del profilo",
   "widgets.mediaUpload": "Foto e video",
+  "widgets.rules": "Regole",
+  "widgets.rulesField": "Regole del widget {number}",
+  "widgets.rulesHint":
+    "Una regola per riga, fino a 12 regole di 200 caratteri. Gli invitati spuntano ogni regola prima di continuare.",
   "widgets.add": "Aggiungi il widget {name}",
   "widgets.dragNew": "Trascina il widget {name} nel passo",
   "widgets.canvas": "Widget del passo",
@@ -129,6 +151,8 @@ const it: WidgetMessages = {
     "Gli invitati possono scegliere o cambiare la foto del profilo qui. Non servono impostazioni.",
   "widgets.invalidText":
     "Compila ogni titolo e testo. I titoli possono avere 120 caratteri, i testi 1000.",
+  "widgets.invalidRules":
+    "Scrivi almeno una regola, una per riga. Fino a 12 regole di 200 caratteri ciascuna.",
   "widgets.emptyError": "Aggiungi almeno un widget in ogni passo.",
 };
 
@@ -139,6 +163,10 @@ const es: WidgetMessages = {
   "widgets.text": "Texto",
   "widgets.profilePhoto": "Foto de perfil",
   "widgets.mediaUpload": "Fotos y vídeos",
+  "widgets.rules": "Reglas",
+  "widgets.rulesField": "Reglas del widget {number}",
+  "widgets.rulesHint":
+    "Una regla por línea, hasta 12 reglas de 200 caracteres. Los invitados marcan cada regla antes de continuar.",
   "widgets.add": "Añadir el widget {name}",
   "widgets.dragNew": "Arrastrar el widget {name} al paso",
   "widgets.canvas": "Widgets del paso",
@@ -161,6 +189,8 @@ const es: WidgetMessages = {
     "Los invitados pueden elegir o cambiar su foto de perfil aquí. No necesita ajustes.",
   "widgets.invalidText":
     "Completa cada título y texto. Los títulos admiten 120 caracteres y los textos 1000.",
+  "widgets.invalidRules":
+    "Escribe al menos una regla, una por línea. Hasta 12 reglas de 200 caracteres cada una.",
   "widgets.emptyError": "Añade al menos un widget a cada paso.",
 };
 

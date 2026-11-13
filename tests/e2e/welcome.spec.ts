@@ -149,6 +149,7 @@ test("guests navigate unlocked steps independently and keep their position acros
     canPrevious: false,
     canNext: false,
     canFinish: false,
+    rulesAccepted: false,
   });
   const initialHTML = await page.content();
   for (const step of steps) {
@@ -197,6 +198,7 @@ test("guests navigate unlocked steps independently and keep their position acros
     canPrevious: false,
     canNext: false,
     canFinish: false,
+    rulesAccepted: false,
   });
   const lockedProgress = await (await page.request.get("/api/welcome")).json();
   const rejectedNext = await page.request.post("/api/welcome/progress", {

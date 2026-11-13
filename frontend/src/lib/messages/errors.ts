@@ -28,7 +28,7 @@ const en = {
   welcome_conflict:
     "The welcome sequence changed. Refresh it before trying again.",
   invalid_welcome_steps:
-    "Add up to 12 steps with 1 to 12 widgets each. Titles can have 120 characters and texts 1,000.",
+    "Add up to 12 steps with 1 to 12 widgets each. Titles can have 120 characters, texts 1,000, and a rules widget up to 12 rules of 200 characters.",
   invalid_media_category:
     "Choose a category with a name of 1 to 80 characters and a visibility setting.",
   media_category_not_found: "This category is no longer available.",
@@ -138,7 +138,7 @@ export const errorMessages = {
     welcome_conflict:
       "L’accueil a changé. Actualise son état avant de réessayer.",
     invalid_welcome_steps:
-      "Ajoute jusqu’à 12 étapes avec 1 à 12 widgets chacune. Les titres peuvent avoir 120 caractères, les textes 1000.",
+      "Ajoute jusqu’à 12 étapes avec 1 à 12 widgets chacune. Les titres peuvent avoir 120 caractères, les textes 1000, et un widget Règles jusqu’à 12 règles de 200 caractères.",
     invalid_media_category:
       "Choisis un nom de 1 à 80 caractères et la visibilité de la catégorie.",
     media_category_not_found: "Cette catégorie n’est plus disponible.",
@@ -257,7 +257,7 @@ export const errorMessages = {
     welcome_conflict:
       "Der Empfangsablauf hat sich geändert. Aktualisiere den Status und versuche es erneut.",
     invalid_welcome_steps:
-      "Füge bis zu 12 Schritte mit jeweils 1 bis 12 Widgets hinzu. Titel dürfen 120 Zeichen haben, Texte 1000.",
+      "Füge bis zu 12 Schritte mit jeweils 1 bis 12 Widgets hinzu. Titel dürfen 120 Zeichen haben, Texte 1000 und ein Regeln-Widget bis zu 12 Regeln mit je 200 Zeichen.",
     invalid_media_category:
       "Wähle einen Namen mit 1 bis 80 Zeichen und die Sichtbarkeit der Kategorie.",
     media_category_not_found: "Diese Kategorie ist nicht mehr verfügbar.",
@@ -376,7 +376,7 @@ export const errorMessages = {
     welcome_conflict:
       "L’accoglienza è cambiata. Aggiorna lo stato prima di riprovare.",
     invalid_welcome_steps:
-      "Aggiungi fino a 12 passi con 1–12 widget ciascuno. I titoli possono avere 120 caratteri, i testi 1000.",
+      "Aggiungi fino a 12 passi con 1–12 widget ciascuno. I titoli possono avere 120 caratteri, i testi 1000 e un widget Regole fino a 12 regole di 200 caratteri.",
     invalid_media_category:
       "Scegli un nome da 1 a 80 caratteri e la visibilità della categoria.",
     media_category_not_found: "Questa categoria non è più disponibile.",
@@ -489,7 +489,7 @@ export const errorMessages = {
     welcome_conflict:
       "La bienvenida ha cambiado. Actualiza el estado antes de volver a intentarlo.",
     invalid_welcome_steps:
-      "Añade hasta 12 pasos con entre 1 y 12 widgets cada uno. Los títulos admiten 120 caracteres y los textos 1000.",
+      "Añade hasta 12 pasos con entre 1 y 12 widgets cada uno. Los títulos admiten 120 caracteres, los textos 1000 y un widget de reglas hasta 12 reglas de 200 caracteres.",
     invalid_media_category:
       "Elige un nombre de 1 a 80 caracteres y la visibilidad de la categoría.",
     media_category_not_found: "Esta categoría ya no está disponible.",

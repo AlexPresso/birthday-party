@@ -27,6 +27,7 @@ import { ErrorNotice } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { WelcomeProfile } from "./welcome-profile";
 import { WelcomeMedia } from "./welcome-media";
+import { WelcomeRules } from "./welcome-rules";
 import { UploadProvider } from "@/features/media/upload-provider";
 import { UploadQueueError } from "@/features/media/upload-queue";
 import "./waiting-room.css";
@@ -50,6 +51,10 @@ export function WaitingRoom({
   const [error, setError] = useState<string | null>(null);
   const progressRequest = useRef<AbortController | null>(null);
   const state = welcome ?? initial;
+  // Go refuses Next and "Enter the app" until every rule of the step is ticked.
+  const rulesPending =
+    !state.rulesAccepted &&
+    !!state.step?.widgets.some((widget) => widget.type === "rules");
 
   useEffect(() => {
     if (state.open) window.location.replace("/photos");
@@ -160,6 +165,9 @@ export function WaitingRoom({
                   key={state.progressRevision}
                   step={state.step}
                   revision={state.progressRevision}
+                  rulesAccepted={state.rulesAccepted}
+                  onWelcome={accept}
+                  onRefresh={refresh}
                 />
               )}
             </>
@@ -228,11 +236,13 @@ export function WaitingRoom({
             ? t("welcome.opening")
             : moving
               ? t("welcome.moving")
-              : state.canNext
-                ? t("welcome.nextDescription")
-                : !state.canFinish && state.step
-                  ? t("welcome.nextLocked")
-                  : null}
+              : rulesPending
+                ? t("welcome.rulesPending")
+                : state.canNext
+                  ? t("welcome.nextDescription")
+                  : !state.canFinish && state.step
+                    ? t("welcome.nextLocked")
+                    : null}
         </p>
         {failed && (
           <div className="welcome-connection">
@@ -252,9 +262,15 @@ export function WaitingRoom({
 function WelcomeWidgets({
   step,
   revision,
+  rulesAccepted,
+  onWelcome,
+  onRefresh,
 }: {
   step: WelcomeStep;
   revision: number;
+  rulesAccepted: boolean;
+  onWelcome: (welcome: Welcome) => void;
+  onRefresh: () => void;
 }) {
   const firstTitle = step.widgets.findIndex(
     (widget) => widget.type === "title",
@@ -294,6 +310,17 @@ function WelcomeWidgets({
                 key={index}
                 revision={revision}
                 widgetIndex={index}
+              />
+            );
+          case "rules":
+            return (
+              <WelcomeRules
+                key={index}
+                rules={widget.rules}
+                accepted={rulesAccepted}
+                revision={revision}
+                onChange={onWelcome}
+                onConflict={onRefresh}
               />
             );
         }

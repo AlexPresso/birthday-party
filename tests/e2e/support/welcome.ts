@@ -5,7 +5,8 @@ export type WelcomeWidget =
   | { type: "text"; text: string }
   | { type: "profile_photo" }
   | { type: "enable_notifications" }
-  | { type: "media_upload"; mediaUpload: { categoryId: number | null } };
+  | { type: "media_upload"; mediaUpload: { categoryId: number | null } }
+  | { type: "rules"; rules: string[] };
 export type WelcomeStep = { widgets: WelcomeWidget[] };
 export type AdminWelcome = {
   open: boolean;

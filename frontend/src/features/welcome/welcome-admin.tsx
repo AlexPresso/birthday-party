@@ -22,7 +22,7 @@ import { WelcomeStepEditor } from "./welcome-step-editor";
 import { focusWidget } from "./welcome-widget-editor";
 import "./welcome-admin.css";
 
-import { isInvalidTextWidget, type StepDraft } from "./editor-model";
+import { cleanRules, isInvalidWidget, type StepDraft } from "./editor-model";
 
 /**
  * Composes the host's live controls and the step editor. Both act on the same
@@ -73,12 +73,14 @@ export function WelcomeAdmin({
           return { type: widget.type };
         case "media_upload":
           return { type: widget.type, mediaUpload: widget.mediaUpload };
+        case "rules":
+          return { type: widget.type, rules: cleanRules(widget.rules) };
       }
     }),
   }));
   const dirty = JSON.stringify(steps) !== JSON.stringify(state.steps);
   const invalidIndex = draft.findIndex(
-    ({ widgets }) => widgets.length === 0 || widgets.some(isInvalidTextWidget),
+    ({ widgets }) => widgets.length === 0 || widgets.some(isInvalidWidget),
   );
   const mutationDisabled = !!busy || conflict;
   const { flush, saving, onBlur } = useAutosave({ save });
@@ -149,15 +151,17 @@ export function WelcomeAdmin({
     setNotice("");
     if (invalidIndex !== -1) {
       const invalid = draft[invalidIndex];
+      const invalidWidget = invalid.widgets.find(isInvalidWidget);
       setValidationError(
         t(
-          invalid.widgets.length === 0
+          !invalidWidget
             ? "widgets.emptyError"
-            : "widgets.invalidText",
+            : invalidWidget.type === "rules"
+              ? "widgets.invalidRules"
+              : "widgets.invalidText",
         ),
       );
       setSelectedKey(invalid.key);
-      const invalidWidget = invalid.widgets.find(isInvalidTextWidget);
       requestAnimationFrame(() => {
         if (invalidWidget) focusWidget(invalidWidget.key);
         else

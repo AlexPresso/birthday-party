@@ -170,6 +170,89 @@
   .welcome-profile > p:last-child {
     margin-bottom: 0;
   }
+  .welcome-rules fieldset {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .welcome-rule {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    min-height: 52px;
+    margin: 0;
+    padding: 13px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--surface-muted);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+  .welcome-rule:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .welcome-rule:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .welcome-rule > span {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  /* The native checkbox keeps the keyboard and the semantics. */
+  .welcome-rule > input {
+    appearance: none;
+    flex: 0 0 auto;
+    display: grid;
+    place-content: center;
+    width: 22px;
+    height: 22px;
+    min-height: 0;
+    margin: 1px 0 0;
+    padding: 0;
+    border: 2px solid var(--border-strong);
+    border-radius: var(--radius-tiny);
+    background: transparent;
+    cursor: inherit;
+  }
+  .welcome-rule > input:focus-visible {
+    outline: 0;
+  }
+  .welcome-rule > input::after {
+    content: "";
+    width: 11px;
+    height: 6px;
+    margin-top: -3px;
+    border: solid var(--on-accent);
+    border-width: 0 0 2px 2px;
+    transform: rotate(-45deg);
+    opacity: 0;
+  }
+  .welcome-rule > input:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .welcome-rule > input:checked::after {
+    opacity: 1;
+  }
+  /* The boxes wait for the server's answer without losing the focus. */
+  .welcome-rules fieldset[aria-busy="true"] > .welcome-rule {
+    cursor: progress;
+    opacity: 0.6;
+  }
+  .welcome-rules > .error-notice {
+    margin-bottom: 0;
+  }
   @media (max-width: 600px) {
     .welcome-page {
       padding: 0 18px 20px;

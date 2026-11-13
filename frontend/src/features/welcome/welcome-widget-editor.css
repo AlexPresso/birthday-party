@@ -201,6 +201,11 @@
     line-height: 1.6;
   }
 
+  /* Below the right-aligned rule count. */
+  .welcome-widget-fields > .welcome-rules-hint {
+    margin-top: 6px;
+  }
+
   .welcome-widget-limit {
     line-height: 1.6;
   }
