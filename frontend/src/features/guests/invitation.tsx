@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { Snow } from "@/components/snow";
 import { ErrorNotice } from "@/components/ui";
 import { useI18n } from "@/lib/i18n-context";
+import "./invitation.css";
 
 export function Invitation({
   age,

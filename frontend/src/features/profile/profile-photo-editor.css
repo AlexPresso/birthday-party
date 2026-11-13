@@ -1,78 +1,83 @@
-.profile-photo-editor {
-  width: 100%;
-  min-width: 0;
-  padding-block: 18px;
-  border-block: 1px solid var(--border);
-}
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
 
-.profile-photo-editor h3 {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 8px;
-}
-
-.profile-photo-editor > .fine-print {
-  margin-bottom: 16px;
-  font-size: 13px;
-}
-
-.profile-photo-editor input[hidden] {
-  display: none;
-}
-
-.profile-photo-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-}
-
-.profile-photo-actions .button {
-  max-width: 100%;
-  white-space: normal;
-}
-
-.profile-photo-actions .text-button {
-  justify-content: center;
-}
-
-.profile-photo-preview {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-block: 16px;
-}
-
-.profile-photo-preview img {
-  flex: 0 0 auto;
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--border);
-  background: var(--background);
-}
-
-.profile-photo-preview p {
-  margin: 0;
-  min-width: 0;
-}
-
-.profile-photo-editor > .success-notice {
-  margin: 0;
-}
-
-.profile-photo-editor > .success-notice:not(:empty) {
-  margin-top: 12px;
-}
-
-@media (max-width: 420px) {
-  .profile-photo-actions .button {
+@layer features {
+  .profile-photo-editor {
     width: 100%;
+    min-width: 0;
+    padding-block: 18px;
+    border-block: 1px solid var(--border);
+  }
+
+  .profile-photo-editor h3 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 8px;
+  }
+
+  .profile-photo-editor > .fine-print {
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+
+  .profile-photo-editor input[hidden] {
+    display: none;
+  }
+
+  .profile-photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+  }
+
+  .profile-photo-actions .button {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .profile-photo-actions .text-button {
-    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .profile-photo-preview {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-block: 16px;
+  }
+
+  .profile-photo-preview img {
+    flex: 0 0 auto;
+    width: 112px;
+    height: 112px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: var(--background);
+  }
+
+  .profile-photo-preview p {
+    margin: 0;
+    min-width: 0;
+  }
+
+  .profile-photo-editor > .success-notice {
+    margin: 0;
+  }
+
+  .profile-photo-editor > .success-notice:not(:empty) {
+    margin-top: 12px;
+  }
+
+  @media (max-width: 420px) {
+    .profile-photo-actions .button {
+      width: 100%;
+    }
+
+    .profile-photo-actions .text-button {
+      flex: 1 1 auto;
+    }
   }
 }
