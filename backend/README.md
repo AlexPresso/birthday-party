@@ -38,9 +38,6 @@ and `internal/locale` hold the two conventions every feature shares: how instant
 are written and which languages are supported. See [code organization](../docs/architecture.md) for ownership, dependency
 rules and the testing strategy.
 
-[AGENTS.md](AGENTS.md) defines the project's Go conventions and when to grow the
-architecture.
-
 ## Run
 
 From `backend/`, with Go 1.27.2 or newer and `DATABASE_URL` pointing to PostgreSQL:

@@ -171,7 +171,3 @@ preserves it. Event edits retain the round and its accepted questions.
    for interactions spanning routes, uploads or realtime updates.
 5. Run the relevant checks from the [development guide](development.md#check-your-changes).
    Moving files alone does not establish a runtime performance improvement.
-
-The scoped [frontend](../frontend/AGENTS.md) and
-[backend](../backend/AGENTS.md) instructions define the current implementation
-rules.

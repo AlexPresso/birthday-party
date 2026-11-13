@@ -6,6 +6,8 @@ dist/
 coverage/
 *.tsbuildinfo
 frontend/next-env.d.ts
+# Written by next dev
+frontend/AGENTS.md
 backend/server
 backend/server.exe
 backend/.cache/

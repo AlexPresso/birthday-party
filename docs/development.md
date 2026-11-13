@@ -166,12 +166,6 @@ are refused to guests, and request logs leave out invitation and session
 tokens. The host link printed at startup is the one exception, and you can
 switch it off.
 
-## Working with coding agents
-
-[AGENTS.md](../AGENTS.md) and the `AGENTS.md` files in `frontend/` and
-`backend/` describe the project's rules for AI coding agents. The app does not
-use them: they are not part of the build or the images.
-
 ## Third-party material
 
 Bundled third-party material keeps its own licence, included next to it:
