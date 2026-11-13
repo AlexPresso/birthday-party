@@ -39,7 +39,7 @@ func (s *Store) NextUnlock(ctx context.Context, after time.Time) (time.Time, err
 	return next.Time, err
 }
 
-// Create commits the event, its settings and candidates together.
+// Create commits the event, its settings and options together.
 func (s *Store) Create(ctx context.Context, actor programme.Actor, input programme.Input, limit int) (programme.Event, error) {
 	tx, err := s.begin(ctx, actor, 0, true, inputCandidates(input))
 	if err != nil {
@@ -63,7 +63,7 @@ func (s *Store) Create(ctx context.Context, actor programme.Actor, input program
 		return programme.Event{}, err
 	}
 	if input.Vote != nil {
-		if err := createVote(ctx, tx.Tx, id, *input.Vote); err != nil {
+		if err := s.createVote(ctx, tx.Tx, id, *input.Vote); err != nil {
 			return programme.Event{}, err
 		}
 	}
@@ -92,7 +92,7 @@ func (s *Store) Update(ctx context.Context, actor programme.Actor, id int64, inp
 		return programme.Event{}, err
 	}
 	if input.Vote != nil {
-		if err := updateVote(ctx, tx.Tx, event, *input.Vote); err != nil {
+		if err := s.updateVote(ctx, tx.Tx, event, *input.Vote); err != nil {
 			return programme.Event{}, err
 		}
 	}

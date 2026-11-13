@@ -22,7 +22,8 @@ func TestEveryFeatureErrorHasOneAPIEntry(t *testing.T) {
 		welcome.ErrInvalidSteps, welcome.ErrInvalidAction, welcome.ErrConflict, welcome.ErrTransition, welcome.ErrCategoryNotFound,
 		party.ErrInvalidParty, party.ErrInvalidTimezone, party.ErrUnknownTimezone, party.ErrInvalidDate, party.ErrInvalidConfiguration,
 		profile.ErrRevoked, profile.ErrExpired, profile.ErrWelcome, profile.ErrNotFound,
-		programme.ErrInvalidActivity, programme.ErrActivityConflict, programme.ErrVoteClosed, programme.ErrInvalidCandidate, programme.ErrSelfVote,
+		programme.ErrInvalidActivity, programme.ErrActivityConflict, programme.ErrVoteClosed, programme.ErrInvalidOption, programme.ErrSelfVote,
+		programme.ErrWriteInsDisabled, programme.ErrOptionLimit, programme.ErrInvalidLabel,
 		programme.ErrInvalidQuestion, programme.ErrQuestionsClosed, programme.ErrQuestionLimit, programme.ErrNoJokers,
 	}
 	for _, sentinel := range sentinelCodes {

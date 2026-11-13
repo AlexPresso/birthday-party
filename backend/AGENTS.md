@@ -154,12 +154,28 @@ identities preserve ballots across metadata and schedule edits. Keep the event's
 type fixed after creation. The vote tables remain
 an internal extension with at most one vote per event. Add future types explicitly.
 
+A vote's options come from one source: `guests` (active guests picked by the
+host) or `custom` (labels typed by the host, plus guests' write-ins when the vote
+allows them). Validate the source, option counts, label length and uniqueness
+and the flag combinations in `programme`; self-votes belong to `guests` and
+write-ins to `custom`. Labels are stored trimmed as first typed and matched
+whatever their case. The unique index on `lower(label)` decides which labels are
+the same, so look a write-in up in SQL rather than comparing in Go.
+
 Voting requires full app access and an available vote event. Recheck guest,
-session, welcome state and candidate eligibility within the ballot transaction,
-and serialize ballot replacement against closure. A host revision protects
-configuration and transitions without changing on guest votes. Freeze candidates
-and self-vote settings after opening. Keep candidate totals absent until revealed,
-including from admin responses; admin participation counts may be visible earlier.
+session, welcome state and option eligibility within the ballot transaction.
+The vote lock serializes ballots, write-ins, removals and transitions of one
+vote: take it through `voteTransaction` before reading the state a rule checks.
+Lock the guest behind a guest option together with the voter, in ID order, so
+revocation stays atomic with accepting the ballot. A write-in finds or creates
+its option and records the vote in one transaction; a write-in option without
+votes is removed in the transaction that emptied it. Bound a vote to 200 options.
+A host revision protects configuration and transitions; guest votes, write-ins
+and the host's removal of a write-in leave it unchanged. Freeze the source,
+options and both flags after opening; the question stays editable and option IDs
+stay stable. Transitions are `draft` -> `open` -> `closed`. Every viewer who can
+see a vote gets all options with live counts, ordered by votes, label and ID;
+administrators get the same view as guests, plus drafts.
 Never return other guests' voter IDs or individual choices. Omit draft vote events
 from guest lists and return no vote details for locked events. List events in
 bounded batches and publish the existing programme invalidation only after commit.
@@ -277,8 +293,9 @@ retries. Keep private content out of push payloads.
 - PostgreSQL uses `pgx` through `database/sql`, with `$n` placeholders and
   `RETURNING` for generated IDs. Use row/advisory locks for concurrent invariants.
   `DATABASE_URL` is required; Compose supplies private connection settings.
-- `internal/app/migrations/0001_baseline.sql` creates the whole schema. Schema
-  changes belong in new sequential `NNNN_name.sql` files beside it. Embedded
+- `internal/app/migrations/0001_baseline.sql` creates the initial schema. Schema
+  changes belong in new sequential `NNNN_name.sql` files beside it, such as
+  `0002_vote_options.sql`. Embedded
   migrations run under a transaction and advisory lock at startup; applied
   names/checksums are verified. Never change an applied SQL file. Use `BOOLEAN`
   flags, `TIMESTAMPTZ` instants and `CHECK`-constrained `TEXT` for closed sets;
