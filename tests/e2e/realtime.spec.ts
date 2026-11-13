@@ -1,92 +1,31 @@
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
   type Request,
   type WebSocket,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import { bootstrapHost, mutationHeaders, signInGuest } from "./support/party";
+import { canvasImage } from "./support/images";
+import {
+  welcomeControls,
+  type AdminWelcome as Welcome,
+} from "./support/welcome";
+import { acceptConfirmation } from "./support/confirm";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
-type Widget =
-  | { type: "title"; text: string }
-  | { type: "media_upload"; mediaUpload: { categoryId: number | null } };
-type Step = { widgets: Widget[] };
-type Welcome = {
-  open: boolean;
-  revision: number;
-  currentStep: number;
-  required: boolean;
-  steps: Step[];
-};
 type Frame = { type: string; topics?: string[] };
 let host: APIRequestContext;
 let original: Welcome;
+const {
+  state,
+  transition,
+  saveSteps: save,
+  restoreOpen: reset,
+} = welcomeControls(() => host);
 let eventIDs: number[] = [];
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
-
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
-
-async function state(): Promise<Welcome> {
-  const response = await host.get("/api/admin/welcome");
-  expect(response.status()).toBe(200);
-  return response.json();
-}
-
-async function transition(action: "start" | "next" | "open") {
-  const { revision } = await state();
-  const response = await host.post("/api/admin/welcome/transition", {
-    data: { revision, action },
-  });
-  expect(response.status()).toBe(200);
-}
-
-async function save(steps: Step[]) {
-  const { revision } = await state();
-  expect(
-    (
-      await host.put("/api/admin/welcome", { data: { revision, steps } })
-    ).status(),
-  ).toBe(200);
-}
-
-async function reset(steps: Step[], required = false) {
-  if (!(await state()).open) await transition("open");
-  await transition("start");
-  await save(steps);
-  const { revision } = await state();
-  expect(
-    (
-      await host.patch("/api/admin/welcome/required", {
-        data: { revision, required },
-      })
-    ).status(),
-  ).toBe(200);
-  await transition("open");
-}
-
-async function invite(page: Page, name: string) {
-  const created = await host.post("/api/admin/guests", { data: { name } });
-  expect(created.status()).toBe(201);
-  const invitation = await created.json();
-  const accepted = await page.request.post("/api/invitations/accept", {
-    headers: mutationHeaders,
-    data: { token: invitationToken(invitation.invitationUrl) },
-  });
-  expect(accepted.status()).toBe(200);
-  return invitation.guest as { id: number; name: string };
-}
 
 function observe(page: Page) {
   const sockets: { socket: WebSocket; ready: boolean; closed: boolean }[] = [];
@@ -149,55 +88,16 @@ function expectPrivateFrames(frames: Frame[]) {
   }
 }
 
-async function imageFile(page: Page) {
-  const encoded = await page.evaluate(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 120;
-    canvas.height = 80;
-    const drawing = canvas.getContext("2d")!;
-    drawing.fillStyle = "#91729d";
-    drawing.fillRect(0, 0, 120, 80);
-    return canvas.toDataURL("image/png").split(",")[1];
-  });
-  return {
+function imageFile(page: Page) {
+  return canvasImage(page, {
     name: "realtime-welcome.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(encoded, "base64"),
-  };
+    width: 120,
+    height: 80,
+  });
 }
 
 test.beforeAll(async () => {
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Realtime Test Host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  expect(
-    (
-      await host.post("/api/invitations/accept", {
-        data: { token: invitationToken(match[0]) },
-      })
-    ).status(),
-  ).toBe(200);
+  host = await bootstrapHost("Realtime Test Host");
   original = await state();
 });
 
@@ -232,7 +132,7 @@ test("welcome and media widgets share one socket and refresh only after changes"
     },
     { widgets: [{ type: "title", text: "PRIVATE-REALTIME-FUTURE-STEP" }] },
   ]);
-  await invite(page, "Realtime Welcome Guest");
+  await signInGuest(host, page, "Realtime Welcome Guest");
   const network = observe(page);
   await page.goto("/attente");
   await expect.poll(network.active).toBe(1);
@@ -341,7 +241,7 @@ test("programme edits and scheduled unlocks arrive without minute polling or sec
   page,
 }) => {
   test.setTimeout(120_000);
-  await invite(page, "Realtime Programme Guest");
+  await signInGuest(host, page, "Realtime Programme Guest");
   const network = observe(page);
   await page.goto("/photos");
   await expect.poll(network.active).toBe(1);
@@ -400,10 +300,10 @@ test("programme edits and scheduled unlocks arrive without minute polling or sec
   expect(network.readyCount()).toBe(1);
   expectPrivateFrames(network.frames);
   await page.getByRole("link", { name: /^Profil:/ }).click();
-  page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "Se déconnecter", exact: true })
     .click();
+  await acceptConfirmation(page);
   await expect(page).toHaveURL(/\/invitation(?:\?|$)/);
   await expect.poll(network.active).toBe(0);
   const connections = network.sockets.length;
@@ -417,7 +317,7 @@ test("programme edits and scheduled unlocks arrive without minute polling or sec
 test("queue reads retry explicitly and socket receipts recover a lost upload response", async ({
   page,
 }) => {
-  await invite(page, "Realtime Receipt Guest");
+  await signInGuest(host, page, "Realtime Receipt Guest");
   let unavailable = true;
   await page.route("**/api/uploads", async (route) => {
     if (unavailable) {
@@ -438,9 +338,13 @@ test("queue reads retry explicitly and socket receipts recover a lost upload res
   const failedReads = network.requests.length;
   await page.waitForTimeout(10_500);
   expect(network.requests).toHaveLength(failedReads);
-  await page.screenshot({ path: "artifacts/realtime/queue-retry-mobile.png" });
+  await page.screenshot({
+    path: test.info().outputPath("realtime", "queue-retry-mobile.png"),
+  });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.screenshot({ path: "artifacts/realtime/queue-retry-desktop.png" });
+  await page.screenshot({
+    path: test.info().outputPath("realtime", "queue-retry-desktop.png"),
+  });
   unavailable = false;
   await retry.click();
   await expect(retry).toHaveCount(0);
@@ -485,7 +389,7 @@ test("reconnection shows the first step, preserves position on later unlocks, an
     { widgets: [{ type: "title", text: "Keep your place at the table" }] },
     { widgets: [{ type: "title", text: "PRIVATE-REALTIME-OFFLINE-STEP" }] },
   ]);
-  const guest = await invite(page, "Realtime Reconnect Guest");
+  const guest = await signInGuest(host, page, "Realtime Reconnect Guest");
   await page.addInitScript(() => {
     const NativeSocket = window.WebSocket;
     window.WebSocket = class extends NativeSocket {

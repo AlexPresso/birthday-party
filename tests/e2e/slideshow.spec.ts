@@ -1,18 +1,20 @@
 import {
   test,
   expect,
-  request,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import {
+  activate,
+  baseURL,
+  bootstrapHost,
+  invite,
+  newClient,
+  shareSession,
+} from "./support/party";
+import { canvasImage } from "./support/images";
 import { randomUUID } from "node:crypto";
 
-const baseURL = "http://localhost:3300";
-const mutationHeaders = {
-  "X-Requested-With": "birthday-party",
-  Origin: baseURL,
-};
 type Category = { id: number; name: string; isPublic: boolean };
 type Photo = {
   id: number;
@@ -30,12 +32,6 @@ let albumPhotos: Photo[];
 let mainPhotos: Photo[];
 
 test.use({ viewport: { width: 390, height: 844 }, locale: "fr-CH" });
-
-function invitationToken(url: string) {
-  const token = new URLSearchParams(new URL(url).hash.slice(1)).get("token");
-  if (!token) throw new Error("The invitation URL has no token fragment.");
-  return token;
-}
 
 async function createCategory(name: string, isPublic: boolean) {
   const response = await host.post("/api/admin/media-categories", {
@@ -146,37 +142,7 @@ async function expectNoOverflow(page: Page) {
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);
-  const output = execFileSync(
-    process.execPath,
-    ["scripts/backend.mjs", "invite-admin", "--name", "Slideshow Test Host"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        DATA_DIR: process.env.BIRTHDAY_E2E_DATA_DIR,
-        PUBLIC_URL: baseURL,
-        COOKIE_SECURE: "false",
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-    },
-  );
-  const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
-  );
-  if (!match)
-    throw new Error("Host bootstrap did not return an invitation URL.");
-  host = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  expect(
-    (
-      await host.post("/api/invitations/accept", {
-        data: { token: invitationToken(match[0]) },
-      })
-    ).status(),
-  ).toBe(200);
+  host = await bootstrapHost("Slideshow Test Host");
   const welcome = await (await host.get("/api/admin/welcome")).json();
   if (!welcome.open) {
     expect(
@@ -193,22 +159,11 @@ test.beforeAll(async ({ browser }) => {
 
   const fixturePage = await browser.newPage();
   try {
-    const image = await fixturePage.evaluate(() => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 960;
-      canvas.height = 640;
-      const drawing = canvas.getContext("2d")!;
-      drawing.fillStyle = "#65496f";
-      drawing.fillRect(0, 0, 960, 640);
-      drawing.fillStyle = "#e7cba0";
-      drawing.beginPath();
-      drawing.arc(360, 260, 150, 0, Math.PI * 2);
-      drawing.fill();
-      drawing.fillStyle = "#302235";
-      drawing.fillRect(530, 300, 240, 220);
-      return canvas.toDataURL("image/png").split(",")[1];
+    const { buffer } = await canvasImage(fixturePage, {
+      width: 960,
+      height: 640,
+      color: "#65496f",
     });
-    const buffer = Buffer.from(image, "base64");
     const jobs: number[] = [];
     for (let index = 0; index < 25; index++)
       jobs.push(await uploadImage(buffer, album.id));
@@ -223,26 +178,13 @@ test.beforeAll(async ({ browser }) => {
   mainPhotos = await photos(null);
   expect(albumPhotos).toHaveLength(25);
 
-  const created = await host.post("/api/admin/guests", {
-    data: { name: "Slideshow Test Guest" },
-  });
-  expect(created.status()).toBe(201);
-  const invitation = await created.json();
-  guest = await request.newContext({
-    baseURL,
-    extraHTTPHeaders: mutationHeaders,
-  });
-  expect(
-    (
-      await guest.post("/api/invitations/accept", {
-        data: { token: invitationToken(invitation.invitationUrl) },
-      })
-    ).status(),
-  ).toBe(200);
+  const invitation = await invite(host, "Slideshow Test Guest");
+  guest = await newClient();
+  await activate(guest, invitation.invitationUrl);
 });
 
 test.beforeEach(async ({ context }) => {
-  await context.addCookies((await guest.storageState()).cookies);
+  await shareSession(context, guest);
 });
 
 test.afterAll(async () => {
@@ -335,13 +277,13 @@ test("images advance automatically, pause for manual navigation, and fit phone a
     expect(bounds!.height).toBeGreaterThanOrEqual(44);
   }
   await page.screenshot({
-    path: "artifacts/slideshow/mobile-320.png",
+    path: test.info().outputPath("slideshow", "mobile-320.png"),
     fullPage: false,
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await expectNoOverflow(page);
   await page.screenshot({
-    path: "artifacts/slideshow/desktop.png",
+    path: test.info().outputPath("slideshow", "desktop.png"),
     fullPage: false,
   });
   if (await page.evaluate(() => document.fullscreenEnabled)) {
@@ -377,7 +319,7 @@ test("images advance automatically, pause for manual navigation, and fit phone a
   await expect(launchButton(page)).toBeFocused();
   await page.setViewportSize({ width: 320, height: 740 });
   await page.screenshot({
-    path: "artifacts/slideshow/gallery-mobile-320.png",
+    path: test.info().outputPath("slideshow", "gallery-mobile-320.png"),
     fullPage: false,
   });
 });
@@ -403,7 +345,7 @@ test("empty categories have no slideshow and private categories remain host-only
   ).toBe(404);
 
   await context.clearCookies();
-  await context.addCookies((await host.storageState()).cookies);
+  await shareSession(context, host);
   await page.clock.install();
   await launch(page, privateAlbum.id);
   await expect(slideshow(page)).toContainText(privateAlbum.name);
