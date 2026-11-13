@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"slices"
 )
 
 type Step struct {
@@ -20,6 +21,8 @@ const (
 	WidgetProfilePhoto        WidgetType = "profile_photo"
 	WidgetMediaUpload         WidgetType = "media_upload"
 	WidgetEnableNotifications WidgetType = "enable_notifications"
+	// WidgetRules lists rules the guest ticks before leaving the step.
+	WidgetRules WidgetType = "rules"
 )
 
 // authored reports whether the widget carries host-written text.
@@ -29,6 +32,7 @@ type Widget struct {
 	Type        WidgetType   `json:"type"`
 	Text        string       `json:"text,omitempty"`
 	MediaUpload *MediaUpload `json:"mediaUpload,omitempty"`
+	Rules       []string     `json:"rules,omitempty"`
 }
 
 func (w *Widget) UnmarshalJSON(data []byte) error {
@@ -44,7 +48,7 @@ func (w *Widget) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	for name := range fields {
-		if name != "type" && name != "text" && name != "mediaUpload" {
+		if name != "type" && name != "text" && name != "mediaUpload" && name != "rules" {
 			return errors.New("unsupported welcome widget field")
 		}
 	}
@@ -53,6 +57,9 @@ func (w *Widget) UnmarshalJSON(data []byte) error {
 	}
 	if _, exists := fields["mediaUpload"]; exists && input.Type != WidgetMediaUpload {
 		return errors.New("mediaUpload is only supported on media upload widgets")
+	}
+	if _, exists := fields["rules"]; exists && input.Type != WidgetRules {
+		return errors.New("rules are only supported on rules widgets")
 	}
 	*w = Widget(input)
 	return nil
@@ -103,6 +110,8 @@ type View struct {
 	CanPrevious      bool         `json:"canPrevious"`
 	CanNext          bool         `json:"canNext"`
 	CanFinish        bool         `json:"canFinish"`
+	// RulesAccepted reports that the step has rules and this guest ticked them.
+	RulesAccepted bool `json:"rulesAccepted"`
 }
 
 type VisibleStep struct {
@@ -115,6 +124,8 @@ type Progress struct {
 	Position   int
 	Revision   int64
 	Completed  bool
+	// RulesAccepted reports that the guest ticked the rules at Position.
+	RulesAccepted bool
 }
 
 func HasAccess(state State, progress Progress) bool {
@@ -130,6 +141,10 @@ func HasAccess(state State, progress Progress) bool {
 	return progress.Completed
 }
 
+func hasRules(widgets []Widget) bool {
+	return slices.ContainsFunc(widgets, func(widget Widget) bool { return widget.Type == WidgetRules })
+}
+
 func GuestView(state State, progress Progress) View {
 	view := View{Open: HasAccess(state, progress), Revision: state.Revision, ProgressRevision: progress.Revision}
 	if view.Open || progress.Generation != state.Generation {
@@ -138,8 +153,14 @@ func GuestView(state State, progress Progress) View {
 	if progress.Position > 0 && progress.Position <= state.CurrentStep {
 		view.Step = &VisibleStep{Position: progress.Position, Widgets: state.Steps[progress.Position-1].Widgets}
 	}
+	// Rules hold the guest on their step until every one of them is ticked.
+	pending := false
+	if view.Step != nil && hasRules(view.Step.Widgets) {
+		view.RulesAccepted = progress.RulesAccepted
+		pending = !progress.RulesAccepted
+	}
 	view.CanPrevious = progress.Position > 1
-	view.CanNext = progress.Position < state.CurrentStep
-	view.CanFinish = state.Open && (!state.Required || progress.Position == len(state.Steps))
+	view.CanNext = !pending && progress.Position < state.CurrentStep
+	view.CanFinish = !pending && state.Open && (!state.Required || progress.Position == len(state.Steps))
 	return view
 }

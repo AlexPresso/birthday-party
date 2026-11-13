@@ -32,6 +32,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/guests/{id}/avatar", a.authProfile(a.serveAvatar))
 	mux.HandleFunc("GET /api/welcome", a.auth(false, a.getWelcome))
 	mux.HandleFunc("POST /api/welcome/progress", a.auth(false, a.transitionGuestWelcome))
+	mux.HandleFunc("PUT /api/welcome/rules", a.auth(false, a.acceptWelcomeRules))
 	mux.HandleFunc("GET /api/welcome/upload-context", a.auth(false, a.getWelcomeUploadContext))
 	mux.HandleFunc("GET /api/admin/welcome", a.auth(true, a.getAdminWelcome))
 	mux.HandleFunc("PUT /api/admin/welcome", a.auth(true, a.updateWelcome))

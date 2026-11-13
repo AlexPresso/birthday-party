@@ -16,6 +16,27 @@ func (a *App) getWelcome(w http.ResponseWriter, r *http.Request, viewer access.V
 	respond(w, http.StatusOK, view)
 }
 
+func (a *App) acceptWelcomeRules(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
+	var input struct {
+		Revision *int64 `json:"revision"`
+		Accepted *bool  `json:"accepted"`
+	}
+	if !decode(w, r, &input) {
+		return
+	}
+	if input.Revision == nil || *input.Revision < 0 || input.Accepted == nil {
+		fail(w, "invalid_body")
+		return
+	}
+	view, err := a.welcome.AcceptRules(r.Context(), viewer.Guest.ID, *input.Revision, *input.Accepted)
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	a.realtime.notify(viewer.Guest.ID, realtimeWelcome)
+	respond(w, http.StatusOK, view)
+}
+
 func (a *App) transitionGuestWelcome(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	var input struct {
 		Revision *int64         `json:"revision"`

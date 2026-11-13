@@ -29,6 +29,43 @@ func TestAccessForLateArrivalsAndExistingParticipants(t *testing.T) {
 	}
 }
 
+func TestRulesHoldTheGuestOnTheirStep(t *testing.T) {
+	rules := Step{Widgets: []Widget{{Type: WidgetRules, Rules: []string{"Be kind"}}}}
+	state := State{Generation: 1, CurrentStep: 2, Steps: []Step{rules, {Widgets: []Widget{{Type: WidgetTitle, Text: "Second"}}}}}
+	pending := Progress{Generation: 1, Position: 1, Revision: 7}
+	if view := GuestView(state, pending); view.CanNext || view.CanFinish || view.RulesAccepted {
+		t.Fatalf("pending rules let the guest leave: %+v", view)
+	}
+	if _, err := Navigate(state, pending, 7, ActionNext); !errors.Is(err, ErrTransition) {
+		t.Fatalf("next with pending rules: %v", err)
+	}
+	if err := CheckRulesStep(state, pending, 6); !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale rules command: %v", err)
+	}
+	if err := CheckRulesStep(state, pending, 7); err != nil {
+		t.Fatal(err)
+	}
+	accepted := pending
+	accepted.RulesAccepted = true
+	if view := GuestView(state, accepted); !view.CanNext || !view.RulesAccepted {
+		t.Fatalf("accepted rules still held the guest: %+v", view)
+	}
+	// The flag describes the guest's position: it means nothing without rules.
+	elsewhere := Progress{Generation: 1, Position: 2, Revision: 8, RulesAccepted: true}
+	if view := GuestView(state, elsewhere); view.RulesAccepted || !view.CanPrevious {
+		t.Fatalf("a step without rules reported an acceptance: %+v", view)
+	}
+	if err := CheckRulesStep(state, elsewhere, 8); !errors.Is(err, ErrTransition) {
+		t.Fatalf("rules command on a step without rules: %v", err)
+	}
+	// Previous never needs the rules.
+	state.Steps[0], state.Steps[1] = state.Steps[1], state.Steps[0]
+	back := Progress{Generation: 1, Position: 2, Revision: 9}
+	if view := GuestView(state, back); !view.CanPrevious || view.CanNext {
+		t.Fatalf("pending rules blocked going back: %+v", view)
+	}
+}
+
 func TestHostUnlockPreservesGuestPositionAndRevision(t *testing.T) {
 	state := State{Generation: 1, Revision: 5, CurrentStep: 1, Steps: []Step{{Widgets: []Widget{{Type: "title", Text: "First"}}}, {Widgets: []Widget{{Type: "title", Text: "Second"}}}}}
 	progress := Progress{Generation: 1, Position: 1, Revision: 42}

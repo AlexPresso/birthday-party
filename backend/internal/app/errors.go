@@ -60,7 +60,7 @@ var apiErrors = map[string]apiError{
 
 	// Welcome sequence.
 	"welcome_conflict":           {http.StatusConflict, "The welcome sequence changed. Refresh it before trying again."},
-	"invalid_welcome_steps":      {http.StatusBadRequest, "Add up to 12 steps with 1 to 12 widgets each. Titles can have 120 characters and texts 1,000."},
+	"invalid_welcome_steps":      {http.StatusBadRequest, "Add up to 12 steps with 1 to 12 widgets each. Titles can have 120 characters, texts 1,000, and a rules widget up to 12 rules of 200 characters."},
 	"invalid_welcome_action":     {http.StatusBadRequest, "Choose an available widget and check its settings."},
 	"invalid_welcome_transition": {http.StatusConflict, "This action isn't available now. Refresh the welcome sequence."},
 

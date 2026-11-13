@@ -145,9 +145,9 @@ can revisit earlier unlocked steps. Progress is stored per guest, across
 sessions and restarts. Administrators retain full access. The initial state is
 open until the host explicitly starts the welcome, even when `required` is enabled.
 
-`WelcomeWidget = { type: "title" | "text", text: string } | { type: "profile_photo" | "enable_notifications" } | { type: "media_upload", mediaUpload: { categoryId: number | null } }`
+`WelcomeWidget = { type: "title" | "text", text: string } | { type: "profile_photo" | "enable_notifications" } | { type: "media_upload", mediaUpload: { categoryId: number | null } } | { type: "rules", rules: string[] }`
 `WelcomeStep = { widgets: WelcomeWidget[] }`
-`Welcome = { open: boolean, revision: number, progressRevision: number, step: (WelcomeStep & { position: number }) | null, canPrevious: boolean, canNext: boolean, canFinish: boolean }`
+`Welcome = { open: boolean, revision: number, progressRevision: number, step: (WelcomeStep & { position: number }) | null, canPrevious: boolean, canNext: boolean, canFinish: boolean, rulesAccepted: boolean }`
 `AdminWelcome = { open: boolean, revision: number, currentStep: number, required: boolean, steps: WelcomeStep[] }`
 
 - `GET /api/welcome` -> `Welcome`. Initializes the guest's progress for the current
@@ -165,6 +165,17 @@ open until the host explicitly starts the welcome, even when `required` is enabl
   goes back one step, and `finish` enters the application when `canFinish` is true.
   The first step has no previous step. Invalid movement returns 409
   `invalid_welcome_transition`; stale progress returns 409 `welcome_conflict`.
+- `PUT /api/welcome/rules { revision, accepted }` -> `Welcome`. Use the last
+  `progressRevision` as `revision`. `accepted: true` records that the guest
+  ticked every rule of their current step, and `false` withdraws it. A step with
+  a `rules` widget keeps `canNext` and `canFinish` false, and refuses `next`
+  and `finish`, until its rules are accepted; `previous` stays available.
+  `rulesAccepted` is true only when the current step has rules and this guest
+  accepted them. The call is idempotent and keeps `progressRevision`, so the
+  step's other widgets stay mounted. An acceptance belongs to the step's
+  position in the current run: it survives edits to the rules and ends with a
+  new run. A step without rules, or no current step, returns 409
+  `invalid_welcome_transition`; stale progress returns 409 `welcome_conflict`.
 - `GET /api/admin/welcome` -> `AdminWelcome`.
 - `PATCH /api/admin/welcome/required { revision, required }` -> `AdminWelcome`.
   Saves the global requirement independently of the step list. It can be changed
@@ -174,12 +185,15 @@ open until the host explicitly starts the welcome, even when `required` is enabl
   Title widgets require 1–120 characters, and text widgets require 1–1000
   characters, after trimming. Lengths count Unicode code points. A step can repeat
   titles, texts and media upload widgets; it may contain at most one profile photo
-  widget and at most one notification widget. Profile, notification and media
-  widgets can coexist. A step does not need a title.
+  widget, one notification widget and one rules widget. Profile, notification,
+  rules and media widgets can coexist. A step does not need a title.
+  A rules widget requires `rules`: 1–12 strings of 1–200 characters after
+  trimming, kept in order.
   A media upload widget requires `mediaUpload: { categoryId: null | positiveId }`;
   null selects the main gallery. The `categoryId` field must be present and
   reference an existing category when non-null. Only title/text widgets accept
-  `text`, and only media upload widgets accept `mediaUpload`. Unused fields are
+  `text`, only media upload widgets accept `mediaUpload` and only rules widgets
+  accept `rules`. Unused fields are
   rejected even when null. Widget/settings field names are case-sensitive.
   Unknown fields and incorrect JSON types return 400 `invalid_body`; unknown
   widget types, duplicate profile widgets or invalid media settings return 400

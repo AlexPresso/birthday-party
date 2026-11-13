@@ -53,6 +53,11 @@ with optional write-ins from guests:
 Existing candidates become guest options in their saved order and every ballot
 follows its candidate.
 
+`0003_welcome_rules.sql` adds `guest_welcome_progress.accepted_rules`: the
+positions whose rules widget the guest ticked in the current welcome run. It
+lives on the progress row so that it is locked with the guest's position, and
+it is emptied when the guest joins a new run.
+
 Conventions for new tables and columns:
 
 - Flags are `BOOLEAN`; instants are `TIMESTAMPTZ`. The API renders instants as
@@ -77,7 +82,7 @@ same limits: a statement that needs longer must start with
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
-   `0003_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
+   `0004_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
 2. Put the schema change in that file, with any necessary data backfill. Do not add
    DDL to request handlers or change an already applied migration.
 3. Run `npm run check` against its disposable PostgreSQL instance. Include tests

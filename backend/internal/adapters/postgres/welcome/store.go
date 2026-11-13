@@ -150,10 +150,14 @@ func (s *Store) SetRequired(ctx context.Context, revision int64, required bool) 
 	return state, err
 }
 
+// rulesAcceptedSQL tells whether the guest ticked the rules of the step they
+// are on. In an UPDATE's RETURNING it reads the new position.
+const rulesAcceptedSQL = "position = ANY(accepted_rules)"
+
 func readProgress(ctx context.Context, tx *sql.Tx, guestID int64, lock string) (welcome.Progress, error) {
 	var progress welcome.Progress
-	err := tx.QueryRowContext(ctx, "SELECT generation,position,revision,completed FROM guest_welcome_progress WHERE guest_id=$1"+lock, guestID).
-		Scan(&progress.Generation, &progress.Position, &progress.Revision, &progress.Completed)
+	err := tx.QueryRowContext(ctx, "SELECT generation,position,revision,completed,"+rulesAcceptedSQL+" FROM guest_welcome_progress WHERE guest_id=$1"+lock, guestID).
+		Scan(&progress.Generation, &progress.Position, &progress.Revision, &progress.Completed, &progress.RulesAccepted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return progress, nil
 	}
@@ -182,7 +186,7 @@ func (s *Store) Enroll(ctx context.Context, guestID int64) (welcome.State, welco
 		_, err = tx.ExecContext(ctx, `INSERT INTO guest_welcome_progress(guest_id,generation,position,completed)
  VALUES($1,$2,$3,$4) ON CONFLICT(guest_id) DO UPDATE
  SET generation=excluded.generation,position=excluded.position,completed=excluded.completed,
- revision=nextval('welcome_progress_revision_seq')
+ accepted_rules='{}',revision=nextval('welcome_progress_revision_seq')
  WHERE guest_welcome_progress.generation<>excluded.generation`, guestID, initial.Generation, initial.Position, initial.Completed)
 		if err != nil {
 			return state, progress, err
@@ -196,7 +200,7 @@ func (s *Store) Enroll(ctx context.Context, guestID int64) (welcome.State, welco
 		if entered {
 			err = tx.QueryRowContext(ctx, `UPDATE guest_welcome_progress
  SET position=$1,revision=nextval('welcome_progress_revision_seq')
- WHERE guest_id=$2 RETURNING revision`, progress.Position, guestID).Scan(&progress.Revision)
+ WHERE guest_id=$2 RETURNING revision,`+rulesAcceptedSQL, progress.Position, guestID).Scan(&progress.Revision, &progress.RulesAccepted)
 			if err != nil {
 				return state, progress, err
 			}
@@ -227,10 +231,42 @@ func (s *Store) Navigate(ctx context.Context, guestID, revision int64, action we
 	}
 	err = tx.QueryRowContext(ctx, `UPDATE guest_welcome_progress
  SET position=$1,completed=$2,revision=nextval('welcome_progress_revision_seq')
- WHERE guest_id=$3 RETURNING revision`, progress.Position, progress.Completed, guestID).Scan(&progress.Revision)
+ WHERE guest_id=$3 RETURNING revision,`+rulesAcceptedSQL, progress.Position, progress.Completed, guestID).Scan(&progress.Revision, &progress.RulesAccepted)
 	if err != nil {
 		return state, progress, err
 	}
+	return state, progress, tx.Commit()
+}
+
+// SetRulesAccepted keeps the progress revision: the step's other widgets stay
+// mounted while the guest ticks the rules.
+func (s *Store) SetRulesAccepted(ctx context.Context, guestID, revision int64, accepted bool) (welcome.State, welcome.Progress, error) {
+	var state welcome.State
+	var progress welcome.Progress
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return state, progress, err
+	}
+	defer tx.Rollback()
+	state, err = Scan(tx.QueryRowContext(ctx, Select+" FOR SHARE"))
+	if err != nil {
+		return state, progress, err
+	}
+	progress, err = readProgress(ctx, tx, guestID, " FOR UPDATE")
+	if err != nil {
+		return state, progress, err
+	}
+	if err = welcome.CheckRulesStep(state, progress, revision); err != nil {
+		return state, progress, err
+	}
+	positions := "array_remove(accepted_rules,position)"
+	if accepted {
+		positions = "array_append(" + positions + ",position)"
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE guest_welcome_progress SET accepted_rules="+positions+" WHERE guest_id=$1", guestID); err != nil {
+		return state, progress, err
+	}
+	progress.RulesAccepted = accepted
 	return state, progress, tx.Commit()
 }
 

@@ -2,6 +2,7 @@ package welcome
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -42,6 +43,7 @@ type Repository interface {
 	SetRequired(context.Context, int64, bool) (State, error)
 	Enroll(context.Context, int64) (State, Progress, error)
 	Navigate(context.Context, int64, int64, Action) (State, Progress, error)
+	SetRulesAccepted(context.Context, int64, int64, bool) (State, Progress, error)
 }
 
 type Service struct{ repository Repository }
@@ -81,6 +83,16 @@ func (s *Service) Navigate(ctx context.Context, guestID, revision int64, action 
 	return GuestView(state, progress), nil
 }
 
+// AcceptRules records, or withdraws, that the guest ticked every rule of their
+// current step. It leaves the progress revision alone.
+func (s *Service) AcceptRules(ctx context.Context, guestID, revision int64, accepted bool) (View, error) {
+	state, progress, err := s.repository.SetRulesAccepted(ctx, guestID, revision, accepted)
+	if err != nil {
+		return View{}, err
+	}
+	return GuestView(state, progress), nil
+}
+
 // NormalizeSteps validates authored widgets and returns an independent copy.
 func NormalizeSteps(steps []Step) ([]Step, error) {
 	if steps == nil || len(steps) > 12 {
@@ -92,13 +104,16 @@ func NormalizeSteps(steps []Step) ([]Step, error) {
 			return nil, ErrInvalidSteps
 		}
 		result[i].Widgets = append([]Widget(nil), step.Widgets...)
-		profile, notifications := false, false
+		profile, notifications, rules := false, false, false
 		for j := range result[i].Widgets {
 			widget := &result[i].Widgets[j]
 			if !widget.Type.authored() && widget.Text != "" {
 				return nil, ErrInvalidAction
 			}
 			if widget.Type != WidgetMediaUpload && widget.MediaUpload != nil {
+				return nil, ErrInvalidAction
+			}
+			if widget.Type != WidgetRules && widget.Rules != nil {
 				return nil, ErrInvalidAction
 			}
 			switch widget.Type {
@@ -121,6 +136,23 @@ func NormalizeSteps(steps []Step) ([]Step, error) {
 					return nil, ErrInvalidAction
 				}
 				notifications = true
+			case WidgetRules:
+				// One acceptance per step: a second list would share it.
+				if rules {
+					return nil, ErrInvalidAction
+				}
+				rules = true
+				if len(widget.Rules) < 1 || len(widget.Rules) > 12 {
+					return nil, ErrInvalidSteps
+				}
+				widget.Rules = slices.Clone(widget.Rules)
+				for k, rule := range widget.Rules {
+					rule = strings.TrimSpace(rule)
+					if rule == "" || utf8.RuneCountInString(rule) > 200 {
+						return nil, ErrInvalidSteps
+					}
+					widget.Rules[k] = rule
+				}
 			case WidgetMediaUpload:
 				if widget.MediaUpload == nil || widget.MediaUpload.CategoryID != nil && *widget.MediaUpload.CategoryID < 1 {
 					return nil, ErrInvalidAction
@@ -203,6 +235,19 @@ func EnterFirstStep(state State, progress Progress) (Progress, bool) {
 	}
 	progress.Position = 1
 	return progress, true
+}
+
+// CheckRulesStep accepts a rules command only from a guest who is on a step
+// with rules and holds its current progress revision.
+func CheckRulesStep(state State, progress Progress, revision int64) error {
+	if revision < 0 || progress.Generation != state.Generation || progress.Revision != revision {
+		return ErrConflict
+	}
+	step := GuestView(state, progress).Step
+	if step == nil || !hasRules(step.Widgets) {
+		return ErrTransition
+	}
+	return nil
 }
 
 func Navigate(state State, progress Progress, revision int64, action Action) (Progress, error) {

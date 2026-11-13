@@ -36,6 +36,17 @@ func TestWelcomeWidgetsValidateShapesAndBounds(t *testing.T) {
 		{"duplicate notifications", `{"widgets":[{"type":"enable_notifications"},{"type":"enable_notifications"}]}`, "invalid_welcome_action"},
 		{"notification settings", `{"widgets":[{"type":"enable_notifications","mediaUpload":null}]}`, "invalid_body"},
 		{"notification text", `{"widgets":[{"type":"enable_notifications","text":"Subscribe"}]}`, "invalid_body"},
+		{"rules without a list", `{"widgets":[{"type":"rules"}]}`, "invalid_welcome_steps"},
+		{"empty rules", `{"widgets":[{"type":"rules","rules":[]}]}`, "invalid_welcome_steps"},
+		{"blank rule", `{"widgets":[{"type":"rules","rules":["Be kind","  "]}]}`, "invalid_welcome_steps"},
+		{"long rule", `{"widgets":[{"type":"rules","rules":["` + strings.Repeat("é", 201) + `"]}]}`, "invalid_welcome_steps"},
+		{"too many rules", `{"widgets":[{"type":"rules","rules":[` + strings.TrimSuffix(strings.Repeat(`"Rule",`, 13), ",") + `]}]}`, "invalid_welcome_steps"},
+		{"duplicate rules", `{"widgets":[{"type":"rules","rules":["One"]},{"type":"rules","rules":["Two"]}]}`, "invalid_welcome_action"},
+		{"wrong rules type", `{"widgets":[{"type":"rules","rules":"One"}]}`, "invalid_body"},
+		{"rules on another widget", `{"widgets":[{"type":"text","text":"Text","rules":["One"]}]}`, "invalid_body"},
+		{"unused null rules", `{"widgets":[{"type":"profile_photo","rules":null}]}`, "invalid_body"},
+		{"text on rules", `{"widgets":[{"type":"rules","rules":["One"],"text":"Unused"}]}`, "invalid_body"},
+		{"uppercase rules", `{"widgets":[{"type":"title","text":"Title","Rules":["One"]}]}`, "invalid_body"},
 		{"too many widgets", `{"widgets":[` + strings.TrimSuffix(strings.Repeat(`{"type":"title","text":"Title"},`, 13), ",") + `]}`, "invalid_welcome_steps"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
