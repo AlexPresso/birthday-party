@@ -169,7 +169,7 @@ preserves it. Event edits retain the round and its accepted questions.
    tests for authorization and transactions. Use frontend unit tests for pure
    models and boundary validation, and browser tests
    for interactions spanning routes, uploads or realtime updates.
-5. Run the relevant checks from the root [README](../README.md#vérifier-le-projet).
+5. Run the relevant checks from the [development guide](development.md#check-your-changes).
    Moving files alone does not establish a runtime performance improvement.
 
 The scoped [frontend](../frontend/AGENTS.md) and

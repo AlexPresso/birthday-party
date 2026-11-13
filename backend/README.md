@@ -61,7 +61,7 @@ The first command for the host prints a single-use invitation. Open the entire U
 including its `#token=...` fragment, in the frontend. Repeating the command for the
 same active administrator name issues a fresh invitation for the same identity.
 From the repository root, the Node launcher also provides `npm run dev` and
-`npm run backend -- invite-admin --name "Your name"`; see the root README.
+`npm run backend -- invite-admin --name "Your name"`; see [docs/development.md](../docs/development.md).
 
 Environment variables are read from the process, not automatically from `.env`.
 See [.env.example](.env.example). Defaults are:
