@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/timestamp"
 )
 
 const (
@@ -38,7 +39,7 @@ type Record struct {
 	Author    identity.Author
 	Anonymous bool
 	Body      string
-	CreatedAt string
+	CreatedAt time.Time
 }
 
 // Repository persists entries and retains their owners for permission checks.
@@ -74,9 +75,9 @@ func (record Record) view(viewer identity.Guest) Entry {
 	entry := Entry{
 		ID:        record.ID,
 		Anonymous: record.Anonymous,
-		CanDelete: viewer.Role == "admin" || viewer.ID == record.Author.ID,
+		CanDelete: viewer.IsAdmin() || viewer.ID == record.Author.ID,
 		Body:      record.Body,
-		CreatedAt: record.CreatedAt,
+		CreatedAt: timestamp.Format(record.CreatedAt),
 	}
 	if !record.Anonymous {
 		entry.Author = &record.Author
@@ -98,7 +99,7 @@ func (s *Service) Create(ctx context.Context, viewer identity.Guest, body string
 		},
 		Anonymous: anonymous,
 		Body:      body,
-		CreatedAt: now.UTC().Format(time.RFC3339Nano),
+		CreatedAt: now,
 	}
 	var err error
 	record.ID, err = s.repository.Create(ctx, record)
@@ -115,7 +116,7 @@ func (s *Service) Delete(ctx context.Context, entryID int64, viewer identity.Gue
 	if err != nil {
 		return false, err
 	}
-	if viewer.Role != "admin" && viewer.ID != ownerID {
+	if !viewer.IsAdmin() && viewer.ID != ownerID {
 		return false, ErrDeleteForbidden
 	}
 	return s.repository.Delete(ctx, entryID)

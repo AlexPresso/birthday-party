@@ -1,24 +1,26 @@
 package app
 
 import (
-	"birthday-party/backend/internal/identity"
 	"net/http"
+
+	"birthday-party/backend/internal/access"
+	"birthday-party/backend/internal/programme"
 )
 
-func (a *App) readQuestions(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) readQuestions(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
-	round, err := a.questions.Read(r.Context(), programmeActor(r, guest), id, guest.Role == "admin")
+	round, err := a.questions.Read(r.Context(), programmeActor(viewer), id, viewer.Guest.IsAdmin())
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
-	respond(w, 200, round)
+	respond(w, http.StatusOK, round)
 }
 
-func (a *App) addQuestion(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) addQuestion(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
@@ -29,16 +31,16 @@ func (a *App) addQuestion(w http.ResponseWriter, r *http.Request, guest identity
 	if !decode(w, r, &input) {
 		return
 	}
-	round, err := a.questions.Add(r.Context(), programmeActor(r, guest), id, input.Body)
+	round, err := a.questions.Add(r.Context(), programmeActor(viewer), id, input.Body)
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
 	a.realtime.notify(0, realtimeProgramme)
-	respond(w, 201, round)
+	respond(w, http.StatusCreated, round)
 }
 
-func (a *App) upvoteQuestion(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) upvoteQuestion(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
@@ -50,54 +52,54 @@ func (a *App) upvoteQuestion(w http.ResponseWriter, r *http.Request, guest ident
 	if !decode(w, r, &input) {
 		return
 	}
-	round, err := a.questions.Upvote(r.Context(), programmeActor(r, guest), id, input.QuestionID, input.Upvoted)
+	round, err := a.questions.Upvote(r.Context(), programmeActor(viewer), id, input.QuestionID, input.Upvoted)
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
 	a.realtime.notify(0, realtimeProgramme)
-	respond(w, 200, round)
+	respond(w, http.StatusOK, round)
 }
 
-func (a *App) transitionQuestions(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) transitionQuestions(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	var input struct {
-		Status   string `json:"status"`
-		Revision int64  `json:"revision"`
+		Status   programme.RoundStatus `json:"status"`
+		Revision int64                 `json:"revision"`
 	}
 	if !decode(w, r, &input) {
 		return
 	}
-	round, err := a.questions.Transition(r.Context(), programmeActor(r, guest), id, input.Status, input.Revision)
+	round, err := a.questions.Transition(r.Context(), programmeActor(viewer), id, input.Status, input.Revision)
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
 	a.programmeChanged()
-	respond(w, 200, round)
+	respond(w, http.StatusOK, round)
 }
 
-func (a *App) resolveQuestion(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) resolveQuestion(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	var input struct {
-		QuestionID int64  `json:"questionId"`
-		Status     string `json:"status"`
-		Revision   int64  `json:"revision"`
+		QuestionID int64                    `json:"questionId"`
+		Status     programme.QuestionStatus `json:"status"`
+		Revision   int64                    `json:"revision"`
 	}
 	if !decode(w, r, &input) {
 		return
 	}
-	round, err := a.questions.Resolve(r.Context(), programmeActor(r, guest), id, input.QuestionID, input.Status, input.Revision)
+	round, err := a.questions.Resolve(r.Context(), programmeActor(viewer), id, input.QuestionID, input.Status, input.Revision)
 	if err != nil {
-		failVote(w, err)
+		failError(w, err)
 		return
 	}
 	a.realtime.notify(0, realtimeProgramme)
-	respond(w, 200, round)
+	respond(w, http.StatusOK, round)
 }

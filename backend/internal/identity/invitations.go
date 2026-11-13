@@ -3,6 +3,8 @@ package identity
 import (
 	"context"
 	"time"
+
+	"birthday-party/backend/internal/timestamp"
 )
 
 // Invitation is the single-use link returned to the host.
@@ -31,7 +33,7 @@ type PendingInvitation struct {
 }
 
 func (invitation PendingInvitation) available(now time.Time) bool {
-	return invitation.Guest.Active && !invitation.Used && invitation.ExpiresAt.Unix() > now.Unix()
+	return invitation.Guest.Active && !invitation.Used && invitation.ExpiresAt.After(now)
 }
 
 func (s *Service) issueInvitation(now time.Time) (Invitation, Credential, error) {
@@ -40,7 +42,7 @@ func (s *Service) issueInvitation(now time.Time) (Invitation, Credential, error)
 		return Invitation{}, Credential{}, err
 	}
 	expires := now.Add(InvitationTTL)
-	return Invitation{InvitationURL: s.publicURL + "/invitation#token=" + token, ExpiresAt: expires.UTC().Format(time.RFC3339Nano)},
+	return Invitation{InvitationURL: s.publicURL + "/invitation#token=" + token, ExpiresAt: timestamp.Format(expires)},
 		Credential{TokenHash: HashToken(token), ExpiresAt: expires}, nil
 }
 
@@ -88,7 +90,7 @@ func (s *Service) PreviewInvitation(ctx context.Context, token string, now time.
 	if !invitation.available(now) {
 		return Preview{}, ErrUnavailableInvitation
 	}
-	return Preview{GuestName: invitation.Guest.Name, ExpiresAt: invitation.ExpiresAt.UTC().Format(time.RFC3339Nano)}, nil
+	return Preview{GuestName: invitation.Guest.Name, ExpiresAt: timestamp.Format(invitation.ExpiresAt)}, nil
 }
 
 // RenewInvitation reactivates the same identity and replaces its unused invitation.

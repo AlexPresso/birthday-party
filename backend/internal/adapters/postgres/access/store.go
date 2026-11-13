@@ -1,4 +1,5 @@
-// Package access reads session and welcome permissions from one snapshot.
+// Package access reads session and welcome permissions from one snapshot and
+// provides the row locks that write transactions use to recheck them.
 package access
 
 import (
@@ -28,7 +29,7 @@ func (s *Store) Session(ctx context.Context, session string, now time.Time) (acc
  COALESCE(`+pgwelcome.PositionSQL+` AND w.steps->(p.position-1)->'widgets' @> '[{"type":"media_upload"}]'::jsonb,false)
  FROM sessions s JOIN guests g ON g.id=s.guest_id CROSS JOIN welcome w
  LEFT JOIN guest_welcome_progress p ON p.guest_id=g.id
- WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active=1`, session, now.Unix()).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &result.Open, &avatarVersion, &result.ProfileWidget, &result.MediaWidget)
+ WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active`, session, now).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &result.Open, &avatarVersion, &result.ProfileWidget, &result.MediaWidget)
 	if errors.Is(err, sql.ErrNoRows) {
 		return result, access.ErrExpired
 	}
@@ -39,15 +40,15 @@ func (s *Store) Session(ctx context.Context, session string, now time.Time) (acc
 	return result, nil
 }
 
-func (s *Store) Realtime(ctx context.Context, session string, guestID int64, now time.Time) (int64, bool, error) {
-	var expires int64
+func (s *Store) Realtime(ctx context.Context, session string, guestID int64, now time.Time) (time.Time, bool, error) {
+	var expires time.Time
 	var programme bool
 	err := s.db.QueryRowContext(ctx, `SELECT s.expires_at,(g.role='admin' OR `+pgwelcome.AccessSQL+`)
  FROM sessions s JOIN guests g ON g.id=s.guest_id CROSS JOIN welcome w
  LEFT JOIN guest_welcome_progress p ON p.guest_id=g.id
- WHERE w.id=1 AND s.token_hash=$1 AND s.guest_id=$2 AND s.expires_at>$3 AND g.active=1`, session, guestID, now.Unix()).Scan(&expires, &programme)
+ WHERE w.id=1 AND s.token_hash=$1 AND s.guest_id=$2 AND s.expires_at>$3 AND g.active`, session, guestID, now).Scan(&expires, &programme)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false, access.ErrExpired
+		return time.Time{}, false, access.ErrExpired
 	}
 	return expires, programme, err
 }

@@ -53,7 +53,7 @@ func TestErrorCodesRemainStableAcrossRequestLanguages(t *testing.T) {
 				if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 					t.Fatal(err)
 				}
-				if result.Code != test.code || result.Error != errorMessages[test.code] || result.Error == "" {
+				if result.Code != test.code || result.Error != apiErrors[test.code].message || result.Error == "" {
 					t.Fatalf("language %s: expected code %q and English fallback, got %+v", language, test.code, result)
 				}
 			}
@@ -63,7 +63,7 @@ func TestErrorCodesRemainStableAcrossRequestLanguages(t *testing.T) {
 
 func TestUnknownErrorCodeUsesSafeFallback(t *testing.T) {
 	w := httptest.NewRecorder()
-	fail(w, http.StatusInternalServerError, "private diagnostic")
+	fail(w, "private diagnostic")
 	status(t, w, http.StatusInternalServerError)
 	var result map[string]string
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {

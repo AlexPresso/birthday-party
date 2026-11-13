@@ -7,6 +7,7 @@ import (
 
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/programme"
+	"birthday-party/backend/internal/timestamp"
 )
 
 // Three bounded queries share a snapshot of event content, candidates and ballots.
@@ -30,19 +31,21 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
 	for rows.Next() {
 		event := &programme.Event{}
 		var voteID int64
+		var startsAt, unlockAt *time.Time
 		questions := &programme.QuestionSummary{}
 		vote := &programme.Vote{Candidates: []programme.Candidate{}, Results: []programme.VoteResult{}}
-		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.Teaser, &event.StartsAt, &event.UnlockAt,
+		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.Teaser, &startsAt, &unlockAt,
 			&voteID, &event.Type, &event.Revision, &vote.Question, &vote.Status, &vote.AllowSelfVote,
 			&questions.Status, &questions.JokersUsed, &questions.QuestionCount); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		event.StartsAt, event.UnlockAt = timestamp.FormatOptional(startsAt), timestamp.FormatOptional(unlockAt)
 		*event = event.View(now, admin)
-		if event.Type == "questions" && (!event.Locked || admin) {
+		if event.Type == programme.TypeQuestions && (!event.Locked || admin) {
 			event.Questions = questions
 		}
-		if event.Type == "vote" && (!event.Locked || admin) {
+		if event.Type == programme.TypeVote && (!event.Locked || admin) {
 			count := 0
 			vote.ParticipationCount = &count
 			event.Vote = vote

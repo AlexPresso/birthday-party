@@ -25,10 +25,38 @@ standard PostgreSQL `PGUSER`, `PGPASSWORD` and `PGDATABASE` environment defaults
 The separate `birthday-party-dev` Compose project keeps local development records
 paired with `backend/data`, independently of the deployed application's media volume.
 
+## Schema
+
+`backend/internal/app/migrations/0001_baseline.sql` creates the complete schema.
+It replaced the earlier migration history, so a database created before the
+baseline is refused at startup ("applied migration has changed"): drop it, or its
+Compose volume, and let the backend create a fresh one.
+
+Conventions for new tables and columns:
+
+- Flags are `BOOLEAN`; instants are `TIMESTAMPTZ`. The API renders instants as
+  RFC 3339 UTC strings through `internal/timestamp`, at microsecond precision.
+- Small closed sets (roles, statuses, kinds) are `TEXT` with a `CHECK`
+  constraint; the Go feature package declares the matching typed constants.
+- Generated identifiers use `GENERATED ALWAYS AS IDENTITY`.
+- Add an index for a query that needs one; the baseline comments explain the
+  non-obvious ones, such as the partial indexes of the upload queue.
+
+## Connection settings
+
+The backend opens every pooled connection with a 30-second `statement_timeout`,
+a 10-second `lock_timeout` and a 60-second
+`idle_in_transaction_session_timeout`. They bound runaway statements, lock queues
+and abandoned transactions; an idle session is never affected, so the connection
+holding the worker advisory lock stays open. Override a value by adding it to
+`DATABASE_URL`, for example `?statement_timeout=120s`. Migrations run under the
+same limits: a statement that needs longer must start with
+`SET LOCAL statement_timeout = ...` in its migration file.
+
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
-   `0003_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
+   `0002_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
 2. Put the schema change in that file, with any necessary data backfill. Do not add
    DDL to request handlers or change an already applied migration.
 3. Run `npm run check` against its disposable PostgreSQL instance. Include tests
@@ -48,27 +76,6 @@ transaction; for example, do not use `CREATE INDEX CONCURRENTLY` here.
 Correct a deployed schema with a new forward migration. Automatic destructive
 rollbacks are deliberately absent. Back up records and media before a release
 that changes stored data.
-
-## Existing SQLite installations
-
-On startup, the backend detects `DATA_DIR/birthday.sqlite`. If no import marker
-exists, it reads one consistent SQLite snapshot and copies it into an empty
-PostgreSQL database in a transaction. It accepts legacy schema versions 1 and 2,
-preserves guest IDs, invitation/session hashes, anonymity and media filenames,
-and advances PostgreSQL identity sequences. The source file is never removed.
-
-Stop the old backend before upgrading so it cannot write to SQLite during the
-transition. Back up the complete old media volume, including SQLite/WAL files.
-Then rebuild and start the new stack:
-
-```powershell
-docker compose up -d --build
-```
-
-The import marker prevents replay on later starts. If PostgreSQL already contains
-application data without that marker, startup stops; resolve the two datasets
-explicitly instead of merging them automatically. Restoring the old SQLite file
-does not restore changes made later in PostgreSQL.
 
 ## Consistent backups
 

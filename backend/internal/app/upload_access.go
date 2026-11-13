@@ -1,71 +1,74 @@
 package app
 
 import (
-	"birthday-party/backend/internal/identity"
-	"birthday-party/backend/internal/media"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"birthday-party/backend/internal/access"
+	"birthday-party/backend/internal/media"
 )
 
-func (a *App) getWelcomeUploadContext(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+// A welcome step holds at most 12 widgets, so indexes run from 0 to 11.
+const maxWelcomeWidgetIndex = 11
+
+func (a *App) getWelcomeUploadContext(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	query, err := url.ParseQuery(r.URL.RawQuery)
 	values := query["widgetIndex"]
 	if err != nil || len(values) != 1 {
-		fail(w, 400, "invalid_body")
+		fail(w, "invalid_body")
 		return
 	}
 	index, err := strconv.Atoi(values[0])
-	if err != nil || index < 0 || index > 11 {
-		fail(w, 400, "invalid_body")
+	if err != nil || index < 0 || index > maxWelcomeWidgetIndex {
+		fail(w, "invalid_body")
 		return
 	}
-	result, err := a.media.UploadContext(r.Context(), guest.ID, index)
+	result, err := a.media.UploadContext(r.Context(), viewer.Guest.ID, index)
 	if err != nil {
-		failUpload(w, err)
+		failError(w, err)
 		return
 	}
 	limits, ok := a.currentUploadLimits(w, r)
 	if !ok {
 		return
 	}
-	respond(w, 200, map[string]any{"revision": result.Revision, "widgetIndex": result.WidgetIndex, "category": result.Category, "limits": limits})
+	respond(w, http.StatusOK, map[string]any{"revision": result.Revision, "widgetIndex": result.WidgetIndex, "category": result.Category, "limits": limits})
 }
 
-func parseUploadDestination(r *http.Request) (media.Destination, error) {
-	var destination media.Destination
+// parseUploadDestination reads the requested category and, for a welcome
+// widget upload, the progress revision and widget index sent together.
+func parseUploadDestination(r *http.Request, viewer access.Viewer) (media.Destination, error) {
+	destination := media.Destination{SessionHash: viewer.SessionHash}
 	var err error
-	destination.CategoryID, err = requestedCategory(r)
-	if err != nil {
+	if destination.CategoryID, err = requestedCategory(r); err != nil {
 		return destination, err
 	}
-	if values, exists := r.Header["X-Welcome-Revision"]; exists {
-		if len(values) != 1 {
-			return destination, &media.Error{Code: "invalid_body"}
-		}
-		revision, err := strconv.ParseInt(values[0], 10, 64)
-		if err != nil || revision < 0 {
-			return destination, &media.Error{Code: "invalid_body"}
-		}
-		destination.WelcomeRevision = &revision
+	if destination.WelcomeRevision, err = optionalHeaderNumber(r, "X-Welcome-Revision", math.MaxInt64); err != nil {
+		return destination, err
 	}
-	if values, exists := r.Header["X-Welcome-Widget-Index"]; exists {
-		if len(values) != 1 {
-			return destination, &media.Error{Code: "invalid_body"}
-		}
-		index, err := strconv.ParseInt(values[0], 10, 64)
-		if err != nil || index < 0 || index > 11 {
-			return destination, &media.Error{Code: "invalid_body"}
-		}
-		destination.WelcomeWidgetIndex = &index
+	if destination.WelcomeWidgetIndex, err = optionalHeaderNumber(r, "X-Welcome-Widget-Index", maxWelcomeWidgetIndex); err != nil {
+		return destination, err
 	}
 	if (destination.WelcomeRevision == nil) != (destination.WelcomeWidgetIndex == nil) {
 		return destination, &media.Error{Code: "invalid_body"}
 	}
-	cookie, err := r.Cookie(cookieName)
-	if err != nil {
-		return destination, &media.Error{Code: "session_expired"}
-	}
-	destination.SessionHash = identity.HashToken(cookie.Value)
 	return destination, nil
+}
+
+// optionalHeaderNumber reads an integer header from 0 to limit, sent at most once.
+func optionalHeaderNumber(r *http.Request, name string, limit int64) (*int64, error) {
+	values, exists := r.Header[name]
+	if !exists {
+		return nil, nil
+	}
+	if len(values) != 1 {
+		return nil, &media.Error{Code: "invalid_body"}
+	}
+	value, err := strconv.ParseInt(values[0], 10, 64)
+	if err != nil || value < 0 || value > limit {
+		return nil, &media.Error{Code: "invalid_body"}
+	}
+	return &value, nil
 }

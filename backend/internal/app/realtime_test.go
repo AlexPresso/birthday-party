@@ -210,7 +210,7 @@ func TestRealtimeClosesRevokedLoggedOutAndExpiredSessions(t *testing.T) {
 			host, _ := admin(t, a)
 			visitor, identity, _ := guest(t, a, host, "Live session")
 			if scenario == "expiry" {
-				if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", a.now().Add(2*time.Second).Unix(), guestidentity.HashToken(visitor.Value)); err != nil {
+				if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", a.now().Add(2*time.Second), guestidentity.HashToken(visitor.Value)); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -325,7 +325,7 @@ func TestRealtimeClosesPrunedSessions(t *testing.T) {
 	for index := range 5 {
 		// Ensure the oldest session is unambiguous even with the fixed test clock.
 		now := a.now().Add(time.Second)
-		if _, err := a.db.Exec("UPDATE sessions SET created_at=$1 WHERE token_hash=$2", now.Unix()-100, guestidentity.HashToken(visitor.Value)); err != nil {
+		if _, err := a.db.Exec("UPDATE sessions SET created_at=$1 WHERE token_hash=$2", now.Add(-100*time.Second), guestidentity.HashToken(visitor.Value)); err != nil {
 			t.Fatal(err)
 		}
 		response := request(t, a, "POST", "/api/admin/guests/"+strconv.FormatInt(identity.ID, 10)+"/invitation", nil, host)

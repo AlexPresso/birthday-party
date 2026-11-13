@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,92 +10,87 @@ import (
 	"strconv"
 	"time"
 
+	"birthday-party/backend/internal/access"
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/profile"
 )
 
-func failProfile(w http.ResponseWriter, err error) {
-	var rejected profile.Error
-	if !errors.As(err, &rejected) {
-		internal(w, err)
-		return
-	}
-	status := http.StatusBadRequest
-	switch string(rejected) {
-	case "access_revoked", "session_expired":
-		status = http.StatusUnauthorized
-	case "welcome_required":
-		status = http.StatusLocked
-	case "profile_photo_not_found":
-		status = http.StatusNotFound
-	case "photo_too_large", "photo_dimensions_too_large":
-		status = http.StatusRequestEntityTooLarge
-	case "unsupported_profile_photo_type", "unreadable_photo":
-		status = http.StatusUnsupportedMediaType
-	}
-	fail(w, status, string(rejected))
-}
-
-func (a *App) getProfile(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
+func (a *App) getProfile(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	limits, ok := a.currentUploadLimits(w, r)
 	if !ok {
 		return
 	}
-	a.respondProfile(w, guest, limits.ImageBytes)
+	respondProfile(w, viewer.Guest, limits.ImageBytes)
 }
 
-func (a *App) respondProfile(w http.ResponseWriter, guest identity.Guest, imageBytes int64) {
+func respondProfile(w http.ResponseWriter, guest identity.Guest, imageBytes int64) {
 	respond(w, http.StatusOK, map[string]any{
 		"guest":  guest,
 		"limits": map[string]int64{"imageBytes": imageBytes},
 	})
 }
 
-func (a *App) updateAvatar(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
-	// A single slot bounds temporary storage and decoded memory without queueing
-	// profile requests behind gallery conversion workers.
+func (a *App) updateAvatar(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
+	release, ok := a.acquireReceiver(w, r)
+	if !ok {
+		return
+	}
+	limits, ok := a.currentUploadLimits(w, r)
+	if !ok {
+		release()
+		return
+	}
+	boundReception(w, r, limits.ImageBytes+multipartOverhead)
+	input, err := a.spoolAvatar(r, limits.ImageBytes)
+	release()
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	defer func() {
+		input.Close()
+		os.Remove(input.Name())
+	}()
+	// One decoder at a time bounds decoded memory without queueing behind gallery
+	// workers. The image has already been received, so a slow connection cannot
+	// keep this slot from other guests.
 	select {
 	case a.avatarProcessors <- struct{}{}:
-		defer func() { <-a.avatarProcessors }()
 	default:
 		w.Header().Set("Retry-After", "2")
-		fail(w, http.StatusTooManyRequests, "profile_photo_busy")
+		fail(w, "profile_photo_busy")
 		return
 	}
+	data, err := a.profile.Prepare(r.Context(), input)
+	<-a.avatarProcessors
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	updated, err := a.profile.Save(r.Context(), viewer.Guest.ID, viewer.SessionHash, data)
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	respondProfile(w, updated, limits.ImageBytes)
+}
+
+func (a *App) deleteAvatar(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	limits, ok := a.currentUploadLimits(w, r)
 	if !ok {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, limits.ImageBytes+(64<<10))
-	data, err := a.receiveAvatar(r, limits.ImageBytes)
+	updated, err := a.profile.Save(r.Context(), viewer.Guest.ID, viewer.SessionHash, nil)
 	if err != nil {
-		failProfile(w, err)
+		failError(w, err)
 		return
 	}
-	cookie, _ := r.Cookie(cookieName)
-	updated, err := a.profile.Save(r.Context(), guest.ID, identity.HashToken(cookie.Value), data)
-	if err != nil {
-		failProfile(w, err)
-		return
-	}
-	a.respondProfile(w, updated, limits.ImageBytes)
+	respondProfile(w, updated, limits.ImageBytes)
 }
 
-func (a *App) deleteAvatar(w http.ResponseWriter, r *http.Request, guest identity.Guest) {
-	limits, ok := a.currentUploadLimits(w, r)
-	if !ok {
-		return
-	}
-	cookie, _ := r.Cookie(cookieName)
-	updated, err := a.profile.Save(r.Context(), guest.ID, identity.HashToken(cookie.Value), nil)
-	if err != nil {
-		failProfile(w, err)
-		return
-	}
-	a.respondProfile(w, updated, limits.ImageBytes)
-}
-
-func (a *App) receiveAvatar(r *http.Request, maxImageBytes int64) ([]byte, error) {
+// spoolAvatar streams the single uploaded image into private temporary storage
+// and returns it rewound for decoding. The caller closes and removes the file.
+func (a *App) spoolAvatar(r *http.Request, maxImageBytes int64) (*os.File, error) {
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return nil, profile.Error("profile_photo_required")
@@ -109,9 +103,12 @@ func (a *App) receiveAvatar(r *http.Request, maxImageBytes int64) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	keep := false
 	defer func() {
-		input.Close()
-		os.Remove(input.Name())
+		if !keep {
+			input.Close()
+			os.Remove(input.Name())
+		}
 	}()
 	count, err := io.Copy(input, io.LimitReader(part, maxImageBytes+1))
 	if count > maxImageBytes {
@@ -129,26 +126,27 @@ func (a *App) receiveAvatar(r *http.Request, maxImageBytes int64) ([]byte, error
 	if _, err = input.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	return a.profile.Prepare(r.Context(), input)
+	keep = true
+	return input, nil
 }
 
-func (a *App) serveAvatar(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) serveAvatar(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	version, err := strconv.ParseInt(r.URL.Query().Get("v"), 10, 64)
 	if err != nil || version <= 0 {
-		fail(w, http.StatusNotFound, "profile_photo_not_found")
+		fail(w, string(profile.ErrNotFound))
 		return
 	}
 	data, err := a.profile.Avatar(r.Context(), id, version)
 	if err != nil {
-		failProfile(w, err)
+		failError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"profile-%d.jpg\"", id))
-	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "profile.jpg", time.Time{}, bytes.NewReader(data))
+	revalidateMedia(w, strongETag(data))
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }

@@ -62,10 +62,10 @@ func CanEdit(guest identity.Guest, view welcome.View) error {
 	if !guest.Active {
 		return ErrRevoked
 	}
-	allowed := guest.Role == "admin" || view.Open
+	allowed := guest.IsAdmin() || view.Open
 	if view.Step != nil {
 		for _, widget := range view.Step.Widgets {
-			allowed = allowed || widget.Type == "profile_photo"
+			allowed = allowed || widget.Type == welcome.WidgetProfilePhoto
 		}
 	}
 	if !allowed {

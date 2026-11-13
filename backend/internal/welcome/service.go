@@ -19,15 +19,29 @@ const (
 	ErrCategoryNotFound Error = "media_category_not_found"
 )
 
+// Action is a host transition or a guest navigation command.
+type Action string
+
+const (
+	// Host transitions.
+	ActionStart Action = "start"
+	ActionOpen  Action = "open"
+	// ActionNext unlocks one more step for the host and advances a guest.
+	ActionNext Action = "next"
+	// Guest navigation.
+	ActionPrevious Action = "previous"
+	ActionFinish   Action = "finish"
+)
+
 // Repository executes each change atomically, checking revisions under a lock.
 // Host transitions also enqueue notifications in the same commit.
 type Repository interface {
 	State(context.Context) (State, error)
 	Edit(context.Context, int64, []Step) (State, error)
-	Transition(context.Context, int64, string) (State, error)
+	Transition(context.Context, int64, Action) (State, error)
 	SetRequired(context.Context, int64, bool) (State, error)
 	Enroll(context.Context, int64) (State, Progress, error)
-	Navigate(context.Context, int64, int64, string) (State, Progress, error)
+	Navigate(context.Context, int64, int64, Action) (State, Progress, error)
 }
 
 type Service struct{ repository Repository }
@@ -43,7 +57,7 @@ func (s *Service) Edit(ctx context.Context, revision int64, steps []Step) (State
 	return s.repository.Edit(ctx, revision, normalized)
 }
 
-func (s *Service) Transition(ctx context.Context, revision int64, action string) (State, error) {
+func (s *Service) Transition(ctx context.Context, revision int64, action Action) (State, error) {
 	return s.repository.Transition(ctx, revision, action)
 }
 
@@ -59,7 +73,7 @@ func (s *Service) View(ctx context.Context, guestID int64) (View, error) {
 	return GuestView(state, progress), nil
 }
 
-func (s *Service) Navigate(ctx context.Context, guestID, revision int64, action string) (View, error) {
+func (s *Service) Navigate(ctx context.Context, guestID, revision int64, action Action) (View, error) {
 	state, progress, err := s.repository.Navigate(ctx, guestID, revision, action)
 	if err != nil {
 		return View{}, err
@@ -81,33 +95,33 @@ func NormalizeSteps(steps []Step) ([]Step, error) {
 		profile, notifications := false, false
 		for j := range result[i].Widgets {
 			widget := &result[i].Widgets[j]
-			if widget.Type != "title" && widget.Type != "text" && widget.Text != "" {
+			if !widget.Type.authored() && widget.Text != "" {
 				return nil, ErrInvalidAction
 			}
-			if widget.Type != "media_upload" && widget.MediaUpload != nil {
+			if widget.Type != WidgetMediaUpload && widget.MediaUpload != nil {
 				return nil, ErrInvalidAction
 			}
 			switch widget.Type {
-			case "title", "text":
+			case WidgetTitle, WidgetText:
 				widget.Text = strings.TrimSpace(widget.Text)
 				limit := 1000
-				if widget.Type == "title" {
+				if widget.Type == WidgetTitle {
 					limit = 120
 				}
 				if widget.Text == "" || utf8.RuneCountInString(widget.Text) > limit {
 					return nil, ErrInvalidSteps
 				}
-			case "profile_photo":
+			case WidgetProfilePhoto:
 				if profile {
 					return nil, ErrInvalidAction
 				}
 				profile = true
-			case "enable_notifications":
+			case WidgetEnableNotifications:
 				if notifications {
 					return nil, ErrInvalidAction
 				}
 				notifications = true
-			case "media_upload":
+			case WidgetMediaUpload:
 				if widget.MediaUpload == nil || widget.MediaUpload.CategoryID != nil && *widget.MediaUpload.CategoryID < 1 {
 					return nil, ErrInvalidAction
 				}
@@ -145,23 +159,23 @@ func Edit(state State, revision int64, steps []Step) (State, error) {
 	return state, nil
 }
 
-func Transition(state State, revision int64, action string) (State, error) {
+func Transition(state State, revision int64, action Action) (State, error) {
 	if err := CheckRevision(state, revision); err != nil {
 		return state, err
 	}
 	switch action {
-	case "start":
+	case ActionStart:
 		if !state.Open {
 			return state, ErrTransition
 		}
 		state.Open, state.CurrentStep = false, 0
 		state.Generation++
-	case "next":
+	case ActionNext:
 		if state.Open || state.CurrentStep >= len(state.Steps) {
 			return state, ErrTransition
 		}
 		state.CurrentStep++
-	case "open":
+	case ActionOpen:
 		if state.Open {
 			return state, ErrTransition
 		}
@@ -191,17 +205,17 @@ func EnterFirstStep(state State, progress Progress) (Progress, bool) {
 	return progress, true
 }
 
-func Navigate(state State, progress Progress, revision int64, action string) (Progress, error) {
+func Navigate(state State, progress Progress, revision int64, action Action) (Progress, error) {
 	if revision < 0 || progress.Generation != state.Generation || progress.Revision != revision {
 		return progress, ErrConflict
 	}
 	view := GuestView(state, progress)
 	switch {
-	case action == "previous" && view.CanPrevious:
+	case action == ActionPrevious && view.CanPrevious:
 		progress.Position--
-	case action == "next" && view.CanNext:
+	case action == ActionNext && view.CanNext:
 		progress.Position++
-	case action == "finish" && view.CanFinish:
+	case action == ActionFinish && view.CanFinish:
 		progress.Completed = true
 	default:
 		return progress, ErrTransition

@@ -267,7 +267,7 @@ func TestProgrammeVoteRechecksSessionAfterVoteLockWait(t *testing.T) {
 	event := voteEvent(t, a, host, h.ID, g.ID)
 	event = voteState(t, a, host, event, "open")
 	expires := clock.Load() + 1
-	if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", expires, identity.HashToken(visitor.Value)); err != nil {
+	if _, err := a.db.Exec("UPDATE sessions SET expires_at=$1 WHERE token_hash=$2", time.Unix(expires, 0), identity.HashToken(visitor.Value)); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)

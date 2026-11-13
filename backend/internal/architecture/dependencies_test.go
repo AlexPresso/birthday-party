@@ -10,15 +10,18 @@ import (
 	"testing"
 )
 
-// Core packages may depend on each other and on transport-independent standard
-// library types. Storage, HTTP, filesystem and vendor SDK dependencies belong in
-// adapters. Parse every production file, including files for other build targets.
+// Core packages may depend on each other, on the shared pure conventions
+// (timestamp, locale) and on transport-independent standard library types.
+// Storage, HTTP, filesystem and vendor SDK dependencies belong in adapters.
+// Parse every production file, including files for other build targets.
 func TestCoreDependenciesPointInward(t *testing.T) {
 	const module = "birthday-party/backend/"
 	corePackages := map[string]bool{
 		"access": true, "guestbook": true, "identity": true,
 		"media": true, "notifications": true, "party": true,
 		"profile": true, "programme": true, "welcome": true,
+		// API conventions shared by features; they obey the same rules.
+		"locale": true, "timestamp": true,
 	}
 	for name := range corePackages {
 		t.Run(name, func(t *testing.T) {

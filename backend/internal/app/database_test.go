@@ -67,7 +67,7 @@ func testDatabase(t *testing.T) *sql.DB {
 
 func TestDatabaseConfigurationErrorsHideCredentials(t *testing.T) {
 	for _, value := range []string{"", "postgres://guest:private-test-password%zz@localhost/birthday"} {
-		db, err := openDatabase(t.Context(), value, t.TempDir())
+		db, err := openDatabase(t.Context(), value)
 		if db != nil {
 			db.Close()
 			t.Fatal("invalid configuration opened a database")
@@ -130,7 +130,7 @@ func TestMigrationsRejectChangedOrMissingHistory(t *testing.T) {
 			if err := applyMigrations(t.Context(), db, files); err != nil {
 				t.Fatal(err)
 			}
-			initial := "migrations/0001_initial.sql"
+			initial := "migrations/0001_baseline.sql"
 			switch scenario {
 			case "changed file":
 				files[initial].Data = append(files[initial].Data, []byte("\n-- changed\n")...)

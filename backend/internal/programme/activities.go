@@ -33,9 +33,32 @@ type VoteResult struct {
 	Votes       int   `json:"votes"`
 }
 
+// VoteStatus is the host-controlled phase of a vote; it only moves forward.
+type VoteStatus string
+
+const (
+	VoteDraft    VoteStatus = "draft"
+	VoteOpen     VoteStatus = "open"
+	VoteClosed   VoteStatus = "closed"
+	VoteRevealed VoteStatus = "revealed"
+)
+
+// next returns the only phase a vote may move to, if any.
+func (s VoteStatus) next() (VoteStatus, bool) {
+	switch s {
+	case VoteDraft:
+		return VoteOpen, true
+	case VoteOpen:
+		return VoteClosed, true
+	case VoteClosed:
+		return VoteRevealed, true
+	}
+	return "", false
+}
+
 type Vote struct {
 	Question           string       `json:"question"`
-	Status             string       `json:"status"`
+	Status             VoteStatus   `json:"status"`
 	AllowSelfVote      bool         `json:"allowSelfVote"`
 	Candidates         []Candidate  `json:"candidates"`
 	MyCandidateID      *int64       `json:"myCandidateId"`
@@ -80,7 +103,7 @@ func (event Event) CheckEdit(input Input) error {
 	if event.Vote == nil {
 		return ErrActivityConflict
 	}
-	if event.Vote.Status == "draft" {
+	if event.Vote.Status == VoteDraft {
 		return nil
 	}
 	ids := make([]int64, 0, len(event.Vote.Candidates))
@@ -93,18 +116,17 @@ func (event Event) CheckEdit(input Input) error {
 	return nil
 }
 
-func (event Event) CheckTransition(status string, revision int64) error {
+func (event Event) CheckTransition(status VoteStatus, revision int64) error {
 	if event.Vote == nil {
 		return ErrNotFound
 	}
 	if revision != event.Revision {
 		return ErrActivityConflict
 	}
-	next := map[string]string{"draft": "open", "open": "closed", "closed": "revealed"}
-	if expected, ok := next[event.Vote.Status]; !ok || expected != status {
+	if expected, ok := event.Vote.Status.next(); !ok || expected != status {
 		return ErrActivityConflict
 	}
-	if status == "open" {
+	if status == VoteOpen {
 		active := 0
 		for _, candidate := range event.Vote.Candidates {
 			if candidate.Active {
@@ -122,7 +144,7 @@ func (event Event) CheckBallot(guestID, candidateID int64) error {
 	if event.Vote == nil {
 		return ErrNotFound
 	}
-	if event.Vote.Status != "open" {
+	if event.Vote.Status != VoteOpen {
 		return ErrVoteClosed
 	}
 	if !event.Vote.AllowSelfVote && guestID == candidateID {
@@ -144,14 +166,14 @@ func (event Event) VoteView(guestID int64, adminView bool) Event {
 	vote := *event.Vote
 	event.Vote = &vote
 	vote.CanVote = false
-	if vote.Status == "open" && !adminView {
+	if vote.Status == VoteOpen && !adminView {
 		for _, candidate := range vote.Candidates {
 			if candidate.Active && (vote.AllowSelfVote || candidate.ID != guestID) {
 				vote.CanVote = true
 			}
 		}
 	}
-	if vote.Status != "revealed" {
+	if vote.Status != VoteRevealed {
 		vote.Results = nil
 		if !adminView {
 			vote.ParticipationCount = nil
@@ -165,7 +187,7 @@ type Actor struct {
 	SessionHash string
 }
 
-func (s *Service) Transition(ctx context.Context, actor Actor, eventID int64, status string, revision int64) (Event, error) {
+func (s *Service) Transition(ctx context.Context, actor Actor, eventID int64, status VoteStatus, revision int64) (Event, error) {
 	return s.repository.TransitionVote(ctx, actor, eventID, status, revision)
 }
 

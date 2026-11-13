@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	pgaccess "birthday-party/backend/internal/adapters/postgres/access"
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/notifications"
@@ -56,31 +57,27 @@ func (s *Store) Save(ctx context.Context, guest identity.Guest, sessionHash stri
 		return err
 	}
 	defer tx.Rollback()
-	var access notifications.RegistrationAccess
-	if err = tx.QueryRowContext(ctx, "SELECT active FROM guests WHERE id=$1 FOR UPDATE", guest.ID).Scan(&access.Active); err != nil {
-		return err
-	}
-	if !access.Active {
-		return &notifications.Error{Code: "access_revoked"}
-	}
-	var sessionGuestID int64
-	// Evaluate expiry after any wait for the guest lock, before accepting a session.
-	err = tx.QueryRowContext(ctx, "SELECT guest_id FROM sessions WHERE token_hash=$1 AND guest_id=$2 AND expires_at>$3 FOR SHARE", sessionHash, guest.ID, s.now().Unix()).Scan(&sessionGuestID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &notifications.Error{Code: "session_expired"}
-	}
+	current, session, err := pgaccess.LockGuestSession(ctx, tx, guest.ID, sessionHash, pgaccess.GuestForUpdate)
 	if err != nil {
 		return err
 	}
-	access.SessionValid = true
+	access := notifications.RegistrationAccess{Active: current.Active, Admin: current.IsAdmin()}
+	if !access.Active {
+		return &notifications.Error{Code: "access_revoked"}
+	}
+	// Evaluate expiry after any wait for the guest and session locks.
+	access.SessionValid = session.ValidAt(s.now())
+	if !access.SessionValid {
+		return &notifications.Error{Code: "session_expired"}
+	}
 	view, err := pgwelcome.CurrentGuest(ctx, tx, guest.ID)
 	if err != nil {
 		return err
 	}
-	access.Open, access.Admin = view.Open, guest.Role == "admin"
+	access.Open = view.Open
 	if view.Step != nil {
 		for _, widget := range view.Step.Widgets {
-			access.NotificationWidget = access.NotificationWidget || widget.Type == "enable_notifications"
+			access.NotificationWidget = access.NotificationWidget || widget.Type == welcome.WidgetEnableNotifications
 		}
 	}
 	// Authorize before inspecting quotas, preserving error priority and lock order.
@@ -110,14 +107,14 @@ func (s *Store) Save(ctx context.Context, guest identity.Guest, sessionHash stri
 }
 
 // EnqueueWelcome participates in the host's existing transaction. It never commits.
-func (s *Store) EnqueueWelcome(ctx context.Context, tx *sql.Tx, state welcome.State, action string) error {
-	if action == "start" {
+func (s *Store) EnqueueWelcome(ctx context.Context, tx *sql.Tx, state welcome.State, action welcome.Action) error {
+	if action == welcome.ActionStart {
 		_, err := tx.ExecContext(ctx, "DELETE FROM notification_outbox")
 		return err
 	}
-	kind := "welcome_step"
-	if action == "open" {
-		kind = "welcome_open"
+	kind := notifications.KindWelcomeStep
+	if action == welcome.ActionOpen {
+		kind = notifications.KindWelcomeOpen
 	}
 	now := s.now()
 	// Lock subscriptions before child rows, matching deletion and revocation.
@@ -125,38 +122,41 @@ func (s *Store) EnqueueWelcome(ctx context.Context, tx *sql.Tx, state welcome.St
  SELECT s.id,s.version FROM notification_subscriptions s
  JOIN sessions session ON session.token_hash=s.session_hash AND session.guest_id=s.guest_id
  JOIN guests guest ON guest.id=s.guest_id
- WHERE guest.active=1 AND session.expires_at>$1
+ WHERE guest.active AND session.expires_at>$1
  ORDER BY s.id FOR KEY SHARE OF s
  ) INSERT INTO notification_outbox(subscription_id,subscription_version,revision,generation,unlocked_step,kind,next_attempt,expires_at)
  SELECT id,version,$2,$3,$4,$5,$1,$6 FROM recipients
  ON CONFLICT(subscription_id) DO UPDATE SET subscription_version=excluded.subscription_version,
  revision=excluded.revision,generation=excluded.generation,unlocked_step=excluded.unlocked_step,
  kind=excluded.kind,attempts=0,next_attempt=excluded.next_attempt,expires_at=excluded.expires_at`,
-		now.Unix(), state.Revision+1, state.Generation, state.CurrentStep, kind, now.Add(notifications.Lifetime).Unix())
+		now, state.Revision+1, state.Generation, state.CurrentStep, string(kind), now.Add(notifications.Lifetime))
 	return err
 }
 
+// eligibleSQL selects outbox rows (alias o) whose recipient may still be
+// notified at $1: an active guest with a live session who has not moved past
+// the announced step. The attempt bound mirrors notifications.MaxAttempts.
 const eligibleSQL = `FROM notification_subscriptions s
  JOIN sessions session ON session.token_hash=s.session_hash AND session.guest_id=s.guest_id
  JOIN guests guest ON guest.id=s.guest_id
  JOIN welcome w ON w.id=1
  LEFT JOIN guest_welcome_progress p ON p.guest_id=s.guest_id AND p.generation=w.generation
  WHERE s.id=o.subscription_id AND s.version=o.subscription_version
- AND guest.active=1 AND session.expires_at>$1
+ AND guest.active AND session.expires_at>$1
  AND o.generation=w.generation AND o.expires_at>$1 AND o.attempts<5
  AND (guest.role='admin' OR ((p.guest_id IS NULL OR NOT p.completed)
  AND (o.kind='welcome_open' OR COALESCE(p.position,0)<LEAST(o.unlocked_step,w.current_step))))`
 
 func (s *Store) Next(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
 	var pending notifications.Pending
-	if _, err := s.db.ExecContext(ctx, "DELETE FROM notification_outbox o WHERE NOT EXISTS(SELECT 1 "+eligibleSQL+")", now.Unix()); err != nil {
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM notification_outbox o WHERE NOT EXISTS(SELECT 1 "+eligibleSQL+")", now); err != nil {
 		return pending, false, err
 	}
 	err := s.db.QueryRowContext(ctx, `SELECT o.subscription_id,o.subscription_version,o.revision,
  s.endpoint,s.p256dh,s.auth,o.kind,s.locale,o.attempts,o.expires_at
  FROM notification_outbox o JOIN notification_subscriptions s ON s.id=o.subscription_id
  WHERE o.next_attempt<=$1 AND EXISTS(SELECT 1 `+eligibleSQL+`)
- ORDER BY o.next_attempt,o.subscription_id LIMIT 1`, now.Unix()).Scan(
+ ORDER BY o.next_attempt,o.subscription_id LIMIT 1`, now).Scan(
 		&pending.SubscriptionID, &pending.SubscriptionVersion, &pending.Revision,
 		&pending.Endpoint, &pending.Keys.P256dh, &pending.Keys.Auth,
 		&pending.Kind, &pending.Locale, &pending.Attempts, &pending.ExpiresAt)

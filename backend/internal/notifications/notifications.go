@@ -3,17 +3,24 @@ package notifications
 
 import (
 	"context"
-	"crypto/elliptic"
+	"crypto/ecdh"
 	"encoding/base64"
-	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/locale"
 )
 
-const Lifetime = 15 * time.Minute
-const queryTimeout = 5 * time.Second
+const (
+	// Lifetime is how long a queued notification stays worth delivering.
+	Lifetime = 15 * time.Minute
+	// MaxAttempts bounds deliveries of one notification, including the first.
+	MaxAttempts  = 5
+	queryTimeout = 5 * time.Second
+	sendTimeout  = 10 * time.Second
+)
 
 type SigningKeys struct{ Public, Private string }
 
@@ -21,6 +28,14 @@ type SigningKeys struct{ Public, Private string }
 type Error struct{ Code string }
 
 func (e *Error) Error() string { return e.Code }
+
+// Kind is the generic event a push message announces; it carries no content.
+type Kind string
+
+const (
+	KindWelcomeStep Kind = "welcome_step"
+	KindWelcomeOpen Kind = "welcome_open"
+)
 
 type BrowserKeys struct {
 	P256dh string `json:"p256dh"`
@@ -65,10 +80,10 @@ type Pending struct {
 	Revision            int64
 	Endpoint            string
 	Keys                BrowserKeys
-	Kind                string
+	Kind                Kind
 	Locale              string
 	Attempts            int
-	ExpiresAt           int64
+	ExpiresAt           time.Time
 }
 
 type Delivery uint8
@@ -82,7 +97,7 @@ const (
 
 type Completion struct {
 	Delivery    Delivery
-	NextAttempt int64
+	NextAttempt time.Time
 }
 
 // Repository keeps registration authorization atomic and returns eligible work only.
@@ -137,30 +152,49 @@ func (s *Service) Save(ctx context.Context, guest identity.Guest, sessionHash st
 	if err := s.validateEndpoint(input.Endpoint); err != nil {
 		return err
 	}
-	key, keyError := base64.RawURLEncoding.Strict().DecodeString(strings.TrimRight(input.Keys.P256dh, "="))
-	auth, authError := base64.RawURLEncoding.Strict().DecodeString(strings.TrimRight(input.Keys.Auth, "="))
-	x, _ := elliptic.Unmarshal(elliptic.P256(), key)
-	validLocale := input.Locale == "en" || input.Locale == "fr" || input.Locale == "de" || input.Locale == "it" || input.Locale == "es"
-	if len(input.Keys.P256dh) > 88 || len(input.Keys.Auth) > 24 || keyError != nil || authError != nil || len(auth) != 16 || x == nil || !validLocale {
+	keys, ok := normalizeKeys(input.Keys)
+	if !ok || !locale.IsSupported(input.Locale) {
 		return &Error{Code: "invalid_notification_subscription"}
 	}
-	input.Keys = BrowserKeys{P256dh: base64.RawURLEncoding.EncodeToString(key), Auth: base64.RawURLEncoding.EncodeToString(auth)}
+	input.Keys = keys
 	return s.repository.Save(ctx, guest, sessionHash, input)
 }
 
-// ProcessNext preserves accepted work across interruptions and bounds retries.
+// normalizeKeys accepts padded or unpadded URL-safe base64 and requires an
+// uncompressed P-256 point with a 16-byte authentication secret.
+func normalizeKeys(input BrowserKeys) (BrowserKeys, bool) {
+	if len(input.P256dh) > 88 || len(input.Auth) > 24 {
+		return BrowserKeys{}, false
+	}
+	encoding := base64.RawURLEncoding.Strict()
+	key, keyErr := encoding.DecodeString(strings.TrimRight(input.P256dh, "="))
+	auth, authErr := encoding.DecodeString(strings.TrimRight(input.Auth, "="))
+	if keyErr != nil || authErr != nil || len(auth) != 16 {
+		return BrowserKeys{}, false
+	}
+	if _, err := ecdh.P256().NewPublicKey(key); err != nil {
+		return BrowserKeys{}, false
+	}
+	return BrowserKeys{P256dh: base64.RawURLEncoding.EncodeToString(key), Auth: base64.RawURLEncoding.EncodeToString(auth)}, true
+}
+
+// ProcessNext delivers at most one due notification and reports whether it
+// found one. Cancellation leaves interrupted work in the durable outbox, and a
+// failed delivery is retried a bounded number of times before it is dropped.
 func (s *Service) ProcessNext(ctx context.Context) (bool, error) {
 	query, cancel := context.WithTimeout(ctx, queryTimeout)
 	pending, found, err := s.repository.Next(query, s.now())
 	cancel()
-	if err != nil || !found {
-		return false, err
+	if err != nil {
+		return false, fmt.Errorf("read notification queue: %w", err)
+	}
+	if !found {
+		return false, nil
 	}
 	result := DiscardDelivery
-	if s.endpointAllowed(pending.Endpoint) && pending.ExpiresAt > s.now().Unix() {
-		ttl := min(Lifetime, time.Duration(pending.ExpiresAt-s.now().Unix())*time.Second)
-		send, cancelSend := context.WithTimeout(ctx, 10*time.Second)
-		result = s.sender.Send(send, pending, max(0, ttl))
+	if now := s.now(); s.endpointAllowed(pending.Endpoint) && pending.ExpiresAt.After(now) {
+		send, cancelSend := context.WithTimeout(ctx, sendTimeout)
+		result = s.sender.Send(send, pending, min(Lifetime, pending.ExpiresAt.Sub(now)))
 		cancelSend()
 	}
 	if ctx.Err() != nil {
@@ -168,38 +202,17 @@ func (s *Service) ProcessNext(ctx context.Context) (bool, error) {
 	}
 	completion := Completion{Delivery: result}
 	if result == RetryDelivery {
-		// Repository work is bounded to fewer than five prior attempts.
+		// The repository only returns work with fewer than MaxAttempts attempts.
 		delay := time.Duration(5*(1<<min(max(pending.Attempts, 0), 4))) * time.Second
-		completion.NextAttempt = s.now().Add(delay).Unix()
-		if pending.Attempts+1 >= 5 || completion.NextAttempt >= pending.ExpiresAt {
+		completion.NextAttempt = s.now().Add(delay)
+		if pending.Attempts+1 >= MaxAttempts || !completion.NextAttempt.Before(pending.ExpiresAt) {
 			completion.Delivery = DiscardDelivery
 		}
 	}
 	update, cancelUpdate := context.WithTimeout(ctx, queryTimeout)
 	defer cancelUpdate()
-	return true, s.repository.Complete(update, pending, completion)
-}
-
-// Run owns the delivery loop; cancellation leaves interrupted work durable.
-func (s *Service) Run(ctx context.Context) error {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for ctx.Err() == nil {
-		processed, err := s.ProcessNext(ctx)
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return errors.New("notification queue is unavailable")
-		}
-		if processed {
-			continue
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
+	if err := s.repository.Complete(update, pending, completion); err != nil {
+		return true, fmt.Errorf("record notification delivery: %w", err)
 	}
-	return ctx.Err()
+	return true, nil
 }

@@ -80,7 +80,7 @@ func TestDeliveryRetryAndExpiry(t *testing.T) {
 		{"successful delivery", 0, Lifetime + time.Hour, Delivered, Delivered, 0, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			q := &queueStub{pending: Pending{SubscriptionID: 11, SubscriptionVersion: 3, Revision: 7, Endpoint: "allowed", Attempts: test.attempts, ExpiresAt: now.Add(test.remaining).Unix()}}
+			q := &queueStub{pending: Pending{SubscriptionID: 11, SubscriptionVersion: 3, Revision: 7, Endpoint: "allowed", Attempts: test.attempts, ExpiresAt: now.Add(test.remaining)}}
 			calls := 0
 			sender := senderFunc(func(ctx context.Context, pending Pending, ttl time.Duration) Delivery {
 				calls++
@@ -106,7 +106,7 @@ func TestDeliveryRetryAndExpiry(t *testing.T) {
 			if q.snapshots[0] != q.pending {
 				t.Fatal("completion lost the version or revision used for delivery")
 			}
-			if test.delay > 0 && q.completed[0].NextAttempt != now.Add(test.delay).Unix() {
+			if test.delay > 0 && !q.completed[0].NextAttempt.Equal(now.Add(test.delay)) {
 				t.Fatal("incorrect retry delay")
 			}
 		})
@@ -115,7 +115,7 @@ func TestDeliveryRetryAndExpiry(t *testing.T) {
 
 func TestCancelledDeliveryKeepsDurableWork(t *testing.T) {
 	now := time.Now()
-	q := &queueStub{pending: Pending{Endpoint: "allowed", ExpiresAt: now.Add(Lifetime).Unix()}}
+	q := &queueStub{pending: Pending{Endpoint: "allowed", ExpiresAt: now.Add(Lifetime)}}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	s := New(q, senderFunc(func(context.Context, Pending, time.Duration) Delivery {
@@ -131,7 +131,7 @@ func TestCancelledDeliveryKeepsDurableWork(t *testing.T) {
 }
 
 func TestRejectedEndpointCannotReachTransport(t *testing.T) {
-	q := &queueStub{pending: Pending{Endpoint: "forbidden", ExpiresAt: time.Now().Add(Lifetime).Unix()}}
+	q := &queueStub{pending: Pending{Endpoint: "forbidden", ExpiresAt: time.Now().Add(Lifetime)}}
 	s := New(q, senderFunc(func(context.Context, Pending, time.Duration) Delivery {
 		t.Fatal("forbidden endpoint reached the transport")
 		return Delivered

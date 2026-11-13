@@ -6,12 +6,11 @@ import (
 	"context"
 	"errors"
 	"image"
-	"image/color"
-	"image/draw"
-	"image/jpeg"
+	_ "image/jpeg"
 	_ "image/png"
 	"io"
 
+	"birthday-party/backend/internal/adapters/preview"
 	"birthday-party/backend/internal/profile"
 
 	"github.com/disintegration/imaging"
@@ -50,12 +49,9 @@ func (p *Processor) Prepare(ctx context.Context, input io.ReadSeeker) ([]byte, e
 	side := min(decoded.Bounds().Dx(), decoded.Bounds().Dy())
 	square := imaging.CropCenter(decoded, side, side)
 	thumbnail := imaging.Resize(square, 256, 256, imaging.Linear)
-	flat := image.NewRGBA(thumbnail.Bounds())
-	draw.Draw(flat, flat.Bounds(), &image.Uniform{C: color.RGBA{R: 32, G: 19, B: 31, A: 255}}, image.Point{}, draw.Src)
-	draw.Draw(flat, flat.Bounds(), thumbnail, thumbnail.Bounds().Min, draw.Over)
 	var encoded bytes.Buffer
 	// Re-encoding only pixels strips EXIF and other original metadata.
-	if err = jpeg.Encode(&encoded, flat, &jpeg.Options{Quality: 82}); err != nil {
+	if err = preview.EncodeJPEG(&encoded, thumbnail); err != nil {
 		return nil, err
 	}
 	if encoded.Len() > profile.MaxAvatarBytes {

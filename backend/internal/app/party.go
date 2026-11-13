@@ -1,36 +1,30 @@
 package app
 
 import (
-	"errors"
 	"net/http"
 
-	"birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/access"
 	"birthday-party/backend/internal/party"
 )
 
-func (a *App) getParty(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) getParty(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
 	details, err := a.party.Get(r.Context())
 	if err != nil {
-		internal(w, err)
+		failError(w, err)
 		return
 	}
-	respond(w, 200, details)
+	respond(w, http.StatusOK, details)
 }
 
-func (a *App) updateParty(w http.ResponseWriter, r *http.Request, _ identity.Guest) {
+func (a *App) updateParty(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
 	var input party.Party
 	if !decode(w, r, &input) {
 		return
 	}
 	details, err := a.party.Update(r.Context(), input)
 	if err != nil {
-		var rejected party.Error
-		if errors.As(err, &rejected) {
-			fail(w, 400, string(rejected))
-		} else {
-			internal(w, err)
-		}
+		failError(w, err)
 		return
 	}
-	respond(w, 200, details)
+	respond(w, http.StatusOK, details)
 }

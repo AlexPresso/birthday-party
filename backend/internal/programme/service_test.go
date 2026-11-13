@@ -28,15 +28,8 @@ func (repository *memoryEvents) List(_ context.Context, limit int, _ int64, priv
 	return items, repository.err
 }
 
-func (repository *memoryEvents) UnlockTimes(_ context.Context, limit int) ([]string, error) {
-	repository.limit = limit
-	times := []string{}
-	for _, event := range repository.items {
-		if event.UnlockAt != nil {
-			times = append(times, *event.UnlockAt)
-		}
-	}
-	return times, repository.err
+func (repository *memoryEvents) NextUnlock(context.Context, time.Time) (time.Time, error) {
+	return time.Time{}, repository.err
 }
 
 func (repository *memoryEvents) Create(_ context.Context, _ Actor, input Input, limit int) (Event, error) {
@@ -52,7 +45,7 @@ func (repository *memoryEvents) Update(_ context.Context, _ Actor, _ int64, inpu
 }
 
 func (repository *memoryEvents) Delete(context.Context, Actor, int64) error { return repository.err }
-func (repository *memoryEvents) TransitionVote(context.Context, Actor, int64, string, int64) (Event, error) {
+func (repository *memoryEvents) TransitionVote(context.Context, Actor, int64, VoteStatus, int64) (Event, error) {
 	return Event{}, repository.err
 }
 func (repository *memoryEvents) CastVote(context.Context, Actor, int64, int64) (Event, error) {
@@ -99,22 +92,6 @@ func TestServiceAppliesAudienceRulesWithoutMutatingStoredEvents(t *testing.T) {
 	}
 	if repository.items[1].Title != "Secret" || repository.items[1].Description != "Private details" {
 		t.Fatal("guest view changed stored content")
-	}
-}
-
-func TestServiceSchedulesOnlyValidFutureUnlocks(t *testing.T) {
-	now := time.Date(2026, 10, 17, 18, 0, 0, 0, time.UTC)
-	past, current := now.Add(-time.Hour).Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)
-	soon, later := now.Add(time.Minute).Format(time.RFC3339Nano), now.Add(time.Hour).Format(time.RFC3339Nano)
-	malformed := "invalid"
-	repository := &memoryEvents{items: []Event{{UnlockAt: &past}, {UnlockAt: &current}, {UnlockAt: &later}, {UnlockAt: &malformed}, {}, {UnlockAt: &soon}}}
-	next, err := New(repository).NextUnlock(t.Context(), now)
-	if err != nil || !next.Equal(now.Add(time.Minute)) || repository.limit != readLimit {
-		t.Fatalf("next=%v error=%v", next, err)
-	}
-	next, err = New(repository).NextUnlock(t.Context(), now.Add(time.Hour))
-	if err != nil || !next.IsZero() {
-		t.Fatalf("exhausted next=%v error=%v", next, err)
 	}
 }
 

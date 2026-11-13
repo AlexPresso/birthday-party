@@ -2,12 +2,15 @@
 package programme
 
 import (
+	"cmp"
 	"context"
 	"errors"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"birthday-party/backend/internal/timestamp"
 )
 
 var (
@@ -17,10 +20,20 @@ var (
 	ErrNotFound     = errors.New("event not found")
 )
 
+// EventType selects the activity attached to a programme event. It is fixed
+// when the event is created.
+type EventType string
+
+const (
+	TypeEvent     EventType = "event"
+	TypeVote      EventType = "vote"
+	TypeQuestions EventType = "questions"
+)
+
 // Event contains the fields visible to its requested audience.
 type Event struct {
 	ID          int64            `json:"id"`
-	Type        string           `json:"type"`
+	Type        EventType        `json:"type"`
 	Revision    int64            `json:"revision"`
 	Title       string           `json:"title"`
 	Description string           `json:"description"`
@@ -32,9 +45,10 @@ type Event struct {
 	Questions   *QuestionSummary `json:"questions"`
 }
 
-// Input is the host-authored event content before normalization and validation.
+// Input is the host-authored event content. After normalization its instants
+// are valid UTC timestamps in the API form.
 type Input struct {
-	Type        string     `json:"type"`
+	Type        EventType  `json:"type"`
 	Revision    int64      `json:"revision"`
 	Vote        *VoteInput `json:"vote"`
 	Title       string     `json:"title"`
@@ -45,10 +59,12 @@ type Input struct {
 }
 
 func (input Input) normalize() (Input, error) {
-	if input.Type != "" && input.Type != "event" && input.Type != "vote" && input.Type != "questions" {
+	switch input.Type {
+	case "", TypeEvent, TypeVote, TypeQuestions:
+	default:
 		return input, ErrInvalidEvent
 	}
-	if (input.Type == "event" || input.Type == "questions") && input.Vote != nil || input.Type == "vote" && input.Vote == nil {
+	if (input.Type == TypeEvent || input.Type == TypeQuestions) && input.Vote != nil || input.Type == TypeVote && input.Vote == nil {
 		return input, ErrInvalidEvent
 	}
 	if input.Vote != nil {
@@ -64,24 +80,20 @@ func (input Input) normalize() (Input, error) {
 	if input.Title == "" || utf8.RuneCountInString(input.Title) > 160 || utf8.RuneCountInString(input.Description) > 4000 || utf8.RuneCountInString(input.Teaser) > 160 {
 		return input, ErrInvalidEvent
 	}
-	for _, value := range []**string{&input.StartsAt, &input.UnlockAt} {
-		if *value == nil {
-			continue
-		}
-		parsed, err := time.Parse(time.RFC3339, **value)
-		if err != nil || parsed.Year() < 2000 || parsed.Year() > 2200 {
-			return input, ErrInvalidDate
-		}
-		normalized := parsed.UTC().Format(time.RFC3339Nano)
-		*value = &normalized
+	var valid bool
+	if input.StartsAt, valid = timestamp.Normalize(input.StartsAt); !valid {
+		return input, ErrInvalidDate
+	}
+	if input.UnlockAt, valid = timestamp.Normalize(input.UnlockAt); !valid {
+		return input, ErrInvalidDate
 	}
 	return input, nil
 }
 
-// View hides unrevealed content from guests. Invalid stored timestamps fail closed.
+// View hides unrevealed content from guests. An unreadable unlock time fails closed.
 func (event Event) View(now time.Time, private bool) Event {
 	if event.UnlockAt != nil {
-		unlock, err := time.Parse(time.RFC3339Nano, *event.UnlockAt)
+		unlock, err := timestamp.Parse(*event.UnlockAt)
 		event.Locked = err != nil || now.Before(unlock)
 	}
 	if event.Locked && !private {
@@ -97,19 +109,18 @@ func (event Event) View(now time.Time, private bool) Event {
 // including current authorization and persistence of each event's vote settings.
 type Repository interface {
 	List(context.Context, int, int64, bool, time.Time) ([]Event, error)
-	UnlockTimes(context.Context, int) ([]string, error)
+	// NextUnlock returns the earliest unlock instant after the given one, or
+	// the zero time when no later unlock is scheduled.
+	NextUnlock(ctx context.Context, after time.Time) (time.Time, error)
 	Create(context.Context, Actor, Input, int) (Event, error)
 	Update(context.Context, Actor, int64, Input) (Event, error)
 	Delete(context.Context, Actor, int64) error
-	TransitionVote(context.Context, Actor, int64, string, int64) (Event, error)
+	TransitionVote(context.Context, Actor, int64, VoteStatus, int64) (Event, error)
 	CastVote(context.Context, Actor, int64, int64) (Event, error)
 }
 
+// eventLimit bounds the programme; creation enforces it transactionally.
 const eventLimit = 200
-
-// Migration can split each of the former 12 nested activities into an event.
-// Keep those existing records readable while retaining the creation limit.
-const readLimit = eventLimit * 12
 
 // Service validates event changes and controls when authored content becomes visible.
 type Service struct{ repository Repository }
@@ -120,31 +131,52 @@ func New(repository Repository) *Service { return &Service{repository: repositor
 // List orders the bounded programme by start time and applies reveal rules.
 func (s *Service) List(ctx context.Context, clock func() time.Time, guestID int64, private bool) ([]Event, error) {
 	now := clock()
-	items, err := s.repository.List(ctx, readLimit, guestID, private, now)
+	items, err := s.repository.List(ctx, eventLimit, guestID, private, now)
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].StartsAt == nil {
-			return false
+	return sortByStart(items), nil
+}
+
+// sortByStart orders events by start time and then ID. Unscheduled events
+// keep their order after the scheduled ones.
+func sortByStart(items []Event) []Event {
+	type entry struct {
+		event     Event
+		start     time.Time
+		scheduled bool
+	}
+	entries := make([]entry, len(items))
+	for i, event := range items {
+		entries[i] = entry{event: event, scheduled: event.StartsAt != nil}
+		if event.StartsAt != nil {
+			entries[i].start, _ = timestamp.Parse(*event.StartsAt)
 		}
-		if items[j].StartsAt == nil {
-			return true
+	}
+	slices.SortStableFunc(entries, func(a, b entry) int {
+		switch {
+		case !a.scheduled && !b.scheduled:
+			return 0
+		case !a.scheduled:
+			return 1
+		case !b.scheduled:
+			return -1
 		}
-		left, _ := time.Parse(time.RFC3339Nano, *items[i].StartsAt)
-		right, _ := time.Parse(time.RFC3339Nano, *items[j].StartsAt)
-		if left.Equal(right) {
-			return items[i].ID < items[j].ID
+		if order := a.start.Compare(b.start); order != 0 {
+			return order
 		}
-		return left.Before(right)
+		return cmp.Compare(a.event.ID, b.event.ID)
 	})
-	return items, nil
+	for i := range entries {
+		items[i] = entries[i].event
+	}
+	return items
 }
 
 // Create validates an event and enforces the collection limit transactionally.
 func (s *Service) Create(ctx context.Context, actor Actor, input Input) (Event, error) {
 	if input.Type == "" {
-		input.Type = "event"
+		input.Type = TypeEvent
 	}
 	input, err := input.normalize()
 	if err != nil {
@@ -167,18 +199,7 @@ func (s *Service) Delete(ctx context.Context, actor Actor, id int64) error {
 	return s.repository.Delete(ctx, actor, id)
 }
 
-// NextUnlock ignores malformed legacy times, matching View's fail-closed rule.
+// NextUnlock returns the next scheduled unlock after now, or the zero time.
 func (s *Service) NextUnlock(ctx context.Context, now time.Time) (time.Time, error) {
-	times, err := s.repository.UnlockTimes(ctx, readLimit)
-	if err != nil {
-		return time.Time{}, err
-	}
-	var next time.Time
-	for _, value := range times {
-		unlock, err := time.Parse(time.RFC3339Nano, value)
-		if err == nil && unlock.After(now) && (next.IsZero() || unlock.Before(next)) {
-			next = unlock
-		}
-	}
-	return next, nil
+	return s.repository.NextUnlock(ctx, now)
 }

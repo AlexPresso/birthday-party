@@ -48,10 +48,10 @@ func (f *Files) Receive(reader *multipart.Reader, maxImageBytes, maxVideoBytes i
 		return upload, &media.Error{Code: "photo_upload_failed"}
 	}
 	upload.Format = detectVideoFormat(header)
-	upload.Kind = "image"
+	upload.Kind = media.KindImage
 	limit, tooLarge := maxImageBytes, "photo_too_large"
 	if upload.Format != "" {
-		upload.Kind, limit, tooLarge = "video", maxVideoBytes, "video_too_large"
+		upload.Kind, limit, tooLarge = media.KindVideo, maxVideoBytes, "video_too_large"
 	}
 	upload.Size, err = io.Copy(input, io.LimitReader(io.MultiReader(bytes.NewReader(header), part), limit+1))
 	if upload.Size > limit {
@@ -66,7 +66,7 @@ func (f *Files) Receive(reader *multipart.Reader, maxImageBytes, maxVideoBytes i
 	if _, err = reader.NextPart(); err != io.EOF {
 		return upload, &media.Error{Code: "single_photo_required"}
 	}
-	if upload.Kind == "image" {
+	if upload.Kind == media.KindImage {
 		if _, err = input.Seek(0, io.SeekStart); err != nil {
 			return upload, err
 		}
