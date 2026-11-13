@@ -179,17 +179,23 @@ interactions.
   and count ceilings are enforced by Go alone.
 - Activities are programme events themselves, with stable event IDs and an
   explicit type: `event` for ordinary entries and `vote` for voting. A vote has
-  a question, 2–200 selected active candidates
-  with their profile photos, and an optional self-vote setting (off by default).
+  a question and its own page at `/programme/[id]`; the Programme tab only
+  previews it. Its options come from one source chosen by the host: 2–200 active
+  guests, shown with their profile photos and an optional self-vote setting (off
+  by default), or up to 200 free-text choices of at most 80 characters. For
+  free-text votes the host may let guests type a choice: it joins the option
+  with the same text, ignoring case, or creates one, and takes their vote. A
+  write-in option disappears with its last vote, and the host can remove one.
   Hosts choose the event type in settings and save its schedule and settings
-  together, then open, close and reveal
-  each vote separately. Freeze candidates and the self-vote rule after opening;
-  allow question corrections. One choice per guest is replaceable while open.
+  together, then open and close each vote; there is no reveal step. Freeze the
+  source, host options and both settings after opening; allow question
+  corrections. One choice per guest is replaceable while open.
   Keep ballots across event edits and schedule changes; remove them with the event.
   Each event has at most one vote extension. Keep its type fixed after creation.
   Omit draft vote events from guest lists and hide vote details in locked events.
-  Never expose other guests' choices; administrators see participation counts,
-  but all candidate totals stay hidden until revelation. Enforce current access,
+  Every viewer of a vote always sees all options with their live counts, most
+  votes first. Never expose who voted for what, to guests or administrators.
+  Enforce current access,
   event availability, eligibility and vote state atomically in PostgreSQL.
   Use the existing programme WebSocket topic. Programme activities require full
   app access; they do not grant access during the welcome sequence. Add future

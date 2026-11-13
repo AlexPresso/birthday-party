@@ -104,9 +104,9 @@ Do not invent party details, guest contributions, dates, or activity counts.
   retryable. Persist bounded dismissed upload IDs in session storage so completed
   banners do not reappear after reload. Respect reduced motion and never fetch
   private media merely to decorate a queue.
-- Put the first available open vote in a compact accent card with its real
-  question, candidate avatars and a Vote action. Keep the ballot behind a
-  disclosure, retaining selections while it is collapsed. Present the remaining
+- Put the first available open vote in a compact card with its real question,
+  its three leading options (avatars for guests, short labels for free-text
+  choices) and a Vote action that opens the vote's own page. Present the remaining
   programme as agenda rows with a time column and fine dividers. Show only the
   authorized teaser and unlock information for locked events.
 - Question activities ("Sans filtre") have their own page at `/programme/[id]`,
@@ -267,20 +267,25 @@ Do not invent party details, guest contributions, dates, or activity counts.
 
 - Activities are individual events in the programme. From Add event, hosts choose
   an ordinary event or a vote, then complete one form containing the schedule and
-  the settings for that type. Keep opening, closing and revealing a vote directly
+  the settings for that type. Keep opening and closing a vote directly
   on its event controls. The Programme management shortcut opens the matching
   settings section. Preserve drafts and event identity when refreshing or editing.
-- The first activity is voting for a guest. Show the question followed by a
-  searchable portrait grid, with a name beneath each photo and initial fallbacks.
-  Center portraits and names within consistent touch targets. Use a check and an
-  accent outline to mark the selected candidate, then require an explicit vote
-  action. Show the saved choice and allow changing it until closure; retain an
-  unsent selection after a connection failure or unrelated refresh.
-- Hosts choose candidates and whether self-voting is allowed while preparing the
-  draft. Opening, closing and revealing results are separate actions. Show
-  participation counts to the host without revealing individual choices. Guests
-  see aggregate candidate counts only after revelation, including ties and a
-  clear empty result when nobody voted. Keep the existing navigation order.
+- A vote has its own page at `/programme/[id]`, with a Programme back link and
+  the question as its title. Every option is always listed, most votes first,
+  with its live count and a thin bar showing its share of the leading option.
+  A guest option shows the profile photo large enough to recognise the person
+  (72px on phones, 88px from 960px) with an initial fallback; a free-text option
+  shows its text only. Use a check and an accent outline to mark the selection,
+  then require an explicit vote action fixed above the dock. Mark the viewer's
+  saved choice in words, allow changing it until closure, and retain an unsent
+  selection through refreshes, reorders and connection failures. When the host
+  allows it, a labelled field under the list lets a guest type a new choice.
+  A closed vote is read-only and marks its leading option or options, with a
+  clear empty result when nobody voted.
+- While preparing the draft, hosts choose the source of the options: guests,
+  with the self-vote setting, or free-text choices, with a checkbox letting
+  guests add their own. Opening and closing are the only transitions. Hosts can
+  remove an option a guest added. Never show who voted for what, to anyone.
 - Distinguish upcoming, available, and completed experiences with text as well as color.
 - An upcoming reveal can offer a hint when the host wants one; do not expose
   content that is intended to remain hidden.
@@ -305,8 +310,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - The media gallery opens as a mosaic that follows each photo's proportions,
   with the author's avatar and name in a pill on the photo. The list view stays
   available from the view switch.
-- In the featured vote, candidates and the vote button share one row until the
-  ballot opens.
+- In the featured vote, the leading options and the vote button share one row.
 - An invitation opens a personal welcome and an explicit `Entrer` action.
   Activation is a deliberate action; link previews must not consume invitations.
 - Explain invalid, expired and already used invitations, with a clear route back

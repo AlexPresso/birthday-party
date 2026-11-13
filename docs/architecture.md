@@ -136,11 +136,11 @@ changes keep dependencies pointing toward the core.
 
 Programme activities are individual typed events with stable IDs. A vote's
 configuration and event metadata are saved atomically. Its internal vote extension
-retains the candidate and ballot records; one event has at most one extension.
+retains the option and ballot records; one event has at most one extension.
 The vote event separates host configuration and state transitions
 from guest ballots. Its PostgreSQL adapter coordinates authorization, event
 availability, vote closure and ballot replacement atomically. Public views expose
-only the viewer's choice and revealed aggregate results. Reuse the programme
+only the viewer's choice and each option's live count. Reuse the programme
 invalidation topic and existing avatar component; adding a new activity means
 adding its explicit type, rules, adapter behavior and UI, not a plugin runtime.
 Activities may expose a dedicated `/programme/[id]` page. The App Router selects
