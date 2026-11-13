@@ -12,7 +12,7 @@ import {
 import { type MediaCategory } from "@/features/media/contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { useLatestState } from "@/lib/use-latest-state";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
   WelcomeControlPanel,
@@ -303,10 +303,17 @@ export function WelcomeAdmin({
         <p className="welcome-admin-notice" role="status">
           {saving
             ? t("adminWelcome.saving")
-            : dirty && notice === t("adminWelcome.saved")
+            : notice === t("adminWelcome.saved")
               ? ""
               : notice}
         </p>
+        <SavedAnnouncement
+          message={
+            !saving && !dirty && notice === t("adminWelcome.saved")
+              ? notice
+              : ""
+          }
+        />
 
         <WelcomeStepEditor
           steps={draft}

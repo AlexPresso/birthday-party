@@ -1,4 +1,7 @@
-import { openSettingsSection } from "./support/settings";
+import {
+  expectSavedAnnouncement,
+  openSettingsSection,
+} from "./support/settings";
 import { acceptConfirmation } from "./support/confirm";
 import { reconnectRealtime } from "./support/realtime";
 import {
@@ -1105,9 +1108,10 @@ test("the host can manage party details, named invitations and scheduled events"
     .getByLabel("Nom de la fête", { exact: true })
     .fill("Les 30 ans — fête de test");
   await page.getByLabel("Nom de la fête", { exact: true }).blur();
-  await expect(
-    page.getByText("Les infos de la fête sont enregistrées.", { exact: true }),
-  ).toBeVisible();
+  await expectSavedAnnouncement(
+    page,
+    "Les infos de la fête sont enregistrées.",
+  );
   expect((await (await admin.get("/api/party")).json()).title).toBe(
     "Les 30 ans — fête de test",
   );

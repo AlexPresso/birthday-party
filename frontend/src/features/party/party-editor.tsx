@@ -6,7 +6,7 @@ import { useRouteRefresh } from "@/lib/use-route-refresh";
 import { useI18n } from "@/lib/i18n-context";
 import { localInput, utcInput } from "@/lib/dates";
 import { partySchema, type Party } from "./contracts";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 
 const noSubscription = () => () => {};
 
@@ -156,12 +156,13 @@ export function PartyEditor({
       <ErrorNotice message={error} />
       <div className="form-actions">
         <span className="success-notice" role="status">
-          {autosave.saving
-            ? t("admin.saving")
-            : saved && !dirty
-              ? t("admin.partySaved")
-              : ""}
+          {autosave.saving ? t("admin.saving") : ""}
         </span>
+        <SavedAnnouncement
+          message={
+            !autosave.saving && saved && !dirty ? t("admin.partySaved") : ""
+          }
+        />
       </div>
     </form>
   );

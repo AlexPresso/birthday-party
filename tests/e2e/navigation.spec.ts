@@ -141,6 +141,7 @@ test("grouped settings save edits and preserve creation drafts through browser h
     "party",
     "programme",
     "welcome",
+    "information",
     "guests",
     "invitation",
     "categories",

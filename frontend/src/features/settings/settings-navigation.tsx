@@ -24,6 +24,7 @@ export type SettingsSection =
   | "guests"
   | "invitation"
   | "welcome"
+  | "information"
   | "categories"
   | "uploads";
 type SettingsPage = { id: SettingsSection; title: string; content: ReactNode };

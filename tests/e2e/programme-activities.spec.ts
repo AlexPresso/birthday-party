@@ -1,4 +1,7 @@
-import { openSettingsSection } from "./support/settings";
+import {
+  expectSavedAnnouncement,
+  openSettingsSection,
+} from "./support/settings";
 import {
   test,
   expect,
@@ -285,9 +288,8 @@ test("the host prepares a vote on custom choices and may let guests add theirs",
   ).toBe(true);
   // The saved vote came back in another order: the rows do not move and the
   // editor reports neither unsaved changes nor a conflict.
-  await expect(editor.locator(".programme-save-status")).toHaveText(
-    "Le programme est enregistré.",
-  );
+  await expectSavedAnnouncement(editor, "Le programme est enregistré.");
+  await expect(editor.locator(".programme-save-status")).toBeEmpty();
   await expect(choice(1)).toHaveValue("Pizza");
   await expect(choice(2)).toHaveValue("Raclette");
   await expect(choice(3)).toHaveValue("Burgers");

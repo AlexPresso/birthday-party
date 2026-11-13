@@ -1,4 +1,7 @@
-import { openSettingsSection } from "./support/settings";
+import {
+  expectSavedAnnouncement,
+  openSettingsSection,
+} from "./support/settings";
 import {
   test,
   expect,
@@ -45,9 +48,10 @@ test.afterAll(async () => {
 
 async function saveParty(page: Page) {
   await page.locator(".admin-form input:focus").blur();
-  await expect(
-    page.getByText("Les infos de la fête sont enregistrées.", { exact: true }),
-  ).toBeVisible();
+  await expectSavedAnnouncement(
+    page,
+    "Les infos de la fête sont enregistrées.",
+  );
 }
 
 async function returnToSettings(page: Page) {

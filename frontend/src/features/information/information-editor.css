@@ -1,0 +1,124 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  .information-editor-intro {
+    max-width: 68ch;
+    margin-bottom: 18px;
+    line-height: 1.6;
+  }
+  .information-switch {
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .information-switch > p {
+    max-width: 68ch;
+    margin: 2px 0 0;
+    line-height: 1.6;
+  }
+  .information-switch .checkbox-field {
+    width: fit-content;
+    max-width: 100%;
+    gap: 12px;
+    margin-bottom: 0;
+    font-size: 15px;
+  }
+  /* The same switch as the welcome's Required setting. */
+  .information-switch input {
+    appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 42px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-muted);
+  }
+  .information-switch input::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .information-switch input:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .information-switch input:checked::before {
+    transform: translateX(18px);
+    background: var(--background);
+  }
+  .information-tab-list {
+    display: grid;
+    gap: 16px;
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .information-tab-list:empty {
+    display: none;
+  }
+  .information-tab-list > li {
+    min-width: 0;
+    padding: 12px 16px 18px;
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .information-tab-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .information-tab-toolbar h3 {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .information-tab-controls {
+    display: flex;
+    flex-shrink: 0;
+  }
+  /* On a card, fields take the page color to stay readable as fields. */
+  .information-tab-list input,
+  .information-tab-list textarea {
+    background: var(--background);
+  }
+  .information-tab-list textarea {
+    min-height: 160px;
+  }
+  .information-tab-hint {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .information-tab-hint[data-partial] {
+    color: var(--danger);
+  }
+  /* The same breathing room as the welcome editor's "add a step" row. */
+  .information-editor-actions {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .information-editor-actions > p {
+    margin: 0;
+  }
+  .information-notice {
+    min-height: 1.6em;
+    margin: 14px 0 0;
+    color: var(--success);
+    font-size: 13px;
+  }
+  @media (max-width: 360px) {
+    .information-tab-list > li {
+      padding-inline: 12px;
+    }
+  }
+}

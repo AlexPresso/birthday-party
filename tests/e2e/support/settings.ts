@@ -1,4 +1,17 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
+
+/**
+ * Settings show no "saved" message: a finished save is announced to screen
+ * readers only, through a visually hidden status.
+ */
+export async function expectSavedAnnouncement(
+  scope: Page | Locator,
+  message: string,
+) {
+  await expect(scope.getByText(message, { exact: true })).toHaveClass(
+    "visually-hidden",
+  );
+}
 
 export type SettingsSection =
   | "party"
@@ -7,6 +20,7 @@ export type SettingsSection =
   | "guests"
   | "invitation"
   | "welcome"
+  | "information"
   | "categories"
   | "uploads";
 

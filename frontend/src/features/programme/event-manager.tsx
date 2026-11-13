@@ -11,7 +11,7 @@ import { api, remove, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { browserZone } from "@/lib/dates";
 import { eventSchema, eventsSchema, type PartyEvent } from "./contracts";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { Guest } from "../guests/contracts";
 import { replaceEvent, voteTransitions } from "./vote-model";
@@ -273,8 +273,9 @@ export function EventManager({
         </div>
       )}
       <p className="success-notice programme-save-status" role="status">
-        {autosave.saving ? t("admin.saving") : notice}
+        {autosave.saving ? t("admin.saving") : ""}
       </p>
+      <SavedAnnouncement message={autosave.saving ? "" : notice} />
       {draft && (
         <EventForm
           draft={draft}

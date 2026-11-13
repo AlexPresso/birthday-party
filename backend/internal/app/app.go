@@ -19,6 +19,7 @@ import (
 	pgaccess "birthday-party/backend/internal/adapters/postgres/access"
 	pgguestbook "birthday-party/backend/internal/adapters/postgres/guestbook"
 	pgidentity "birthday-party/backend/internal/adapters/postgres/identity"
+	pginformation "birthday-party/backend/internal/adapters/postgres/information"
 	pgmedia "birthday-party/backend/internal/adapters/postgres/media"
 	pgnotifications "birthday-party/backend/internal/adapters/postgres/notifications"
 	pgparty "birthday-party/backend/internal/adapters/postgres/party"
@@ -29,6 +30,7 @@ import (
 	push "birthday-party/backend/internal/adapters/webpush"
 	"birthday-party/backend/internal/guestbook"
 	"birthday-party/backend/internal/identity"
+	"birthday-party/backend/internal/information"
 	"birthday-party/backend/internal/media"
 	"birthday-party/backend/internal/notifications"
 	"birthday-party/backend/internal/party"
@@ -48,6 +50,7 @@ type App struct {
 	welcome             *welcome.Service
 	profile             *profile.Service
 	party               *party.Service
+	information         *information.Service
 	configuration       *party.ConfigurationService
 	access              *access.Service
 	notifications       *notifications.Service
@@ -141,6 +144,7 @@ func Open(config Config) (*App, error) {
 	}
 	a.party = party.New(partyStore)
 	a.configuration = party.NewConfiguration(partyStore)
+	a.information = information.New(pginformation.New(db))
 	programmeStore := pgprogramme.New(db, clock)
 	a.programme = programme.New(programmeStore)
 	a.questions = programme.NewQuestions(programmeStore)

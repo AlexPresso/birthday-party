@@ -36,6 +36,10 @@ const en = {
   invalid_welcome_action: "Choose an available widget and check its settings.",
   invalid_welcome_transition:
     "This action isn't available now. Refresh the welcome sequence.",
+  invalid_information:
+    "Add up to 8 tabs. Each needs a title of up to 40 characters and a text of up to 4,000.",
+  information_conflict:
+    "The information page changed. Refresh it before trying again.",
   invalid_body: "We couldn’t read what you sent. Try again.",
   internal_error: "Something went wrong. Try again in a moment.",
   invalid_id: "We couldn’t find this item. Refresh the page.",
@@ -147,6 +151,10 @@ export const errorMessages = {
       "Choisis un widget disponible et vérifie ses réglages.",
     invalid_welcome_transition:
       "Cette action n’est pas disponible pour le moment. Actualise l’état de l’accueil.",
+    invalid_information:
+      "Ajoute jusqu’à 8 onglets. Chacun a besoin d’un titre de 40 caractères maximum et d’un texte de 4 000 caractères maximum.",
+    information_conflict:
+      "La page d’informations a changé. Charge la version enregistrée avant de réessayer.",
     invalid_body: "Impossible de lire ce que tu as envoyé. Réessaie.",
     internal_error: "Ça n’a pas fonctionné. Réessaie dans un instant.",
     invalid_id: "Impossible de trouver cet élément. Actualise la page.",
@@ -266,6 +274,10 @@ export const errorMessages = {
       "Wähle ein verfügbares Widget und prüfe seine Einstellungen.",
     invalid_welcome_transition:
       "Diese Aktion ist gerade nicht verfügbar. Aktualisiere den Empfangsablauf.",
+    invalid_information:
+      "Füge bis zu 8 Tabs hinzu. Jeder braucht einen Titel mit höchstens 40 Zeichen und einen Text mit höchstens 4000 Zeichen.",
+    information_conflict:
+      "Die Infoseite hat sich geändert. Lade die gespeicherte Version und versuche es erneut.",
     invalid_body:
       "Wir konnten deine Angaben nicht lesen. Versuch es noch einmal.",
     internal_error: "Etwas ist schiefgelaufen. Versuch es gleich noch einmal.",
@@ -385,6 +397,10 @@ export const errorMessages = {
       "Scegli un widget disponibile e controlla le sue impostazioni.",
     invalid_welcome_transition:
       "Questa azione non è disponibile ora. Aggiorna lo stato dell’accoglienza.",
+    invalid_information:
+      "Aggiungi fino a 8 schede. Ognuna ha bisogno di un titolo di massimo 40 caratteri e di un testo di massimo 4000.",
+    information_conflict:
+      "La pagina delle informazioni è cambiata. Carica la versione salvata prima di riprovare.",
     invalid_body: "Non riusciamo a leggere ciò che hai inviato. Riprova.",
     internal_error: "Qualcosa è andato storto. Riprova tra poco.",
     invalid_id: "Non troviamo questo elemento. Ricarica la pagina.",
@@ -498,6 +514,10 @@ export const errorMessages = {
     invalid_welcome_action: "Elige un widget disponible y revisa sus ajustes.",
     invalid_welcome_transition:
       "Esta acción no está disponible ahora. Actualiza el estado de la bienvenida.",
+    invalid_information:
+      "Añade hasta 8 pestañas. Cada una necesita un título de 40 caracteres como máximo y un texto de 4000 como máximo.",
+    information_conflict:
+      "La página de información ha cambiado. Carga la versión guardada antes de volver a intentarlo.",
     invalid_body: "No podemos leer lo que has enviado. Inténtalo de nuevo.",
     internal_error: "Algo ha fallado. Vuelve a intentarlo en un momento.",
     invalid_id: "No encontramos este elemento. Recarga la página.",

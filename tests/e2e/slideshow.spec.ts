@@ -85,6 +85,9 @@ function launchButton(page: Page) {
 }
 
 async function startSlideshow(page: Page) {
+  // The page can finish loading before React reveals the streamed gallery:
+  // wait for it, or the check below reads a page that is still hidden.
+  await expect(page.locator(".media-view-actions")).toBeVisible();
   if (!(await launchButton(page).isVisible())) {
     await page.locator(".media-post-menu > summary").first().click();
   }

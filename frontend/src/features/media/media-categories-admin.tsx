@@ -4,7 +4,7 @@ import { Folder, Eye, EyeOff, Plus } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { mediaCategorySchema, type MediaCategory } from "./contracts";
 import { useI18n } from "@/lib/i18n-context";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import "./media-categories.css";
 
@@ -22,6 +22,8 @@ export function MediaCategoriesAdmin({
   const [busy, setBusy] = useState<number | "create" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  // A changed visibility shows on its row; only screen readers are told.
+  const [announcement, setAnnouncement] = useState("");
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -29,6 +31,7 @@ export function MediaCategoriesAdmin({
     setBusy("create");
     setError(null);
     setNotice("");
+    setAnnouncement("");
     try {
       const category = await api(
         "/admin/media-categories",
@@ -58,6 +61,7 @@ export function MediaCategoriesAdmin({
     setBusy(category.id);
     setError(null);
     setNotice("");
+    setAnnouncement("");
     try {
       const saved = await api(
         `/admin/media-categories/${category.id}`,
@@ -68,7 +72,7 @@ export function MediaCategoriesAdmin({
         },
       );
       onSaved(saved);
-      setNotice(t("categories.updated"));
+      setAnnouncement(t("categories.updated"));
     } catch (cause) {
       setError(errorMessage(cause, t));
     } finally {
@@ -158,6 +162,7 @@ export function MediaCategoriesAdmin({
       <p className="fine-print" role="status">
         {notice}
       </p>
+      <SavedAnnouncement message={announcement} />
       <ErrorNotice message={error} />
     </section>
   );

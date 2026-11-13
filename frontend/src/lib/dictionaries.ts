@@ -14,6 +14,7 @@ import { configurationMessages } from "./messages/configuration.ts";
 import { programmeDesignMessages } from "./messages/programme-design.ts";
 import { guestbookDesignMessages } from "./messages/guestbook-design.ts";
 import { settingsMessages } from "./messages/settings.ts";
+import { informationMessages } from "./messages/information.ts";
 import type { Locale } from "./locale.ts";
 import type { Messages } from "./i18n.ts";
 
@@ -43,6 +44,7 @@ export function getMessages(locale: Locale): Messages {
     programmeDesignMessages[locale],
     guestbookDesignMessages[locale],
     settingsMessages[locale],
+    informationMessages[locale],
     errors,
   ) as Messages;
 }
