@@ -12,7 +12,10 @@ import {
 } from "@/features/programme/contracts";
 import { adminWelcomeSchema } from "@/features/welcome/contracts";
 import { adminInformationSchema } from "@/features/information/contracts";
-import { mediaCategoriesSchema } from "@/features/media/contracts";
+import {
+  mediaCategoriesSchema,
+  storageSchema,
+} from "@/features/media/contracts";
 import { getI18n } from "@/lib/server-i18n";
 export async function generateMetadata() {
   return { title: (await getI18n()).t("page.settings") };
@@ -31,6 +34,7 @@ export default async function SettingsPage() {
     information,
     categories,
     configuration,
+    storage,
   ] = await Promise.all([
     getParty(),
     serverApi("/admin/guests", guestsSchema),
@@ -40,6 +44,7 @@ export default async function SettingsPage() {
     serverApi("/admin/information", adminInformationSchema),
     serverApi("/media-categories", mediaCategoriesSchema),
     serverApi("/admin/config", configurationSchema),
+    serverApi("/admin/storage", storageSchema),
   ]);
   return (
     <PageTransition>
@@ -53,6 +58,7 @@ export default async function SettingsPage() {
         welcome={welcome}
         information={information}
         categories={categories.items}
+        storage={storage}
       />
     </PageTransition>
   );

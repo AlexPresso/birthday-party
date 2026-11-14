@@ -6,13 +6,13 @@ import { ArrowLeft, Check, Pencil, Trash2, Trophy } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
-import { api, errorMessage } from "@/lib/api";
+import { ApiError, api, errorMessage } from "@/lib/api";
 import type { MessageKey } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n-context";
 import { useRealtimeResource } from "@/lib/use-realtime-resource";
 import {
   eventSchema,
-  eventsSchema,
+  type PartyEvent,
   type Vote,
   type VoteEvent,
   type VoteOption,
@@ -239,13 +239,14 @@ export function VoteActivity({
     hasInitialData: true,
     async read(signal) {
       const current = generation.current;
-      const events = await api(
-        isAdmin ? "/admin/programme" : "/programme",
-        eventsSchema,
-        { signal },
-      );
+      // The programme list only previews a vote: read this event whole.
+      let latest: PartyEvent | undefined;
+      try {
+        latest = await api(`/programme/${event.id}`, eventSchema, { signal });
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) throw error;
+      }
       signal.throwIfAborted();
-      const latest = events.items.find((item) => item.id === event.id);
       // Deleted, locked again or, for a guest, back to a draft.
       if (!isReadableVote(latest)) {
         window.location.replace("/programme");

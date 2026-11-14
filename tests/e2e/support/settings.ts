@@ -23,7 +23,8 @@ export type SettingsSection =
   | "welcome"
   | "information"
   | "categories"
-  | "uploads";
+  | "uploads"
+  | "storage";
 
 export async function openSettingsSection(
   page: Page,

@@ -37,6 +37,7 @@ func questionState(t *testing.T, a *App, host *http.Cookie, eventID int64, state
 }
 
 func TestQuestionsAreAnonymousRankedAndLimitedToTwoJokers(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "Question author")
@@ -112,6 +113,7 @@ func TestQuestionsAreAnonymousRankedAndLimitedToTwoJokers(t *testing.T) {
 }
 
 func TestQuestionAccessAndConcurrentJokers(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	guestCookie, _, _ := guest(t, a, host, "Guest")
@@ -172,6 +174,7 @@ func TestQuestionAccessAndConcurrentJokers(t *testing.T) {
 }
 
 func TestQuestionLimitsWelcomeAndRevocationAreEnforced(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, viewer, _ := guest(t, a, host, "Question participant")

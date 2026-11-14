@@ -98,6 +98,7 @@ func closedRealtime(t *testing.T, socket *testRealtimeConnection, code websocket
 }
 
 func TestRealtimeRequiresSessionAndExactOrigin(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	server := httptest.NewServer(a.Handler())
@@ -148,6 +149,7 @@ func TestRealtimeRequiresSessionAndExactOrigin(t *testing.T) {
 }
 
 func TestRealtimeScopesWelcomeUploadsAndProgramme(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First live guest")
@@ -203,6 +205,7 @@ func TestRealtimeScopesWelcomeUploadsAndProgramme(t *testing.T) {
 }
 
 func TestRealtimeClosesRevokedLoggedOutAndExpiredSessions(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"logout", "revocation", "expiry"} {
 		t.Run(scenario, func(t *testing.T) {
 			a := testApp(t)
@@ -240,6 +243,7 @@ func (w realtimeHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 }
 
 func TestRealtimeRechecksSessionAfterSubscribing(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -255,6 +259,7 @@ func TestRealtimeRechecksSessionAfterSubscribing(t *testing.T) {
 }
 
 func TestRealtimeOnlyPublishesCommittedWelcomeChanges(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	server := httptest.NewServer(a.Handler())
@@ -278,6 +283,7 @@ func TestRealtimeOnlyPublishesCommittedWelcomeChanges(t *testing.T) {
 }
 
 func TestRealtimeClosesConnectionsWithApp(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	server := httptest.NewServer(a.Handler())
@@ -302,6 +308,7 @@ func TestRealtimeClosesConnectionsWithApp(t *testing.T) {
 }
 
 func TestRealtimeRejectsClientApplicationMessages(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	server := httptest.NewServer(a.Handler())
@@ -315,6 +322,7 @@ func TestRealtimeRejectsClientApplicationMessages(t *testing.T) {
 }
 
 func TestRealtimeClosesPrunedSessions(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, identity, _ := guest(t, a, host, "Multiple devices")
@@ -343,6 +351,7 @@ func TestRealtimeClosesPrunedSessions(t *testing.T) {
 }
 
 func TestRealtimeCoalescesAndBoundsConnections(t *testing.T) {
+	t.Parallel()
 	hub := newRealtimeHub()
 	clients := make([]*realtimeClient, 0, realtimeMaxConnections)
 	defer func() {
@@ -374,6 +383,7 @@ func TestRealtimeCoalescesAndBoundsConnections(t *testing.T) {
 }
 
 func TestRealtimeProgrammeTimerReschedulesAndUnlocks(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	a.now = time.Now
 	host, _ := admin(t, a)
@@ -405,4 +415,27 @@ func TestRealtimeProgrammeTimerReschedulesAndUnlocks(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil || len(result.Items) != 1 || result.Items[0].Locked {
 		t.Fatal("programme invalidation preceded the unlock boundary")
 	}
+}
+
+func TestRealtimeSendsAtMostOneInvalidationPerSecond(t *testing.T) {
+	t.Parallel()
+	a := testApp(t)
+	host, _ := admin(t, a)
+	visitor, _, _ := guest(t, a, host, "Busy evening guest")
+	server := httptest.NewServer(a.Handler())
+	defer server.Close()
+	socket := dialRealtime(t, a, server, visitor)
+	readRealtime(t, socket, "ready")
+	status(t, request(t, a, "POST", "/api/admin/programme", map[string]any{"title": "First"}, host), 201)
+	readRealtime(t, socket, "invalidate", "programme")
+	sent := time.Now()
+	// Changes right after a signal wait together for the next second.
+	for _, title := range []string{"Second", "Third", "Fourth"} {
+		status(t, request(t, a, "POST", "/api/admin/programme", map[string]any{"title": title}, host), 201)
+	}
+	readRealtime(t, socket, "invalidate", "programme")
+	if elapsed := time.Since(sent); elapsed < realtimeMinInterval-50*time.Millisecond {
+		t.Fatalf("second invalidation after %s", elapsed)
+	}
+	noRealtime(t, socket)
 }

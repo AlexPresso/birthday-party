@@ -7,12 +7,18 @@ import (
 	"os"
 	"path/filepath"
 
+	"birthday-party/backend/internal/adapters/preview"
 	"birthday-party/backend/internal/media"
 )
 
-type Files struct{ root string }
+type Files struct {
+	root   string
+	budget *preview.DecodeBudget
+}
 
-func New(root string) *Files { return &Files{root: root} }
+func New(root string, budget *preview.DecodeBudget) *Files {
+	return &Files{root: root, budget: budget}
+}
 
 func (f *Files) StageInput(input media.Received, key string) error {
 	return os.Rename(input.Path, filepath.Join(f.root, "uploads", key+".input"))

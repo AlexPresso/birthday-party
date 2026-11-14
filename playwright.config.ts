@@ -9,6 +9,10 @@ const dataDir =
   process.env.BIRTHDAY_E2E_DATA_DIR ??
   mkdtempSync(join(tmpdir(), "birthday-party-e2e-"));
 process.env.BIRTHDAY_E2E_DATA_DIR = dataDir;
+// scripts/e2e.mjs gives each parallel shard its own ports; one run uses these.
+const port = process.env.E2E_PORT ?? "3300";
+const apiAddress = `127.0.0.1:${process.env.E2E_API_PORT ?? "18080"}`;
+const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -19,7 +23,7 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3300",
+    baseURL,
     ...devices["Desktop Chrome"],
     locale: "fr-CH",
     channel: process.env.PLAYWRIGHT_CHANNEL || "chrome",
@@ -28,14 +32,14 @@ export default defineConfig({
   },
   webServer: {
     command: "node scripts/dev.mjs",
-    url: "http://localhost:3300/invitation",
+    url: `${baseURL}/invitation`,
     reuseExistingServer: false,
     timeout: 240_000,
     env: {
-      PORT: "3300",
-      LISTEN_ADDR: "127.0.0.1:18080",
-      API_INTERNAL_URL: "http://127.0.0.1:18080",
-      PUBLIC_URL: "http://localhost:3300",
+      PORT: port,
+      LISTEN_ADDR: apiAddress,
+      API_INTERNAL_URL: `http://${apiAddress}`,
+      PUBLIC_URL: baseURL,
       DATA_DIR: dataDir,
       COOKIE_SECURE: "false",
       PRINT_ADMIN_INVITATION: "false",

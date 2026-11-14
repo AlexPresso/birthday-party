@@ -14,6 +14,7 @@ import (
 )
 
 func TestConcurrentStartupKeepsOneAdministrator(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	var tasks sync.WaitGroup
 	errors := make(chan error, 4)
@@ -40,6 +41,7 @@ func TestConcurrentStartupKeepsOneAdministrator(t *testing.T) {
 }
 
 func TestStartupAdminInvitationCreatesAdministrator(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	link, err := a.StartupAdminInvitation(context.Background())
 	if err != nil {
@@ -79,6 +81,7 @@ func TestStartupAdminInvitationCreatesAdministrator(t *testing.T) {
 }
 
 func TestStartupAdminInvitationPreservesIdentityAndSession(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	first, err := a.StartupAdminInvitation(context.Background())
@@ -116,6 +119,7 @@ func TestStartupAdminInvitationPreservesIdentityAndSession(t *testing.T) {
 }
 
 func TestStartupAdminInvitationSelectsOnlyActiveAdministrators(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name   string
 		guests []guestidentity.Guest

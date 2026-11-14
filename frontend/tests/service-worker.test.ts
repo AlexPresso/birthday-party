@@ -320,3 +320,38 @@ test("worker activates immediately without intercepting requests or storing priv
     ["install", "activate", "push", "notificationclick"],
   );
 });
+
+test("storage alerts show a localized sentence and open the storage settings", async () => {
+  const sw = worker();
+  for (const locale of locales) {
+    for (const type of ["storage_warning", "storage_full"]) {
+      await sw.dispatch("push", JSON.stringify({ type, locale }));
+      const notification = sw.displayed.at(-1)!;
+      assert.ok(notification.title.length > 3);
+      assert.ok(notification.options.body.length > 20);
+      assert.equal(notification.options.tag, "birthday-storage");
+    }
+  }
+  assert.equal(sw.displayed.length, locales.length * 2);
+  // A storage alert names nothing: any extra field is refused.
+  await sw.dispatch(
+    "push",
+    JSON.stringify({ type: "storage_full", locale: "fr", title: "x" }),
+  );
+  assert.equal(sw.displayed.length, locales.length * 2);
+
+  const settings = `${origin}/parametres?section=storage`;
+  let focused = 0;
+  const shown = worker([
+    {
+      url: settings,
+      navigate: async () => assert.fail("The open page must not reload."),
+      focus: async () => focused++,
+    },
+  ]);
+  await shown.dispatch("notificationclick", undefined, "birthday-storage");
+  assert.equal(focused, 1);
+  const none = worker();
+  await none.dispatch("notificationclick", undefined, "birthday-storage");
+  assert.deepEqual(none.opened, [settings]);
+});

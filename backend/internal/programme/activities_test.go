@@ -240,6 +240,18 @@ func TestVoteViewTellsWhetherTheViewerCanVote(t *testing.T) {
 			if view.Vote.CanVote != test.want {
 				t.Fatalf("canVote=%v want=%v", view.Vote.CanVote, test.want)
 			}
+			// The list's preview decides from the one option the store picks:
+			// active, and not the viewer's own when another exists.
+			var eligible *VoteOption
+			for _, option := range test.vote.Options {
+				if option.Active && (eligible == nil || (eligible.GuestID != nil && *eligible.GuestID == test.guestID)) {
+					eligible = &option
+				}
+			}
+			preview := stored.PreviewView(test.guestID, eligible)
+			if preview.Vote.CanVote != test.want || preview.Vote.MyOptionID != nil {
+				t.Fatalf("preview canVote=%v mine=%v", preview.Vote.CanVote, preview.Vote.MyOptionID)
+			}
 			if stored.Vote.CanVote {
 				t.Fatal("view changed the stored vote")
 			}

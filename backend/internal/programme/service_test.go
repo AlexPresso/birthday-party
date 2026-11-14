@@ -16,10 +16,20 @@ type memoryEvents struct {
 	limit     int
 	err       error
 	afterRead func()
+	preview   int
 }
 
-func (repository *memoryEvents) List(_ context.Context, limit int, _ int64, private bool, now time.Time) ([]Event, error) {
-	repository.limit = limit
+func (repository *memoryEvents) Event(_ context.Context, id, _ int64, private bool, now time.Time) (Event, error) {
+	for _, event := range repository.items {
+		if event.ID == id {
+			return event.View(now, private), nil
+		}
+	}
+	return Event{}, ErrNotFound
+}
+
+func (repository *memoryEvents) List(_ context.Context, limit int, _ int64, private bool, now time.Time, preview int) ([]Event, error) {
+	repository.limit, repository.preview = limit, preview
 	if repository.afterRead != nil {
 		repository.afterRead()
 	}

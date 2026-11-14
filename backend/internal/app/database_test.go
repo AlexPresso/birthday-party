@@ -18,12 +18,38 @@ import (
 )
 
 // Tests only use an explicitly supplied test database and a disposable schema.
+// Integration tests run in parallel against one PostgreSQL server, whose
+// default limit is 100 connections. A test App's pool keeps up to
+// testDatabaseConnections and a test may open a second App, so at most this
+// many top-level tests hold a database.
+const testDatabaseConnections = 10
+
+var (
+	databaseSlots   = make(chan struct{}, 6)
+	databaseHolders sync.Map
+)
+
+// holdDatabaseSlot waits for a database slot shared by a top-level test and
+// its subtests, released when the test that took it ends.
+func holdDatabaseSlot(t *testing.T) {
+	test, _, _ := strings.Cut(t.Name(), "/")
+	if _, held := databaseHolders.LoadOrStore(test, true); held {
+		return
+	}
+	databaseSlots <- struct{}{}
+	t.Cleanup(func() {
+		databaseHolders.Delete(test)
+		<-databaseSlots
+	})
+}
+
 func testDatabaseURL(t *testing.T) string {
 	t.Helper()
 	value := os.Getenv("TEST_DATABASE_URL")
 	if value == "" {
 		t.Skip("set TEST_DATABASE_URL to run PostgreSQL integration tests")
 	}
+	holdDatabaseSlot(t)
 	u, err := url.Parse(value)
 	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || !strings.HasSuffix(strings.TrimPrefix(u.Path, "/"), "_test") {
 		t.Fatal("TEST_DATABASE_URL must be a PostgreSQL URL whose database name ends in _test")
@@ -66,8 +92,9 @@ func testDatabase(t *testing.T) *sql.DB {
 }
 
 func TestDatabaseConfigurationErrorsHideCredentials(t *testing.T) {
+	t.Parallel()
 	for _, value := range []string{"", "postgres://guest:private-test-password%zz@localhost/birthday"} {
-		db, err := openDatabase(t.Context(), value)
+		db, err := openDatabase(t.Context(), value, testDatabaseConnections)
 		if db != nil {
 			db.Close()
 			t.Fatal("invalid configuration opened a database")
@@ -97,6 +124,7 @@ func migrationFiles(t *testing.T) fstest.MapFS {
 }
 
 func TestMigrationsAreSerializedAndIdempotent(t *testing.T) {
+	t.Parallel()
 	db := testDatabase(t)
 	var tasks sync.WaitGroup
 	errors := make(chan error, 4)
@@ -123,6 +151,7 @@ func TestMigrationsAreSerializedAndIdempotent(t *testing.T) {
 }
 
 func TestMigrationsRejectChangedOrMissingHistory(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"changed file", "missing applied file", "missing history", "renamed file"} {
 		t.Run(scenario, func(t *testing.T) {
 			db := testDatabase(t)
@@ -152,6 +181,7 @@ func TestMigrationsRejectChangedOrMissingHistory(t *testing.T) {
 }
 
 func TestMigrationsRollBackFailedChangesAndNormalizeLineEndings(t *testing.T) {
+	t.Parallel()
 	db := testDatabase(t)
 	files := migrationFiles(t)
 	if err := applyMigrations(t.Context(), db, files); err != nil {

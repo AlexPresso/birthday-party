@@ -45,6 +45,7 @@ func assertWelcomeError(t *testing.T, response *httptest.ResponseRecorder, wantS
 }
 
 func TestWelcomeSequenceRevealsOnlyCurrentStepAndSurvivesRestart(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Welcome guest")
@@ -118,6 +119,7 @@ func TestWelcomeSequenceRevealsOnlyCurrentStepAndSurvivesRestart(t *testing.T) {
 }
 
 func TestWelcomeBlocksGuestContentAndMutationsButKeepsIdentity(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, guestIdentity, _ := guest(t, a, host, "Waiting guest")
@@ -164,6 +166,7 @@ func TestWelcomeBlocksGuestContentAndMutationsButKeepsIdentity(t *testing.T) {
 }
 
 func TestWelcomeEditsAndTransitionsEnforceRevisionAndBounds(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	validSteps := []welcomeStep{testWelcomeStep(strings.Repeat("é", 120), strings.Repeat("🙂", 1000))}
@@ -205,6 +208,7 @@ func TestWelcomeEditsAndTransitionsEnforceRevisionAndBounds(t *testing.T) {
 }
 
 func TestConcurrentWelcomeAdvanceCannotSkipSteps(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	saved := readWelcomeState(t, request(t, a, "PUT", "/api/admin/welcome", map[string]any{"revision": 0, "steps": []welcomeStep{testWelcomeStep("First", ""), testWelcomeStep("Second", "")}}, host))
@@ -235,6 +239,7 @@ func TestConcurrentWelcomeAdvanceCannotSkipSteps(t *testing.T) {
 }
 
 func TestWelcomeClosurePreservesAcceptedUploadsWithoutExposingThem(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, identity, _ := guest(t, a, host, "Uploading guest")
@@ -306,6 +311,7 @@ func (r *welcomeClosureReader) Read(p []byte) (int, error) {
 }
 
 func TestWelcomeClosureDuringReceptionRejectsNewGuestUpload(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Guest sending a file")

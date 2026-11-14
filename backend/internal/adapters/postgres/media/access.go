@@ -57,7 +57,8 @@ func (s *Store) Inspect(ctx context.Context, guestID int64, clientID string, des
 	}
 	job, err := scanUpload(tx.QueryRowContext(ctx, uploadSelect+` WHERE j.guest_id=$1 AND j.client_upload_id=$2`, guestID, clientID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
+		// An early answer before the bytes arrive; Accept decides under the quota lock.
+		return nil, checkCapacity(ctx, tx, guestID)
 	}
 	if err != nil {
 		return nil, err

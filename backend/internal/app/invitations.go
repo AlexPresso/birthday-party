@@ -19,23 +19,40 @@ func (a *App) InviteAdmin(ctx context.Context, name string) (string, error) {
 	return a.identity.InviteAdmin(ctx, name, a.now)
 }
 
-// A global bounded limiter also works behind the same-origin Next.js proxy,
-// without trusting spoofable X-Forwarded-For headers or retaining client IPs.
+// invitationFailureLimit bounds failed invitation attempts per minute across
+// all clients. A global limiter also works behind the same-origin Next.js
+// proxy, without trusting spoofable X-Forwarded-For headers or retaining client
+// IPs. Only failures count: guessing a token fails, while guests opening their
+// links at the same moment must not lock each other out.
+const invitationFailureLimit = 120
+
+// allowInvitation answers 429 while this minute's failure budget is spent.
 func (a *App) allowInvitation(w http.ResponseWriter) bool {
 	a.authMu.Lock()
+	a.resetInvitationWindow()
+	blocked := a.authFailures >= invitationFailureLimit
+	a.authMu.Unlock()
+	if blocked {
+		w.Header().Set("Retry-After", "60")
+		fail(w, "too_many_attempts")
+	}
+	return !blocked
+}
+
+func (a *App) invitationFailed() {
+	a.authMu.Lock()
 	defer a.authMu.Unlock()
+	a.resetInvitationWindow()
+	a.authFailures++
+}
+
+// resetInvitationWindow starts a new minute; the caller holds authMu.
+func (a *App) resetInvitationWindow() {
 	now := a.now()
 	if now.Sub(a.authWindow) >= time.Minute || now.Before(a.authWindow) {
 		a.authWindow = now
-		a.authCount = 0
+		a.authFailures = 0
 	}
-	a.authCount++
-	if a.authCount > 120 {
-		w.Header().Set("Retry-After", "60")
-		fail(w, "too_many_attempts")
-		return false
-	}
-	return true
 }
 
 func (a *App) previewInvitation(w http.ResponseWriter, r *http.Request) {
@@ -46,10 +63,12 @@ func (a *App) previewInvitation(w http.ResponseWriter, r *http.Request) {
 		Token string `json:"token"`
 	}
 	if !decode(w, r, &input) {
+		a.invitationFailed()
 		return
 	}
 	preview, err := a.identity.PreviewInvitation(r.Context(), input.Token, a.now())
 	if err != nil {
+		a.invitationFailed()
 		failError(w, err)
 		return
 	}
@@ -64,10 +83,12 @@ func (a *App) acceptInvitation(w http.ResponseWriter, r *http.Request) {
 		Token string `json:"token"`
 	}
 	if !decode(w, r, &input) {
+		a.invitationFailed()
 		return
 	}
 	session, err := a.identity.AcceptInvitation(r.Context(), input.Token, a.now)
 	if err != nil {
+		a.invitationFailed()
 		failError(w, err)
 		return
 	}

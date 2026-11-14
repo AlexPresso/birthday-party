@@ -7,8 +7,8 @@ import {
 } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 
-/** The frontend started by playwright.config.ts. */
-export const baseURL = "http://localhost:3300";
+/** The frontend started by playwright.config.ts for this shard. */
+export const baseURL = `http://localhost:${process.env.E2E_PORT ?? "3300"}`;
 
 /** The API rejects state-changing requests without these headers. */
 export const mutationHeaders = {
@@ -74,7 +74,7 @@ export async function bootstrapHost(name: string) {
     },
   );
   const match = output.match(
-    /http:\/\/localhost:3300\/invitation#token=[A-Za-z0-9_-]+/,
+    new RegExp(`${RegExp.escape(baseURL)}/invitation#token=[A-Za-z0-9_-]+`),
   );
   if (!match)
     throw new Error("Host bootstrap did not return an invitation URL.");

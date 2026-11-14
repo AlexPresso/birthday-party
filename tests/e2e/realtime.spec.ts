@@ -6,7 +6,12 @@ import {
   type Request,
   type WebSocket,
 } from "@playwright/test";
-import { bootstrapHost, mutationHeaders, signInGuest } from "./support/party";
+import {
+  baseURL,
+  bootstrapHost,
+  mutationHeaders,
+  signInGuest,
+} from "./support/party";
 import { canvasImage } from "./support/images";
 import {
   welcomeControls,
@@ -232,7 +237,7 @@ test("welcome and media widgets share one socket and refresh only after changes"
   expect(network.readyCount()).toBe(1);
   expect(network.progressRequests).toEqual([]);
   expect(network.sockets[0].socket.url()).toBe(
-    "ws://localhost:3300/api/realtime",
+    `${baseURL.replace(/^http/, "ws")}/api/realtime`,
   );
   expectPrivateFrames(network.frames);
   console.log(

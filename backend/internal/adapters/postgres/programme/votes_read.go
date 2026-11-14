@@ -11,7 +11,10 @@ import (
 )
 
 // Two bounded queries share a snapshot of event content, options and ballots.
-func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guestID int64, admin bool, now time.Time) ([]programme.Event, error) {
+// readEvents reads up to limit events, or the one with eventID when it is not
+// zero. A positive preview keeps only that many leading options per vote,
+// without the viewer's choice.
+func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guestID int64, admin bool, now time.Time, preview int) ([]programme.Event, error) {
 	ordered := []*programme.Event{}
 	byVoteID := map[int64]*programme.Event{}
 	voteIDs := []int64{}
@@ -77,15 +80,103 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
 	}
 	rows.Close()
 	if len(voteIDs) > 0 {
-		if err := readOptions(ctx, tx, voteIDs, guestID, byVoteID); err != nil {
+		var err error
+		if preview > 0 {
+			err = readLeadingOptions(ctx, tx, voteIDs, preview, byVoteID)
+		} else {
+			err = readOptions(ctx, tx, voteIDs, guestID, byVoteID)
+		}
+		if err != nil {
 			return nil, err
+		}
+	}
+	if preview > 0 {
+		eligible, err := readEligibleOptions(ctx, tx, byVoteID, guestID)
+		if err != nil {
+			return nil, err
+		}
+		for voteID, event := range byVoteID {
+			*event = event.PreviewView(guestID, eligible[voteID])
 		}
 	}
 	items := make([]programme.Event, 0, len(ordered))
 	for _, event := range ordered {
-		items = append(items, event.VoteView(guestID))
+		if preview == 0 {
+			*event = event.VoteView(guestID)
+		}
+		items = append(items, *event)
 	}
 	return items, nil
+}
+
+// readEligibleOptions picks, for each open vote, the option standing for all
+// of them in PreviewView: an active option other than the viewer's own first.
+func readEligibleOptions(ctx context.Context, tx *sql.Tx, byVoteID map[int64]*programme.Event, guestID int64) (map[int64]*programme.VoteOption, error) {
+	open := []int64{}
+	for voteID, event := range byVoteID {
+		if event.Vote.Status == programme.VoteOpen && !event.Vote.AllowWriteIns {
+			open = append(open, voteID)
+		}
+	}
+	eligible := map[int64]*programme.VoteOption{}
+	if len(open) == 0 {
+		return eligible, nil
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT ON (o.activity_id) o.activity_id,o.id,o.guest_id
+ FROM programme_vote_options o LEFT JOIN guests g ON g.id=o.guest_id
+ WHERE o.activity_id=ANY($1) AND COALESCE(g.active,TRUE)
+ ORDER BY o.activity_id,o.guest_id IS NOT DISTINCT FROM $2,o.id`, open, guestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var voteID int64
+		option := programme.VoteOption{Active: true}
+		if err := rows.Scan(&voteID, &option.ID, &option.GuestID); err != nil {
+			return nil, err
+		}
+		eligible[voteID] = &option
+	}
+	return eligible, rows.Err()
+}
+
+// readLeadingOptions fills each vote with its count leading options only.
+// Each vote keeps just a top-N sort of its options, instead of sorting them
+// all, which made the full options query most of a programme refetch.
+func readLeadingOptions(ctx context.Context, tx *sql.Tx, voteIDs []int64, count int, byVoteID map[int64]*programme.Event) error {
+	rows, err := tx.QueryContext(ctx, `SELECT v.id,o.id,o.label,o.guest_id,o.active,o.avatar_version,o.write_in,o.votes
+ FROM unnest($1::bigint[]) v(id) CROSS JOIN LATERAL (
+  SELECT o.id,COALESCE(o.label,g.name) AS label,o.guest_id,COALESCE(g.active,TRUE) AS active,
+  CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END AS avatar_version,
+  o.write_in,COALESCE(b.votes,0) AS votes
+  FROM programme_vote_options o
+  LEFT JOIN guests g ON g.id=o.guest_id
+  LEFT JOIN (
+   SELECT option_id,COUNT(*) AS votes FROM programme_ballots WHERE activity_id=v.id GROUP BY option_id
+  ) b ON b.option_id=o.id
+  WHERE o.activity_id=v.id
+  ORDER BY COALESCE(b.votes,0) DESC,lower(COALESCE(o.label,g.name)),o.id LIMIT $2
+ ) o
+ ORDER BY v.id,o.votes DESC,lower(o.label),o.id`, voteIDs, count)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var voteID, avatarVersion int64
+		var option programme.VoteOption
+		if err := rows.Scan(&voteID, &option.ID, &option.Label, &option.GuestID, &option.Active,
+			&avatarVersion, &option.WriteIn, &option.Votes); err != nil {
+			return err
+		}
+		if option.GuestID != nil {
+			option.AvatarURL = identity.AvatarURL(*option.GuestID, avatarVersion)
+		}
+		vote := byVoteID[voteID].Vote
+		vote.Options = append(vote.Options, option)
+	}
+	return rows.Err()
 }
 
 // readOptions fills each vote with its options, most voted first, and with
@@ -127,7 +218,7 @@ func readOptions(ctx context.Context, tx *sql.Tx, voteIDs []int64, guestID int64
 }
 
 func readEvent(ctx context.Context, tx *sql.Tx, eventID, guestID int64, admin bool, now time.Time) (programme.Event, error) {
-	items, err := readEvents(ctx, tx, eventID, 1, guestID, admin, now)
+	items, err := readEvents(ctx, tx, eventID, 1, guestID, admin, now, 0)
 	if err != nil {
 		return programme.Event{}, err
 	}

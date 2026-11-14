@@ -8,6 +8,7 @@ import (
 )
 
 func TestWelcomeEnrollmentLocksGuestBeforeSharedSequence(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, identity, _ := guest(t, a, host, "Concurrent enrollment")

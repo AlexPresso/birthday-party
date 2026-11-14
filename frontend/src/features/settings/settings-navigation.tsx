@@ -27,7 +27,8 @@ export type SettingsSection =
   | "welcome"
   | "information"
   | "categories"
-  | "uploads";
+  | "uploads"
+  | "storage";
 type SettingsPage = { id: SettingsSection; title: string; content: ReactNode };
 type Navigate = (
   event: MouseEvent<HTMLAnchorElement>,

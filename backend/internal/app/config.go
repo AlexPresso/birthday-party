@@ -33,6 +33,9 @@ type Config struct {
 	VAPIDSubject              string
 	ProductConfiguration      party.Configuration
 	initialConfigurationError error
+	// databaseConnections lets tests running side by side share one
+	// PostgreSQL server with smaller pools; zero uses the default.
+	databaseConnections int
 }
 
 // ConfigFromEnv reads and validates process environment variables without loading files.

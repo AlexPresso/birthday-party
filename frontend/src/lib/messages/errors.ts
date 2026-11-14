@@ -96,7 +96,8 @@ const en = {
   photo_dimensions_too_large:
     "This photo exceeds 40 megapixels. Choose a smaller image.",
   unreadable_photo: "This photo could not be read. Choose another image.",
-  album_full: "The gallery is full (5000 files or 10 GB). Contact the host.",
+  album_full: "The gallery is full (5000 files). Contact the host.",
+  storage_full: "The server has no room left for this file. Contact the host.",
   access_revoked: "You no longer have access to the party. Contact the host.",
   photo_not_found: "This file could not be found.",
   photo_unavailable: "This file is no longer available.",
@@ -226,7 +227,9 @@ export const errorMessages = {
       "La photo dépasse 40 mégapixels. Choisis une image plus petite.",
     unreadable_photo: "Cette photo est illisible. Choisis une autre image.",
     album_full:
-      "La galerie est pleine (5 000 fichiers ou 10 Go). Contacte l’organisateur.",
+      "La galerie est pleine (5 000 fichiers). Contacte l’organisateur.",
+    storage_full:
+      "Le serveur n’a plus de place pour ce fichier. Contacte l’organisateur.",
     access_revoked: "Tu n’as plus accès à la fête. Contacte l’organisateur.",
     photo_not_found: "Ce fichier est introuvable.",
     photo_unavailable: "Ce fichier n’est plus disponible.",
@@ -363,7 +366,9 @@ export const errorMessages = {
     unreadable_photo:
       "Dieses Foto konnte nicht gelesen werden. Wähle ein anderes Bild.",
     album_full:
-      "Die Galerie ist voll (5000 Dateien oder 10 GB). Wende dich an den Gastgeber.",
+      "Die Galerie ist voll (5000 Dateien). Wende dich an den Gastgeber.",
+    storage_full:
+      "Auf dem Server ist kein Platz mehr für diese Datei. Wende dich an den Gastgeber.",
     access_revoked:
       "Du hast keinen Zugang mehr zur Feier. Melde dich beim Gastgeber.",
     photo_not_found: "Diese Datei wurde nicht gefunden.",
@@ -491,8 +496,9 @@ export const errorMessages = {
     photo_dimensions_too_large:
       "Questa foto supera i 40 megapixel. Scegli un’immagine più piccola.",
     unreadable_photo: "Questa foto non è leggibile. Scegli un’altra immagine.",
-    album_full:
-      "La galleria è piena (5000 file o 10 GB). Contatta chi organizza.",
+    album_full: "La galleria è piena (5000 file). Contatta chi organizza.",
+    storage_full:
+      "Sul server non c’è più spazio per questo file. Contatta chi organizza.",
     access_revoked: "Non hai più accesso alla festa. Contatta chi organizza.",
     photo_not_found: "Questo file non è stato trovato.",
     photo_unavailable: "Questo file non è più disponibile.",
@@ -620,7 +626,9 @@ export const errorMessages = {
       "Esta foto supera los 40 megapíxeles. Elige una imagen más pequeña.",
     unreadable_photo: "No se ha podido leer esta foto. Elige otra imagen.",
     album_full:
-      "La galería está llena (5000 archivos o 10 GB). Contacta con quien organiza.",
+      "La galería está llena (5000 archivos). Contacta con quien organiza.",
+    storage_full:
+      "No queda espacio en el servidor para este archivo. Contacta con quien organiza.",
     access_revoked:
       "Ya no tienes acceso a la fiesta. Contacta con quien organiza.",
     photo_not_found: "No se ha encontrado este archivo.",

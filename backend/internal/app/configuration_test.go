@@ -40,6 +40,7 @@ func TestProductConfigurationEnvironmentPreservesEmptyOverrides(t *testing.T) {
 }
 
 func TestConfigurationAccessPersistenceAndPublicProjection(t *testing.T) {
+	t.Parallel()
 	seed := party.DefaultConfiguration()
 	seed.Age = 42
 	title, empty := "Shared title", ""
@@ -173,6 +174,7 @@ func TestConfigurationImportsValidateEnvironmentOnlyOnce(t *testing.T) {
 }
 
 func TestConfigurationSaveRejectsSessionExpiringWhileWaitingForLocks(t *testing.T) {
+	t.Parallel()
 	for _, lockTarget := range []string{"guest", "session", "configuration"} {
 		t.Run(lockTarget, func(t *testing.T) {
 			a := testApp(t)
@@ -251,6 +253,7 @@ func TestConfigurationSaveRejectsSessionExpiringWhileWaitingForLocks(t *testing.
 }
 
 func TestConfigurationRequiresCompleteValidInput(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	valid, err := json.Marshal(party.DefaultConfiguration())
@@ -277,6 +280,7 @@ func TestConfigurationRequiresCompleteValidInput(t *testing.T) {
 }
 
 func TestConfigurationRechecksAdministratorDuringSave(t *testing.T) {
+	t.Parallel()
 	for _, action := range []string{"logout", "revoke", "demote"} {
 		t.Run(action, func(t *testing.T) {
 			a := testApp(t)
@@ -319,6 +323,7 @@ func TestConfigurationRechecksAdministratorDuringSave(t *testing.T) {
 }
 
 func TestConfigurationLimitChangesPreserveAcceptedUploads(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	configuration := party.DefaultConfiguration()
@@ -339,6 +344,7 @@ func TestConfigurationLimitChangesPreserveAcceptedUploads(t *testing.T) {
 }
 
 func TestAppearanceIsPublicAndValidated(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Visitor")

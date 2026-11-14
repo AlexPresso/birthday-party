@@ -16,6 +16,7 @@ func editWelcomeSteps(t *testing.T, a *App, host *http.Cookie, state welcomeStat
 }
 
 func TestWelcomeLiveTextEditsPreserveCurrentUploadsAndHiddenContent(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Editing instructions guest")
@@ -63,6 +64,7 @@ func TestWelcomeLiveTextEditsPreserveCurrentUploadsAndHiddenContent(t *testing.T
 }
 
 func TestWelcomeLiveWidgetEditsRejectStaleMediaAcceptance(t *testing.T) {
+	t.Parallel()
 	for _, change := range []string{"destination", "widget position"} {
 		t.Run(change, func(t *testing.T) {
 			a := testApp(t)
@@ -104,6 +106,7 @@ func TestWelcomeLiveWidgetEditsRejectStaleMediaAcceptance(t *testing.T) {
 }
 
 func TestWelcomeLiveEditsPreserveAcceptedUploadsAcrossRestart(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Accepted upload guest")
@@ -148,6 +151,7 @@ func TestWelcomeLiveEditsPreserveAcceptedUploadsAcrossRestart(t *testing.T) {
 }
 
 func TestWelcomeLiveEditsClampRemovedStepsWithoutRestarting(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First step guest")
@@ -188,6 +192,7 @@ func TestWelcomeLiveEditsClampRemovedStepsWithoutRestarting(t *testing.T) {
 }
 
 func TestWelcomeLiveAppendPreservesCompletionAndRequiredFinishBoundary(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	finished, _, _ := guest(t, a, host, "Finished guest")
@@ -225,6 +230,7 @@ func TestWelcomeLiveAppendPreservesCompletionAndRequiredFinishBoundary(t *testin
 }
 
 func TestWelcomeLiveWidgetRemovalRechecksMutationsAfterReadingBody(t *testing.T) {
+	t.Parallel()
 	for _, widget := range []string{"profile_photo", "enable_notifications"} {
 		t.Run(widget, func(t *testing.T) {
 			a := testApp(t)

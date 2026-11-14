@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: frontendRoot,
   turbopack: { root: frontendRoot },
+  // Parallel browser test shards (scripts/e2e.mjs) each run a dev server: two
+  // cannot share a build directory, and Next must not edit tsconfig.json.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+  ...(process.env.NEXT_TSCONFIG_PATH && {
+    typescript: { tsconfigPath: process.env.NEXT_TSCONFIG_PATH },
+  }),
   poweredByHeader: false,
   // The development indicator overlaps the first mobile navigation tab.
   devIndicators: false,
@@ -17,6 +23,9 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // Browsers and crawlers may ask for /favicon.ico before, or instead of,
+      // reading the page's icon link: answer with the app icon, not a 404.
+      { source: "/favicon.ico", destination: "/icons/app-192.png" },
       {
         source: "/api/:path*",
         destination: `${process.env.API_INTERNAL_URL || "http://127.0.0.1:8080"}/api/:path*`,

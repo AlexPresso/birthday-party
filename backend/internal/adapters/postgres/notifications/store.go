@@ -187,14 +187,93 @@ const eligibleSQL = `FROM notification_subscriptions s
  AND (guest.role='admin' OR ((p.guest_id IS NULL OR NOT p.completed)
  AND (o.kind='welcome_open' OR COALESCE(p.position,0)<LEAST(o.unlocked_step,w.current_step))))`
 
+// adminRecipientsSQL selects subscriptions (alias s) of administrators with
+// a live session at $1, who receive storage alerts.
+const adminRecipientsSQL = `FROM notification_subscriptions s
+ JOIN sessions session ON session.token_hash=s.session_hash AND session.guest_id=s.guest_id
+ JOIN guests guest ON guest.id=s.guest_id
+ WHERE guest.active AND guest.role='admin' AND session.expires_at>$1`
+
+// storageEligibleSQL keeps storage outbox rows (alias o) whose recipient may
+// still be notified. The attempt bound mirrors notifications.MaxAttempts.
+const storageEligibleSQL = adminRecipientsSQL + `
+ AND s.id=o.subscription_id AND s.version=o.subscription_version
+ AND o.expires_at>$1 AND o.attempts<5`
+
+// SetStorageWarning records the disk's warning state and queues the alert
+// when the state starts, in one transaction so it is sent once per crossing.
+func (s *Store) SetStorageWarning(ctx context.Context, warning bool, now time.Time) (bool, error) {
+	return s.storageAlert(ctx, notifications.KindStorageWarning, now,
+		"UPDATE storage_alert SET warned=$1 WHERE id=1 AND warned<>$1 RETURNING warned", warning)
+}
+
+// StorageFull queues the refused-files alert unless one was queued after since.
+func (s *Store) StorageFull(ctx context.Context, now, since time.Time) (bool, error) {
+	return s.storageAlert(ctx, notifications.KindStorageFull, now,
+		"UPDATE storage_alert SET full_notified_at=$1 WHERE id=1 AND (full_notified_at IS NULL OR full_notified_at<=$2) RETURNING TRUE", now, since)
+}
+
+// storageAlert runs change on the alert row and, when it returns true, queues
+// kind for every administrator's device.
+func (s *Store) storageAlert(ctx context.Context, kind notifications.Kind, now time.Time, change string, args ...any) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var alert bool
+	err = tx.QueryRowContext(ctx, change, args...).Scan(&alert)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !alert) {
+		return false, tx.Commit()
+	}
+	if err != nil {
+		return false, err
+	}
+	// Lock subscriptions before child rows, matching deletion and revocation.
+	_, err = tx.ExecContext(ctx, `WITH recipients AS MATERIALIZED (
+ SELECT s.id,s.version `+adminRecipientsSQL+`
+ ORDER BY s.id FOR KEY SHARE OF s
+ ) INSERT INTO storage_notification_outbox(subscription_id,subscription_version,kind,next_attempt,expires_at)
+ SELECT id,version,$2,$1,$3 FROM recipients
+ ON CONFLICT(subscription_id,kind) DO UPDATE SET subscription_version=excluded.subscription_version,
+ attempts=0,next_attempt=excluded.next_attempt,expires_at=excluded.expires_at`,
+		now, string(kind), now.Add(notifications.StorageAlertLifetime))
+	if err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
 // Next returns the next due notification: welcome updates first, then
-// programme announcements.
+// programme announcements, then storage alerts.
 func (s *Store) Next(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
 	pending, found, err := s.nextWelcome(ctx, now)
 	if err != nil || found {
 		return pending, found, err
 	}
-	return s.nextProgramme(ctx, now)
+	if pending, found, err = s.nextProgramme(ctx, now); err != nil || found {
+		return pending, found, err
+	}
+	return s.nextStorage(ctx, now)
+}
+
+func (s *Store) nextStorage(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
+	var pending notifications.Pending
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM storage_notification_outbox o WHERE NOT EXISTS(SELECT 1 "+storageEligibleSQL+")", now); err != nil {
+		return pending, false, err
+	}
+	err := s.db.QueryRowContext(ctx, `SELECT o.id,o.subscription_id,o.subscription_version,
+ s.endpoint,s.p256dh,s.auth,o.kind,s.locale,o.attempts,o.expires_at
+ FROM storage_notification_outbox o JOIN notification_subscriptions s ON s.id=o.subscription_id
+ WHERE o.next_attempt<=$1 AND EXISTS(SELECT 1 `+storageEligibleSQL+`)
+ ORDER BY o.next_attempt,o.id LIMIT 1`, now).Scan(
+		&pending.StorageOutboxID, &pending.SubscriptionID, &pending.SubscriptionVersion,
+		&pending.Endpoint, &pending.Keys.P256dh, &pending.Keys.Auth,
+		&pending.Kind, &pending.Locale, &pending.Attempts, &pending.ExpiresAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return pending, false, nil
+	}
+	return pending, err == nil, err
 }
 
 func (s *Store) nextProgramme(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
@@ -240,6 +319,10 @@ func (s *Store) Complete(ctx context.Context, pending notifications.Pending, res
 	switch {
 	case result.Delivery == notifications.RemoveSubscription:
 		_, err = s.db.ExecContext(ctx, "DELETE FROM notification_subscriptions WHERE id=$1 AND version=$2", pending.SubscriptionID, pending.SubscriptionVersion)
+	case pending.StorageOutboxID != 0 && result.Delivery == notifications.RetryDelivery:
+		_, err = s.db.ExecContext(ctx, "UPDATE storage_notification_outbox SET attempts=attempts+1,next_attempt=$2 WHERE id=$1", pending.StorageOutboxID, result.NextAttempt)
+	case pending.StorageOutboxID != 0:
+		_, err = s.db.ExecContext(ctx, "DELETE FROM storage_notification_outbox WHERE id=$1", pending.StorageOutboxID)
 	case pending.ProgrammeOutboxID != 0 && result.Delivery == notifications.RetryDelivery:
 		_, err = s.db.ExecContext(ctx, "UPDATE programme_notification_outbox SET attempts=attempts+1,next_attempt=$2 WHERE id=$1", pending.ProgrammeOutboxID, result.NextAttempt)
 	case pending.ProgrammeOutboxID != 0:

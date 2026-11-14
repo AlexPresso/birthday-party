@@ -57,6 +57,7 @@ func notificationSubscribed(t *testing.T, a *App, cookie *http.Cookie, endpoint 
 }
 
 func TestNotificationsKeysAndSubscriptionIdentity(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First notification guest")
@@ -101,6 +102,7 @@ func inputEndpoint(input notificationInput) map[string]string {
 }
 
 func TestNotificationsValidateAndBoundSubscriptions(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	input := testNotificationInput(t)
@@ -132,6 +134,7 @@ func TestNotificationsValidateAndBoundSubscriptions(t *testing.T) {
 }
 
 func TestNotificationsRespectSelectedWelcomeWidget(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Notification participant")
@@ -188,6 +191,7 @@ func queuedTestNotification(t *testing.T, a *App) (*http.Cookie, *http.Cookie, w
 }
 
 func TestNotificationsCoalesceEncryptAndPreserveNewerUpdates(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _, state, _ := queuedTestNotification(t, a)
 	state = changeWelcome(t, a, host, state.Revision, "next")
@@ -225,6 +229,7 @@ func TestNotificationsCoalesceEncryptAndPreserveNewerUpdates(t *testing.T) {
 }
 
 func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"retry limit", "expired endpoint", "logout", "expired session", "inactive guest", "completed welcome", "restarted welcome", "expired message", "redirect", "rejected request"} {
 		t.Run(scenario, func(t *testing.T) {
 			a := testApp(t)
@@ -299,6 +304,7 @@ func TestNotificationsRetryExpireAndRespectRevocation(t *testing.T) {
 }
 
 func TestNotificationWorkerStopsOnClose(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	queuedTestNotification(t, a)
 	started := make(chan struct{})
@@ -328,6 +334,7 @@ func TestNotificationWorkerStopsOnClose(t *testing.T) {
 }
 
 func TestNotificationsIncludeAdministratorsWhoOptIn(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	status(t, request(t, a, "PUT", "/api/notifications/subscription", testNotificationInput(t), host), 200)
@@ -347,6 +354,7 @@ func TestNotificationsIncludeAdministratorsWhoOptIn(t *testing.T) {
 }
 
 func TestNotificationDeliveryKeepsReboundSubscription(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, visitor, _, input := queuedTestNotification(t, a)
 	a.notificationSender.Client = notificationHTTPFunc(func(*http.Request) (*http.Response, error) {
@@ -365,6 +373,7 @@ func TestNotificationDeliveryKeepsReboundSubscription(t *testing.T) {
 }
 
 func TestNotificationSubscriptionRechecksWidgetAfterReadingBody(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Changing widget guest")

@@ -23,17 +23,30 @@ func New(db *sql.DB, now func() time.Time, announce func(context.Context, *sql.T
 	return &Store{db: db, now: now, announce: announce}
 }
 
-func (s *Store) List(ctx context.Context, limit int, guestID int64, admin bool, now time.Time) ([]programme.Event, error) {
+func (s *Store) List(ctx context.Context, limit int, guestID int64, admin bool, now time.Time, preview int) ([]programme.Event, error) {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	items, err := readEvents(ctx, tx, 0, limit, guestID, admin, now)
+	items, err := readEvents(ctx, tx, 0, limit, guestID, admin, now, preview)
 	if err != nil {
 		return nil, err
 	}
 	return items, tx.Commit()
+}
+
+func (s *Store) Event(ctx context.Context, id, guestID int64, admin bool, now time.Time) (programme.Event, error) {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return programme.Event{}, err
+	}
+	defer tx.Rollback()
+	event, err := readEvent(ctx, tx, id, guestID, admin, now)
+	if err != nil {
+		return programme.Event{}, err
+	}
+	return event, tx.Commit()
 }
 
 // Create commits the event, its settings and options together.

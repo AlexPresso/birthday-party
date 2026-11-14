@@ -57,6 +57,15 @@ func completeTestUpload(t *testing.T, a *App, cookie *http.Cookie, response *htt
 
 func queuedUpload(t *testing.T, a *App, cookie *http.Cookie, id string, data []byte) *httptest.ResponseRecorder {
 	t.Helper()
+	r, _ := uploadRequest(t, cookie, id, data)
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, r)
+	return w
+}
+
+// uploadRequest also returns the body, to tell whether the server read it.
+func uploadRequest(t *testing.T, cookie *http.Cookie, id string, data []byte) (*http.Request, *bytes.Buffer) {
+	t.Helper()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	part, err := writer.CreateFormFile("file", "holiday.png")
@@ -76,9 +85,7 @@ func queuedUpload(t *testing.T, a *App, cookie *http.Cookie, id string, data []b
 	if cookie != nil {
 		r.AddCookie(cookie)
 	}
-	w := httptest.NewRecorder()
-	a.Handler().ServeHTTP(w, r)
-	return w
+	return r, &body
 }
 
 func parseJob(t *testing.T, response *httptest.ResponseRecorder) UploadJob {
@@ -110,6 +117,7 @@ func waitForUpload(t *testing.T, a *App, cookie *http.Cookie, id int64, want med
 }
 
 func TestUploadQueueIsDurablePrivateAndIdempotent(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	one, _, _ := guest(t, a, host, "One")
@@ -163,6 +171,7 @@ func TestUploadQueueIsDurablePrivateAndIdempotent(t *testing.T) {
 }
 
 func TestUploadWorkersAcceptConcurrentUploadsAndSerializeQuota(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	data := pngBytes(t)
@@ -190,19 +199,18 @@ func TestUploadWorkersAcceptConcurrentUploadsAndSerializeQuota(t *testing.T) {
 }
 
 func TestUploadQueueQuotaRevocationFailureAndCleanup(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	data := pngBytes(t)
 	response := queuedUpload(t, a, host, "", data)
 	status(t, response, 202)
 	job := parseJob(t, response)
-	if _, err := a.db.Exec("UPDATE upload_jobs SET byte_size=$1", maxQueuedBytes); err != nil {
-		t.Fatal(err)
-	}
+	diskWithRoom(a, 1<<40, defaultKeepFree(1<<40))
 	status(t, queuedUpload(t, a, host, "", data), 409)
 	files, err := os.ReadDir(filepath.Join(a.config.DataDir, "uploads"))
 	if err != nil || len(files) != 1 {
-		t.Fatalf("queue quota leaked raw inputs: %v %v", files, err)
+		t.Fatalf("a refused upload leaked raw inputs: %v %v", files, err)
 	}
 	if _, err = a.db.Exec("UPDATE guests SET active=FALSE WHERE id=$1", identity.ID); err != nil {
 		t.Fatal(err)
@@ -230,6 +238,7 @@ func TestUploadQueueQuotaRevocationFailureAndCleanup(t *testing.T) {
 }
 
 func TestOnlyOneServingProcessCanOwnMediaWorkers(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	if err := a.StartWorkers(context.Background()); err != nil {
 		t.Fatal(err)
@@ -251,6 +260,7 @@ func TestOnlyOneServingProcessCanOwnMediaWorkers(t *testing.T) {
 }
 
 func TestCancelledMediaProcessingKeepsInputForRetry(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	response := queuedUpload(t, a, host, "", pngBytes(t))
@@ -282,6 +292,7 @@ func TestCancelledMediaProcessingKeepsInputForRetry(t *testing.T) {
 }
 
 func TestUploadCommitFailureCanRecoverWithoutLosingInput(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	response := queuedUpload(t, a, host, "", pngBytes(t))
@@ -321,6 +332,7 @@ CREATE CONSTRAINT TRIGGER reject_photo_commit AFTER INSERT ON photos DEFERRABLE 
 }
 
 func TestUploadIDsAndConcurrentRetries(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	data := pngBytes(t)
@@ -357,6 +369,7 @@ func TestUploadIDsAndConcurrentRetries(t *testing.T) {
 }
 
 func TestUploadHistoryRemainsBoundedWithoutHidingActiveJobs(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	_, err := a.db.Exec(`INSERT INTO upload_jobs(guest_id,client_upload_id,status,filename,kind,input_format,storage_key,byte_size,created_at,updated_at,available_at)
@@ -386,6 +399,7 @@ SELECT $1,'11111111-1111-4111-8111-'||lpad(n::text,12,'0'),CASE WHEN n<=100 THEN
 }
 
 func TestMediaWorkerLockLossIsReportedForRestart(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	if err := a.StartWorkers(context.Background()); err != nil {
 		t.Fatal(err)
@@ -408,6 +422,7 @@ func TestMediaWorkerLockLossIsReportedForRestart(t *testing.T) {
 }
 
 func TestSupersededWorkerCannotPublishOrFailAnotherAttempt(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	response := queuedUpload(t, a, host, "", pngBytes(t))
@@ -448,6 +463,7 @@ func TestSupersededWorkerCannotPublishOrFailAnotherAttempt(t *testing.T) {
 }
 
 func TestStartupRecoveryWaitsForAnUploadCommit(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	tx, err := a.db.BeginTx(context.Background(), nil)
@@ -492,4 +508,25 @@ VALUES($1,'11111111-1111-4111-8111-111111111111','queued','photo.png','image','p
 	}
 	job := waitForUpload(t, a, host, id, "ready")
 	status(t, request(t, a, "GET", job.Photo.URL, nil, host), 200)
+}
+
+func TestFullGalleryRefusesUploadsBeforeReceivingThem(t *testing.T) {
+	t.Parallel()
+	a := testApp(t)
+	host, identity := admin(t, a)
+	// One file short of the 5,000-file gallery, then one upload waiting to be
+	// processed: the pending file already takes the last place.
+	if _, err := a.db.Exec(`INSERT INTO photos(guest_id,filename,thumbnail,mime,width,height,byte_size,created_at)
+ SELECT $1,'seed-'||n||'.png','seed-'||n||'.thumb.jpg','image/png',1,1,1,now() FROM generate_series(1,4999) n`, identity.ID); err != nil {
+		t.Fatal(err)
+	}
+	status(t, queuedUpload(t, a, host, "", pngBytes(t)), 202)
+	r, body := uploadRequest(t, host, "", pngBytes(t))
+	unread := body.Len()
+	refused := httptest.NewRecorder()
+	a.Handler().ServeHTTP(refused, r)
+	status(t, refused, 409)
+	if !strings.Contains(refused.Body.String(), `"album_full"`) || body.Len() != unread {
+		t.Fatalf("full gallery answered %s after reading %d bytes", refused.Body.String(), unread-body.Len())
+	}
 }

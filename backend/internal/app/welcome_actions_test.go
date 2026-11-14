@@ -10,6 +10,7 @@ import (
 )
 
 func TestWelcomeProfileActionRevealsOnlyCurrentStepAndPersists(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Welcome action guest")
@@ -71,6 +72,7 @@ func TestWelcomeProfileActionRevealsOnlyCurrentStepAndPersists(t *testing.T) {
 }
 
 func TestWelcomeProfileActionAllowsOnlyOwnProfile(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, identity, _ := guest(t, a, host, "Profile step guest")
@@ -148,6 +150,7 @@ func TestWelcomeProfileActionAllowsOnlyOwnProfile(t *testing.T) {
 }
 
 func TestWelcomeProfileActionAdvanceDuringReceptionRejectsLateSave(t *testing.T) {
+	t.Parallel()
 	for _, ending := range []string{"unlock", "next", "revoke", "logout"} {
 		t.Run(ending, func(t *testing.T) {
 			a := testApp(t)

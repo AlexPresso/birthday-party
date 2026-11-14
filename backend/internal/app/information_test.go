@@ -22,6 +22,7 @@ func readInformation[T any](t *testing.T, response *httptest.ResponseRecorder) T
 }
 
 func TestInformationPageIsHostWrittenAndHiddenUntilEnabled(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Information reader")

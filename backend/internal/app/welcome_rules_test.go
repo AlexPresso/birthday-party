@@ -20,6 +20,7 @@ func setWelcomeRules(t *testing.T, a *App, visitor *http.Cookie, accepted bool) 
 }
 
 func TestWelcomeRulesHoldGuestsUntilAccepted(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, firstIdentity, _ := guest(t, a, host, "Rules reader")

@@ -347,6 +347,22 @@ func (event Event) VoteView(guestID int64) Event {
 	return event
 }
 
+// PreviewView is VoteView for a vote cut to its leading options, without the
+// viewer's choice. eligible stands for all the options: one that is active and
+// not the viewer's own when the vote has such an option, otherwise any active
+// one, or nil when none is active.
+func (event Event) PreviewView(guestID int64, eligible *VoteOption) Event {
+	if event.Vote == nil {
+		return event
+	}
+	vote := *event.Vote
+	event.Vote = &vote
+	vote.MyOptionID = nil
+	vote.CanVote = vote.Status == VoteOpen &&
+		(vote.AllowWriteIns || (eligible != nil && vote.checkOption(*eligible, guestID) == nil))
+	return event
+}
+
 type Actor struct {
 	GuestID     int64
 	SessionHash string

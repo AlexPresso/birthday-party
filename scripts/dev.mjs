@@ -52,7 +52,9 @@ try {
     throw new Error("Install frontend dependencies with npm --prefix frontend ci.");
   });
   const env = localEnvironment();
-  const output = path.join(backend, ".cache", process.platform === "win32" ? "server.exe" : "server");
+  // Parallel browser test shards each build and run their own server binary.
+  const name = process.env.SERVER_BINARY_NAME || "server";
+  const output = path.join(backend, ".cache", process.platform === "win32" ? `${name}.exe` : name);
   await mkdir(path.dirname(output), { recursive: true });
   console.log("Building the Go server...");
   await run(findGo(), ["build", "-o", output, "./cmd/server"], { cwd: backend, env });

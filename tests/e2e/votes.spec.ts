@@ -105,11 +105,11 @@ function labels(page: Page) {
   return page.locator(".vote-option-label").allTextContents();
 }
 
-/** Resolves once the page has read the programme again. */
+/** Resolves once the vote page has read its event again. */
 function programmeRead(page: Page) {
   return page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === "/api/programme" &&
+      /^\/api\/programme\/\d+$/.test(new URL(response.url()).pathname) &&
       response.request().method() === "GET",
   );
 }

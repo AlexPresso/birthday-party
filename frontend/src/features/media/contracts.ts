@@ -109,3 +109,13 @@ export type UploadJob = z.infer<typeof uploadSchema>;
 export type PhotoPage = z.infer<typeof photosSchema>;
 
 export type UploadLimits = PhotoPage["limits"];
+
+export const storageSchema = z
+  .object({
+    totalBytes: z.number().int().positive(),
+    availableBytes: z.number().int().nonnegative(),
+    warning: z.boolean(),
+  })
+  .refine((storage) => storage.availableBytes <= storage.totalBytes);
+
+export type Storage = z.infer<typeof storageSchema>;

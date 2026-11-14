@@ -143,6 +143,7 @@ func runningWerewolf(t *testing.T, a *App, host *http.Cookie, names ...string) (
 }
 
 func TestWerewolfDealsSecretRolesAndRevealsThemAtTheEnd(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	hostCookie, hostGuest := admin(t, a)
 	host := werewolfViewer{name: "host", id: hostGuest.ID, cookie: hostCookie}
@@ -481,6 +482,7 @@ func TestWerewolfDealsSecretRolesAndRevealsThemAtTheEnd(t *testing.T) {
 }
 
 func TestWerewolfGhostMessagesReachOnlyTheMayorAndTheGameMaster(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	hostCookie, hostGuest := admin(t, a)
 	host := werewolfViewer{name: "host", id: hostGuest.ID, cookie: hostCookie}
@@ -658,6 +660,7 @@ func TestWerewolfGhostMessagesReachOnlyTheMayorAndTheGameMaster(t *testing.T) {
 }
 
 func TestWerewolfRequiresAnUnlockedEventAndFullAccess(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	hostCookie, hostGuest := admin(t, a)
 	host := werewolfViewer{name: "host", id: hostGuest.ID, cookie: hostCookie}
@@ -746,6 +749,7 @@ func TestWerewolfRequiresAnUnlockedEventAndFullAccess(t *testing.T) {
 }
 
 func TestWerewolfGameMasterIsChosenByTheHost(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	hostCookie, hostGuest := admin(t, a)
 	host := werewolfViewer{name: "host", id: hostGuest.ID, cookie: hostCookie}
@@ -842,6 +846,7 @@ func TestWerewolfGameMasterIsChosenByTheHost(t *testing.T) {
 }
 
 func TestConcurrentWerewolfStartsDealOnce(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	hostCookie, _ := admin(t, a)
 	master := werewolfGuest(t, a, hostCookie, "Morgan")
@@ -881,6 +886,7 @@ func TestConcurrentWerewolfStartsDealOnce(t *testing.T) {
 }
 
 func TestWerewolfEventIsAnnouncedAndInvalidatesTheProgramme(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	base := a.now()
 	now := base

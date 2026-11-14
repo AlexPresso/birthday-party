@@ -21,6 +21,7 @@ func decodeEntry(t *testing.T, response *httptest.ResponseRecorder) guestbook.En
 }
 
 func TestAnonymousGuestbookRedactsIdentityForEveryViewer(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	owner, identity, _ := guest(t, a, host, "Anonymous author")
@@ -95,6 +96,7 @@ func assertAnonymousEntry(t *testing.T, raw []byte, ownerName string) {
 }
 
 func TestGuestbookDeletionUsesPrivateOwnerForAnonymousEntries(t *testing.T) {
+	t.Parallel()
 	for _, anonymous := range []bool{false, true} {
 		t.Run(strconv.FormatBool(anonymous), func(t *testing.T) {
 			a := testApp(t)
@@ -116,6 +118,7 @@ func TestGuestbookDeletionUsesPrivateOwnerForAnonymousEntries(t *testing.T) {
 }
 
 func TestGuestbookKeepsNamedPostingAsDefault(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	owner, identity, _ := guest(t, a, host, "Named author")

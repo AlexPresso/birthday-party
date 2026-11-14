@@ -64,6 +64,7 @@ func assertMediaFiles(t *testing.T, a *App, count int) {
 }
 
 func TestVideoUploadPreservesContainersAndProtectsPlayback(t *testing.T) {
+	t.Parallel()
 	for _, format := range []string{"mp4", "mov", "webm"} {
 		t.Run(format, func(t *testing.T) {
 			data := videoFixture(t, format)
@@ -161,6 +162,7 @@ func TestVideoUploadPreservesContainersAndProtectsPlayback(t *testing.T) {
 }
 
 func TestVideoUploadPreservesResolutionAndFrameRate(t *testing.T) {
+	t.Parallel()
 	original := videoFixtureStream(t, "mp4", "0.6", "1600x900", "60")
 	a := testApp(t)
 	host, _ := admin(t, a)
@@ -182,6 +184,7 @@ func TestVideoUploadPreservesResolutionAndFrameRate(t *testing.T) {
 }
 
 func TestVideoValidationAndCleanup(t *testing.T) {
+	t.Parallel()
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	host, _ := admin(t, a)
@@ -191,18 +194,17 @@ func TestVideoValidationAndCleanup(t *testing.T) {
 	}
 	imageResponse := upload(t, a, host, pngBytes(t))
 	status(t, imageResponse, 201)
-	if _, err := a.db.Exec("UPDATE photos SET byte_size=$1", maxStoredPhotoBytes); err != nil {
-		t.Fatal(err)
-	}
+	diskWithRoom(a, 1<<40, defaultKeepFree(1<<40))
 	response := upload(t, a, host, data)
 	status(t, response, 409)
-	if !strings.Contains(response.Body.String(), `"code":"album_full"`) {
+	if !strings.Contains(response.Body.String(), `"code":"storage_full"`) {
 		t.Fatal(response.Body.String())
 	}
 	assertMediaFiles(t, a, 2)
 }
 
 func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
+	t.Parallel()
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	host, identity := admin(t, a)
@@ -235,6 +237,7 @@ func TestVideoUploadRechecksRevokedIdentityBeforeCommit(t *testing.T) {
 }
 
 func TestVideoDurationBoundary(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	status(t, upload(t, a, host, videoFixtureDuration(t, "mp4", "300")), 201)
@@ -251,6 +254,7 @@ type zeroReader struct{}
 func (zeroReader) Read(p []byte) (int, error) { clear(p); return len(p), nil }
 
 func TestVideoSizeLimitStreamsAndRemovesTemporaryFile(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	var envelope bytes.Buffer

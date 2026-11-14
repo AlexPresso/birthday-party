@@ -94,12 +94,7 @@ func (s *Store) Accept(ctx context.Context, guestID int64, clientID, key string,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return job, false, err
 	}
-	var total, owned int
-	var queuedBytes int64
-	if err = tx.QueryRowContext(ctx, "SELECT COUNT(*),COUNT(*) FILTER (WHERE guest_id=$1),COALESCE(SUM(byte_size),0) FROM upload_jobs WHERE status IN ('queued','processing')", guestID).Scan(&total, &owned, &queuedBytes); err != nil {
-		return job, false, err
-	}
-	if err := media.ValidateQueueCapacity(total, owned, queuedBytes, upload.Size); err != nil {
+	if err = checkCapacity(ctx, tx, guestID); err != nil {
 		return job, false, err
 	}
 	if err := stage(); err != nil {
@@ -121,6 +116,23 @@ func (s *Store) Accept(ctx context.Context, guestID int64, clientID, key string,
 		return job, true, err
 	}
 	return job, true, nil
+}
+
+// checkCapacity refuses an upload the queue or the gallery cannot take.
+// Queued and processing jobs count as future gallery files, so a full gallery
+// answers before a guest sends the bytes rather than after processing them.
+// Disk space is checked by the caller of Accept against the real disk.
+func checkCapacity(ctx context.Context, tx *sql.Tx, guestID int64) error {
+	var total, owned, published int
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*),COUNT(*) FILTER (WHERE guest_id=$1),(SELECT COUNT(*) FROM photos)
+ FROM upload_jobs WHERE status IN ('queued','processing')`, guestID).Scan(&total, &owned, &published)
+	if err != nil {
+		return err
+	}
+	if err = media.ValidateQueueCapacity(total, owned); err != nil {
+		return err
+	}
+	return media.ValidateAlbumCapacity(published + total)
 }
 
 func (s *Store) Claim(ctx context.Context, attempt string) (media.Pending, error) {

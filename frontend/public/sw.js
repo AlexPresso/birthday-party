@@ -6,6 +6,10 @@ const messages = {
     surprise: "Surprise",
     programme_start: "It’s starting.",
     programme_unlock: "It’s revealed.",
+    storage: "Storage",
+    storage_warning: "The server’s disk is more than 80% full.",
+    storage_full:
+      "The server’s disk is full: new photos and videos are refused.",
   },
   fr: {
     title: "La fête",
@@ -14,6 +18,10 @@ const messages = {
     surprise: "Surprise",
     programme_start: "Ça commence.",
     programme_unlock: "C’est dévoilé.",
+    storage: "Stockage",
+    storage_warning: "Le disque du serveur est plein à plus de 80 %.",
+    storage_full:
+      "Le disque du serveur est plein : les nouvelles photos et vidéos sont refusées.",
   },
   de: {
     title: "Geburtstagsfeier",
@@ -23,6 +31,10 @@ const messages = {
     surprise: "Überraschung",
     programme_start: "Es geht los.",
     programme_unlock: "Nicht mehr geheim.",
+    storage: "Speicher",
+    storage_warning: "Der Speicher des Servers ist zu über 80 % voll.",
+    storage_full:
+      "Der Speicher des Servers ist voll: Neue Fotos und Videos werden abgelehnt.",
   },
   it: {
     title: "La festa",
@@ -31,6 +43,10 @@ const messages = {
     surprise: "Sorpresa",
     programme_start: "Si comincia.",
     programme_unlock: "È svelato.",
+    storage: "Spazio",
+    storage_warning: "Il disco del server è pieno oltre l’80%.",
+    storage_full:
+      "Il disco del server è pieno: le nuove foto e i video vengono rifiutati.",
   },
   es: {
     title: "La fiesta",
@@ -39,6 +55,10 @@ const messages = {
     surprise: "Sorpresa",
     programme_start: "Ya empieza.",
     programme_unlock: "Ya se ha revelado.",
+    storage: "Almacenamiento",
+    storage_warning: "El disco del servidor está lleno por encima del 80 %.",
+    storage_full:
+      "El disco del servidor está lleno: se rechazan las nuevas fotos y vídeos.",
   },
 };
 
@@ -47,6 +67,9 @@ const messages = {
 const maxPayloadLength = 2048;
 const welcomeTypes = ["welcome_step", "welcome_open"];
 const programmeTypes = ["programme_start", "programme_unlock"];
+// Storage alerts reach the host only; a click opens the storage settings.
+const storageTypes = ["storage_warning", "storage_full"];
+const storageTag = "birthday-storage";
 // The tag of a programme notification also tells a click where to go.
 const programmeTag = "birthday-programme-";
 
@@ -86,6 +109,9 @@ self.addEventListener("push", (event) => {
   if (welcomeTypes.includes(payload.type) && fields === 2) {
     title = copy.title;
     tag = "birthday-welcome";
+  } else if (storageTypes.includes(payload.type) && fields === 2) {
+    title = copy.storage;
+    tag = storageTag;
   } else if (
     programmeTypes.includes(payload.type) &&
     fields === 4 &&
@@ -115,8 +141,13 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   // Only the tag this worker wrote chooses the page, never a URL in the data.
-  const programme = event.notification.tag.startsWith(programmeTag);
-  event.waitUntil(openPage(programme ? "/programme" : "/attente"));
+  const tag = event.notification.tag;
+  const page = tag.startsWith(programmeTag)
+    ? "/programme"
+    : tag === storageTag
+      ? "/parametres?section=storage"
+      : "/attente";
+  event.waitUntil(openPage(page));
 });
 
 async function openPage(path) {
@@ -129,7 +160,9 @@ async function openPage(path) {
     const current = new URL(client.url);
     if (current.origin !== self.location.origin) continue;
     try {
-      if (current.pathname === path) return await client.focus();
+      if (current.pathname + current.search === path) {
+        return await client.focus();
+      }
       const navigated = await client.navigate(target);
       if (navigated) return await navigated.focus();
     } catch {

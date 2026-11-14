@@ -26,6 +26,7 @@ import (
 	pgprofile "birthday-party/backend/internal/adapters/postgres/profile"
 	pgprogramme "birthday-party/backend/internal/adapters/postgres/programme"
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
+	"birthday-party/backend/internal/adapters/preview"
 	"birthday-party/backend/internal/adapters/pushtransport"
 	push "birthday-party/backend/internal/adapters/webpush"
 	"birthday-party/backend/internal/guestbook"
@@ -60,8 +61,7 @@ type App struct {
 	mediaFiles          *mediafiles.Files
 	config              Config
 	now                 func() time.Time
-	receivers           chan struct{}
-	avatarProcessors    chan struct{}
+	receivers           *receptionSlots
 	workerMu            sync.Mutex
 	workerCancel        context.CancelFunc
 	workerConn          *sql.Conn
@@ -71,13 +71,15 @@ type App struct {
 	closeErr            error
 	authMu              sync.Mutex
 	authWindow          time.Time
-	authCount           int
+	authFailures        int
 	notificationKeys    notifications.SigningKeys
 	notificationSender  *push.Sender
 	realtime            *realtimeHub
 	programmeReschedule chan struct{}
 	mediaWake           wakeSignal
 	notificationWake    wakeSignal
+	// diskSpace reads the media disk; tests replace it to simulate a full one.
+	diskSpace func() (media.Storage, error)
 }
 
 // Open prepares private storage, opens PostgreSQL and applies pending migrations.
@@ -110,7 +112,7 @@ func Open(config Config) (*App, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	db, err := openDatabase(ctx, config.DatabaseURL)
+	db, err := openDatabase(ctx, config.DatabaseURL, config.databaseConnections)
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +123,7 @@ func Open(config Config) (*App, error) {
 		access:              access.New(pgaccess.New(db)),
 		config:              config,
 		now:                 time.Now,
-		receivers:           make(chan struct{}, 4),
-		avatarProcessors:    make(chan struct{}, 1),
+		receivers:           newReceptionSlots(),
 		workerErrors:        make(chan error, 1),
 		realtime:            newRealtimeHub(),
 		programmeReschedule: make(chan struct{}, 1),
@@ -151,9 +152,11 @@ func Open(config Config) (*App, error) {
 	a.programme = programme.New(programmeStore)
 	a.questions = programme.NewQuestions(programmeStore)
 	a.werewolf = programme.NewWerewolf(programmeStore)
-	a.profile = profile.New(pgprofile.New(db, clock), avatar.New())
+	decodeBudget := preview.NewDecodeBudget(decodeMemory)
+	a.profile = profile.New(pgprofile.New(db, clock), avatar.New(decodeBudget))
 	a.mediaStore = pgmedia.New(db, clock)
-	a.mediaFiles = mediafiles.New(config.DataDir)
+	a.mediaFiles = mediafiles.New(config.DataDir, decodeBudget)
+	a.diskSpace = a.mediaFiles.Space
 	a.media = media.New(a.mediaStore, a.mediaFiles, clock, func(id int64) { a.realtime.notify(id, realtimeUploads) }, log.Printf)
 	keys, err := notificationStore.LoadKeys(ctx, push.GenerateKeys)
 	if err != nil {
