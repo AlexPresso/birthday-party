@@ -1,4 +1,9 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { mutationHeaders } from "./party";
 
 export type Person = { id: number; name: string; avatarUrl: string | null };
@@ -134,6 +139,41 @@ export function sendToGame(
 /** Has `client` join the lobby; the caller checks the response. */
 export function joinGame(client: APIRequestContext, eventID: number) {
   return sendToGame(client, eventID, "POST", "/players", {});
+}
+
+/** The page's background and the fill of one control, as painted now. */
+export async function paint(page: Page, control: Locator) {
+  return {
+    background: await page.evaluate(
+      () => getComputedStyle(document.body).backgroundColor,
+    ),
+    fill: await control.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+  };
+}
+
+/** The normal theme's background and accent fill (tokens.css). */
+export const dayPaint = {
+  background: "rgb(16, 15, 14)",
+  fill: "rgb(255, 106, 31)",
+};
+
+/** The same by night, in a running werewolf game. */
+export const nightPaint = {
+  background: "rgb(14, 18, 32)",
+  fill: "rgb(201, 212, 236)",
+};
+
+/** The longest transition of the document root, in seconds. */
+export function rootTransition(page: Page) {
+  return page.evaluate(() =>
+    Math.max(
+      ...getComputedStyle(document.documentElement)
+        .transitionDuration.split(",")
+        .map((duration) => parseFloat(duration)),
+    ),
+  );
 }
 
 /**

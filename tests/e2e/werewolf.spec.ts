@@ -24,10 +24,14 @@ import {
 } from "./support/settings";
 import {
   createWerewolf,
+  dayPaint,
   gameFrom,
   givePortrait,
   joinGame,
+  nightPaint,
+  paint,
   roleName,
+  rootTransition,
   sendToGame,
   setGameMaster,
   type Werewolf,
@@ -604,11 +608,11 @@ test("the host picks a game master, guests join, and only the game master sets t
   expect((await tooLate.json()).code).toBe("activity_conflict");
 });
 
-test("each player sees their own role only, hidden until asked for, while the game master names a mayor and marks the dead", async ({
+test("a player sees day or night, their role on request, their own state and the dead, while the game master runs the board", async ({
   page,
   browser,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const { event, master, players, dealt, roleOf } = await runningGame(
     "Veillée du samedi",
     [
@@ -619,6 +623,7 @@ test("each player sees their own role only, hidden until asked for, while the ga
     ],
   );
   const [lou, noe, zoe, tom] = players;
+  const onlooker = await participant("Eva — regarde sans jouer");
   const dealtRoles = dealt.players.map((player) => roleName(player.role!));
   expect([...dealtRoles].sort()).toEqual([
     "Loup-garou",
@@ -630,16 +635,16 @@ test("each player sees their own role only, hidden until asked for, while the ga
   await shareSession(page.context(), lou.client);
   const second = await pageFor(browser, noe.client);
 
-  // The response of a player carries their role and nobody else's.
+  // A player's response carries their own seat and role, and nobody else.
   for (const player of [lou, noe]) {
     const view = await gameFrom(player.client, event.id);
     expect(view.roles).toBeNull();
     expect(view.messages).toBeNull();
     expect(view.isGameMaster).toBe(false);
     expect(roleName(view.myRole!)).toBe(roleOf(player.guest));
-    for (const other of view.players)
-      if (other.id !== player.guest.id) expect(other.role).toBeNull();
+    expect(view.players.map((seat) => seat.id)).toEqual([player.guest.id]);
   }
+  expect((await gameFrom(onlooker.client, event.id)).players).toEqual([]);
 
   for (const [viewer, own] of [
     [page, lou],
@@ -653,11 +658,17 @@ test("each player sees their own role only, hidden until asked for, while the ga
     // Hidden by default: no role is written anywhere on the page.
     await expect(reveal).toHaveAttribute("aria-expanded", "false");
     await expect(viewer.locator(".werewolf-role-name")).toHaveCount(0);
-    await expect(list(viewer, "En vie").locator("li")).toHaveCount(4);
-    await expect(row(viewer, own.guest.name)).toContainText("Toi");
-    for (const role of dealtRoles)
-      expect(await pageText(viewer)).not.toContain(role);
-    if (viewer === page) await capture(page, "werewolf-role-hidden-mobile.png");
+    // Day or night, and nothing about the others while nobody died.
+    await expect(viewer.locator(".werewolf-phase")).toHaveText("Jour");
+    await expect(viewer.locator(".werewolf-player")).toHaveCount(0);
+    await expect(viewer.locator(".werewolf-master")).toHaveCount(0);
+    await expect(viewer.locator(".werewolf-self")).toHaveCount(0);
+    const text = await pageText(viewer);
+    for (const other of players)
+      if (other !== own) expect(text).not.toContain(other.guest.name);
+    for (const role of dealtRoles) expect(text).not.toContain(role);
+    await expectNoHorizontalOverflow(viewer);
+    if (viewer === page) await capture(page, "werewolf-player-day-mobile.png");
 
     // Shown on demand: the viewer's role, and still nobody else's.
     await reveal.click();
@@ -688,7 +699,19 @@ test("each player sees their own role only, hidden until asked for, while the ga
       viewer.getByRole("button", { name: "Terminer la partie", exact: true }),
     ).toHaveCount(0);
     await expect(viewer.locator(".werewolf-player-actions")).toHaveCount(0);
+    // The pointer leaves the button, so its colour is not the hovered one.
+    await viewer.mouse.move(0, 0);
   }
+
+  // A guest who did not join sees the same, without a role or a state.
+  const watcher = await pageFor(browser, onlooker.client);
+  await watcher.goto(gameURL);
+  await expect(watcher.locator(".werewolf-phase")).toHaveText("Jour");
+  await expect(
+    watcher.getByRole("button", { name: "Voir mon rôle", exact: true }),
+  ).toHaveCount(0);
+  await expect(watcher.locator(".werewolf-self")).toHaveCount(0);
+  await expect(watcher.locator(".werewolf-player")).toHaveCount(0);
 
   // The game master's board shows every role beside its player.
   const board = await pageFor(browser, master.client);
@@ -701,7 +724,7 @@ test("each player sees their own role only, hidden until asked for, while the ga
       roleOf(player.guest),
     );
 
-  // A mayor is named without a confirmation, and everybody sees the badge.
+  // A mayor is named without a confirmation; only the mayor reads it.
   await board
     .getByRole("button", {
       name: `Nommer ${lou.guest.name} maire`,
@@ -709,15 +732,22 @@ test("each player sees their own role only, hidden until asked for, while the ga
     })
     .click();
   await expect(row(board, lou.guest.name)).toContainText("Maire");
-  await expect(row(page, lou.guest.name)).toContainText("Maire");
-  await expect(row(second, lou.guest.name)).toContainText("Maire");
-  await expect(row(second, noe.guest.name)).not.toContainText("Maire");
+  const own = page.locator(".werewolf-self");
+  await expect(own).toHaveText("Tu es maire");
+  await expect(own).toHaveAttribute("data-state", "mayor");
+  await expect(own.locator("svg")).toBeVisible();
   await expect(
     board.getByRole("button", {
       name: `Retirer le titre de maire à ${lou.guest.name}`,
       exact: true,
     }),
   ).toBeVisible();
+  const othersView = await gameFrom(noe.client, event.id);
+  expect(othersView.players).toEqual([
+    expect.objectContaining({ id: noe.guest.id, alive: true, mayor: false }),
+  ]);
+  await expect(second.locator(".werewolf-self")).toHaveCount(0);
+  expect(await pageText(second)).not.toMatch(/maire/i);
 
   // A death is confirmed, because it shows the dead player's role to all.
   await board
@@ -732,22 +762,29 @@ test("each player sees their own role only, hidden until asked for, while the ga
   );
   await expect(list(board, "Morts").locator("li")).toHaveCount(1);
   await expect(list(board, "En vie").locator("li")).toHaveCount(3);
-  for (const viewer of [page, second]) {
+  for (const viewer of [page, second, watcher]) {
     const dead = list(viewer, "Morts").locator("li");
     await expect(dead).toHaveCount(1);
     await expect(dead).toContainText(zoe.guest.name);
     await expect(dead).toContainText(roleOf(zoe.guest));
     await expect(dead.locator(".werewolf-skull")).toBeVisible();
-    // The living keep their secret.
-    await expect(row(viewer, tom.guest.name)).not.toContainText(
-      roleOf(tom.guest),
-    );
+    // The living stay off the page.
+    await expect(viewer.locator(".werewolf-player")).toHaveCount(1);
+    await expect(list(viewer, "En vie")).toHaveCount(0);
+    expect(await pageText(viewer)).not.toContain(tom.guest.name);
   }
   expect(
     (await gameFrom(lou.client, event.id)).players.map((player) =>
       player.id === lou.guest.id ? "own" : player.role && roleName(player.role),
     ),
-  ).toEqual(["own", null, roleOf(zoe.guest), null]);
+  ).toEqual(["own", roleOf(zoe.guest)]);
+  expect(
+    (await gameFrom(onlooker.client, event.id)).players.map(
+      (player) => player.id,
+    ),
+  ).toEqual([zoe.guest.id]);
+  await expectNoHorizontalOverflow(watcher);
+  await capture(watcher, "werewolf-onlooker-mobile.png");
 
   // With secret deaths on, the dead keep their role until the end.
   const secret = board.getByRole("switch", {
@@ -778,7 +815,7 @@ test("each player sees their own role only, hidden until asked for, while the ga
   // The game master still reads every role.
   await expect(row(board, tom.guest.name)).toContainText(roleOf(tom.guest));
 
-  // A mistake is undone without a confirmation.
+  // A mistake is undone without a confirmation; the living leave the list.
   await board
     .getByRole("button", {
       name: `Ramener ${zoe.guest.name} en jeu`,
@@ -786,7 +823,7 @@ test("each player sees their own role only, hidden until asked for, while the ga
     })
     .click();
   await expect(list(page, "Morts").locator("li")).toHaveCount(1);
-  await expect(list(page, "En vie")).toContainText(zoe.guest.name);
+  await expect(row(page, zoe.guest.name)).toHaveCount(0);
   await secret.uncheck();
   await expect(row(page, tom.guest.name)).toContainText(roleOf(tom.guest));
   await expectNoHorizontalOverflow(board);
@@ -804,6 +841,81 @@ test("each player sees their own role only, hidden until asked for, while the ga
   await expectNoHorizontalOverflow(board);
   await capture(board, "werewolf-board-master-desktop.png");
   await board.setViewportSize(phone);
+
+  // Day and night exist without the ghosts: everybody follows the switch,
+  // and the whole app turns to its night colours.
+  await expect(
+    board.getByRole("switch", {
+      name: "Les morts écrivent au maire pendant la nuit",
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  const reveal = page.getByRole("button", {
+    name: "Voir mon rôle",
+    exact: true,
+  });
+  const toNight = board.getByRole("button", {
+    name: "Faire tomber la nuit",
+    exact: true,
+  });
+  const toDay = board.getByRole("button", {
+    name: "Lever le jour",
+    exact: true,
+  });
+  await expect(page.locator("html")).toHaveAttribute("data-phase", "day");
+  expect(await paint(page, reveal)).toEqual(dayPaint);
+  expect(await rootTransition(page)).toBe(1.6);
+  await toNight.click();
+  await board.mouse.move(0, 0);
+  for (const viewer of [page, second, watcher, board]) {
+    await expect(viewer.locator(".werewolf-phase")).toHaveText("Nuit");
+    await expect(viewer.locator("html")).toHaveAttribute("data-phase", "night");
+  }
+  // One frame of the crossfade, for review.
+  await page.waitForTimeout(800);
+  await page.screenshot({
+    path: test.info().outputPath("werewolf-player-dusk-mobile.png"),
+    style: "nextjs-portal { visibility: hidden; }",
+  });
+  await expect.poll(() => paint(page, reveal)).toEqual(nightPaint);
+  await expect.poll(() => paint(board, toDay)).toEqual(nightPaint);
+  await capture(page, "werewolf-player-night-mobile.png");
+  await capture(board, "werewolf-board-night-mobile.png");
+  await board.setViewportSize({ width: 1280, height: 900 });
+  await expectNoHorizontalOverflow(board);
+  await capture(board, "werewolf-board-night-desktop.png");
+  await board.setViewportSize(phone);
+
+  // Night belongs to the game's page: leaving it restores the theme at once.
+  await watcher.locator(".activity-back").click();
+  await expect(watcher).toHaveURL("/programme");
+  await expect(watcher.locator("html")).not.toHaveAttribute("data-phase");
+  await expect
+    .poll(
+      () =>
+        watcher.evaluate(() => getComputedStyle(document.body).backgroundColor),
+      { timeout: 400 },
+    )
+    .toBe(dayPaint.background);
+
+  // Under reduced motion the colours switch at once.
+  await second.emulateMedia({ reducedMotion: "reduce" });
+  const secondReveal = second.getByRole("button", {
+    name: "Voir mon rôle",
+    exact: true,
+  });
+  expect(await rootTransition(second)).toBeLessThan(0.001);
+  expect(await paint(second, secondReveal)).toEqual(nightPaint);
+  await toDay.click();
+  await expect(second.locator("html")).toHaveAttribute("data-phase", "day");
+  await expect
+    .poll(() => paint(second, secondReveal), { timeout: 400 })
+    .toEqual(dayPaint);
+  // By day, everything is back to the normal theme.
+  await expect(page.locator(".werewolf-phase")).toHaveText("Jour");
+  await expect.poll(() => paint(page, reveal)).toEqual(dayPaint);
+  // Without the variant, nothing was written or delivered.
+  expect((await gameFrom(master.client, event.id)).messages).toEqual([]);
 
   // Only the game master commands the board.
   const refused = await sendToGame(lou.client, event.id, "PUT", "/mayor", {
@@ -844,12 +956,19 @@ test("a ghost's message reaches the mayor alone, the end reveals every role and 
       (await sendToGame(master.client, event.id, "PUT", path, data)).status(),
     ).toBe(200);
   await expect(list(page, "Morts")).toContainText(noe.guest.name);
+  // The mayor and the ghost each read their own state.
+  await expect(page.locator(".werewolf-self")).toHaveText("Tu es maire");
+  const ghostState = ghost.locator(".werewolf-self");
+  await expect(ghostState).toHaveText("Tu fais partie des morts");
+  await expect(ghostState).toHaveAttribute("data-state", "dead");
 
-  // Without the variant there is no day or night, and no control for them.
-  await expect(page.locator(".werewolf-phase")).toHaveCount(0);
+  // Without the variant, day and night are there already; the dead write
+  // nothing.
+  for (const viewer of [page, ghost, board])
+    await expect(viewer.locator(".werewolf-phase")).toHaveText("Jour");
   await expect(
     board.getByRole("button", { name: "Faire tomber la nuit", exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await board
     .getByRole("switch", {
       name: "Les morts écrivent au maire pendant la nuit",
@@ -870,10 +989,7 @@ test("a ghost's message reaches the mayor alone, the end reveals every role and 
     .click();
   for (const viewer of [page, ghost, board]) {
     await expect(viewer.locator(".werewolf-phase")).toHaveText("Nuit");
-    await expect(viewer.locator(".werewolf-page")).toHaveAttribute(
-      "data-phase",
-      "night",
-    );
+    await expect(viewer.locator("html")).toHaveAttribute("data-phase", "night");
   }
   await expect(field).toBeVisible();
   await expect(page.getByRole("textbox")).toHaveCount(0);
@@ -896,6 +1012,7 @@ test("a ghost's message reaches the mayor alone, the end reveals every role and 
   const first = "Regarde du côté de la fenêtre.";
   await field.fill(first);
   await expectNoHorizontalOverflow(ghost);
+  await expectClearOfDock(ghost, list(ghost, "Morts"));
   await capture(ghost, "werewolf-ghost-form-mobile.png");
   await send.click();
 
@@ -943,6 +1060,8 @@ test("a ghost's message reaches the mayor alone, the end reveals every role and 
   await expect(delivered).toContainText(noe.guest.name);
   await expect(delivered).not.toContainText(roleOf(noe.guest));
   await expect(page.locator(".werewolf-phase")).toHaveText("Jour");
+  await expect(page.locator(".werewolf-self")).toHaveText("Tu es maire");
+  await expect(page.locator("html")).toHaveAttribute("data-phase", "day");
   await expectNoHorizontalOverflow(page);
   await capture(page, "werewolf-mayor-message-mobile.png");
 
@@ -977,6 +1096,7 @@ test("a ghost's message reaches the mayor alone, the end reveals every role and 
         roleOf(player.guest),
       );
     await expect(viewer.locator(".werewolf-phase")).toHaveCount(0);
+    await expect(viewer.locator(".werewolf-self")).toHaveCount(0);
     await expect(
       viewer.getByRole("button", { name: "Nouvelle partie", exact: true }),
     ).toHaveCount(0);

@@ -270,25 +270,23 @@ export function MasterBoard({ game, guestId, busy, command }: MasterProps) {
 
   return (
     <div className="werewolf-layout">
-      {game.ghostMessages && (
-        <div className="werewolf-phase-control">
-          <button
-            type="button"
-            className="button primary"
-            disabled={busy}
-            onClick={() =>
-              void command("/phase", "PUT", { phase: night ? "day" : "night" })
-            }
-          >
-            {night ? (
-              <Sun size={18} aria-hidden="true" />
-            ) : (
-              <Moon size={18} aria-hidden="true" />
-            )}
-            {t(night ? "werewolf.toDay" : "werewolf.toNight")}
-          </button>
-        </div>
-      )}
+      <div className="werewolf-phase-control">
+        <button
+          type="button"
+          className="button primary"
+          disabled={busy}
+          onClick={() =>
+            void command("/phase", "PUT", { phase: night ? "day" : "night" })
+          }
+        >
+          {night ? (
+            <Sun size={18} aria-hidden="true" />
+          ) : (
+            <Moon size={18} aria-hidden="true" />
+          )}
+          {t(night ? "werewolf.toDay" : "werewolf.toNight")}
+        </button>
+      </div>
       <div ref={board} className="werewolf-main" tabIndex={-1}>
         <WerewolfPlayers
           game={game}

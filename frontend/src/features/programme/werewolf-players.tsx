@@ -80,10 +80,34 @@ function PlayerList({
 }
 
 /**
- * The players as the server lets this viewer see them. A lobby lists them in
- * join order; a game lists the living first, then the dead under their own
- * heading, each with the role the server sent, if any. The viewer's own role
- * stays in its card until everyone may see it.
+ * The dead of a running game, for a viewer who is not the game master, each
+ * with the role the server sent, if any. Nothing while nobody died.
+ */
+export function DeadPlayers({
+  game,
+  guestId,
+}: {
+  game: Werewolf;
+  guestId: number;
+}) {
+  const { t } = useI18n();
+  const { dead } = playersByFate(game.players);
+  if (dead.length === 0) return null;
+  return (
+    <PlayerList
+      title={t("werewolf.dead")}
+      players={dead}
+      game={game}
+      guestId={guestId}
+    />
+  );
+}
+
+/**
+ * Every player, in the lobby, on the game master's board and once finished.
+ * A lobby lists them in join order; a game lists the living first, then the
+ * dead under their own heading, each with the role the server sent, if any.
+ * The viewer's own role stays in its card until everyone may see it.
  */
 export function WerewolfPlayers({
   game,

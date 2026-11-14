@@ -1,17 +1,61 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Crown, Eye, EyeOff, Skull } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import type { RoleCard, Werewolf } from "./contracts";
 import type { SendCommand } from "./use-werewolf-game";
-import { codePoints, messageLength, roleText } from "./werewolf-model";
+import {
+  codePoints,
+  messageLength,
+  ownState,
+  roleText,
+} from "./werewolf-model";
+import { DeadPlayers } from "./werewolf-players";
 
 /** The counter appears once this few characters are left. */
 const counterMargin = 40;
+
+/**
+ * The screen of everyone but the game master while the game runs. The living
+ * and the mayor are said aloud: a player reads their role, their own state,
+ * the ghost message when it applies and the dead.
+ */
+export function PlayerBoard({
+  game,
+  guestId,
+  send,
+}: {
+  game: Werewolf;
+  guestId: number;
+  send: SendCommand;
+}) {
+  const { t } = useI18n();
+  const state = ownState(game.players, guestId);
+  return (
+    <div className="werewolf-play">
+      {game.myRole && <RoleReveal role={game.myRole} />}
+      {state && (
+        <p className="werewolf-self" data-state={state}>
+          {state === "dead" ? (
+            <Skull size={19} aria-hidden="true" />
+          ) : (
+            <Crown size={19} aria-hidden="true" />
+          )}
+          {t(state === "dead" ? "werewolf.youAreDead" : "werewolf.youAreMayor")}
+        </p>
+      )}
+      {game.mayorMessage && <MayorMessage message={game.mayorMessage} />}
+      {game.canWriteMessage && (
+        <GhostMessage saved={game.myMessage} send={send} />
+      )}
+      <DeadPlayers game={game} guestId={guestId} />
+    </div>
+  );
+}
 
 /**
  * The viewer's own role. It stays out of the page until the player asks for

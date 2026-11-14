@@ -49,3 +49,149 @@
   --avatar-neutral-background: #45403b;
   --avatar-neutral-foreground: #a29b92;
 }
+
+/*
+ * Night in a running werewolf game (werewolf-activity.tsx sets
+ * data-phase="night" on the document root while its page shows it): the same
+ * roles in a cool moonlit blue-grey, the accent a pale moonlight that still
+ * carries dark text.
+ */
+:root[data-phase="night"] {
+  --background: #0e1220;
+  --surface: #171c2b;
+  --surface-muted: #131827;
+  --surface-raised: #1d2740;
+  --text: #e6eaf2;
+  --muted: #8a93a6;
+  --accent: #c9d4ec;
+  --accent-hover: #dce4f5;
+  --accent-text: #b7c6e8;
+  --on-accent: #0e1220;
+  --accent-soft: #1f2a44;
+  --highlight: #a9bde3;
+  --highlight-pale: #e1e8f7;
+  --featured-background: #171c2b;
+  --border: #2a3145;
+  --border-strong: #465068;
+  --input-background: #171c2b;
+  --placeholder: #7c8599;
+  --nav-background: #171c2b;
+  --overlay: #080b14d9;
+  --avatar-neutral-background: #343c52;
+  --avatar-neutral-foreground: #8a93a6;
+}
+
+/*
+ * The colours night changes are registered, so they interpolate as colours
+ * and everything painted from them crossfades with the root (werewolf.css).
+ */
+@property --background {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #100f0e;
+}
+@property --surface {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b1917;
+}
+@property --surface-muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #161412;
+}
+@property --surface-raised {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #292623;
+}
+@property --text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f5f1ea;
+}
+@property --muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a29b92;
+}
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ff6a1f;
+}
+@property --accent-hover {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ff8242;
+}
+@property --accent-text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ff8a4c;
+}
+@property --on-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #100f0e;
+}
+@property --accent-soft {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #33211a;
+}
+@property --highlight {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffb547;
+}
+@property --highlight-pale {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffe2b0;
+}
+@property --featured-background {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b1917;
+}
+@property --border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #33302c;
+}
+@property --border-strong {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #57514a;
+}
+@property --input-background {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b1917;
+}
+@property --placeholder {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8f887f;
+}
+@property --nav-background {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b1917;
+}
+@property --overlay {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0a0908d9;
+}
+@property --avatar-neutral-background {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #45403b;
+}
+@property --avatar-neutral-foreground {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a29b92;
+}

@@ -41,7 +41,8 @@ const en = {
   "werewolf.dead": "Dead",
   "werewolf.you": "You",
   "werewolf.mayor": "Mayor",
-  "werewolf.notPlaying": "You’re not playing this game.",
+  "werewolf.youAreDead": "You’re dead",
+  "werewolf.youAreMayor": "You’re the mayor",
   "werewolf.removePlayer": "Remove {name} from the game",
   "werewolf.kill": "Mark {name} as dead",
   "werewolf.killConfirm":
@@ -157,7 +158,8 @@ const fr: WerewolfMessages = {
   "werewolf.dead": "Morts",
   "werewolf.you": "Toi",
   "werewolf.mayor": "Maire",
-  "werewolf.notPlaying": "Tu ne joues pas cette partie.",
+  "werewolf.youAreDead": "Tu fais partie des morts",
+  "werewolf.youAreMayor": "Tu es maire",
   "werewolf.removePlayer": "Retirer {name} de la partie",
   "werewolf.kill": "Annoncer la mort de {name}",
   "werewolf.killConfirm":
@@ -273,7 +275,8 @@ const de: WerewolfMessages = {
   "werewolf.dead": "Tot",
   "werewolf.you": "Du",
   "werewolf.mayor": "Bürgermeister",
-  "werewolf.notPlaying": "Du spielst in dieser Runde nicht mit.",
+  "werewolf.youAreDead": "Du bist tot",
+  "werewolf.youAreMayor": "Du bist Bürgermeister",
   "werewolf.removePlayer": "{name} aus dem Spiel nehmen",
   "werewolf.kill": "{name} als tot markieren",
   "werewolf.killConfirm":
@@ -389,7 +392,8 @@ const it: WerewolfMessages = {
   "werewolf.dead": "Morti",
   "werewolf.you": "Tu",
   "werewolf.mayor": "Sindaco",
-  "werewolf.notPlaying": "Non giochi questa partita.",
+  "werewolf.youAreDead": "Sei tra i morti",
+  "werewolf.youAreMayor": "Sei il sindaco",
   "werewolf.removePlayer": "Togli {name} dalla partita",
   "werewolf.kill": "Annuncia la morte di {name}",
   "werewolf.killConfirm":
@@ -505,7 +509,8 @@ const es: WerewolfMessages = {
   "werewolf.dead": "Muertos",
   "werewolf.you": "Tú",
   "werewolf.mayor": "Alcalde",
-  "werewolf.notPlaying": "No juegas esta partida.",
+  "werewolf.youAreDead": "Estás entre los muertos",
+  "werewolf.youAreMayor": "Eres alcalde",
   "werewolf.removePlayer": "Quitar a {name} de la partida",
   "werewolf.kill": "Anunciar la muerte de {name}",
   "werewolf.killConfirm":

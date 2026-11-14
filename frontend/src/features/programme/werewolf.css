@@ -3,6 +3,25 @@
 
 /* The werewolf page (werewolf-activity.tsx and its views). */
 @layer features {
+  /*
+   * Day and night crossfade the whole app while the page is open: the root
+   * carries data-phase, and night swaps the registered tokens (tokens.css).
+   * Under reduced motion they switch at once.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-phase] {
+      transition-property:
+        --background, --surface, --surface-muted, --surface-raised, --text,
+        --muted, --accent, --accent-hover, --accent-text, --on-accent,
+        --accent-soft, --highlight, --highlight-pale, --featured-background,
+        --border, --border-strong, --input-background, --placeholder,
+        --nav-background, --overlay, --avatar-neutral-background,
+        --avatar-neutral-foreground;
+      transition-duration: 1.6s;
+      transition-timing-function: ease-in-out;
+    }
+  }
+
   .werewolf-page {
     min-width: 0;
   }
@@ -24,23 +43,18 @@
     margin: 0;
   }
 
-  /* Day or night, while the ghosts may write. */
+  /* Day or night: what a player glances at first. */
   .werewolf-phase {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 11px;
+    gap: 7px;
+    padding: 4px 13px 4px 11px;
     border-radius: var(--radius-pill);
-    background: var(--surface-raised);
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1.5;
-  }
-
-  [data-phase="day"] .werewolf-phase {
     background: var(--accent-soft);
     color: var(--highlight);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.5;
   }
 
   .werewolf-description {
@@ -286,6 +300,38 @@
     border-color: transparent;
     background: var(--accent);
     color: var(--on-accent);
+  }
+
+  /* A player's screen while the game runs (werewolf-player.tsx). */
+  .werewolf-play {
+    display: grid;
+    align-content: start;
+    gap: 24px;
+    min-width: 0;
+    max-width: 560px;
+  }
+
+  /* The player's own state: dead or mayor, with its icon. */
+  .werewolf-self {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    margin: 0;
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .werewolf-self svg {
+    color: var(--muted);
+  }
+
+  .werewolf-self[data-state="mayor"] svg {
+    color: var(--highlight);
   }
 
   /* The viewer's own role: closed until asked for (werewolf-player.tsx). */
@@ -588,25 +634,6 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 14px;
-  }
-
-  /*
-   * Night changes the mood, not the theme: the cards sink into the page and
-   * the living dim a little.
-   */
-  [data-phase="night"]
-    :is(
-      .werewolf-role-card[data-shown],
-      .werewolf-message,
-      .werewolf-mayor-message,
-      .werewolf-ghost
-    ) {
-    background: var(--surface-muted);
-    box-shadow: inset 0 0 0 1px var(--border);
-  }
-
-  [data-phase="night"] .werewolf-player:not([data-dead]) .avatar {
-    opacity: 0.7;
   }
 
   @media (min-width: 960px) {

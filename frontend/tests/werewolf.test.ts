@@ -23,6 +23,8 @@ import {
   codePoints,
   completeWithVillagers,
   countLine,
+  gamePhase,
+  ownState,
   mergeSavedRoles,
   playerCount,
   playersByFate,
@@ -541,4 +543,31 @@ test("the viewer's own role stays off the board until everyone may see it", () =
     boardRole({ status: "finished", hideRolesOfDead: true }, own, sam.id),
     seer,
   );
+});
+
+test("day and night exist only while the game runs, with or without ghosts", () => {
+  assert.equal(gamePhase(playerView), "day");
+  assert.equal(gamePhase({ ...playerView, phase: "night" }), "night");
+  const withoutGhosts: Werewolf = {
+    ...playerView,
+    ghostMessages: false,
+    phase: "night",
+  };
+  assert.equal(gamePhase(withoutGhosts), "night");
+  for (const status of ["lobby", "finished"] as const)
+    assert.equal(gamePhase({ status, phase: "night" }), null);
+});
+
+test("a player's own state says dead or mayor, from their own seat only", () => {
+  const players = [
+    player(sam, { mayor: true }),
+    player(robin, { alive: false }),
+    player(alex),
+  ];
+  assert.equal(ownState(players, sam.id), "mayor");
+  assert.equal(ownState(players, robin.id), "dead");
+  assert.equal(ownState(players, alex.id), null);
+  // A viewer without a seat, who did not join, has no state.
+  assert.equal(ownState(players, 99), null);
+  assert.equal(ownState([], sam.id), null);
 });

@@ -110,6 +110,26 @@ export function playersByFate<Player extends Pick<WerewolfPlayer, "alive">>(
   };
 }
 
+/** Day or night, which only exist while the game runs. */
+export function gamePhase(game: Pick<Werewolf, "status" | "phase">) {
+  return game.status === "running" ? game.phase : null;
+}
+
+/**
+ * What the viewer's own seat says that the rest of their screen does not:
+ * dead, or mayor. Null for a living player without the title, or a viewer
+ * who does not play.
+ */
+export function ownState(
+  players: readonly Pick<WerewolfPlayer, "id" | "alive" | "mayor">[],
+  viewerId: number,
+): "dead" | "mayor" | null {
+  const seat = players.find((player) => player.id === viewerId);
+  if (!seat) return null;
+  if (!seat.alive) return "dead";
+  return seat.mayor ? "mayor" : null;
+}
+
 /**
  * The role to show beside a player's name on the board. The server also
  * sends the viewer their own role there; while the others cannot see it, it

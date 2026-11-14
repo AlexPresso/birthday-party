@@ -123,11 +123,15 @@ Do not invent party details, guest contributions, dates, or activity counts.
   who joined and one button to join; the game master edits roles with
   steppers, switches the variants and starts. Say how many roles there are
   for how many players only when the numbers differ, with one action to
-  complete with villagers. During the game, a player's role stays hidden
-  until they ask to see it and can be hidden again. Mark dead players and the
-  mayor with more than colour. The game master's board shows every role with
-  the two actions per player; killing asks for confirmation. Day and night
-  appear only with the ghost variant, as a restrained change of mood. Never
+  complete with villagers. During the game, a player's screen keeps to what
+  they need: day or night, their role hidden until they ask to see it, their
+  own state (dead, mayor), the ghost message when it applies, and the list of
+  the dead. Living players and the mayor are said aloud, not shown. Mark the
+  dead and the mayor with more than colour. The game master's board shows
+  every role with the two actions per player and the day/night control;
+  killing asks for confirmation. At night the page's glow, background, snow
+  and accent crossfade to a cool moonlit blue-grey, and back by day; skip the
+  transition under reduced motion. Never
   render, cache or log a role the server did not send for that viewer.
 - Question activities ("Sans filtre") have their own page at `/programme/[id]`,
   linked from the agenda and programme settings. Follow the approved
