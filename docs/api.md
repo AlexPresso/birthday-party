@@ -754,8 +754,8 @@ type Werewolf = {
   joined: boolean; // the viewer is a player
   hideRolesOfDead: boolean; // variant "secret deaths"
   ghostMessages: boolean; // variant "ghost messages"
-  phase: "day" | "night"; // "night" only with ghostMessages, once started
-  players: Player[]; // join order
+  phase: "day" | "night"; // "night" only once started
+  players: Player[]; // join order; while running, a non-master viewer gets their own seat and the dead only
   myRole: RoleCard | null; // the viewer's own role, when running or finished
   canWriteMessage: boolean; // viewer is a dead player, night, variant on, game running
   myMessage: string | null; // what the viewer wrote, while the game runs with the variant
@@ -806,9 +806,12 @@ Go builds each response for its viewer; no response carries the full state.
   every ghost message with its `delivered` flag.
 - A player: their own role once the game runs, as `myRole` and on their own
   entry of `players`.
-- Everyone who can open the game: the players' names, photos, `alive` and
-  `mayor`; a dead player's role while the game runs, unless `hideRolesOfDead`
-  is on; every role once the game is `finished`.
+- Everyone who can open the game: in the lobby and once `finished`, every
+  player's name, photo, `alive` and `mayor`, and every role once
+  `finished`. While the game runs, a viewer who is not the game master gets
+  only their own seat (with `alive` and `mayor`) and the dead players, with a
+  dead player's role unless `hideRolesOfDead` is on. Who is still alive and
+  who is mayor are said aloud.
 - The party's host has no special view: they see what a game master, a player
   or a guest who did not join sees, whichever they are.
 - Ghost messages: a ghost sees their own (`myMessage`) and the current mayor,
@@ -851,7 +854,7 @@ stale `revision` on the two commands that carry one.
   Unicode code points. 400 `invalid_werewolf_roles` otherwise.
 - `PUT /api/programme/{id}/werewolf/variants { hideRolesOfDead, ghostMessages }`.
   Any state; both booleans are required (400 `invalid_body`). Turning ghost
-  messages off deletes the messages and sets the phase to `day`.
+  messages off deletes the messages; the phase stays as it is.
 - `POST /api/programme/{id}/werewolf/state { revision, action }`.
   `start` (lobby -> running) needs at least 3 players and quantities that add
   up to the number of players, 409 `werewolf_roles_mismatch` otherwise; it
@@ -870,7 +873,8 @@ stale `revision` on the two commands that carry one.
   `invalid_werewolf_player` for someone who is not a player, 409
   `activity_conflict` for a dead player.
 - `PUT /api/programme/{id}/werewolf/phase { phase: "day" | "night" }`. Running
-  only, with ghost messages on. `night` -> `day` draws one of the night's
+  only, in every game: every viewer sees the phase. With ghost messages on,
+  `night` -> `day` draws one of the night's
   messages, each equally likely, and marks it delivered if the game has a
   mayor at that moment; without a mayor nothing is delivered. `day` -> `night`
   deletes the messages. Sending the current phase changes neither the phase

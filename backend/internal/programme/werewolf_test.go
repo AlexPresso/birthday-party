@@ -66,6 +66,7 @@ func werewolfFixture(status WerewolfStatus, hideRolesOfDead, ghostMessages bool,
 
 // sight is what one viewer is expected to receive.
 type sight struct {
+	seats string // IDs of the players listed, in join order; empty means everyone
 	roles string // IDs of the players whose role is shown, in join order
 	list  bool   // the role list and every ghost message: the game master's view
 	write bool
@@ -91,34 +92,40 @@ func TestWerewolfViewShowsEachAudienceOnlyWhatItMaySee(t *testing.T) {
 		{"lobby", WerewolfLobby, false, false, PhaseDay, nobody},
 		{"lobby with both variants", WerewolfLobby, true, true, PhaseDay, nobody},
 		{"running, deaths shown", WerewolfRunning, false, false, PhaseDay, map[int64]sight{
-			masterID: {roles: everyone, list: true}, adaID: {roles: "10 11 13"}, benID: {roles: "11 13"}, cleoID: {roles: "11 12 13"},
-			danID: {roles: "11 13"}, outsiderID: {roles: "11 13"}, hostID: {roles: "11 13"},
+			masterID: {roles: everyone, list: true}, adaID: {seats: "10 11 13", roles: "10 11 13"}, benID: {seats: "11 13", roles: "11 13"},
+			cleoID: {seats: "11 12 13", roles: "11 12 13"}, danID: {seats: "11 13", roles: "11 13"},
+			outsiderID: {seats: "11 13", roles: "11 13"}, hostID: {seats: "11 13", roles: "11 13"},
 		}},
 		{"running, secret deaths", WerewolfRunning, true, false, PhaseDay, map[int64]sight{
-			masterID: {roles: everyone, list: true}, adaID: {roles: "10"}, benID: {roles: "11"}, cleoID: {roles: "12"},
-			danID: {roles: "13"}, outsiderID: {}, hostID: {},
+			masterID: {roles: everyone, list: true}, adaID: {seats: "10 11 13", roles: "10"}, benID: {seats: "11 13", roles: "11"},
+			cleoID: {seats: "11 12 13", roles: "12"}, danID: {seats: "11 13", roles: "13"},
+			outsiderID: {seats: "11 13"}, hostID: {seats: "11 13"},
 		}},
 		{"running night, ghost messages", WerewolfRunning, false, true, PhaseNight, map[int64]sight{
-			masterID: {roles: everyone, list: true}, adaID: {roles: "10 11 13"},
-			benID:  {roles: "11 13", write: true, mine: "Ben's hint"},
-			cleoID: {roles: "11 12 13"},
-			danID:  {roles: "11 13", write: true, mine: "Dan's hint"}, outsiderID: {roles: "11 13"}, hostID: {roles: "11 13"},
+			masterID: {roles: everyone, list: true}, adaID: {seats: "10 11 13", roles: "10 11 13"},
+			benID:      {seats: "11 13", roles: "11 13", write: true, mine: "Ben's hint"},
+			cleoID:     {seats: "11 12 13", roles: "11 12 13"},
+			danID:      {seats: "11 13", roles: "11 13", write: true, mine: "Dan's hint"},
+			outsiderID: {seats: "11 13", roles: "11 13"}, hostID: {seats: "11 13", roles: "11 13"},
 		}},
 		{"running night, both variants", WerewolfRunning, true, true, PhaseNight, map[int64]sight{
-			masterID: {roles: everyone, list: true}, adaID: {roles: "10"},
-			benID:  {roles: "11", write: true, mine: "Ben's hint"},
-			cleoID: {roles: "12"},
-			danID:  {roles: "13", write: true, mine: "Dan's hint"}, outsiderID: {}, hostID: {},
+			masterID: {roles: everyone, list: true}, adaID: {seats: "10 11 13", roles: "10"},
+			benID:      {seats: "11 13", roles: "11", write: true, mine: "Ben's hint"},
+			cleoID:     {seats: "11 12 13", roles: "12"},
+			danID:      {seats: "11 13", roles: "13", write: true, mine: "Dan's hint"},
+			outsiderID: {seats: "11 13"}, hostID: {seats: "11 13"},
 		}},
 		{"running day, ghost messages", WerewolfRunning, false, true, PhaseDay, map[int64]sight{
-			masterID: {roles: everyone, list: true}, adaID: {roles: "10 11 13", drawn: "Ben's hint"},
-			benID: {roles: "11 13", mine: "Ben's hint"}, cleoID: {roles: "11 12 13"},
-			danID: {roles: "11 13", mine: "Dan's hint"}, outsiderID: {roles: "11 13"}, hostID: {roles: "11 13"},
+			masterID: {roles: everyone, list: true}, adaID: {seats: "10 11 13", roles: "10 11 13", drawn: "Ben's hint"},
+			benID: {seats: "11 13", roles: "11 13", mine: "Ben's hint"}, cleoID: {seats: "11 12 13", roles: "11 12 13"},
+			danID:      {seats: "11 13", roles: "11 13", mine: "Dan's hint"},
+			outsiderID: {seats: "11 13", roles: "11 13"}, hostID: {seats: "11 13", roles: "11 13"},
 		}},
 		{"running day, both variants", WerewolfRunning, true, true, PhaseDay, map[int64]sight{
-			masterID: {roles: everyone, list: true}, adaID: {roles: "10", drawn: "Ben's hint"},
-			benID: {roles: "11", mine: "Ben's hint"}, cleoID: {roles: "12"},
-			danID: {roles: "13", mine: "Dan's hint"}, outsiderID: {}, hostID: {},
+			masterID: {roles: everyone, list: true}, adaID: {seats: "10 11 13", roles: "10", drawn: "Ben's hint"},
+			benID: {seats: "11 13", roles: "11", mine: "Ben's hint"}, cleoID: {seats: "11 12 13", roles: "12"},
+			danID:      {seats: "11 13", roles: "13", mine: "Dan's hint"},
+			outsiderID: {seats: "11 13"}, hostID: {seats: "11 13"},
 		}},
 		{"finished", WerewolfFinished, false, false, PhaseDay, revealed},
 		{"finished, secret deaths", WerewolfFinished, true, false, PhaseDay, revealed},
@@ -144,10 +151,11 @@ func assertSight(t *testing.T, game WerewolfGame, viewerID int64, want sight) {
 	if view.IsGameMaster != (viewerID == masterID) || view.Joined != playing {
 		t.Errorf("viewer %d: isGameMaster=%t joined=%t", viewerID, view.IsGameMaster, view.Joined)
 	}
-	var shown []string
+	var shown, listed []string
 	var own *RoleCard
-	for i, player := range view.Players {
-		seat := game.Players[i]
+	for _, player := range view.Players {
+		listed = append(listed, fmt.Sprint(player.ID))
+		seat, _ := game.seat(player.ID)
 		if player.Person != seat.Person || player.Alive != seat.Alive || player.Mayor != seat.Mayor {
 			t.Errorf("viewer %d: the board shows %+v for %+v", viewerID, player, seat)
 		}
@@ -157,6 +165,13 @@ func assertSight(t *testing.T, game WerewolfGame, viewerID int64, want sight) {
 		if player.ID == viewerID {
 			own = player.Role
 		}
+	}
+	seats := want.seats
+	if seats == "" {
+		seats = "10 11 12 13"
+	}
+	if got := strings.Join(listed, " "); got != seats {
+		t.Errorf("viewer %d sees the seats of %q, want %q", viewerID, got, seats)
 	}
 	if got := strings.Join(shown, " "); got != want.roles {
 		t.Errorf("viewer %d sees the roles of %q, want %q", viewerID, got, want.roles)
@@ -455,7 +470,7 @@ func TestWerewolfCommandsFollowStateRevisionAndGameMaster(t *testing.T) {
 
 		{"switch to day", phase(running, masterID, PhaseDay), nil},
 		{"switch phase as a player", phase(running, benID, PhaseDay), ErrGameMasterRequired},
-		{"switch phase without the variant", phase(withoutGhosts, masterID, PhaseNight), ErrActivityConflict},
+		{"switch phase without the variant", phase(withoutGhosts, masterID, PhaseNight), nil},
 		{"switch phase after the end", phase(finished, masterID, PhaseNight), ErrActivityConflict},
 		{"unknown phase", phase(running, masterID, "dusk"), ErrActivityConflict},
 

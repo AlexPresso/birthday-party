@@ -75,6 +75,10 @@ event.
 `programme_activities.type` be `werewolf`. Everything hangs from the activity,
 so deleting the event removes the game with its roles, players and messages.
 
+`0007_werewolf_nights.sql` lets a game be in the night whether or not ghost
+messages are on: players see the phase in every game. A game in the lobby is
+still always in the day.
+
 - `programme_werewolf_games` has one row per werewolf event: the game master
   (a guest, or null while undecided), the `status` (`lobby`, `running`,
   `finished`), the `phase` (`day`, `night`) and the two variants. Every command
@@ -128,7 +132,7 @@ same limits: a statement that needs longer must start with
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
-   `0007_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
+   `0008_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
 2. Put the schema change in that file, with any necessary data backfill. Do not add
    DDL to request handlers or change an already applied migration.
 3. Run `npm run check` against its disposable PostgreSQL instance. Include tests

@@ -317,6 +317,12 @@ func (game WerewolfGame) View(viewerID int64) Werewolf {
 	var viewer WerewolfSeat
 	for _, seat := range game.Players {
 		own := seat.ID == viewerID
+		people[seat.ID] = seat.Person
+		// While the game runs, a player's screen keeps to their own seat and
+		// the dead: who is still alive, and who is mayor, are said aloud.
+		if running && !master && !own && seat.Alive {
+			continue
+		}
 		player := WerewolfPlayer{Person: seat.Person, Alive: seat.Alive, Mayor: seat.Mayor}
 		if game.Status == WerewolfFinished || running && (master || own || !seat.Alive && !game.HideRolesOfDead) {
 			player.Role = cards[seat.RoleID]
@@ -324,7 +330,6 @@ func (game WerewolfGame) View(viewerID int64) Werewolf {
 		if own {
 			viewer, view.Joined, view.MyRole = seat, true, player.Role
 		}
-		people[seat.ID] = seat.Person
 		view.Players = append(view.Players, player)
 	}
 	if master {
@@ -480,14 +485,14 @@ func (game WerewolfGame) CheckMayor(actorID int64, guestID *int64) error {
 	return nil
 }
 
-// CheckPhase lets the game master switch between day and night in the ghost
-// variant. It reports false when the game is already in that phase, which
+// CheckPhase lets the game master switch between day and night while the
+// game runs. It reports false when the game is already in that phase, which
 // must then change nothing: a repeated command would draw or clear again.
 func (game WerewolfGame) CheckPhase(actorID int64, phase WerewolfPhase) (bool, error) {
 	if err := game.checkCommand(actorID, WerewolfRunning); err != nil {
 		return false, err
 	}
-	if !game.GhostMessages || phase != PhaseDay && phase != PhaseNight {
+	if phase != PhaseDay && phase != PhaseNight {
 		return false, ErrActivityConflict
 	}
 	return phase != game.Phase, nil

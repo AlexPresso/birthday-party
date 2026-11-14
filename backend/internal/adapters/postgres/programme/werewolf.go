@@ -302,14 +302,14 @@ func saveWerewolfRoles(ctx context.Context, tx *sql.Tx, id int64, roles []progra
 }
 
 // SetWerewolfVariants switches both variants. Without ghost messages there
-// are no nights and nothing left to deliver.
+// is nothing left to deliver; the phase stays as the game master set it.
 func (s *Store) SetWerewolfVariants(ctx context.Context, actor programme.Actor, eventID int64, hideRolesOfDead, ghostMessages bool) (programme.Werewolf, error) {
 	return s.commandWerewolf(ctx, actor, eventID, func(tx *sql.Tx, id int64, game programme.WerewolfGame) error {
 		if err := game.CheckGameMaster(actor.GuestID); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE programme_werewolf_games SET hide_roles_of_dead=$2,ghost_messages=$3,
- phase=CASE WHEN $3 THEN phase ELSE 'day' END WHERE activity_id=$1`, id, hideRolesOfDead, ghostMessages)
+		_, err := tx.ExecContext(ctx, "UPDATE programme_werewolf_games SET hide_roles_of_dead=$2,ghost_messages=$3 WHERE activity_id=$1",
+			id, hideRolesOfDead, ghostMessages)
 		if err != nil || ghostMessages {
 			return err
 		}
@@ -425,6 +425,8 @@ func (s *Store) SetWerewolfPhase(ctx context.Context, actor programme.Actor, eve
 		}
 		if phase == programme.PhaseNight {
 			err = clearGhostMessages(ctx, tx, id)
+		} else if !game.GhostMessages {
+			// Without the variant there is no message to deliver.
 		} else if authorID, drawn := game.DrawMessage(newRandom()); drawn {
 			_, err = tx.ExecContext(ctx, "UPDATE programme_werewolf_messages SET delivered=TRUE WHERE activity_id=$1 AND guest_id=$2", id, authorID)
 		}

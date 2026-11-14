@@ -299,8 +299,15 @@ func TestWerewolfDealsSecretRolesAndRevealsThemAtTheEnd(t *testing.T) {
 			want[player.id] = dealt[player.id]
 			jesterShown = jesterShown || dealt[player.id] == "Jester"
 		}
-		if len(view.Players) != 4 {
+		// The game master sees every seat; while the game runs, anyone else
+		// sees their own and the dead.
+		if isMaster && len(view.Players) != 4 {
 			t.Fatalf("%s sees %d players", viewer.name, len(view.Players))
+		}
+		for _, player := range view.Players {
+			if !isMaster && view.Status == programme.WerewolfRunning && player.ID != viewer.id && player.Alive {
+				t.Fatalf("%s sees %s, who is alive", viewer.name, player.Name)
+			}
 		}
 		for _, player := range view.Players {
 			if roleLabel(player.Role) != want[player.ID] {
@@ -340,7 +347,7 @@ func TestWerewolfDealsSecretRolesAndRevealsThemAtTheEnd(t *testing.T) {
 		{master, "POST", "/state", map[string]any{"revision": game.Revision, "action": "start"}},
 		{master, "POST", "/state", map[string]any{"revision": game.Revision, "action": "reset"}},
 		{master, "POST", "/state", map[string]any{"revision": game.Revision - 1, "action": "finish"}},
-		{master, "PUT", "/phase", map[string]any{"phase": "night"}},
+		{master, "PUT", "/phase", map[string]any{"phase": "dusk"}},
 	} {
 		assertWelcomeError(t, werewolfDo(t, a, command.viewer, command.method, event.ID, command.suffix, command.body), 409, "activity_conflict")
 	}
@@ -398,9 +405,14 @@ func TestWerewolfDealsSecretRolesAndRevealsThemAtTheEnd(t *testing.T) {
 	}
 	werewolfGame(t, a, master, "PUT", event.ID, "/mayor", map[string]any{"guestId": cleo.id})
 	werewolfGame(t, a, master, "PUT", event.ID, "/mayor", map[string]any{"guestId": ada.id})
+	// The mayor is named aloud: only the game master and the mayor read it.
 	for _, viewer := range everyone {
-		if got := mayors(werewolfRead(t, a, viewer, event.ID)); !slices.Equal(got, []int64{ada.id}) {
-			t.Fatalf("%s sees mayors %v", viewer.name, got)
+		want := []int64(nil)
+		if viewer.id == master.id || viewer.id == ada.id {
+			want = []int64{ada.id}
+		}
+		if got := mayors(werewolfRead(t, a, viewer, event.ID)); !slices.Equal(got, want) {
+			t.Fatalf("%s sees mayors %v, want %v", viewer.name, got, want)
 		}
 	}
 	assertWelcomeError(t, werewolfDo(t, a, master, "PUT", event.ID, "/mayor", map[string]any{"guestId": ben.id}), 409, "activity_conflict")
@@ -490,10 +502,13 @@ func TestWerewolfGhostMessagesReachOnlyTheMayorAndTheGameMaster(t *testing.T) {
 		}
 	}
 
-	// Without the variant there are no nights and no messages.
+	// Without the variant nights still fall, but the dead cannot write.
 	werewolfLife(t, a, master, event.ID, ben.id, false)
-	assertWelcomeError(t, werewolfDo(t, a, master, "PUT", event.ID, "/phase", map[string]any{"phase": "night"}), 409, "activity_conflict")
+	if night := werewolfPhase(t, a, master, event.ID, programme.PhaseNight); night.Phase != programme.PhaseNight {
+		t.Fatalf("night without the variant=%+v", night)
+	}
 	assertWelcomeError(t, write(ben, "Too early"), 403, "werewolf_message_forbidden")
+	werewolfPhase(t, a, master, event.ID, programme.PhaseDay)
 	werewolfVariants(t, a, master, event.ID, true, true)
 	assertWelcomeError(t, write(ben, "By day"), 403, "werewolf_message_forbidden")
 	assertWelcomeError(t, werewolfDo(t, a, master, "PUT", event.ID, "/phase", map[string]any{"phase": "dusk"}), 409, "activity_conflict")
@@ -615,9 +630,9 @@ func TestWerewolfGhostMessagesReachOnlyTheMayorAndTheGameMaster(t *testing.T) {
 	}
 	assertWelcomeError(t, write(ben, "Alive"), 403, "werewolf_message_forbidden")
 
-	// Turning the variant off ends the night and clears the messages.
+	// Turning the variant off clears the messages; the night goes on.
 	off := werewolfVariants(t, a, master, event.ID, true, false)
-	if off.Phase != programme.PhaseDay || len(off.Messages) != 0 || off.GhostMessages {
+	if off.Phase != programme.PhaseNight || len(off.Messages) != 0 || off.GhostMessages {
 		t.Fatalf("game without the variant=%+v", off)
 	}
 	readers("Cleo again")
