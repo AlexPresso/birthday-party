@@ -124,32 +124,25 @@ export function Invitation({
             {t("invitation.checking")}
           </p>
         ) : name ? (
-          <>
-            <p className="muted">{t("invitation.noAccount")}</p>
-            <div className="invitation-actions">
-              <button
-                className="invitation-enter"
-                onClick={enter}
-                disabled={busy}
-              >
-                <span>
-                  {busy ? t("invitation.entering") : t("invitation.enter")}
-                </span>
-                <span className="invitation-enter-icon" aria-hidden="true">
-                  {busy ? (
-                    <span className="spinner" />
-                  ) : (
-                    <ArrowRight size={22} strokeWidth={2.25} />
-                  )}
-                </span>
-              </button>
-              <p className="fine-print">
-                {t("invitation.session")}
-                <br />
-                {t("invitation.privateLink")}
-              </p>
-            </div>
-          </>
+          <div className="invitation-actions">
+            <button
+              className="invitation-enter"
+              onClick={enter}
+              disabled={busy}
+            >
+              <span>
+                {busy ? t("invitation.entering") : t("invitation.enter")}
+              </span>
+              <span className="invitation-enter-icon" aria-hidden="true">
+                {busy ? (
+                  <span className="spinner" />
+                ) : (
+                  <ArrowRight size={22} strokeWidth={2.25} />
+                )}
+              </span>
+            </button>
+            <p className="fine-print">{t("invitation.privateLink")}</p>
+          </div>
         ) : (
           <div className="invitation-help">
             {error ? (
@@ -165,7 +158,6 @@ export function Invitation({
         )}
         <ErrorNotice message={error} />
       </div>
-      <p className="invitation-footer">{t("invitation.footer")}</p>
     </main>
   );
 }

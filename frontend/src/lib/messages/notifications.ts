@@ -1,13 +1,10 @@
 const en = {
   "notifications.widget": "Enable notifications",
-  "notifications.widgetHint":
-    "Guests can choose to receive notifications on this device. No settings needed.",
   "notifications.title": "Notifications",
   "notifications.device": "On this device",
   "notifications.enable": "Enable notifications",
   "notifications.disable": "Turn off on this device",
   "notifications.enabled": "Enabled on this device.",
-  "notifications.off": "You can enable them on this device.",
   "notifications.checking": "Checking notifications…",
   "notifications.enabling": "Enabling notifications…",
   "notifications.disabling": "Turning notifications off…",
@@ -35,14 +32,11 @@ type NotificationMessages = Record<keyof typeof en, string>;
 
 const fr: NotificationMessages = {
   "notifications.widget": "Activer les notifications",
-  "notifications.widgetHint":
-    "Les invités peuvent choisir de recevoir des notifications sur cet appareil. Aucun réglage nécessaire.",
   "notifications.title": "Notifications",
   "notifications.device": "Sur cet appareil",
   "notifications.enable": "Activer les notifications",
   "notifications.disable": "Désactiver sur cet appareil",
   "notifications.enabled": "Activées sur cet appareil.",
-  "notifications.off": "Tu peux les activer sur cet appareil.",
   "notifications.checking": "Vérification des notifications…",
   "notifications.enabling": "Activation des notifications…",
   "notifications.disabling": "Désactivation des notifications…",
@@ -69,14 +63,11 @@ const fr: NotificationMessages = {
 
 const de: NotificationMessages = {
   "notifications.widget": "Benachrichtigungen aktivieren",
-  "notifications.widgetHint":
-    "Gäste können Benachrichtigungen auf diesem Gerät aktivieren. Keine Einstellungen nötig.",
   "notifications.title": "Benachrichtigungen",
   "notifications.device": "Auf diesem Gerät",
   "notifications.enable": "Benachrichtigungen aktivieren",
   "notifications.disable": "Auf diesem Gerät deaktivieren",
   "notifications.enabled": "Auf diesem Gerät aktiviert.",
-  "notifications.off": "Du kannst sie auf diesem Gerät aktivieren.",
   "notifications.checking": "Benachrichtigungen werden geprüft…",
   "notifications.enabling": "Benachrichtigungen werden aktiviert…",
   "notifications.disabling": "Benachrichtigungen werden deaktiviert…",
@@ -104,14 +95,11 @@ const de: NotificationMessages = {
 
 const it: NotificationMessages = {
   "notifications.widget": "Attiva le notifiche",
-  "notifications.widgetHint":
-    "Gli invitati possono scegliere di ricevere notifiche su questo dispositivo. Non servono impostazioni.",
   "notifications.title": "Notifiche",
   "notifications.device": "Su questo dispositivo",
   "notifications.enable": "Attiva le notifiche",
   "notifications.disable": "Disattiva su questo dispositivo",
   "notifications.enabled": "Attive su questo dispositivo.",
-  "notifications.off": "Puoi attivarle su questo dispositivo.",
   "notifications.checking": "Verifica delle notifiche…",
   "notifications.enabling": "Attivazione delle notifiche…",
   "notifications.disabling": "Disattivazione delle notifiche…",
@@ -137,14 +125,11 @@ const it: NotificationMessages = {
 
 const es: NotificationMessages = {
   "notifications.widget": "Activar las notificaciones",
-  "notifications.widgetHint":
-    "Los invitados pueden elegir recibir notificaciones en este dispositivo. No necesita ajustes.",
   "notifications.title": "Notificaciones",
   "notifications.device": "En este dispositivo",
   "notifications.enable": "Activar las notificaciones",
   "notifications.disable": "Desactivar en este dispositivo",
   "notifications.enabled": "Activadas en este dispositivo.",
-  "notifications.off": "Puedes activarlas en este dispositivo.",
   "notifications.checking": "Comprobando las notificaciones…",
   "notifications.enabling": "Activando las notificaciones…",
   "notifications.disabling": "Desactivando las notificaciones…",

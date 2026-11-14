@@ -768,6 +768,9 @@
     margin-bottom: 8px;
     max-width: 28ch;
   }
+  .empty-state h2:last-child {
+    margin-bottom: 0;
+  }
   .empty-state .muted {
     font-size: 14px;
     line-height: 1.8;
@@ -832,9 +835,6 @@
   .form-grid .fine-print {
     font-size: 11px;
     margin: 8px 0 0;
-  }
-  .admin-form > .section-row > p {
-    font-size: 13px;
   }
   .admin-form > .section-row > .button {
     flex-shrink: 0;

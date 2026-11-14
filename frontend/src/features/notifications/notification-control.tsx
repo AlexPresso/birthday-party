@@ -245,7 +245,10 @@ export function NotificationControl({
     ? t(`notifications.${busy}`)
     : compact && canToggle
       ? t("notifications.device")
-      : t(`notifications.${state}`);
+      : state === "off"
+        ? // The Enable button says it all.
+          ""
+        : t(`notifications.${state}`);
   return (
     <section
       className={`notification-control${compact ? " notification-control-compact" : ""}`}

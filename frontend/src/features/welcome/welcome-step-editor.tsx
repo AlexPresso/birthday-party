@@ -119,10 +119,7 @@ export function WelcomeStepEditor({
       className="welcome-editor"
     >
       <div className="welcome-editor-heading">
-        <div>
-          <h3>{t("adminWelcome.stepsTitle")}</h3>
-          <p className="fine-print">{t("adminWelcome.stepsHint")}</p>
-        </div>
+        <h3>{t("adminWelcome.stepsTitle")}</h3>
         <span className="status-label">
           {number(steps.length)} / {number(maximumSteps)}
         </span>

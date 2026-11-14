@@ -119,7 +119,6 @@ export function GuestManager({
             : t("admin.createInvitation")}
         </button>
       </form>
-      <p className="fine-print">{t("admin.invitationHint")}</p>
       <ErrorNotice message={error} />
       {invitation && (
         <div className="invitation-result">

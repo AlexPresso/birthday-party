@@ -7,16 +7,14 @@ const en = {
   "information.on": "On",
   "information.off": "Off",
   "information.intro":
-    "Write what your guests need to know: address, times, contacts. Web addresses, e-mail addresses and phone numbers become links.",
+    "Web addresses, e-mail addresses and phone numbers become links.",
   "information.enabled": "Show the page to guests",
-  "information.enabledHint":
-    "Guests open it from the menu at the bottom of the screen.",
   "information.noTabs": "The page appears once it has a saved tab.",
   "information.tab": "Tab {number}",
   "information.tabTitle": "Title of tab {number}",
   "information.tabBody": "Text of tab {number}",
   "information.incomplete":
-    "Add a title and a text to this tab, or delete it. Until then, changes to the tabs aren’t saved.",
+    "Add a title and a text, or delete this tab. Nothing is saved until then.",
   "information.moveUp": "Move tab {number} up",
   "information.moveDown": "Move tab {number} down",
   "information.remove": "Delete tab {number}",
@@ -46,17 +44,15 @@ const fr: InformationMessages = {
   "information.on": "Activée",
   "information.off": "Désactivée",
   "information.intro":
-    "Écris ce que tes invités doivent savoir : adresse, horaires, contacts. Les adresses web, les e-mails et les numéros de téléphone deviennent des liens.",
+    "Les adresses web, les e-mails et les numéros de téléphone deviennent des liens.",
   "information.enabled": "Afficher la page aux invités",
-  "information.enabledHint":
-    "Les invités l’ouvrent depuis le menu en bas de l’écran.",
   "information.noTabs":
     "La page apparaîtra dès qu’elle aura un onglet enregistré.",
   "information.tab": "Onglet {number}",
   "information.tabTitle": "Titre de l’onglet {number}",
   "information.tabBody": "Texte de l’onglet {number}",
   "information.incomplete":
-    "Ajoute un titre et un texte à cet onglet, ou supprime-le. En attendant, les modifications des onglets ne sont pas enregistrées.",
+    "Ajoute un titre et un texte, ou supprime cet onglet. D’ici là, rien n’est enregistré.",
   "information.moveUp": "Monter l’onglet {number}",
   "information.moveDown": "Descendre l’onglet {number}",
   "information.remove": "Supprimer l’onglet {number}",
@@ -85,17 +81,15 @@ const de: InformationMessages = {
   "information.on": "An",
   "information.off": "Aus",
   "information.intro":
-    "Schreib auf, was deine Gäste wissen müssen: Adresse, Zeiten, Kontakte. Webadressen, E-Mail-Adressen und Telefonnummern werden zu Links.",
+    "Webadressen, E-Mail-Adressen und Telefonnummern werden zu Links.",
   "information.enabled": "Seite den Gästen anzeigen",
-  "information.enabledHint":
-    "Die Gäste öffnen sie über das Menü unten am Bildschirm.",
   "information.noTabs":
     "Die Seite erscheint, sobald sie einen gespeicherten Tab hat.",
   "information.tab": "Tab {number}",
   "information.tabTitle": "Titel von Tab {number}",
   "information.tabBody": "Text von Tab {number}",
   "information.incomplete":
-    "Füge diesem Tab einen Titel und einen Text hinzu oder lösche ihn. Bis dahin werden Änderungen an den Tabs nicht gespeichert.",
+    "Füge einen Titel und einen Text hinzu oder lösche diesen Tab. Bis dahin wird nichts gespeichert.",
   "information.moveUp": "Tab {number} nach oben verschieben",
   "information.moveDown": "Tab {number} nach unten verschieben",
   "information.remove": "Tab {number} löschen",
@@ -125,16 +119,14 @@ const it: InformationMessages = {
   "information.on": "Attiva",
   "information.off": "Disattivata",
   "information.intro":
-    "Scrivi ciò che i tuoi invitati devono sapere: indirizzo, orari, contatti. Gli indirizzi web, le e-mail e i numeri di telefono diventano link.",
+    "Gli indirizzi web, le e-mail e i numeri di telefono diventano link.",
   "information.enabled": "Mostra la pagina agli invitati",
-  "information.enabledHint":
-    "Gli invitati la aprono dal menu in fondo allo schermo.",
   "information.noTabs": "La pagina apparirà appena avrà una scheda salvata.",
   "information.tab": "Scheda {number}",
   "information.tabTitle": "Titolo della scheda {number}",
   "information.tabBody": "Testo della scheda {number}",
   "information.incomplete":
-    "Aggiungi un titolo e un testo a questa scheda, oppure eliminala. Fino ad allora le modifiche alle schede non vengono salvate.",
+    "Aggiungi un titolo e un testo, oppure elimina questa scheda. Fino ad allora non viene salvato nulla.",
   "information.moveUp": "Sposta la scheda {number} in alto",
   "information.moveDown": "Sposta la scheda {number} in basso",
   "information.remove": "Elimina la scheda {number}",
@@ -163,17 +155,15 @@ const es: InformationMessages = {
   "information.on": "Activada",
   "information.off": "Desactivada",
   "information.intro":
-    "Escribe lo que tus invitados necesitan saber: dirección, horarios, contactos. Las direcciones web, los correos y los números de teléfono se convierten en enlaces.",
+    "Las direcciones web, los correos y los números de teléfono se convierten en enlaces.",
   "information.enabled": "Mostrar la página a los invitados",
-  "information.enabledHint":
-    "Los invitados la abren desde el menú de la parte inferior de la pantalla.",
   "information.noTabs":
     "La página aparecerá en cuanto tenga una pestaña guardada.",
   "information.tab": "Pestaña {number}",
   "information.tabTitle": "Título de la pestaña {number}",
   "information.tabBody": "Texto de la pestaña {number}",
   "information.incomplete":
-    "Añade un título y un texto a esta pestaña, o elimínala. Mientras tanto, los cambios en las pestañas no se guardan.",
+    "Añade un título y un texto, o elimina esta pestaña. Hasta entonces no se guarda nada.",
   "information.moveUp": "Subir la pestaña {number}",
   "information.moveDown": "Bajar la pestaña {number}",
   "information.remove": "Eliminar la pestaña {number}",

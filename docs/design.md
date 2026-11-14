@@ -359,9 +359,12 @@ Dates use the viewer's language and the party's explicit timezone.
 
 Use short, ordinary sentences, as the host would when explaining the app to a
 guest. Remove decorative slogans, redundant headings and repeated instructions.
-Empty states describe what is missing and how to add it; do not promise that
-content will arrive soon. Keep errors and confirmations specific about the
-problem, the next step and any consequences.
+Add no text that states what the screen already shows: no feature
+introductions, no hint restating a label, no reassurance. A line earns its
+place when it gives a constraint, a privacy fact, a consequence or a state the
+person cannot see. Empty states name what is missing and nothing more; do not
+promise that content will arrive soon. Keep errors and confirmations specific
+about the problem, the next step and any consequences.
 
 Names, guestbook messages, party titles, descriptions and teasers stay in their
 authors' language. Do not translate these automatically. The host can provide

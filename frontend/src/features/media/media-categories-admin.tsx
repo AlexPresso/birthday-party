@@ -92,7 +92,6 @@ export function MediaCategoriesAdmin({
           {t("categories.title")}
         </h2>
       </div>
-      <p className="muted">{t("categories.description")}</p>
       <form onSubmit={create}>
         <label htmlFor="new-media-category">{t("categories.name")}</label>
         <div className="media-category-create-row">

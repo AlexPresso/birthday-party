@@ -22,11 +22,9 @@ const en = {
     "These texts appear on the invitation page, which is visible without signing in.",
   "configuration.shared": "Shared text",
   "configuration.scope": "Text to edit",
-  "configuration.defaultHint":
-    "Default uses the app’s text. Hide removes the text.",
   "configuration.languages": "Text by language",
   "configuration.languageHint":
-    "Text set for a language replaces the shared text. Default uses the shared text, then the app’s text in that language.",
+    "A text set for one language replaces the shared text.",
   "configuration.titleMode": "Title display",
   "configuration.descriptionMode": "Description display",
   "configuration.default": "Default",
@@ -73,11 +71,9 @@ const fr: ConfigurationMessages = {
     "Ces textes apparaissent sur la page d’invitation, visible sans connexion.",
   "configuration.shared": "Texte commun",
   "configuration.scope": "Texte à modifier",
-  "configuration.defaultHint":
-    "Par défaut utilise le texte de l’application. Masquer retire le texte.",
   "configuration.languages": "Textes par langue",
   "configuration.languageHint":
-    "Un texte défini pour une langue remplace le texte commun. Par défaut utilise le texte commun, puis le texte de l’application dans cette langue.",
+    "Un texte défini pour une langue remplace le texte commun.",
   "configuration.titleMode": "Affichage du titre",
   "configuration.descriptionMode": "Affichage de la description",
   "configuration.default": "Par défaut",
@@ -122,11 +118,9 @@ const de: ConfigurationMessages = {
     "Diese Texte erscheinen auf der Einladungsseite, die ohne Anmeldung sichtbar ist.",
   "configuration.shared": "Gemeinsamer Text",
   "configuration.scope": "Text bearbeiten",
-  "configuration.defaultHint":
-    "Standard verwendet den Text der App. Ausblenden entfernt den Text.",
   "configuration.languages": "Texte nach Sprache",
   "configuration.languageHint":
-    "Ein Text für eine Sprache ersetzt den gemeinsamen Text. Standard verwendet den gemeinsamen Text, sonst den App-Text in dieser Sprache.",
+    "Ein Text für eine Sprache ersetzt den gemeinsamen Text.",
   "configuration.titleMode": "Titelanzeige",
   "configuration.descriptionMode": "Beschreibungsanzeige",
   "configuration.default": "Standard",
@@ -171,11 +165,9 @@ const it: ConfigurationMessages = {
     "Questi testi appaiono sulla pagina d’invito, visibile senza accedere.",
   "configuration.shared": "Testo comune",
   "configuration.scope": "Testo da modificare",
-  "configuration.defaultHint":
-    "Predefinito usa il testo dell’app. Nascondi rimuove il testo.",
   "configuration.languages": "Testi per lingua",
   "configuration.languageHint":
-    "Un testo per una lingua sostituisce il testo comune. Predefinito usa il testo comune, poi il testo dell’app in quella lingua.",
+    "Un testo impostato per una lingua sostituisce il testo comune.",
   "configuration.titleMode": "Visualizzazione del titolo",
   "configuration.descriptionMode": "Visualizzazione della descrizione",
   "configuration.default": "Predefinito",
@@ -220,11 +212,9 @@ const es: ConfigurationMessages = {
     "Estos textos aparecen en la página de invitación, visible sin iniciar sesión.",
   "configuration.shared": "Texto común",
   "configuration.scope": "Texto que quieres editar",
-  "configuration.defaultHint":
-    "Predeterminado usa el texto de la aplicación. Ocultar elimina el texto.",
   "configuration.languages": "Textos por idioma",
   "configuration.languageHint":
-    "Un texto para un idioma sustituye al texto común. Predeterminado usa el texto común y después el texto de la aplicación en ese idioma.",
+    "Un texto definido para un idioma sustituye al texto común.",
   "configuration.titleMode": "Visualización del título",
   "configuration.descriptionMode": "Visualización de la descripción",
   "configuration.default": "Predeterminado",

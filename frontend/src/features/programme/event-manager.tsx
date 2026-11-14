@@ -222,7 +222,6 @@ export function EventManager({
   return (
     <div className="admin-form">
       <div className="section-row">
-        <p className="muted">{t("admin.surpriseHint")}</p>
         <button
           className="button secondary"
           disabled={busy || autosave.saving}

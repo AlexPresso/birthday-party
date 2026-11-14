@@ -58,11 +58,6 @@
     background: var(--background);
   }
 
-  .profile-photo-preview p {
-    margin: 0;
-    min-width: 0;
-  }
-
   .profile-photo-editor > .success-notice {
     margin: 0;
   }

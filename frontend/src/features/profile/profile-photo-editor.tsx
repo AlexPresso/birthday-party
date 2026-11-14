@@ -153,7 +153,6 @@ export function ProfilePhotoEditor({
               height={112}
               onError={() => setError(t("errors.unreadable_photo"))}
             />
-            <p className="fine-print">{t("profile.cropHint")}</p>
           </div>
         )}
         <div className="profile-photo-actions">

@@ -291,7 +291,6 @@ export function WelcomeAdmin({
       data-dirty={dirty || undefined}
     >
       <div className="admin-form">
-        <p className="muted welcome-admin-intro">{t("adminWelcome.intro")}</p>
         <WelcomeControlPanel
           state={state}
           pending={busy === "reload" || busy === "discard" ? null : busy}

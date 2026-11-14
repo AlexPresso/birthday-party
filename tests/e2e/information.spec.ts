@@ -126,7 +126,7 @@ async function held(page: Page, saves: Save[], action: () => Promise<unknown>) {
 
 function incompleteHint(page: Page) {
   return page.getByText(
-    "Ajoute un titre et un texte à cet onglet, ou supprime-le. En attendant, les modifications des onglets ne sont pas enregistrées.",
+    "Ajoute un titre et un texte, ou supprime cet onglet. D’ici là, rien n’est enregistré.",
     { exact: true },
   );
 }

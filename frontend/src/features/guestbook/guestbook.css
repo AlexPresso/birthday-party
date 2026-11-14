@@ -237,9 +237,4 @@
   .guestbook-empty h2 {
     font-size: 18px;
   }
-
-  .guestbook-empty p {
-    margin-bottom: 10px;
-    font-size: 14px;
-  }
 }

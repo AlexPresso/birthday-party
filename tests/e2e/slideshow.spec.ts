@@ -312,7 +312,7 @@ test("images advance automatically, pause for manual navigation, and fit phone a
       .getByRole("button", { name: "Plein écran", exact: true })
       .click();
     await expect(slideshow(page).getByRole("alert")).toContainText(
-      "Le plein écran n’est pas disponible. Tu peux continuer ici.",
+      "Le plein écran n’est pas disponible.",
     );
     await expectPhoto(page, albumPhotos[2]);
   }

@@ -150,7 +150,6 @@ export function PartyEditor({
             <option value="America/Montreal" />
             <option value="UTC" />
           </datalist>
-          <p className="fine-print">{t("admin.timezoneHint")}</p>
         </div>
       </div>
       <ErrorNotice message={error} />

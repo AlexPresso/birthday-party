@@ -23,12 +23,10 @@ export function Guestbook({
   initial,
   guest,
   timezone,
-  age,
 }: {
   initial: EntryPage;
   guest: Guest;
   timezone: string;
-  age: number;
 }) {
   const { locale, t } = useI18n();
   const confirm = useConfirm();
@@ -126,12 +124,7 @@ export function Guestbook({
     <div className="guestbook-page">
       <PageHeading
         title={t("page.guestbook")}
-        description={t(
-          new Intl.PluralRules(locale).select(age) === "one"
-            ? "guestbook.descriptionOne"
-            : "guestbookDesign.description",
-          { age: numbers.format(age) },
-        )}
+        description={t("guestbookDesign.description")}
       />
       <div className="guestbook-layout">
         <section className="guestbook-compose">
@@ -200,7 +193,6 @@ export function Guestbook({
             <div className="guestbook-empty">
               <Heart size={30} strokeWidth={1.3} aria-hidden="true" />
               <h2>{t("guestbook.emptyTitle")}</h2>
-              <p className="muted">{t("guestbook.emptyDescription")}</p>
               <button
                 className="text-button"
                 onClick={() => text.current?.focus()}

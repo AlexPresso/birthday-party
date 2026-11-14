@@ -102,9 +102,6 @@ test("choosing a profile photo uploads it immediately and persists replacements 
     await expect(input).toBeDisabled();
     await expect(preview).toHaveCount(0);
     await expect(
-      card.getByText("Ta photo sera recadrée autour du centre."),
-    ).toHaveCount(0);
-    await expect(
       card.getByRole("button", { name: "Enregistrer la photo", exact: true }),
     ).toHaveCount(0);
     await expect(

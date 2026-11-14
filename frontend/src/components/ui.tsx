@@ -55,7 +55,7 @@ export function EmptyState({
 }: {
   icon: ReactNode;
   title: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <div className="empty-state">
@@ -63,7 +63,7 @@ export function EmptyState({
         {icon}
       </div>
       <h2>{title}</h2>
-      <div className="muted">{children}</div>
+      {children && <div className="muted">{children}</div>}
     </div>
   );
 }

@@ -6,8 +6,7 @@ const en = {
   "slideshow.resume": "Resume",
   "slideshow.fullscreen": "Full screen",
   "slideshow.exitFullscreen": "Exit full screen",
-  "slideshow.fullscreenError":
-    "Full screen is unavailable. You can keep watching here.",
+  "slideshow.fullscreenError": "Full screen isn’t available.",
   "slideshow.loading": "Loading…",
   "slideshow.retry": "Try again",
   "slideshow.mediaError":
@@ -25,8 +24,7 @@ const fr: SlideshowMessages = {
   "slideshow.resume": "Reprendre",
   "slideshow.fullscreen": "Plein écran",
   "slideshow.exitFullscreen": "Quitter le plein écran",
-  "slideshow.fullscreenError":
-    "Le plein écran n’est pas disponible. Tu peux continuer ici.",
+  "slideshow.fullscreenError": "Le plein écran n’est pas disponible.",
   "slideshow.loading": "Chargement…",
   "slideshow.retry": "Réessayer",
   "slideshow.mediaError":
@@ -42,8 +40,7 @@ const de: SlideshowMessages = {
   "slideshow.resume": "Fortsetzen",
   "slideshow.fullscreen": "Vollbild",
   "slideshow.exitFullscreen": "Vollbild beenden",
-  "slideshow.fullscreenError":
-    "Vollbild ist nicht verfügbar. Du kannst hier weiterschauen.",
+  "slideshow.fullscreenError": "Vollbild ist nicht verfügbar.",
   "slideshow.loading": "Wird geladen…",
   "slideshow.retry": "Erneut versuchen",
   "slideshow.mediaError":
@@ -60,8 +57,7 @@ const it: SlideshowMessages = {
   "slideshow.resume": "Riprendi",
   "slideshow.fullscreen": "Schermo intero",
   "slideshow.exitFullscreen": "Esci dallo schermo intero",
-  "slideshow.fullscreenError":
-    "Lo schermo intero non è disponibile. Puoi continuare qui.",
+  "slideshow.fullscreenError": "Lo schermo intero non è disponibile.",
   "slideshow.loading": "Caricamento…",
   "slideshow.retry": "Riprova",
   "slideshow.mediaError":
@@ -77,8 +73,7 @@ const es: SlideshowMessages = {
   "slideshow.resume": "Reanudar",
   "slideshow.fullscreen": "Pantalla completa",
   "slideshow.exitFullscreen": "Salir de pantalla completa",
-  "slideshow.fullscreenError":
-    "La pantalla completa no está disponible. Puedes seguir aquí.",
+  "slideshow.fullscreenError": "La pantalla completa no está disponible.",
   "slideshow.loading": "Cargando…",
   "slideshow.retry": "Reintentar",
   "slideshow.mediaError":

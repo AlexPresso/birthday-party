@@ -62,7 +62,6 @@ export function WelcomeStepList({
               className="welcome-drag-handle icon-button"
               disabled={disabled}
               aria-label={t("adminWelcome.drag", { number: number(index + 1) })}
-              aria-describedby="welcome-reorder-hint"
               {...bindings({ type: "existing", key: step.key, from: index })}
             >
               <GripVertical size={18} aria-hidden="true" />
@@ -90,9 +89,6 @@ export function WelcomeStepList({
           </li>
         ))}
       </ol>
-      <p id="welcome-reorder-hint" className="fine-print welcome-reorder-hint">
-        {t("adminWelcome.reorderHint")}
-      </p>
       <p className="welcome-announcement" role="status">
         {announcement}
       </p>

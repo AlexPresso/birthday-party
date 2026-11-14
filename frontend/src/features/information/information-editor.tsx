@@ -71,6 +71,8 @@ export function InformationEditor({
     body: body.trim(),
   }));
   const incompleteIndex = tabs.findIndex(({ title, body }) => !title || !body);
+  // Switched on without a saved tab, the page is still hidden from guests.
+  const noTabs = enabled && state.tabs.length === 0;
   const dirty = enabled !== state.enabled || !sameTabs(tabs, state.tabs);
   const locked = !!busy || conflict;
   const draftKept = notice === t("information.draftKept");
@@ -283,18 +285,16 @@ export function InformationEditor({
               role="switch"
               checked={enabled}
               disabled={locked}
-              aria-describedby={`${id}-switch-hint`}
+              aria-describedby={noTabs ? `${id}-switch-hint` : undefined}
               onChange={(event) => toggle(event.target.checked)}
             />
             {t("information.enabled")}
           </label>
-          <p id={`${id}-switch-hint`} className="fine-print">
-            {t(
-              enabled && state.tabs.length === 0
-                ? "information.noTabs"
-                : "information.enabledHint",
-            )}
-          </p>
+          {noTabs && (
+            <p id={`${id}-switch-hint`} className="fine-print">
+              {t("information.noTabs")}
+            </p>
+          )}
         </div>
 
         <ol className="information-tab-list" ref={list}>

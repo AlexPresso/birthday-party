@@ -266,9 +266,7 @@ export function Programme({
         <EmptyState
           icon={<CalendarDays size={36} strokeWidth={1.4} />}
           title={t("programme.emptyTitle")}
-        >
-          <p>{t("programme.emptyDescription")}</p>
-        </EmptyState>
+        />
       ) : (
         <ol
           className="programme-list"
