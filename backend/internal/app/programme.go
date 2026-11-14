@@ -11,6 +11,33 @@ func programmeActor(viewer access.Viewer) programme.Actor {
 	return programme.Actor{GuestID: viewer.Guest.ID, SessionHash: viewer.SessionHash}
 }
 
+func (a *App) getProgrammeNotifications(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
+	enabled, err := a.programme.Notifications(r.Context())
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	respond(w, http.StatusOK, map[string]bool{"enabled": enabled})
+}
+
+func (a *App) updateProgrammeNotifications(w http.ResponseWriter, r *http.Request, _ access.Viewer) {
+	var input struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if !decode(w, r, &input) {
+		return
+	}
+	if input.Enabled == nil {
+		fail(w, "invalid_body")
+		return
+	}
+	if err := a.programme.SetNotifications(r.Context(), *input.Enabled); err != nil {
+		failError(w, err)
+		return
+	}
+	respond(w, http.StatusOK, map[string]bool{"enabled": *input.Enabled})
+}
+
 func (a *App) listProgramme(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
 	a.events(w, r, viewer, false)
 }

@@ -11,6 +11,7 @@ import (
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
 	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/notifications"
+	"birthday-party/backend/internal/programme"
 	"birthday-party/backend/internal/welcome"
 )
 
@@ -133,6 +134,45 @@ func (s *Store) EnqueueWelcome(ctx context.Context, tx *sql.Tx, state welcome.St
 	return err
 }
 
+// EnqueueProgramme participates in the announcement transaction. It never
+// commits. Recipients are the devices of guests who can open the programme
+// now: administrators and guests with full app access.
+func (s *Store) EnqueueProgramme(ctx context.Context, tx *sql.Tx, announcements []programme.Announcement) error {
+	now := s.now()
+	for _, announcement := range announcements {
+		// Lock subscriptions before child rows, matching deletion and revocation.
+		_, err := tx.ExecContext(ctx, `WITH recipients AS MATERIALIZED (
+ SELECT s.id,s.version `+programmeRecipientsSQL+`
+ ORDER BY s.id FOR KEY SHARE OF s
+ ) INSERT INTO programme_notification_outbox(subscription_id,subscription_version,event_id,kind,title,next_attempt,expires_at)
+ SELECT id,version,$2,$3,$4,$1,$5 FROM recipients
+ ON CONFLICT(subscription_id,event_id,kind) DO UPDATE SET subscription_version=excluded.subscription_version,
+ title=excluded.title,attempts=0,next_attempt=excluded.next_attempt,expires_at=excluded.expires_at`,
+			now, announcement.EventID, string(announcement.Kind), announcement.Title, now.Add(notifications.Lifetime))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// programmeRecipientsSQL selects subscriptions (alias s) that may receive a
+// programme notification at $1: an active guest with a live session who has
+// full app access, or an administrator.
+const programmeRecipientsSQL = `FROM notification_subscriptions s
+ JOIN sessions session ON session.token_hash=s.session_hash AND session.guest_id=s.guest_id
+ JOIN guests guest ON guest.id=s.guest_id
+ JOIN welcome w ON w.id=1
+ LEFT JOIN guest_welcome_progress p ON p.guest_id=s.guest_id
+ WHERE guest.active AND session.expires_at>$1
+ AND (guest.role='admin' OR ` + pgwelcome.AccessSQL + `)`
+
+// programmeEligibleSQL keeps programme outbox rows (alias o) whose recipient
+// may still be notified. The attempt bound mirrors notifications.MaxAttempts.
+const programmeEligibleSQL = programmeRecipientsSQL + `
+ AND s.id=o.subscription_id AND s.version=o.subscription_version
+ AND o.expires_at>$1 AND o.attempts<5`
+
 // eligibleSQL selects outbox rows (alias o) whose recipient may still be
 // notified at $1: an active guest with a live session who has not moved past
 // the announced step. The attempt bound mirrors notifications.MaxAttempts.
@@ -147,7 +187,36 @@ const eligibleSQL = `FROM notification_subscriptions s
  AND (guest.role='admin' OR ((p.guest_id IS NULL OR NOT p.completed)
  AND (o.kind='welcome_open' OR COALESCE(p.position,0)<LEAST(o.unlocked_step,w.current_step))))`
 
+// Next returns the next due notification: welcome updates first, then
+// programme announcements.
 func (s *Store) Next(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
+	pending, found, err := s.nextWelcome(ctx, now)
+	if err != nil || found {
+		return pending, found, err
+	}
+	return s.nextProgramme(ctx, now)
+}
+
+func (s *Store) nextProgramme(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
+	var pending notifications.Pending
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM programme_notification_outbox o WHERE NOT EXISTS(SELECT 1 "+programmeEligibleSQL+")", now); err != nil {
+		return pending, false, err
+	}
+	err := s.db.QueryRowContext(ctx, `SELECT o.id,o.subscription_id,o.subscription_version,
+ s.endpoint,s.p256dh,s.auth,o.kind,s.locale,o.attempts,o.expires_at,o.event_id,o.title
+ FROM programme_notification_outbox o JOIN notification_subscriptions s ON s.id=o.subscription_id
+ WHERE o.next_attempt<=$1 AND EXISTS(SELECT 1 `+programmeEligibleSQL+`)
+ ORDER BY o.next_attempt,o.id LIMIT 1`, now).Scan(
+		&pending.ProgrammeOutboxID, &pending.SubscriptionID, &pending.SubscriptionVersion,
+		&pending.Endpoint, &pending.Keys.P256dh, &pending.Keys.Auth,
+		&pending.Kind, &pending.Locale, &pending.Attempts, &pending.ExpiresAt, &pending.EventID, &pending.Title)
+	if errors.Is(err, sql.ErrNoRows) {
+		return pending, false, nil
+	}
+	return pending, err == nil, err
+}
+
+func (s *Store) nextWelcome(ctx context.Context, now time.Time) (notifications.Pending, bool, error) {
 	var pending notifications.Pending
 	if _, err := s.db.ExecContext(ctx, "DELETE FROM notification_outbox o WHERE NOT EXISTS(SELECT 1 "+eligibleSQL+")", now); err != nil {
 		return pending, false, err
@@ -168,10 +237,14 @@ func (s *Store) Next(ctx context.Context, now time.Time) (notifications.Pending,
 
 func (s *Store) Complete(ctx context.Context, pending notifications.Pending, result notifications.Completion) error {
 	var err error
-	switch result.Delivery {
-	case notifications.RemoveSubscription:
+	switch {
+	case result.Delivery == notifications.RemoveSubscription:
 		_, err = s.db.ExecContext(ctx, "DELETE FROM notification_subscriptions WHERE id=$1 AND version=$2", pending.SubscriptionID, pending.SubscriptionVersion)
-	case notifications.RetryDelivery:
+	case pending.ProgrammeOutboxID != 0 && result.Delivery == notifications.RetryDelivery:
+		_, err = s.db.ExecContext(ctx, "UPDATE programme_notification_outbox SET attempts=attempts+1,next_attempt=$2 WHERE id=$1", pending.ProgrammeOutboxID, result.NextAttempt)
+	case pending.ProgrammeOutboxID != 0:
+		_, err = s.db.ExecContext(ctx, "DELETE FROM programme_notification_outbox WHERE id=$1", pending.ProgrammeOutboxID)
+	case result.Delivery == notifications.RetryDelivery:
 		_, err = s.db.ExecContext(ctx, `UPDATE notification_outbox SET attempts=attempts+1,next_attempt=$4
  WHERE subscription_id=$1 AND subscription_version=$2 AND revision=$3`, pending.SubscriptionID, pending.SubscriptionVersion, pending.Revision, result.NextAttempt)
 	default:

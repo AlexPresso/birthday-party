@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,10 +61,24 @@ func (s *Sender) Send(ctx context.Context, pending notifications.Pending, ttl ti
 	if !pushtransport.ValidEndpoint(pending.Endpoint) {
 		return notifications.DiscardDelivery
 	}
-	payload, err := json.Marshal(struct {
+	message := struct {
 		Type   notifications.Kind `json:"type"`
 		Locale string             `json:"locale"`
-	}{Type: pending.Kind, Locale: pending.Locale})
+		// Programme kinds name their event; welcome kinds carry no content.
+		Title   *string `json:"title,omitempty"`
+		EventID int64   `json:"eventId,omitempty"`
+	}{Type: pending.Kind, Locale: pending.Locale}
+	// A push service keeps one pending message per topic: every welcome
+	// update replaces the last, while each event keeps its own.
+	topic := "birthday-welcome"
+	if pending.ProgrammeOutboxID != 0 {
+		message.Title, message.EventID = &pending.Title, pending.EventID
+		topic = "event-" + strconv.FormatInt(pending.EventID, 10)
+		if pending.Kind == notifications.KindProgrammeUnlock {
+			topic += "-unlock"
+		}
+	}
+	payload, err := json.Marshal(message)
 	if err != nil {
 		return notifications.DiscardDelivery
 	}
@@ -72,7 +87,7 @@ func (s *Sender) Send(ctx context.Context, pending notifications.Pending, ttl ti
 	}, &webpush.Options{
 		HTTPClient: s.Client, Subscriber: strings.TrimPrefix(s.Subject, "mailto:"),
 		VAPIDPublicKey: s.Keys.Public, VAPIDPrivateKey: s.Keys.Private,
-		TTL: int(ttl.Seconds()), Topic: "birthday-welcome", Urgency: webpush.UrgencyNormal,
+		TTL: int(ttl.Seconds()), Topic: topic, Urgency: webpush.UrgencyNormal,
 	})
 	if response != nil && response.Body != nil {
 		defer response.Body.Close()

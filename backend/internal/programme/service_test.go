@@ -30,7 +30,12 @@ func (repository *memoryEvents) List(_ context.Context, limit int, _ int64, priv
 	return items, repository.err
 }
 
-func (repository *memoryEvents) NextUnlock(context.Context, time.Time) (time.Time, error) {
+func (repository *memoryEvents) Announce(context.Context, time.Time) (int, error) { return 0, nil }
+func (repository *memoryEvents) NotificationsEnabled(context.Context) (bool, error) {
+	return true, nil
+}
+func (repository *memoryEvents) SetNotificationsEnabled(context.Context, bool) error { return nil }
+func (repository *memoryEvents) NextMoment(context.Context, time.Time) (time.Time, error) {
 	return time.Time{}, repository.err
 }
 

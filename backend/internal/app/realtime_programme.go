@@ -14,18 +14,28 @@ func (a *App) programmeChanged() {
 	}
 }
 
-func (a *App) nextProgrammeUnlock(ctx context.Context) (time.Time, error) {
+// nextProgrammeMoment first queues the notifications of the moments already
+// reached, then returns the next start or unlock to wait for.
+func (a *App) nextProgrammeMoment(ctx context.Context) (time.Time, error) {
 	query, cancel := context.WithTimeout(ctx, workerQueryTimeout)
 	defer cancel()
-	return a.programme.NextUnlock(query, a.now())
+	queued, err := a.programme.Announce(query, a.now())
+	if err != nil {
+		return time.Time{}, err
+	}
+	if queued > 0 {
+		a.notificationWake.notify()
+	}
+	return a.programme.NextMoment(query, a.now())
 }
 
-// programmeWorker announces each scheduled unlock when it is reached. It sleeps
-// until the next unlock, a host edit or, after a failed read, a retry delay.
+// programmeWorker signals each scheduled start and unlock when it is reached
+// and queues its notifications. It sleeps until the next moment, a host edit
+// or, after a failed read, a retry delay.
 func (a *App) programmeWorker(ctx context.Context) {
 	failures := 0
 	for ctx.Err() == nil {
-		next, err := a.nextProgrammeUnlock(ctx)
+		next, err := a.nextProgrammeMoment(ctx)
 		if ctx.Err() != nil {
 			return
 		}
@@ -35,7 +45,7 @@ func (a *App) programmeWorker(ctx context.Context) {
 		case err != nil:
 			failures++
 			wait := retryDelay(failures)
-			log.Printf("schedule programme unlock: %v; retrying in %s", err, wait.Round(time.Millisecond))
+			log.Printf("schedule programme moments: %v; retrying in %s", err, wait.Round(time.Millisecond))
 			timer = time.NewTimer(wait)
 		case !next.IsZero():
 			failures = 0

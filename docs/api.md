@@ -353,6 +353,33 @@ future instructions or tokens. Clicking opens same-origin `/attente`, where the
 server selects the guest's current position or redirects to their available app.
 It never advances the guest automatically.
 
+### Programme notifications
+
+While the host's switch is on, subscribed devices are told when an event starts
+and when a scheduled reveal is reached. Opening a vote or a question round
+sends nothing. A worker advances one cursor under a row lock and queues what
+became due since its last pass, so each moment is announced once, even after a
+restart; a moment more than 15 minutes old is dropped, and moving an event to a
+later time announces it again then. The cursor also advances while the switch
+is off, so turning it on announces nothing from the past.
+
+- An event whose start and reveal are due together sends one notification, for
+  the start.
+- A vote or question activity still in draft sends nothing.
+- Recipients are devices of administrators and of guests with full app access
+  at that moment; guests held in the welcome sequence receive nothing.
+- Each device keeps one queued message per event and moment, with the same
+  attempts, lifetime and removal rules as welcome notifications.
+
+The payload is `{ type: "programme_start" | "programme_unlock", locale, title,
+eventId }`. `title` is the event's name as the programme shows it to guests at
+that moment: the title once unlocked, the teaser while locked, or an empty
+string for a locked event without a teaser, which the service worker replaces
+with its translated surprise wording. This is the only host-written text a
+push payload may carry: descriptions, venues, names, media and tokens never
+travel. The service worker shows the name with a short translated line, and a
+click opens same-origin `/programme`.
+
 Push delivery validates HTTPS endpoints, resolves and pins public destination
 addresses, and disables redirects and proxy forwarding. Endpoints and subscription
 keys are private and must not appear in logs or error responses.
@@ -501,6 +528,10 @@ settings for that type; there is no nested activity collection.
 - `POST /api/admin/programme { type, title, description, teaser, startsAt, unlockAt, vote? }` -> `Event` (201).
 - `PUT /api/admin/programme/{id}` accepts the same body plus `revision` for interactive events -> `Event`.
 - `DELETE /api/admin/programme/{id}` -> 204, including its votes, questions and upvotes.
+- `GET /api/admin/programme/notifications` -> `{ enabled: boolean }`, administrators only.
+- `PUT /api/admin/programme/notifications { enabled }` -> `{ enabled }`. One switch
+  for every programme notification, on by default. No revision: the last write
+  wins. A missing or non-boolean `enabled` returns 400 `invalid_body`.
 
 A missing type creates an ordinary `event`; omitting type on update preserves
 its existing type. Types cannot change after creation. Ordinary events have

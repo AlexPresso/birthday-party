@@ -49,6 +49,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/admin/guests/{id}", a.auth(true, a.revokeGuest))
 	mux.HandleFunc("GET /api/programme", a.authContent(a.listProgramme))
 	mux.HandleFunc("GET /api/admin/programme", a.auth(true, a.listAdminProgramme))
+	mux.HandleFunc("GET /api/admin/programme/notifications", a.auth(true, a.getProgrammeNotifications))
+	mux.HandleFunc("PUT /api/admin/programme/notifications", a.auth(true, a.updateProgrammeNotifications))
 	mux.HandleFunc("POST /api/admin/programme", a.auth(true, a.createEvent))
 	mux.HandleFunc("PUT /api/admin/programme/{id}", a.auth(true, a.updateEvent))
 	mux.HandleFunc("DELETE /api/admin/programme/{id}", a.auth(true, a.deleteEvent))
