@@ -386,6 +386,7 @@ const birthdayConfiguration = {
       es: { title: null, description: null },
     },
   },
+  appearance: { theme: "dark" as const, accent: "#ff6a1f" },
 };
 
 test("birthday defaults follow the selected language and saved age", () => {

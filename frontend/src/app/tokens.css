@@ -1,8 +1,17 @@
 /*
- * The app has a single dark theme. Change --accent to restyle it for another
- * party; filled accent surfaces always carry dark text (--on-accent).
+ * The host picks the theme and the main colour in settings ("Apparence").
+ * The root layout renders them on <html>: data-theme="dark" or "light", and
+ * the accent-dependent colours as --party-* properties computed by
+ * features/party/appearance.ts. The tokens below read those properties rather
+ * than being set inline, so the werewolf night (further down) still wins.
+ * The fallbacks are the default dark theme with #ff6a1f.
+ *
+ * `[data-theme="dark"]` also gives an element inside the light theme the dark
+ * surfaces (the slideshow stays a dark media viewer). Accent shades are those
+ * of the page's theme.
  */
-:root {
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
   --background: #100f0e;
   --surface: #1b1917;
@@ -10,29 +19,38 @@
   --surface-raised: #292623;
   --text: #f5f1ea;
   --muted: #a29b92;
-  --accent: #ff6a1f;
-  --accent-hover: #ff8242;
-  --accent-text: #ff8a4c;
-  --on-accent: #100f0e;
-  --accent-soft: #33211a;
-  --highlight: #ffb547;
-  --highlight-pale: #ffe2b0;
-  --accent-gradient: linear-gradient(135deg, var(--highlight), var(--accent));
   --featured-background: #1b1917;
   --featured-border: transparent;
-  --nav-active: var(--accent);
-  --profile-ring: var(--accent);
-  --button-fill: var(--accent);
   --border: #33302c;
   --border-strong: #57514a;
   --input-background: #1b1917;
   --placeholder: #8f887f;
   --danger: #ff6b81;
+  --on-danger: #100f0e;
   --danger-soft: #3a2226;
   --danger-border: #74434c;
   --shadow: 0 16px 44px #00000055;
   --nav-background: #1b1917;
   --overlay: #0a0908d9;
+  --avatar-neutral-background: #45403b;
+  --avatar-neutral-foreground: #a29b92;
+}
+
+:root {
+  /* The main colour and its shades; text on the filled accent is --on-accent. */
+  --accent: var(--party-accent, #ff6a1f);
+  --accent-hover: var(--party-accent-hover, #ff8242);
+  --accent-text: var(--party-accent-text, #ff8a4c);
+  --accent-text-hover: var(--party-accent-text-hover, #ff8242);
+  --on-accent: var(--party-on-accent, #100f0e);
+  --accent-soft: var(--party-accent-soft, #33211a);
+  --highlight: var(--party-highlight, #ffb547);
+  --highlight-pale: var(--party-highlight-pale, #ffe2b0);
+  --accent-gradient: linear-gradient(135deg, var(--highlight), var(--accent));
+  --nav-active: var(--accent);
+  --profile-ring: var(--accent);
+  --button-fill: var(--accent);
+  /* Photos and videos keep a dark frame in both themes. */
   --media-background: #0a0908;
   --media-text: #ffffff;
   --media-overlay: #100f0eb8;
@@ -46,17 +64,47 @@
   --page-gutter: 20px;
   --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
   --font-display: "Unbounded", "Figtree", "Segoe UI", system-ui, sans-serif;
-  --avatar-neutral-background: #45403b;
-  --avatar-neutral-foreground: #a29b92;
+}
+
+/*
+ * The light theme: warm off-white surfaces and dark text. Every text colour
+ * reaches 4.5:1 on the surfaces; the accent shades come from appearance.ts.
+ * Like the dark set, it also applies to an element (the settings preview).
+ */
+[data-theme="light"] {
+  color-scheme: light;
+  --background: #f7f3ee;
+  --surface: #fffdfa;
+  --surface-muted: #f1ece5;
+  --surface-raised: #ebe5dd;
+  --text: #1b1917;
+  --muted: #6b645c;
+  --featured-background: #fffdfa;
+  --featured-border: #e4ddd4;
+  --border: #e4ddd4;
+  --border-strong: #b9afa3;
+  --input-background: #fffdfa;
+  --placeholder: #7a7269;
+  --danger: #c4314b;
+  --on-danger: #ffffff;
+  --danger-soft: #fbe8ea;
+  --danger-border: #eeb4bd;
+  --shadow: 0 12px 32px #3b2a1a24;
+  --nav-background: #fffdfa;
+  --overlay: #1b191766;
+  --avatar-neutral-background: #e4ddd4;
+  --avatar-neutral-foreground: #6b645c;
 }
 
 /*
  * Night in a running werewolf game (werewolf-activity.tsx sets
  * data-phase="night" on the document root while its page shows it): the same
  * roles in a cool moonlit blue-grey, the accent a pale moonlight that still
- * carries dark text.
+ * carries dark text. It comes after the light theme so it wins in both, and
+ * sets every token the light theme changes.
  */
 :root[data-phase="night"] {
+  color-scheme: dark;
   --background: #0e1220;
   --surface: #171c2b;
   --surface-muted: #131827;
@@ -66,15 +114,22 @@
   --accent: #c9d4ec;
   --accent-hover: #dce4f5;
   --accent-text: #b7c6e8;
+  --accent-text-hover: #dce4f5;
   --on-accent: #0e1220;
   --accent-soft: #1f2a44;
   --highlight: #a9bde3;
   --highlight-pale: #e1e8f7;
   --featured-background: #171c2b;
+  --featured-border: transparent;
   --border: #2a3145;
   --border-strong: #465068;
   --input-background: #171c2b;
   --placeholder: #7c8599;
+  --danger: #ff6b81;
+  --on-danger: #0e1220;
+  --danger-soft: #3a2226;
+  --danger-border: #74434c;
+  --shadow: 0 16px 44px #00000055;
   --nav-background: #171c2b;
   --overlay: #080b14d9;
   --avatar-neutral-background: #343c52;

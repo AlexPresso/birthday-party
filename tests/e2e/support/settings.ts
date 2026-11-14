@@ -15,6 +15,7 @@ export async function expectSavedAnnouncement(
 
 export type SettingsSection =
   | "party"
+  | "appearance"
   | "age"
   | "programme"
   | "guests"

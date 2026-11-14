@@ -1,0 +1,150 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  .appearance-editor {
+    display: grid;
+    gap: 28px;
+    min-width: 0;
+  }
+
+  .appearance-group {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .appearance-group > legend {
+    margin-bottom: 12px;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* Two cards, each with a tiny page of its theme. */
+  .appearance-themes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    max-width: 420px;
+  }
+
+  .appearance-theme {
+    position: relative;
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--surface);
+    cursor: pointer;
+  }
+
+  .appearance-theme:has(input:checked) {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .appearance-theme:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .appearance-theme > input,
+  .appearance-swatch > input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  /* Painted from the theme set on the element itself (tokens.css). */
+  .appearance-theme-preview {
+    display: grid;
+    align-content: center;
+    gap: 6px;
+    height: 56px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--background);
+  }
+
+  .appearance-theme-preview > span {
+    display: block;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+  }
+
+  .appearance-theme-preview > span:last-child {
+    width: 40%;
+    background: var(--accent);
+  }
+
+  .appearance-theme-name {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .appearance-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .appearance-swatch {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border-radius: 50%;
+    background: var(--swatch);
+    color: var(--swatch-text);
+    cursor: pointer;
+  }
+
+  .appearance-swatch > svg {
+    pointer-events: none;
+  }
+
+  /* The ring repeats the check, so the choice never rests on colour alone. */
+  .appearance-swatch:has(input:checked),
+  .appearance-custom[data-selected] {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 5px var(--text);
+  }
+
+  .appearance-swatch:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 7px;
+  }
+
+  .appearance-custom:not([data-selected]) {
+    border: 1px dashed var(--border-strong);
+    background: var(--surface);
+    color: var(--muted);
+  }
+
+  .appearance-warning {
+    margin: 14px 0 0;
+    line-height: 1.6;
+  }
+
+  .appearance-editor > .status-notice:empty {
+    display: none;
+  }
+}

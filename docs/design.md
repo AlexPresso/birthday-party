@@ -21,7 +21,7 @@ new decision; do not revisit the rejected directions without a reason.
 - Interface language follows the phone/browser's preferred supported language:
   French, English, German, Italian or Spanish, with English as the fallback.
 
-## Selected direction: "K · Neige", dark with one orange accent
+## Selected direction: "K · Neige", one accent on a dark or light base
 
 On 2026-11-12 the host chose a single dark theme, meant to suit any party so
 other hosts can reuse the app. It replaces the cream and dark plum themes. Every
@@ -29,13 +29,21 @@ reference image in this folder was drawn in those previous colors: use them for
 layout only. Photographs, names and messages in any mockup are
 illustrative and must not be seeded into the application.
 
-- **Theme.** Dark only; do not follow the device's light preference. Background
-  `#100F0E`, surfaces `#1B1917` and `#292623`, borders `#33302C`, text `#F5F1EA`,
-  secondary text `#A29B92`.
-- **Accent.** Orange `#FF6A1F`, with amber `#FFB547` for times and the ring
-  gradient. A filled accent always carries dark text, so another party can swap
-  `--accent` in `frontend/src/app/tokens.css` without losing contrast. Use the
-  accent for the one main action on a screen and for the current tab.
+- **Theme.** The host picks it in Settings → La fête → Apparence; it never
+  follows the device's preference. Dark (the default): background `#100F0E`,
+  surfaces `#1B1917` and `#292623`, borders `#33302C`, text `#F5F1EA`,
+  secondary text `#A29B92`. Light: background `#F7F3EE`, surfaces `#FFFDFA`
+  and `#EBE5DD`, borders `#E4DDD4`, text `#1B1917`, secondary text `#6B645C`.
+  The theme and the accent apply everywhere, from the invitation page on, in
+  the first server render.
+- **Accent.** Orange `#FF6A1F` by default, with amber for times and the ring
+  gradient; the host may pick one of eight swatches or any colour. The shades
+  (hover, soft tint, accent text, highlight, snow, glow) are derived from it
+  and kept readable on the theme's surfaces. A filled accent carries whichever
+  of dark or white text contrasts more; say so once in the editor when neither
+  reaches AA. Use the accent for the one main action on a screen and for the
+  current tab. The slideshow stays a dark viewer, and the Loup-garou night is
+  the same moonlit blue in both themes.
 - **Type.** Unbounded for page titles, the age, times and the featured vote
   question; Figtree for everything else. Do not use italics or uppercase,
   letter-spaced labels for emphasis.

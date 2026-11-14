@@ -214,7 +214,7 @@
 
   .welcome-list-number {
     min-width: 18px;
-    color: var(--accent);
+    color: var(--accent-text);
     font-size: 13px;
     font-variant-numeric: tabular-nums;
     line-height: 21px;

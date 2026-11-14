@@ -259,6 +259,8 @@ export function MediaSlideshow({
     <dialog
       ref={dialog}
       className="media-slideshow"
+      // A media viewer: dark surfaces in the light theme too (tokens.css).
+      data-theme="dark"
       aria-label={t("slideshow.title")}
       onCancel={(event) => {
         event.preventDefault();

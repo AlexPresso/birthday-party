@@ -58,7 +58,7 @@ const en = {
   invalid_party:
     "The title can contain up to 120 characters and the location up to 240.",
   invalid_configuration:
-    "Choose an age from 1 to 150 and upload limits from 1 to 1024 MiB. Invitation titles allow 200 characters and descriptions 2000.",
+    "Choose an age from 1 to 150, upload limits from 1 to 1024 MiB and a colour such as #ff6a1f. Invitation titles allow 200 characters and descriptions 2000.",
   invalid_timezone: "Choose a time zone such as Europe/Zurich.",
   unknown_timezone: "This time zone was not found. Try Europe/Zurich.",
   invalid_date: "Choose the date and time again, then save.",
@@ -184,7 +184,7 @@ export const errorMessages = {
     invalid_party:
       "Le titre peut contenir jusqu’à 120 caractères et le lieu jusqu’à 240.",
     invalid_configuration:
-      "Choisis un âge de 1 à 150 et des limites de 1 à 1024 Mio. Les titres acceptent 200 caractères et les descriptions 2000.",
+      "Choisis un âge de 1 à 150, des limites de 1 à 1024 Mio et une couleur comme #ff6a1f. Les titres acceptent 200 caractères et les descriptions 2000.",
     invalid_timezone: "Choisis un fuseau horaire, par exemple Europe/Zurich.",
     unknown_timezone: "Ce fuseau horaire est inconnu. Essaie Europe/Zurich.",
     invalid_date: "Choisis à nouveau la date et l’heure, puis enregistre.",
@@ -319,7 +319,7 @@ export const errorMessages = {
     invalid_party:
       "Der Titel darf höchstens 120 Zeichen enthalten, der Ort höchstens 240.",
     invalid_configuration:
-      "Wähle ein Alter von 1 bis 150 und Dateilimits von 1 bis 1024 MiB. Titel erlauben 200 Zeichen, Beschreibungen 2000.",
+      "Wähle ein Alter von 1 bis 150, Dateilimits von 1 bis 1024 MiB und eine Farbe wie #ff6a1f. Titel erlauben 200 Zeichen, Beschreibungen 2000.",
     invalid_timezone: "Wähle eine Zeitzone, zum Beispiel Europe/Zurich.",
     unknown_timezone:
       "Diese Zeitzone wurde nicht gefunden. Versuch es mit Europe/Zurich.",
@@ -451,7 +451,7 @@ export const errorMessages = {
     invalid_party:
       "Il titolo può contenere fino a 120 caratteri e il luogo fino a 240.",
     invalid_configuration:
-      "Scegli un’età da 1 a 150 e limiti da 1 a 1024 MiB. I titoli accettano 200 caratteri e le descrizioni 2000.",
+      "Scegli un’età da 1 a 150, limiti da 1 a 1024 MiB e un colore come #ff6a1f. I titoli accettano 200 caratteri e le descrizioni 2000.",
     invalid_timezone: "Scegli un fuso orario, per esempio Europe/Zurich.",
     unknown_timezone:
       "Questo fuso orario non è stato trovato. Prova Europe/Zurich.",
@@ -578,7 +578,7 @@ export const errorMessages = {
     invalid_party:
       "El título puede tener hasta 120 caracteres y el lugar hasta 240.",
     invalid_configuration:
-      "Elige una edad de 1 a 150 y límites de 1 a 1024 MiB. Los títulos admiten 200 caracteres y las descripciones 2000.",
+      "Elige una edad de 1 a 150, límites de 1 a 1024 MiB y un color como #ff6a1f. Los títulos admiten 200 caracteres y las descripciones 2000.",
     invalid_timezone: "Elige una zona horaria, por ejemplo Europe/Zurich.",
     unknown_timezone:
       "No se ha encontrado esta zona horaria. Prueba con Europe/Zurich.",

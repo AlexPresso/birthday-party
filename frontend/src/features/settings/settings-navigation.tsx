@@ -20,6 +20,7 @@ import {
 
 export type SettingsSection =
   | "party"
+  | "appearance"
   | "programme"
   | "guests"
   | "invitation"
