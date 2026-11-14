@@ -864,7 +864,7 @@ test("a player sees day or night, their role on request, their own state and the
   });
   await expect(page.locator("html")).toHaveAttribute("data-phase", "day");
   expect(await paint(page, reveal)).toEqual(dayPaint);
-  expect(await rootTransition(page)).toBe(1.6);
+  expect(await rootTransition(page)).toBe(0.6);
   await toNight.click();
   await board.mouse.move(0, 0);
   for (const viewer of [page, second, watcher, board]) {
@@ -872,7 +872,7 @@ test("a player sees day or night, their role on request, their own state and the
     await expect(viewer.locator("html")).toHaveAttribute("data-phase", "night");
   }
   // One frame of the crossfade, for review.
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(300);
   await page.screenshot({
     path: test.info().outputPath("werewolf-player-dusk-mobile.png"),
     style: "nextjs-portal { visibility: hidden; }",

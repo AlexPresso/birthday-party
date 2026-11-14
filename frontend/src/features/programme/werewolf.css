@@ -17,7 +17,7 @@
         --border, --border-strong, --input-background, --placeholder,
         --nav-background, --overlay, --avatar-neutral-background,
         --avatar-neutral-foreground;
-      transition-duration: 1.6s;
+      transition-duration: 0.6s;
       transition-timing-function: ease-in-out;
     }
   }
