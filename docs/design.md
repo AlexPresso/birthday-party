@@ -112,7 +112,11 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - Put the first available open vote in a compact card with its real question,
   its three leading options (avatars for guests, short labels for free-text
   choices) and a Vote action that opens the vote's own page. Present the remaining
-  programme as agenda rows with a time column and fine dividers. Show only the
+  programme as agenda rows with a time column and fine dividers. When the
+  events span several days of the party's timezone, group them under a heading
+  per day: the full date in words, with a dot in the accent colour for the
+  party's day and a neutral one otherwise. Never write "today" or "tomorrow".
+  A programme held on one day shows no day heading. Show only the
   authorized teaser and unlock information for locked events.
 - Question activities ("Sans filtre") have their own page at `/programme/[id]`,
   linked from the agenda and programme settings. Follow the approved

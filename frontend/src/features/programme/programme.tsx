@@ -18,6 +18,14 @@ import { PageHeading, EmptyState, ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 import { VoteStatus } from "./vote-status";
 import { ActivityLink } from "./activity-link";
+import {
+  type AgendaDay,
+  calendarDay,
+  dayHeading,
+  groupByDay,
+  impliedYear,
+  spansSeveralDays,
+} from "./agenda-days";
 import "./programme.css";
 
 const previewedOptions = 3;
@@ -47,30 +55,28 @@ function ProgrammeEvent({
   event,
   timezone,
   partyDate,
-  featured,
-  showAgendaHeading,
+  featured = false,
+  showAgendaHeading = false,
+  underDayHeading = false,
 }: {
   event: PartyEvent;
   timezone: string;
   partyDate: string | null;
-  featured: boolean;
-  showAgendaHeading: boolean;
+  featured?: boolean;
+  showAgendaHeading?: boolean;
+  /** The day heading above the event already carries its date. */
+  underDayHeading?: boolean;
 }) {
   const { locale, t } = useI18n();
   const vote = event.locked ? null : event.vote;
   const questionIsTitle = vote?.question === event.title;
   const title =
     event.locked && !event.title ? t("programme.surprise") : event.title;
-  const day = new Intl.DateTimeFormat(locale, {
-    timeZone: timezone,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
   const isPartyDay = (value: string) =>
     partyDate !== null &&
-    day.format(new Date(value)) === day.format(new Date(partyDate));
-  const showDate = event.startsAt && !isPartyDay(event.startsAt);
+    calendarDay(value, timezone) === calendarDay(partyDate, timezone);
+  const showDate =
+    !underDayHeading && event.startsAt && !isPartyDay(event.startsAt);
   let unlockMessage = t("programme.waiting");
   if (event.unlockAt) {
     unlockMessage = isPartyDay(event.unlockAt)
@@ -177,6 +183,50 @@ function ProgrammeEvent({
   );
 }
 
+/** One day of a programme held on several: its heading, then its events. */
+function ProgrammeDay({
+  day,
+  party,
+}: {
+  day: AgendaDay<PartyEvent>;
+  party: Party;
+}) {
+  const { locale, t } = useI18n();
+  const headingId = `programme-day-${day.date ?? "untimed"}`;
+  const isPartyDay =
+    party.date !== null && day.date === calendarDay(party.date, party.timezone);
+  return (
+    <li className="programme-day">
+      <section
+        aria-labelledby={headingId}
+        data-party-day={isPartyDay || undefined}
+      >
+        <h2 id={headingId} className="programme-day-heading">
+          <span className="programme-day-dot" aria-hidden="true" />
+          {day.date
+            ? dayHeading(
+                day.date,
+                locale,
+                impliedYear(party.date, party.timezone),
+              )
+            : t("programme.noTime")}
+        </h2>
+        <ol className="programme-day-events">
+          {day.events.map((event) => (
+            <ProgrammeEvent
+              key={event.id}
+              event={event}
+              timezone={party.timezone}
+              partyDate={party.date}
+              underDayHeading
+            />
+          ))}
+        </ol>
+      </section>
+    </li>
+  );
+}
+
 export function Programme({
   initial,
   party,
@@ -206,9 +256,13 @@ export function Programme({
   const featured = events.find(
     (event) => !event.locked && event.vote?.status === "open",
   );
-  const displayedEvents = featured
-    ? [featured, ...events.filter((event) => event.id !== featured.id)]
+  const agenda = featured
+    ? events.filter((event) => event.id !== featured.id)
     : events;
+  // A programme held on one day keeps its single list, without day headings.
+  const days = spansSeveralDays(events, party.timezone)
+    ? groupByDay(agenda, party.timezone)
+    : null;
 
   return (
     <>
@@ -272,20 +326,36 @@ export function Programme({
           className="programme-list"
           style={
             {
-              "--agenda-rows": Math.max(1, displayedEvents.length - 1),
+              "--agenda-rows": Math.max(1, (days ?? agenda).length),
             } as CSSProperties
           }
         >
-          {displayedEvents.map((event, index) => (
+          {featured && (
             <ProgrammeEvent
-              key={event.id}
-              event={event}
+              key={featured.id}
+              event={featured}
               timezone={party.timezone}
               partyDate={party.date}
-              featured={event.id === featured?.id}
-              showAgendaHeading={index === (featured ? 1 : 0)}
+              featured
             />
-          ))}
+          )}
+          {days
+            ? days.map((day) => (
+                <ProgrammeDay
+                  key={day.date ?? "untimed"}
+                  day={day}
+                  party={party}
+                />
+              ))
+            : agenda.map((event, index) => (
+                <ProgrammeEvent
+                  key={event.id}
+                  event={event}
+                  timezone={party.timezone}
+                  partyDate={party.date}
+                  showAgendaHeading={index === 0}
+                />
+              ))}
         </ol>
       )}
     </>
