@@ -30,14 +30,18 @@ import {
 import { useEventDraft } from "./use-event-draft";
 import { EventForm } from "./event-form";
 import { EventList } from "./event-list";
+import { ProgrammeNotificationsSwitch } from "./notifications-switch";
 import "./activities.css";
 
 export function EventManager({
   initial,
+  notifications,
   timezone,
   guests,
 }: {
   initial: PartyEvent[];
+  /** Whether programme notifications are on, as last saved. */
+  notifications: boolean;
   timezone: string;
   guests: Guest[];
 }) {
@@ -221,6 +225,7 @@ export function EventManager({
 
   return (
     <div className="admin-form">
+      <ProgrammeNotificationsSwitch initial={notifications} />
       <div className="section-row">
         <button
           className="button secondary"

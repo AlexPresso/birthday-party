@@ -6,7 +6,10 @@ import { configurationSchema } from "@/features/party/contracts";
 import { getSession } from "@/features/guests/server";
 import { serverApi } from "@/lib/server-api";
 import { guestsSchema } from "@/features/guests/contracts";
-import { eventsSchema } from "@/features/programme/contracts";
+import {
+  eventsSchema,
+  programmeNotificationsSchema,
+} from "@/features/programme/contracts";
 import { adminWelcomeSchema } from "@/features/welcome/contracts";
 import { adminInformationSchema } from "@/features/information/contracts";
 import { mediaCategoriesSchema } from "@/features/media/contracts";
@@ -23,6 +26,7 @@ export default async function SettingsPage() {
     party,
     guests,
     events,
+    programmeNotifications,
     welcome,
     information,
     categories,
@@ -31,6 +35,7 @@ export default async function SettingsPage() {
     getParty(),
     serverApi("/admin/guests", guestsSchema),
     serverApi("/admin/programme", eventsSchema),
+    serverApi("/admin/programme/notifications", programmeNotificationsSchema),
     serverApi("/admin/welcome", adminWelcomeSchema),
     serverApi("/admin/information", adminInformationSchema),
     serverApi("/media-categories", mediaCategoriesSchema),
@@ -43,6 +48,7 @@ export default async function SettingsPage() {
         party={party}
         guests={guests.items}
         events={events.items}
+        programmeNotifications={programmeNotifications.enabled}
         configuration={configuration}
         welcome={welcome}
         information={information}

@@ -736,3 +736,137 @@ test("invalid event drafts remain editable and a failed autosave retries on blur
   await expect(error).toHaveCount(0);
   await expect(form).toBeVisible();
 });
+
+test.describe("the programme notification setting", () => {
+  const path = "/api/admin/programme/notifications";
+
+  async function savedSetting() {
+    const response = await host.get(path);
+    expect(response.status()).toBe(200);
+    return (await response.json()).enabled as boolean;
+  }
+
+  /** The switch above the host's events. */
+  function notificationSetting(page: Page) {
+    const setting = page.locator(".programme-notifications");
+    const toggle = setting.getByRole("switch", {
+      name: "Notifier le début des événements et les surprises dévoilées",
+      exact: true,
+    });
+    return { setting, toggle };
+  }
+
+  test.afterEach(async () => {
+    // Notifications are on by default; later specs expect that.
+    expect((await host.put(path, { data: { enabled: true } })).status()).toBe(
+      200,
+    );
+  });
+
+  test("the switch is on by default, saves at once and keeps its value after a reload", async ({
+    browser,
+  }) => {
+    expect(await savedSetting()).toBe(true);
+    const editor = await hostSettings(browser);
+    const { setting, toggle } = notificationSetting(editor);
+    await expect(toggle).toBeChecked();
+    // The label says what the switch does: nothing is written under it.
+    await expect(toggle).toHaveAccessibleDescription("");
+    await expect(setting.locator("p:not(.visually-hidden)")).toHaveCount(0);
+    const add = editor.getByRole("button", {
+      name: "Ajouter un événement",
+      exact: true,
+    });
+    const settingBox = (await setting.boundingBox())!;
+    expect(settingBox.y + settingBox.height).toBeLessThanOrEqual(
+      (await add.boundingBox())!.y,
+    );
+    await setting.screenshot({
+      path: test.info().outputPath("programme-notifications-desktop.png"),
+    });
+
+    await toggle.uncheck();
+    await expect(setting).not.toHaveAttribute("data-dirty", "true");
+    await expect(setting).toHaveAttribute("aria-busy", "false");
+    expect(await savedSetting()).toBe(false);
+    // No visible confirmation: only screen readers are told.
+    await expectSavedAnnouncement(setting, "Le programme est enregistré.");
+    await expect(setting.locator("p:not(.visually-hidden)")).toHaveCount(0);
+    await expect(setting.getByRole("alert")).toHaveCount(0);
+
+    await editor.reload();
+    await openSettingsSection(editor, "programme");
+    await expect(toggle).not.toBeChecked();
+
+    await toggle.press("Space");
+    await expect(toggle).toBeChecked();
+    await expect(setting).not.toHaveAttribute("data-dirty", "true");
+    expect(await savedSetting()).toBe(true);
+    await editor.reload();
+    await openSettingsSection(editor, "programme");
+    await expect(toggle).toBeChecked();
+
+    await editor.setViewportSize({ width: 320, height: 740 });
+    await expect(toggle).toBeVisible();
+    await expectNoHorizontalOverflow(editor);
+    await setting.screenshot({
+      path: test.info().outputPath("programme-notifications-mobile.png"),
+    });
+  });
+
+  test("a failed save shows the error, keeps the switch where the host put it and can be retried", async ({
+    browser,
+  }) => {
+    const editor = await hostSettings(browser);
+    const { setting, toggle } = notificationSetting(editor);
+    await expect(toggle).toBeChecked();
+    let refused = 0;
+    await editor.route(`**${path}`, async (route) => {
+      if (route.request().method() !== "PUT") return route.continue();
+      refused++;
+      await route.fulfill({
+        status: 503,
+        json: { code: "internal_error", error: "Unable to save the setting." },
+      });
+    });
+    const error = setting.getByRole("alert");
+    const retry = setting.getByRole("button", {
+      name: "Réessayer",
+      exact: true,
+    });
+
+    await toggle.uncheck();
+    await expect(error).toHaveText(
+      "Ça n’a pas fonctionné. Réessaie dans un instant.",
+    );
+    await expect(toggle).not.toBeChecked();
+    await expect(setting).toHaveAttribute("data-dirty", "true");
+    expect(refused).toBe(1);
+    expect(await savedSetting()).toBe(true);
+
+    // Back on the saved value, nothing is left to save or to retry.
+    await toggle.check();
+    await expect(error).toHaveCount(0);
+    await expect(retry).toHaveCount(0);
+    await expect(setting).not.toHaveAttribute("data-dirty", "true");
+    expect(refused).toBe(1);
+
+    await toggle.uncheck();
+    await expect(error).toBeVisible();
+    expect(refused).toBe(2);
+    await retry.click();
+    await expect.poll(() => refused).toBe(3);
+    await expect(error).toBeVisible();
+    await expect(toggle).not.toBeChecked();
+    expect(await savedSetting()).toBe(true);
+
+    await editor.unroute(`**${path}`);
+    await retry.click();
+    await expect(setting).not.toHaveAttribute("data-dirty", "true");
+    await expect(error).toHaveCount(0);
+    await expect(retry).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+    await expect(toggle).not.toBeChecked();
+    expect(await savedSetting()).toBe(false);
+  });
+});

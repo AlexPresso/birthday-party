@@ -119,7 +119,8 @@ you can see, which is a simple way to prepare a surprise album. When you open
 the app, everyone can come in.
 
 Guests who turned on notifications get one each time you unlock a step or open
-the app. On iPhone and iPad, the app first has to be added to the home screen.
+the app, and later when an event starts or a surprise is revealed, unless you
+switch that off in the schedule settings. On iPhone and iPad, the app first has to be added to the home screen.
 
 ## Privacy
 
