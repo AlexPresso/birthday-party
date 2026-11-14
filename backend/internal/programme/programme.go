@@ -28,6 +28,7 @@ const (
 	TypeEvent     EventType = "event"
 	TypeVote      EventType = "vote"
 	TypeQuestions EventType = "questions"
+	TypeWerewolf  EventType = "werewolf"
 )
 
 // Event contains the fields visible to its requested audience.
@@ -43,29 +44,38 @@ type Event struct {
 	Locked      bool             `json:"locked"`
 	Vote        *Vote            `json:"vote"`
 	Questions   *QuestionSummary `json:"questions"`
+	Werewolf    *WerewolfSummary `json:"werewolf"`
 }
 
 // Input is the host-authored event content. After normalization its instants
-// are valid UTC timestamps in the API form.
+// are valid UTC timestamps in the API form. Vote and Werewolf are the settings
+// of those event types; an update that omits them keeps the saved ones.
 type Input struct {
-	Type        EventType  `json:"type"`
-	Revision    int64      `json:"revision"`
-	Vote        *VoteInput `json:"vote"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Teaser      string     `json:"teaser"`
-	StartsAt    *string    `json:"startsAt"`
-	UnlockAt    *string    `json:"unlockAt"`
+	Type        EventType      `json:"type"`
+	Revision    int64          `json:"revision"`
+	Vote        *VoteInput     `json:"vote"`
+	Werewolf    *WerewolfInput `json:"werewolf"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Teaser      string         `json:"teaser"`
+	StartsAt    *string        `json:"startsAt"`
+	UnlockAt    *string        `json:"unlockAt"`
 }
 
 func (input Input) normalize() (Input, error) {
 	switch input.Type {
-	case "", TypeEvent, TypeVote, TypeQuestions:
+	case "", TypeEvent, TypeVote, TypeQuestions, TypeWerewolf:
 	default:
 		return input, ErrInvalidEvent
 	}
-	if (input.Type == TypeEvent || input.Type == TypeQuestions) && input.Vote != nil || input.Type == TypeVote && input.Vote == nil {
+	// An update may omit the type and still carry the settings of its event.
+	if input.Vote != nil && input.Type != "" && input.Type != TypeVote || input.Type == TypeVote && input.Vote == nil {
 		return input, ErrInvalidEvent
+	}
+	if input.Werewolf != nil {
+		if input.Type != "" && input.Type != TypeWerewolf || input.Werewolf.GameMasterID != nil && *input.Werewolf.GameMasterID <= 0 {
+			return input, ErrInvalidEvent
+		}
 	}
 	if input.Vote != nil {
 		vote, err := input.Vote.normalize()
@@ -101,6 +111,7 @@ func (event Event) View(now time.Time, private bool) Event {
 		event.Description = ""
 		event.Vote = nil
 		event.Questions = nil
+		event.Werewolf = nil
 	}
 	return event
 }

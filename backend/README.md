@@ -237,7 +237,8 @@ HTTP request logs never include these tokens.
   recovery and are deleted together. Lists are paginated
   at 24 items by default, maximum 48. Hosts can manage up to 500 guest identities
   and 200 programme entries. A vote offers at most 200 options, guests' write-ins
-  included. These are initial explicit bounds, not performance claims.
+  included. A werewolf game seats at most 60 players and lists at most 20 roles.
+  These are initial explicit bounds, not performance claims.
 - PostgreSQL migrations are embedded SQL files in `internal/app/migrations`,
   starting with `0001_baseline.sql`, which creates the initial schema. Later files
   change it: `0002_vote_options.sql` gives votes their options and write-ins.

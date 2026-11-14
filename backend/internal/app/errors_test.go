@@ -25,6 +25,8 @@ func TestEveryFeatureErrorHasOneAPIEntry(t *testing.T) {
 		programme.ErrInvalidActivity, programme.ErrActivityConflict, programme.ErrVoteClosed, programme.ErrInvalidOption, programme.ErrSelfVote,
 		programme.ErrWriteInsDisabled, programme.ErrOptionLimit, programme.ErrInvalidLabel,
 		programme.ErrInvalidQuestion, programme.ErrQuestionsClosed, programme.ErrQuestionLimit, programme.ErrNoJokers,
+		programme.ErrGameMasterRequired, programme.ErrInvalidWerewolfRoles, programme.ErrWerewolfRolesMismatch, programme.ErrWerewolfPlayerLimit,
+		programme.ErrInvalidWerewolfPlayer, programme.ErrWerewolfMessageForbidden, programme.ErrInvalidWerewolfMessage,
 	}
 	for _, sentinel := range sentinelCodes {
 		rejections = append(rejections, sentinel.err)

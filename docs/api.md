@@ -365,7 +365,8 @@ is off, so turning it on announces nothing from the past.
 
 - An event whose start and reveal are due together sends one notification, for
   the start.
-- A vote or question activity still in draft sends nothing.
+- A vote or question activity still in draft sends nothing. A werewolf event
+  has no draft: its start and reveal are announced like an ordinary event's.
 - Recipients are devices of administrators and of guests with full app access
   at that moment; guests held in the welcome sequence receive nothing.
 - Each device keeps one queued message per event and moment, with the same
@@ -521,13 +522,13 @@ are removed, and revoked guests' jobs cannot publish media.
 Activities are programme events themselves. An event has a type and optional
 settings for that type; there is no nested activity collection.
 
-`Event = { id, type: "event" | "vote" | "questions", revision, title, description, teaser, startsAt: string | null, unlockAt: string | null, locked: boolean, vote: Vote | null, questions: QuestionSummary | null }`
+`Event = { id, type: "event" | "vote" | "questions" | "werewolf", revision, title, description, teaser, startsAt: string | null, unlockAt: string | null, locked: boolean, vote: Vote | null, questions: QuestionSummary | null, werewolf: WerewolfSummary | null }`
 
 - `GET /api/programme` -> `{ items: Event[] }`.
 - `GET /api/admin/programme` -> `{ items: Event[] }`, including drafts and locked content.
-- `POST /api/admin/programme { type, title, description, teaser, startsAt, unlockAt, vote? }` -> `Event` (201).
-- `PUT /api/admin/programme/{id}` accepts the same body plus `revision` for interactive events -> `Event`.
-- `DELETE /api/admin/programme/{id}` -> 204, including its votes, questions and upvotes.
+- `POST /api/admin/programme { type, title, description, teaser, startsAt, unlockAt, vote?, werewolf? }` -> `Event` (201).
+- `PUT /api/admin/programme/{id}` accepts the same body plus `revision` for vote and question events -> `Event`.
+- `DELETE /api/admin/programme/{id}` -> 204, including its votes, questions, upvotes and werewolf game.
 - `GET /api/admin/programme/notifications` -> `{ enabled: boolean }`, administrators only.
 - `PUT /api/admin/programme/notifications { enabled }` -> `{ enabled }`. One switch
   for every programme notification, on by default. No revision: the last write
@@ -536,12 +537,17 @@ settings for that type; there is no nested activity collection.
 A missing type creates an ordinary `event`; omitting type on update preserves
 its existing type. Types cannot change after creation. Ordinary events have
 `vote: null` and `revision: 1`. Creating a vote requires the `vote` settings
-described under [Vote events](#vote-events). Event metadata, vote settings and
-options are saved in one transaction. Invalid settings leave no partial event.
+described under [Vote events](#vote-events); a werewolf event takes the
+`werewolf` settings described under [Werewolf events](#werewolf-events-loup-garou).
+Settings that do not belong to the event's type are refused (`invalid_event`,
+or `activity_conflict` when an update omits or changes the type). Event
+metadata, settings and options
+are saved in one transaction. Invalid settings leave no partial event.
 The programme is limited to 200 events across all types.
 
 For guests, a locked published event returns the public teaser as `title`, or an
-empty title when no teaser is set, an empty `description`, `vote: null` and `questions: null`.
+empty title when no teaser is set, an empty `description`, `vote: null`,
+`questions: null` and `werewolf: null`.
 The frontend supplies a localized surprise placeholder for an empty title.
 An event unlocks when server time is at or after `unlockAt`; null means available.
 Draft interactive events are omitted entirely from the guest programme, including their
@@ -721,6 +727,191 @@ Vote errors, alongside existing event, access and not-found errors:
 | `vote_closed`         | 409    | Vote or write-in after the vote closed                                 |
 | `vote_option_limit`   | 409    | A new write-in when the vote already has 200 options                   |
 | `activity_conflict`   | 409    | Stale revision, frozen setting, bad transition, removing a host option |
+
+### Werewolf events (Loup-garou)
+
+A companion for the hidden-role party game played aloud. The app deals one
+secret role to each player and keeps the board; turns, votes and nights are
+played aloud. A werewolf event has no draft: its game is visible as soon as the
+event is.
+
+```typescript
+type Person = { id: number; name: string; avatarUrl: string | null };
+
+// On Event, for every viewer who can see the event's content.
+type WerewolfSummary = {
+  status: "lobby" | "running" | "finished";
+  gameMaster: Person | null;
+  players: number; // how many joined
+};
+
+// The game, as one viewer sees it.
+type Werewolf = {
+  status: "lobby" | "running" | "finished";
+  revision: number; // see "Revision" below
+  gameMaster: Person | null;
+  isGameMaster: boolean;
+  joined: boolean; // the viewer is a player
+  hideRolesOfDead: boolean; // variant "secret deaths"
+  ghostMessages: boolean; // variant "ghost messages"
+  phase: "day" | "night"; // "night" only with ghostMessages, once started
+  players: Player[]; // join order
+  myRole: RoleCard | null; // the viewer's own role, when running or finished
+  canWriteMessage: boolean; // viewer is a dead player, night, variant on, game running
+  myMessage: string | null; // what the viewer wrote, while the game runs with the variant
+  mayorMessage: { from: Person; text: string } | null; // only for the current mayor, by day
+  // Game master only; null for everyone else, the party's host included.
+  roles: Role[] | null;
+  messages: { from: Person; text: string; delivered: boolean }[] | null; // join order of the writers
+};
+
+type Player = Person & {
+  alive: boolean;
+  mayor: boolean;
+  role: RoleCard | null; // null whenever this viewer may not see it
+};
+
+// A built-in role has a key and name: null; the interface translates its name
+// and, while description is null, its explanation. A custom role has key: null
+// and its own name. description is null when nothing was written.
+type RoleCard = { key: string | null; name: string | null; description: string | null };
+type Role = RoleCard & { id: number; count: number };
+```
+
+Built-in keys: `werewolf`, `villager`, `seer`, `witch`, `hunter`, `cupid`,
+`guard`. A new game lists all seven in that order, `werewolf` at 1 and the
+others at 0.
+
+#### Event settings
+
+Create and edit (`POST /api/admin/programme`, `PUT /api/admin/programme/{id}`)
+take `type: "werewolf"` and `werewolf: { gameMasterId: number | null }`: the
+guest who leads the game, or null while undecided. The host chooses any active
+guest, themselves included. On creation, omitting `werewolf` means no game
+master; on update, omitting it keeps the current one.
+
+- An unknown or revoked guest returns 400 `invalid_vote_option`; a
+  `gameMasterId` that is not a positive number returns 400 `invalid_event`.
+- While the game is `running`, naming another game master, or none, returns
+  409 `activity_conflict`. Repeating the current one is accepted.
+- A player who becomes game master stops being a player.
+- A werewolf event needs no `revision` to be edited; a value sent is ignored.
+  Renaming or rescheduling the event keeps the game, its players and its roles.
+
+#### Who sees what
+
+Go builds each response for its viewer; no response carries the full state.
+
+- The game master: every player's role, the role list with its quantities and
+  every ghost message with its `delivered` flag.
+- A player: their own role once the game runs, as `myRole` and on their own
+  entry of `players`.
+- Everyone who can open the game: the players' names, photos, `alive` and
+  `mayor`; a dead player's role while the game runs, unless `hideRolesOfDead`
+  is on; every role once the game is `finished`.
+- The party's host has no special view: they see what a game master, a player
+  or a guest who did not join sees, whichever they are.
+- Ghost messages: a ghost sees their own (`myMessage`) and the current mayor,
+  by day, the one that was drawn (`mayorMessage`, with its writer but never
+  the writer's role). Both are null unless the game is running with the
+  variant on. A mayor named after the draw reads the drawn message; a former
+  mayor no longer does. The game master's `messages` stay until the next
+  night, the variant is turned off or the game is reset.
+
+#### Routes
+
+All routes need full app access (423 `welcome_required` otherwise) and an
+unlocked event. An unknown event, an event of another type and a locked event
+return 404 `not_found`, for administrators and the game master too: before the
+unlock, the game only appears as the summary of `GET /api/admin/programme`.
+Every route returns the viewer's `Werewolf` with status 200.
+
+- `GET /api/programme/{id}/werewolf`.
+- `POST /api/programme/{id}/werewolf/players {}`. The viewer joins. Lobby only
+  and not the game master (409 `activity_conflict`); joining twice changes
+  nothing. 409 `werewolf_player_limit` at 60 players.
+- `DELETE /api/programme/{id}/werewolf/players/me`. The viewer leaves. Lobby
+  only (409 `activity_conflict`); leaving twice changes nothing.
+
+Game master only: anyone else, the party's host included, gets 403
+`game_master_required`, as does everyone while the game has no game master.
+A command in the wrong state returns 409 `activity_conflict`, and so does a
+stale `revision` on the two commands that carry one.
+
+- `PUT /api/programme/{id}/werewolf/roles { revision, roles: RoleInput[] }`.
+  Lobby only. `RoleInput = { id?: number, key: string | null, name: string |
+  null, description: string | null, count: number }`. The list replaces the
+  saved one, in its order: a role sent with the `id` of a current role keeps
+  that ID, a role without `id` is added and roles left out are removed. An
+  `id` must belong to this game and keep its kind (the same built-in key, or
+  custom). 1–20 roles; built-in keys known and unique; `villager` present;
+  built-in roles carry `name: null`; custom roles need a name of 1–40
+  characters; `description` up to 600 characters, an empty one is saved as
+  null; `count` 0–60. Names and descriptions are trimmed and lengths count
+  Unicode code points. 400 `invalid_werewolf_roles` otherwise.
+- `PUT /api/programme/{id}/werewolf/variants { hideRolesOfDead, ghostMessages }`.
+  Any state; both booleans are required (400 `invalid_body`). Turning ghost
+  messages off deletes the messages and sets the phase to `day`.
+- `POST /api/programme/{id}/werewolf/state { revision, action }`.
+  `start` (lobby -> running) needs at least 3 players and quantities that add
+  up to the number of players, 409 `werewolf_roles_mismatch` otherwise; it
+  deals the roles at random in the same transaction. `finish` (running ->
+  finished). `reset` (finished -> lobby) keeps the players, roles and variants
+  and clears the dealt roles, deaths, mayor, messages and phase. An unknown
+  action returns 409 `activity_conflict`.
+- `DELETE /api/programme/{id}/werewolf/players/{guestId}`. Lobby only: removes
+  a player. Removing someone who is not a player changes nothing.
+- `PUT /api/programme/{id}/werewolf/players/{guestId} { alive }`. Running
+  only. 400 `invalid_werewolf_player` for someone who is not a player. A mayor
+  who dies stops being mayor. Bringing a player back deletes the message they
+  wrote as a ghost.
+- `PUT /api/programme/{id}/werewolf/mayor { guestId: number | null }`. Running
+  only. Null, or an omitted `guestId`, names nobody. 400
+  `invalid_werewolf_player` for someone who is not a player, 409
+  `activity_conflict` for a dead player.
+- `PUT /api/programme/{id}/werewolf/phase { phase: "day" | "night" }`. Running
+  only, with ghost messages on. `night` -> `day` draws one of the night's
+  messages, each equally likely, and marks it delivered if the game has a
+  mayor at that moment; without a mayor nothing is delivered. `day` -> `night`
+  deletes the messages. Sending the current phase changes neither the phase
+  nor the messages. Another value returns 409 `activity_conflict`.
+
+Ghosts only:
+
+- `PUT /api/programme/{id}/werewolf/message { text }`. The viewer must be a
+  dead player, by night, with the variant on and the game running: 403
+  `werewolf_message_forbidden` otherwise. The text is trimmed; one message per
+  ghost and night, replaced by the next one; an empty text removes it; 400
+  `invalid_werewolf_message` over 280 characters.
+
+Role and message validation (400) runs before the game is read, so it also
+answers a viewer who would otherwise get 403 or 409.
+
+#### Revision
+
+`revision` is the event's revision. Every accepted game master command
+increments it, as does the host's edit of the event; joining, leaving and
+ghost messages do not. Only `roles` and `state` check it.
+
+Each command runs in one transaction that rechecks the viewer's session, guest
+and welcome access, holds the event and locks the game, so commands on one
+game are serialized. The deal and the draw use `crypto/rand`. Successful
+changes publish the shared `programme` invalidation after commit and clients
+fetch their own view; roles, quantities and messages never travel over the
+WebSocket. Deleting the event deletes the game.
+
+Werewolf errors, alongside existing event, access and not-found errors:
+
+| Code                         | Status | Meaning                                                                    |
+| ---------------------------- | ------ | -------------------------------------------------------------------------- |
+| `game_master_required`       | 403    | A game master command from anyone else                                     |
+| `invalid_werewolf_roles`     | 400    | Role list outside the limits, without `villager`, or with a foreign `id`   |
+| `invalid_werewolf_player`    | 400    | Life or mayor command for someone who is not a player                      |
+| `invalid_werewolf_message`   | 400    | Ghost message over 280 characters                                          |
+| `werewolf_message_forbidden` | 403    | Message from someone who is not a ghost, by day or without the variant     |
+| `werewolf_roles_mismatch`    | 409    | Start with fewer than 3 players or quantities that differ from the players |
+| `werewolf_player_limit`      | 409    | Join when the game already has 60 players                                  |
+| `activity_conflict`          | 409    | Wrong state, stale revision, dead mayor, game master change while running  |
 
 ## Information page
 

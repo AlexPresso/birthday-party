@@ -20,10 +20,15 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
  COALESCE(v.question,''),COALESCE(v.status,''),COALESCE(v.choices,''),
  COALESCE(v.allow_self_vote,FALSE),COALESCE(v.allow_write_ins,FALSE),
  COALESCE(q.status,''),COALESCE(q.jokers_used,0),
- (SELECT COUNT(*) FROM programme_questions WHERE activity_id=q.activity_id)
+ (SELECT COUNT(*) FROM programme_questions WHERE activity_id=q.activity_id),
+ COALESCE(w.status,''),w.game_master_id,COALESCE(m.name,''),
+ CASE WHEN m.avatar_jpeg IS NOT NULL THEN m.avatar_version ELSE 0 END,
+ (SELECT COUNT(*) FROM programme_werewolf_players WHERE activity_id=w.activity_id)
  FROM events e LEFT JOIN programme_activities a ON a.event_id=e.id
  LEFT JOIN programme_votes v ON v.activity_id=a.id
  LEFT JOIN programme_question_rounds q ON q.activity_id=a.id
+ LEFT JOIN programme_werewolf_games w ON w.activity_id=a.id
+ LEFT JOIN guests m ON m.id=w.game_master_id
  WHERE ($1::bigint=0 OR e.id=$1) AND ($2 OR (COALESCE(v.status,'')<>'draft' AND COALESCE(q.status,'')<>'draft'))
  ORDER BY e.id LIMIT $3`, eventID, admin, limit)
 	if err != nil {
@@ -35,10 +40,15 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
 		var startsAt, unlockAt *time.Time
 		questions := &programme.QuestionSummary{}
 		vote := &programme.Vote{Options: []programme.VoteOption{}}
+		werewolf := &programme.WerewolfSummary{}
+		var gameMasterID *int64
+		var gameMasterName string
+		var gameMasterAvatar int64
 		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.Teaser, &startsAt, &unlockAt,
 			&voteID, &event.Type, &event.Revision,
 			&vote.Question, &vote.Status, &vote.Choices, &vote.AllowSelfVote, &vote.AllowWriteIns,
-			&questions.Status, &questions.JokersUsed, &questions.QuestionCount); err != nil {
+			&questions.Status, &questions.JokersUsed, &questions.QuestionCount,
+			&werewolf.Status, &gameMasterID, &gameMasterName, &gameMasterAvatar, &werewolf.Players); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -46,6 +56,13 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
 		*event = event.View(now, admin)
 		if event.Type == programme.TypeQuestions && (!event.Locked || admin) {
 			event.Questions = questions
+		}
+		if event.Type == programme.TypeWerewolf && (!event.Locked || admin) {
+			if gameMasterID != nil {
+				gameMaster := person(*gameMasterID, gameMasterName, gameMasterAvatar)
+				werewolf.GameMaster = &gameMaster
+			}
+			event.Werewolf = werewolf
 		}
 		if event.Type == programme.TypeVote && (!event.Locked || admin) {
 			event.Vote = vote
