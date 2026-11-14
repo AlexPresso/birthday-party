@@ -413,8 +413,9 @@ test("the five screens adapt to phones and desktops in the dark theme while pres
     await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
     await page.goto("/parametres");
     await expect(page).toHaveURL(`${baseURL}/profil`);
+    // Profile's title is the guest's name.
     await expect(
-      page.getByRole("heading", { level: 1, name: "Profil", exact: true }),
+      page.getByRole("heading", { level: 1, name: "Camille", exact: true }),
     ).toBeVisible();
     await expect(page.locator(".navigation a")).toHaveCount(4);
     await expect(
@@ -456,7 +457,7 @@ test("the five screens adapt to phones and desktops in the dark theme while pres
       ["photos", "Médias", "Médias"],
       ["programme", "Programme", "Programme"],
       ["livre-d-or", "Livre d'or", "Livre d’or"],
-      ["profil", "Profil: Camille", "Profil"],
+      ["profil", "Profil: Camille", "Camille"],
     ]) {
       const link = page
         .locator(".navigation")

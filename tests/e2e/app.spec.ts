@@ -204,10 +204,7 @@ test("a guest can activate once, use the tabs and profile, upload a photo and si
     .getByRole("link", { name: "Profil: Camille Test", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Profil", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Camille Test", exact: true }),
+    page.getByRole("heading", { level: 1, name: "Camille Test", exact: true }),
   ).toBeVisible();
   expect((await page.request.get("/api/admin/guests")).status()).toBe(403);
   await page.screenshot({

@@ -66,8 +66,8 @@ Do not invent party details, guest contributions, dates, or activity counts.
 - On PC, center the party shell at 90% width without a fixed pixel cap, with
   wider internal gutters on tablets and PCs. Above
   960px, the media list view uses two columns and the mosaic uses four; the
-  guestbook places its composer beside a single reading column. Profile identity
-  and controls sit side by side. An open featured vote sits beside the agenda,
+  guestbook places its composer beside a single reading column. Profile stays
+  one centered column. An open featured vote sits beside the agenda,
   preserving event order and ballot state. Settings use a persistent vertical
   sidebar and an editor to its right above 960px, following Instagram's desktop
   settings layout. Settings editors fill the remaining width and the welcome builder
@@ -132,14 +132,18 @@ Do not invent party details, guest contributions, dates, or activity counts.
   submissions. Closing stops new questions and votes, while remaining questions
   can still be answered. Questions may be daring, answers are honest, and there
   are exactly two jokers for the activity. Mockup questions are illustrative only.
-- Center a large circular profile photo and name, followed by an outlined photo
-  button. Below a divider, show a compact Notifications row with a real switch,
-  then a separate photo removal row and red logout. A switch is enabled only
+- Profile opens on the round photo, ringed in the accent colour, with a
+  camera button on its edge and the name beneath as the page heading. There
+  is no page title, role line or count. Touching the photo opens a menu to
+  choose a photo or remove it. Below sit two rows in the settings style:
+  Notifications with a real switch, and Sign out in the normal text colour;
+  its confirmation carries the warning. A switch is enabled only
   after browser permission and server registration succeed; preserve unsupported
   and denied guidance. Choosing a photo starts its upload immediately; update
   the avatar after the server accepts it. Do not show a separate preview,
-  crop explanation or Save button on Profile. Keep format guidance accessible
-  and show it with validation errors. Preserve the saved avatar on upload
+  crop explanation or Save button on Profile. Keep the accepted formats and
+  size inside the photo menu, as the description of its choose action; errors
+  appear under the photo. Preserve the saved avatar on upload
   failure and offer a retry for the selected file.
 - The guestbook has a plain message field, anonymous checkbox and Publish button.
   Hide redundant signature and visibility paragraphs from the default visual
@@ -163,9 +167,10 @@ Do not invent party details, guest contributions, dates, or activity counts.
   editors mounted so returning to the list preserves drafts, and restore focus
   to the originating row. Respect reduced motion and keep inactive pages inert.
   Save editable settings when a field loses focus and before returning to the
-  menu, without Save buttons. A successful save shows nothing: announce it to
-  screen readers only, and keep visible messages for errors and for results
-  the host must see, such as a copied link. Keep pending edits and errors
+  menu, without Save buttons. A successful action shows no confirmation,
+  anywhere in the app: the page shows the result and screen readers hear it.
+  Keep visible messages for errors. A copy button turns into a check for two
+  seconds. The theme has no success colour. Keep pending edits and errors
   visible, and remain on the editor if validation or saving fails. Changes made during a request
   must remain intact and be saved by the next queued request. Each configuration
   page saves its own fields while preserving the other saved configuration

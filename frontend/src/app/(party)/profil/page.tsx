@@ -1,5 +1,4 @@
 import { PageTransition } from "@/components/page-transition";
-import { PageHeading } from "@/components/ui";
 import { ProfilePanel } from "@/features/profile/profile-panel";
 import { profileSchema } from "@/features/profile/contracts";
 import { serverApi } from "@/lib/server-api";
@@ -10,13 +9,9 @@ export async function generateMetadata() {
 }
 
 export default async function ProfilePage() {
-  const [{ t }, { guest, limits }] = await Promise.all([
-    getI18n(),
-    serverApi("/profile", profileSchema),
-  ]);
+  const { guest, limits } = await serverApi("/profile", profileSchema);
   return (
     <PageTransition>
-      <PageHeading title={t("page.profile")} />
       <ProfilePanel guest={guest} imageBytes={limits.imageBytes} />
     </PageTransition>
   );

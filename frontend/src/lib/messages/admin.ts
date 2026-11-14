@@ -55,8 +55,6 @@ const en = {
   "admin.deleteNamedEvent": "Delete {name}",
   "settings.logoutConfirmation":
     "Sign out of this device? You’ll need a new link from the host to get back in.",
-  "settings.host": "Host",
-  "settings.guest": "Guest",
   "settings.signingOut": "Signing out…",
   "settings.signOut": "Sign out",
 };
@@ -122,8 +120,6 @@ const fr: AdminMessages = {
   "admin.deleteNamedEvent": "Supprimer {name}",
   "settings.logoutConfirmation":
     "Te déconnecter de cet appareil ? Il te faudra un nouveau lien de l’organisateur pour revenir.",
-  "settings.host": "Organisateur",
-  "settings.guest": "Invité",
   "settings.signingOut": "Déconnexion…",
   "settings.signOut": "Se déconnecter",
 };
@@ -186,8 +182,6 @@ const de: AdminMessages = {
   "admin.deleteNamedEvent": "{name} löschen",
   "settings.logoutConfirmation":
     "Von diesem Gerät abmelden? Du brauchst danach einen neuen Link vom Gastgeber, um dich wieder anzumelden.",
-  "settings.host": "Gastgeber",
-  "settings.guest": "Gast",
   "settings.signingOut": "Wird abgemeldet…",
   "settings.signOut": "Abmelden",
 };
@@ -251,8 +245,6 @@ const it: AdminMessages = {
   "admin.deleteNamedEvent": "Elimina {name}",
   "settings.logoutConfirmation":
     "Uscire da questo dispositivo? Per rientrare ti servirà un nuovo link dell’organizzatore.",
-  "settings.host": "Organizzatore",
-  "settings.guest": "Invitato",
   "settings.signingOut": "Disconnessione…",
   "settings.signOut": "Esci",
 };
@@ -316,8 +308,6 @@ const es: AdminMessages = {
   "admin.deleteNamedEvent": "Eliminar {name}",
   "settings.logoutConfirmation":
     "¿Cerrar sesión en este dispositivo? Necesitarás un nuevo enlace del organizador para volver.",
-  "settings.host": "Organizador",
-  "settings.guest": "Invitado",
   "settings.signingOut": "Cerrando sesión…",
   "settings.signOut": "Cerrar sesión",
 };

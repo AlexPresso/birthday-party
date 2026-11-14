@@ -289,8 +289,15 @@ test("admin configuration persists and updates invitation, header and upload lim
     ).toEqual({
       imageBytes: 2 * 1024 * 1024,
     });
-    const editor = page.locator(".profile-photo-editor");
-    await expect(editor).toContainText("JPEG, PNG ou WebP, jusqu’à 2 Mo.");
+    // The limit is written in the photo's menu.
+    const editor = page.locator(".profile-identity");
+    await editor
+      .getByRole("button", { name: "Photo de profil", exact: true })
+      .click();
+    await expect(
+      editor.getByRole("menuitem", { name: "Choisir une photo", exact: true }),
+    ).toHaveAccessibleDescription("JPEG, PNG ou WebP, jusqu’à 2 Mo.");
+    await page.keyboard.press("Escape");
     let avatarUploads = 0;
     page.on("request", (request) => {
       if (

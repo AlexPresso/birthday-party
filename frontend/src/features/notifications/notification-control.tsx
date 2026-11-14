@@ -249,49 +249,61 @@ export function NotificationControl({
         ? // The Enable button says it all.
           ""
         : t(`notifications.${state}`);
+  const statusLine = (
+    <p
+      id={`${heading}-status`}
+      // The switch shows on and off by itself; its row only spells out a
+      // state the switch cannot show, under it.
+      className={
+        compact && canToggle ? "visually-hidden" : "notification-status muted"
+      }
+      role="status"
+    >
+      {!compact && !busy && state === "enabled" && (
+        <Check size={17} aria-hidden="true" />
+      )}
+      {status}
+    </p>
+  );
   return (
     <section
       className={`notification-control${compact ? " notification-control-compact" : ""}`}
       aria-labelledby={heading}
       aria-busy={busy !== null}
     >
-      <div className="notification-summary">
-        {compact && <Bell size={25} strokeWidth={1.6} aria-hidden="true" />}
+      {compact ? (
+        <>
+          <div className="notification-summary">
+            <Bell size={26} strokeWidth={1.6} aria-hidden="true" />
+            <h2 id={heading}>{t("notifications.title")}</h2>
+            <button
+              type="button"
+              role="switch"
+              className="notification-switch"
+              aria-labelledby={heading}
+              aria-describedby={`${heading}-status`}
+              aria-checked={state === "enabled"}
+              disabled={busy !== null || !canToggle}
+              onClick={() =>
+                state === "enabled" ? void disable() : void enable()
+              }
+            >
+              <span className="notification-switch-track" aria-hidden="true">
+                <span className="notification-switch-thumb" />
+              </span>
+            </button>
+          </div>
+          {statusLine}
+        </>
+      ) : (
         <div className="notification-copy">
           <h3 id={heading}>
-            {!compact && <Bell size={19} aria-hidden="true" />}
+            <Bell size={19} aria-hidden="true" />
             {t("notifications.title")}
           </h3>
-          <p
-            id={`${heading}-status`}
-            className="notification-status muted"
-            role="status"
-          >
-            {!compact && !busy && state === "enabled" && (
-              <Check size={17} aria-hidden="true" />
-            )}
-            {status}
-          </p>
+          {statusLine}
         </div>
-        {compact && (
-          <button
-            type="button"
-            role="switch"
-            className="notification-switch"
-            aria-labelledby={heading}
-            aria-describedby={`${heading}-status`}
-            aria-checked={state === "enabled"}
-            disabled={busy !== null || !canToggle}
-            onClick={() =>
-              state === "enabled" ? void disable() : void enable()
-            }
-          >
-            <span className="notification-switch-track" aria-hidden="true">
-              <span className="notification-switch-thumb" />
-            </span>
-          </button>
-        )}
-      </div>
+      )}
       {state === "install" && (
         <p className="fine-print">{t("notifications.installHint")}</p>
       )}

@@ -356,11 +356,10 @@ for (const language of languages) {
         })
         .click();
       await expect(page).toHaveURL(/\/profil$/);
+      // The tab names the page; its heading is the guest's name as written.
+      await expect(page).toHaveTitle(new RegExp(`^${language.profile}`));
       await expect(
-        page.getByRole("heading", { name: language.profile, exact: true }),
-      ).toBeVisible();
-      await expect(
-        page.getByRole("heading", { name, exact: true }),
+        page.getByRole("heading", { level: 1, name, exact: true }),
       ).toBeVisible();
       await page
         .getByRole("button", { name: language.signOut, exact: true })

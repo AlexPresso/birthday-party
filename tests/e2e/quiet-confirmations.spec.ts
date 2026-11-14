@@ -154,19 +154,25 @@ test("a guest's vote, message, question and photo show their result without a su
       response.url().endsWith("/api/profile/avatar") &&
       response.request().method() === "PUT",
   );
-  // The button opens the picker only once the page is interactive.
+  const photo = panel.getByRole("button", {
+    name: "Photo de profil",
+    exact: true,
+  });
+  const choose = panel.getByRole("menuitem", {
+    name: "Choisir une photo",
+    exact: true,
+  });
+  // The photo opens its menu only once the page is interactive.
   await expect(async () => {
-    const chooser = page.waitForEvent("filechooser", { timeout: 2000 });
-    await panel
-      .getByRole("button", { name: "Choisir une photo", exact: true })
-      .click();
-    await (await chooser).setFiles(image);
+    if (!(await choose.isVisible())) await photo.click();
+    await expect(choose).toBeVisible({ timeout: 1000 });
   }).toPass();
+  const chooser = page.waitForEvent("filechooser");
+  await choose.click();
+  await (await chooser).setFiles(image);
   const { avatarUrl } = (await (await saved).json()).guest;
   await expect(panel.locator(".avatar img")).toHaveAttribute("src", avatarUrl);
-  await expect(
-    panel.getByRole("button", { name: "Changer de photo", exact: true }),
-  ).toBeEnabled();
+  await expect(photo).toBeEnabled();
   await expectSavedAnnouncement(page, "Photo de profil enregistrée.");
   await expectNoSuccessColour(page);
   await page.screenshot(screenshot("profile-after-photo"));
