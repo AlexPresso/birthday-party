@@ -5,6 +5,12 @@ import {
 import { acceptConfirmation } from "./support/confirm";
 import { reconnectRealtime } from "./support/realtime";
 import {
+  closeUploadDetails,
+  openUploadDetails,
+  restingBox,
+  uploadSheet,
+} from "./support/uploads";
+import {
   test,
   expect,
   type APIRequestContext,
@@ -337,7 +343,9 @@ test("media transfers survive tab changes and accepted jobs return after reload"
     name: "Envoi des médias",
     exact: true,
   });
-  await expect(queue).toContainText("Envoi en cours");
+  await expect(queue).toHaveAttribute("data-state", "sending");
+  await expect(queue.locator(".upload-pill-text")).toHaveText("0 / 1");
+  await expect(queue.getByRole("status")).toContainText("Envoi en cours");
   await expect(
     queue.getByRole("button", { name: "Détail des envois", exact: true }),
   ).toHaveAttribute("aria-expanded", "false");
@@ -346,7 +354,7 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   expect(response.status()).toBe(202);
   const acceptedJob = await response.json();
   expect(acceptedJob.clientUploadId).toBeTruthy();
-  await expect(queue).toContainText("Préparation…");
+  await expect(queue.locator(".upload-pill-text")).toHaveText("Préparation…");
   await queue
     .getByRole("button", { name: "Détail des envois", exact: true })
     .click();
@@ -401,7 +409,7 @@ test("media transfers survive tab changes and accepted jobs return after reload"
   expect(ownJobs.items[0].id).toBe(acceptedJob.id);
 });
 
-test("compact upload notice waits for preparation, keeps new batches and errors, then dismisses success", async ({
+test("the upload pill waits for preparation, keeps new batches and errors, then dismisses success", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -460,13 +468,15 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
       queue.getByText("notice-first.png", { exact: true }),
     ).toBeHidden();
     await expect(queue.getByRole("progressbar")).toHaveCount(1);
-    await expect(queue.locator(".upload-progress-count")).toHaveText(
-      "0 / 1 fichier envoyé",
-    );
-    const bannerBounds = await queue.boundingBox();
+    const count = queue.locator(".upload-pill-text");
+    const status = queue.getByRole("status");
+    await expect(count).toHaveText("0 / 1");
+    await expect(status).toHaveText("Envoi en cours. 0 / 1 fichier envoyé");
+    const pillBounds = await restingBox(queue);
     const navigationBounds = await page.getByRole("navigation").boundingBox();
-    expect(bannerBounds!.x).toBeGreaterThanOrEqual(16);
-    expect(bannerBounds!.y + bannerBounds!.height).toBeLessThanOrEqual(
+    expect(pillBounds.x).toBeGreaterThanOrEqual(20);
+    expect(pillBounds.x + pillBounds.width).toBeLessThanOrEqual(370);
+    expect(pillBounds.y + pillBounds.height).toBeLessThanOrEqual(
       navigationBounds!.y - 8,
     );
     await page.screenshot({
@@ -477,10 +487,8 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
     gates[0].resolve();
     const firstJob = await (await accepted).json();
     await expect(queue).toHaveAttribute("data-state", "preparing");
-    await expect(queue).toContainText("Préparation…");
-    await expect(queue.locator(".upload-progress-count")).toHaveText(
-      "1 / 1 fichier envoyé",
-    );
+    await expect(count).toHaveText("Préparation…");
+    await expect(status).toHaveText("Préparation…. 1 / 1 fichier envoyé");
     await page.clock.fastForward(3_000);
     await expect(queue).toHaveAttribute("data-state", "preparing");
     await expect(queue).not.toContainText("1 fichier ajouté");
@@ -501,9 +509,8 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
     await expect(queue).toHaveAttribute("data-state", "sending");
     await page.clock.fastForward(3_000);
     await expect(queue).toBeVisible();
-    await expect(queue.locator(".upload-progress-count")).toHaveText(
-      "1 / 2 fichiers envoyés",
-    );
+    await expect(count).toHaveText("1 / 2");
+    await expect(status).toHaveText("Envoi en cours. 1 / 2 fichiers envoyés");
     gates[1].resolve();
     await expect(queue).toContainText("2 fichiers ajoutés");
     await expect(queue.getByRole("progressbar")).toHaveCount(0);
@@ -527,7 +534,7 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
     });
     await expect(closeDetails).toBeFocused();
     await expect(
-      queue.getByText("notice-retry.png", { exact: true }),
+      uploadSheet(page).getByText("notice-retry.png", { exact: true }),
     ).toBeVisible();
     await expect(queue).toContainText(
       "L'envoi s'est interrompu. Vérifie ta connexion et réessaie.",
@@ -546,7 +553,7 @@ test("compact upload notice waits for preparation, keeps new batches and errors,
   }
 });
 
-test("one upload progress bar counts queued files and realtime receipts without duplicates", async ({
+test("one upload progress ring counts queued files and realtime receipts without duplicates", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -601,25 +608,31 @@ test("one upload progress bar counts queued files and realtime receipts without 
       name: "Progression des envois",
       exact: true,
     });
-    const count = queue.locator(".upload-progress-count");
+    const count = queue.locator(".upload-pill-text");
+    const status = queue.getByRole("status");
     await expect.poll(() => started).toBe(2);
     await expect(queue.getByRole("progressbar")).toHaveCount(1);
-    await expect(bar).toHaveAttribute("max", "100");
-    await expect(count).toHaveText("0 / 3 fichiers envoyés");
-    await queue
-      .getByRole("button", { name: "Détail des envois", exact: true })
-      .click();
+    await expect(bar).toHaveAttribute("aria-valuemax", "100");
+    await expect(count).toHaveText("0 / 3");
+    await expect(status).toHaveText("Envoi en cours. 0 / 3 fichiers envoyés");
+    await openUploadDetails(page, queue);
     await expect(
       queue.locator(".upload-item").filter({ hasText: "aggregate-third.png" }),
     ).toContainText("En attente");
 
     reception[0].resolve();
-    await expect(count).toHaveText("1 / 3 fichiers envoyés");
+    await expect(count).toHaveText("1 / 3");
+    await expect(status).toHaveText("Envoi en cours. 1 / 3 fichiers envoyés");
+    await expect(bar).toHaveAttribute(
+      "aria-valuetext",
+      "1 / 3 fichiers envoyés",
+    );
     await expect(queue.locator(".upload-item")).toHaveCount(3);
     expect(started).toBe(2);
-    const progress = Number(await bar.getAttribute("value"));
+    const progress = Number(await bar.getAttribute("aria-valuenow"));
     expect(progress).toBeGreaterThan(0);
     expect(progress).toBeLessThan(100);
+    await closeUploadDetails(page);
 
     for (const { width, height, name } of [
       { width: 320, height: 740, name: "mobile-320" },
@@ -643,36 +656,45 @@ test("one upload progress bar counts queued files and realtime receipts without 
 
     firstResponse.resolve();
     await expect.poll(() => started).toBe(3);
-    await expect(count).toHaveText("1 / 3 fichiers envoyés");
+    await expect(count).toHaveText("1 / 3");
     reception[1].resolve();
     reception[2].resolve();
-    await expect(count).toHaveText("3 / 3 fichiers envoyés");
-    await expect(bar).toHaveAttribute("value", "100");
+    // Everything is received: the pill names the preparation, the status
+    // keeps the count.
+    await expect(count).toHaveText("Préparation…");
+    await expect(status).toHaveText("Préparation…. 3 / 3 fichiers envoyés");
+    await expect(bar).toHaveAttribute("aria-valuenow", "100");
     await expect(queue.getByRole("progressbar")).toHaveCount(1);
-    await expect(queue.locator(".upload-item")).toHaveCount(3);
 
     await page.getByLabel("Ajouter des médias", { exact: true }).setInputFiles({
       name: "aggregate-empty.png",
       mimeType: "image/png",
       buffer: Buffer.alloc(0),
     });
+    await expect(count).toHaveText("1 fichier à réessayer");
+    await expect(status).toHaveText(
+      "1 fichier à réessayer. 3 / 4 fichiers envoyés",
+    );
+    await expect(bar).toHaveAttribute("aria-valuenow", "75");
+    expect(started).toBe(3);
+    await openUploadDetails(page, queue);
+    await expect(queue.locator(".upload-item")).toHaveCount(4);
     const invalid = queue
       .locator(".upload-item")
       .filter({ hasText: "aggregate-empty.png" });
     await expect(invalid).toContainText(
       "Ce fichier est vide. Choisis un autre fichier.",
     );
-    await expect(count).toHaveText("3 / 4 fichiers envoyés");
-    await expect(bar).toHaveAttribute("value", "75");
-    expect(started).toBe(3);
     await invalid
       .getByRole("button", {
         name: "Retirer aggregate-empty.png de la liste",
         exact: true,
       })
       .click();
-    await expect(count).toHaveText("3 / 3 fichiers envoyés");
-    await expect(bar).toHaveAttribute("value", "100");
+    await expect(queue.locator(".upload-item")).toHaveCount(3);
+    await expect(status).toHaveText("Préparation…. 3 / 3 fichiers envoyés");
+    await expect(bar).toHaveAttribute("aria-valuenow", "100");
+    await closeUploadDetails(page);
 
     const jobs = await (await page.request.get("/api/uploads")).json();
     expect(jobs.items).toHaveLength(3);
@@ -725,12 +747,12 @@ test("retrying a lost upload response reuses its receipt without duplicating med
     ),
   ).toBeVisible();
   const queue = page.locator(".upload-queue");
-  await expect(queue.locator(".upload-progress-count")).toHaveText(
-    "0 / 1 fichier envoyé",
+  await expect(queue.getByRole("status")).toHaveText(
+    "1 fichier à réessayer. 0 / 1 fichier envoyé",
   );
   await expect(queue.getByRole("progressbar")).toHaveCount(1);
   expect(
-    Number(await queue.getByRole("progressbar").getAttribute("value")),
+    Number(await queue.getByRole("progressbar").getAttribute("aria-valuenow")),
   ).toBeLessThan(100);
   await page
     .getByRole("button", { name: "Réessayer l'envoi de lost-response.png" })

@@ -13,6 +13,11 @@ import {
   type AdminWelcome as Welcome,
 } from "./support/welcome";
 import { acceptConfirmation } from "./support/confirm";
+import {
+  closeUploadDetails,
+  openUploadDetails,
+  uploadSheet,
+} from "./support/uploads";
 
 type Frame = { type: string; topics?: string[] };
 let host: APIRequestContext;
@@ -168,10 +173,7 @@ test("welcome and media widgets share one socket and refresh only after changes"
     .first()
     .getByLabel("Ajouter des médias", { exact: true })
     .setInputFiles(await imageFile(page));
-  await widgets
-    .first()
-    .getByRole("button", { name: "Détail des envois", exact: true })
-    .click();
+  await openUploadDetails(page, widgets.first());
   const upload = await accepted;
   expect(upload.status()).toBe(202);
   const job = await upload.json();
@@ -180,6 +182,8 @@ test("welcome and media widgets share one socket and refresh only after changes"
     (await (await page.request.get(`/api/uploads/${job.id}`)).json()).status,
   ).toBe("ready");
   expect(network.invalidations("uploads")).toBeGreaterThan(0);
+  // The details are modal: close the first widget's before the second's.
+  await closeUploadDetails(page);
   // A second-device upload has no local transfer callback to refresh this tab.
   const externalUpload = await page.request.post("/api/photos", {
     headers: {
@@ -192,10 +196,7 @@ test("welcome and media widgets share one socket and refresh only after changes"
     },
   });
   expect(externalUpload.status()).toBe(202);
-  await widgets
-    .nth(1)
-    .getByRole("button", { name: "Détail des envois", exact: true })
-    .click();
+  await openUploadDetails(page, widgets.nth(1));
   await expect(widgets.nth(1).locator(".upload-status.done")).toBeVisible();
   await expect(
     widgets.nth(1).getByText("realtime-other-device.png", { exact: true }),
@@ -214,7 +215,9 @@ test("welcome and media widgets share one socket and refresh only after changes"
       exact: true,
     }),
   ).toBeVisible();
-  await expect(widgets.first().locator(".upload-status.done")).toBeVisible();
+  // The unlock keeps the widgets: the second one's details are still open.
+  await expect(uploadSheet(page)).toBeVisible();
+  await expect(widgets.nth(1).locator(".upload-status.done")).toBeVisible();
   expect(
     (await (await page.request.get("/api/welcome")).json()).progressRevision,
   ).toBe(current.progressRevision);

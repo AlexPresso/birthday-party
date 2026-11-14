@@ -248,15 +248,19 @@ for (const language of languages) {
         mimeType: "text/plain",
         buffer: Buffer.from("Upload validation fixture"),
       });
-      // The banner reports the failure; each file's reason sits in its details.
+      // The pill reports the failure; each file's reason sits in its details.
       const queue = page.locator(".upload-queue");
       await expect(queue).toBeVisible();
       await expect(queue).toHaveAttribute("data-state", "error");
       await queue
         .getByRole("button", { name: language.uploadDetails, exact: true })
         .click();
+      const details = page.getByRole("dialog", {
+        name: language.uploadDetails,
+        exact: true,
+      });
       await expect(
-        page.getByText(language.uploadError, { exact: true }),
+        details.getByText(language.uploadError, { exact: true }),
       ).toBeVisible();
 
       if (language.lang === "de") {
@@ -285,6 +289,9 @@ for (const language of languages) {
         ).toBeVisible();
       }
 
+      // The details are modal: leave them before using the dock.
+      await page.keyboard.press("Escape");
+      await expect(details).toHaveCount(0);
       await navigation
         .getByRole("link", { name: language.tabs[0], exact: true })
         .press("Enter");

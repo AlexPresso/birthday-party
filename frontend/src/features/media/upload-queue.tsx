@@ -1,15 +1,16 @@
 "use client";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import {
-  Upload,
-  Check,
-  RotateCw,
-  X,
-  ChevronRight,
-  Image as ImageIcon,
-  AlertCircle,
-} from "lucide-react";
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+  type RefObject,
+} from "react";
+import { usePathname } from "next/navigation";
+import { Upload, Check, RotateCw, X, ChevronUp } from "lucide-react";
 import { responseError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { useUploads, type Transfer } from "./upload-provider";
@@ -17,15 +18,23 @@ import type { UploadJob } from "./contracts";
 import { uploadProgress } from "./upload-progress";
 import { ErrorNotice } from "@/components/ui";
 import "./upload-queue.css";
+
+/**
+ * One pill per visible queue: a progress ring, a short text and a chevron.
+ * Pressing it opens the per-file details in a modal sheet.
+ */
 export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
   const { locale, t } = useI18n();
   const pathname = usePathname();
-  const detailsId = useId();
+  const sheetId = useId();
   const container = useRef<HTMLElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
-  const closeDetails = useRef<HTMLButtonElement>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  // The burst is for a batch this queue showed in progress, not a restored one.
+  const [progressShown, setProgressShown] = useState(false);
+  const [celebrated, setCelebrated] = useState("");
+  const [bursting, setBursting] = useState(false);
   const numbers = new Intl.NumberFormat(locale);
   const plurals = new Intl.PluralRules(locale);
   const uploads = useUploads();
@@ -43,10 +52,6 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
     transfers,
     jobs,
   );
-  if (total === 0 && (expanded || focused)) {
-    setExpanded(false);
-    setFocused(false);
-  }
   const sentCount = t(
     plurals.select(total) === "one"
       ? "photos.sentCountOne"
@@ -103,13 +108,34 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
         .sort()
         .join(",")
     : "";
+  if (total === 0) {
+    if (open || focused || progressShown || bursting) {
+      setOpen(false);
+      setFocused(false);
+      setProgressShown(false);
+      setBursting(false);
+    }
+  } else if (!complete) {
+    if (!progressShown || bursting) {
+      setProgressShown(true);
+      setBursting(false);
+    }
+  } else if (progressShown) {
+    // A batch has one burst, even when a removed failure completes it again.
+    setProgressShown(false);
+    setBursting(
+      completedBatch !== celebrated &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    );
+    setCelebrated(completedBatch);
+  }
   const dismiss = useRef(uploads.dismiss);
   useLayoutEffect(() => {
     dismiss.current = uploads.dismiss;
   }, [uploads.dismiss]);
 
   useEffect(() => {
-    if (!completedBatch || expanded || uploads.error) return;
+    if (!completedBatch || open || uploads.error) return;
     // A completed request may remove a focused retry button without a blur event.
     if (focused && container.current?.contains(document.activeElement)) return;
     let departure: Animation | undefined;
@@ -135,7 +161,7 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
       window.clearTimeout(timer);
       departure?.cancel();
     };
-  }, [completedBatch, expanded, focused, uploads.error]);
+  }, [completedBatch, open, focused, uploads.error]);
 
   const showError =
     widgetIndex === undefined && (total > 0 || pathname === "/photos");
@@ -157,83 +183,91 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
               setFocused(false);
           }}
         >
-          <div
-            className="upload-queue-details"
-            id={detailsId}
-            hidden={!expanded}
-          >
-            <div className="section-row">
-              <h2>{t("photos.uploadDetails")}</h2>
-              <button
-                ref={closeDetails}
-                type="button"
-                className="icon-button"
-                aria-label={t("photos.uploadHideDetails")}
-                onClick={() => {
-                  setExpanded(false);
-                  toggle.current?.focus();
-                }}
-              >
-                <X size={20} aria-hidden="true" />
-              </button>
-            </div>
-            <UploadItems
-              pendingTransfers={pendingTransfers}
-              jobs={jobs}
-              onAction={() => closeDetails.current?.focus()}
-            />
-            {active && (
-              <p className="fine-print">
-                {t(transmitting ? "photos.keepOpen" : "photos.safeToLeave")}
-              </p>
-            )}
-          </div>
-          <div className="upload-banner">
-            <div className="upload-banner-main">
+          <div className="upload-pill">
+            <div className="upload-pill-main">
               <button
                 ref={toggle}
                 type="button"
-                className="upload-banner-toggle"
+                className="upload-pill-toggle"
                 aria-label={t("photos.uploadDetails")}
-                aria-expanded={expanded}
-                aria-controls={detailsId}
-                onClick={() => {
-                  setExpanded(!expanded);
-                  if (!expanded)
-                    requestAnimationFrame(() => closeDetails.current?.focus());
-                }}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                aria-controls={open ? sheetId : undefined}
+                onClick={() => setOpen(true)}
               />
-              <span
-                className={`upload-preview ${complete ? "done" : failed ? "error" : ""}`}
-                aria-hidden="true"
-              >
-                {complete ? (
-                  <Check size={24} />
-                ) : failed ? (
-                  <AlertCircle size={24} />
-                ) : preview ? (
-                  <img src={preview} alt="" width={40} height={40} />
-                ) : (
-                  <ImageIcon size={24} />
-                )}
-              </span>
-              <span className="upload-banner-content">
-                <strong>{title}</strong>
-                {!complete && (
-                  <>
-                    <span className="upload-progress-count">{sentCount}</span>
-                    <progress
-                      aria-label={t("photos.uploadProgress")}
-                      aria-valuetext={sentCount}
-                      max={100}
-                      value={percent}
+              {complete ? (
+                <span className="upload-ring" aria-hidden="true">
+                  <span className="upload-ring-core">
+                    <Check size={20} strokeWidth={2.6} />
+                  </span>
+                  {bursting && <Burst />}
+                </span>
+              ) : (
+                <span
+                  className="upload-ring"
+                  role="progressbar"
+                  aria-label={t("photos.uploadProgress")}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(percent)}
+                  aria-valuetext={sentCount}
+                >
+                  <svg viewBox="0 0 34 34" aria-hidden="true" focusable="false">
+                    <circle
+                      className="upload-ring-track"
+                      cx="17"
+                      cy="17"
+                      r="15.5"
                     />
-                  </>
-                )}
+                    {/* Preparation has no measure: a short arc turns instead. */}
+                    {(state === "preparing" || percent > 0) && (
+                      <circle
+                        className="upload-ring-arc"
+                        cx="17"
+                        cy="17"
+                        r="15.5"
+                        pathLength={100}
+                        strokeDasharray={state === "preparing" ? "24 76" : 100}
+                        strokeDashoffset={
+                          state === "preparing" ? 0 : 100 - percent
+                        }
+                      />
+                    )}
+                  </svg>
+                  <span className="upload-ring-core" aria-hidden="true">
+                    {failed ? (
+                      <svg
+                        className="upload-ring-alert"
+                        viewBox="0 0 24 24"
+                        width={18}
+                        height={18}
+                        focusable="false"
+                      >
+                        <path d="M12 6v7" />
+                        <path d="M12 17.5h.01" />
+                      </svg>
+                    ) : preview ? (
+                      <img src={preview} alt="" width={24} height={24} />
+                    ) : (
+                      <Upload size={14} />
+                    )}
+                  </span>
+                </span>
+              )}
+              <span
+                className={
+                  state === "sending"
+                    ? "upload-pill-text upload-pill-count"
+                    : "upload-pill-text"
+                }
+              >
+                {state === "sending"
+                  ? `${numbers.format(sent)} / ${numbers.format(total)}`
+                  : title}
               </span>
-              <ChevronRight
-                className="upload-banner-chevron"
-                size={19}
+              <ChevronUp
+                className="upload-pill-chevron"
+                size={16}
                 aria-hidden="true"
               />
             </div>
@@ -257,10 +291,197 @@ export function UploadQueue({ widgetIndex }: { widgetIndex?: number } = {}) {
             {title}
             {complete ? "" : `. ${sentCount}`}
           </span>
+          {open && (
+            <UploadSheet
+              id={sheetId}
+              centered={widgetIndex !== undefined}
+              opener={toggle}
+              pendingTransfers={pendingTransfers}
+              jobs={jobs}
+              hint={
+                active
+                  ? t(transmitting ? "photos.keepOpen" : "photos.safeToLeave")
+                  : null
+              }
+              onClose={() => setOpen(false)}
+            />
+          )}
         </section>
       )}
       {showError && <UploadQueueError />}
     </div>
+  );
+}
+
+// Where each particle ends, in pixels from the ring's center: up and outward.
+const burstParticles = [
+  { x: -28, y: -5, size: 4, tone: "" },
+  { x: -32, y: -17, size: 3, tone: "warm" },
+  { x: -18, y: -20, size: 5, tone: "" },
+  { x: -16, y: -34, size: 3, tone: "accent" },
+  { x: -4, y: -30, size: 4, tone: "warm" },
+  { x: 7, y: -39, size: 3, tone: "" },
+  { x: 13, y: -26, size: 5, tone: "accent" },
+  { x: 25, y: -27, size: 3, tone: "" },
+  { x: 25, y: -16, size: 4, tone: "warm" },
+  { x: 33, y: -11, size: 3, tone: "" },
+];
+
+/** A short burst of the snowfall's particles when a batch completes. */
+function Burst() {
+  return (
+    <span className="upload-burst" aria-hidden="true">
+      {burstParticles.map(({ x, y, size, tone }, index) => (
+        <span
+          key={index}
+          className={tone ? `upload-burst-${tone}` : undefined}
+          style={
+            {
+              width: `${size}px`,
+              height: `${size}px`,
+              animationDelay: `${(index % 4) * 40}ms`,
+              "--burst-x": `${x}px`,
+              "--burst-y": `${y}px`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * The per-file details: a modal sheet rising from the bottom on phones, a
+ * compact dialog from 960px. It follows the question composer's sheet, plus a
+ * drag on the header to pull it down.
+ */
+function UploadSheet({
+  id,
+  centered,
+  opener,
+  pendingTransfers,
+  jobs,
+  hint,
+  onClose,
+}: {
+  id: string;
+  centered: boolean;
+  opener: RefObject<HTMLButtonElement | null>;
+  pendingTransfers: Transfer[];
+  jobs: UploadJob[];
+  hint: string | null;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const titleId = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const drag = useRef<{ pointer: number; start: number; offset: number }>(null);
+  const leaving = useRef<number>(undefined);
+
+  useEffect(() => {
+    const modal = dialog.current!;
+    const launcher = opener.current;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    modal.showModal();
+    closeButton.current?.focus();
+    return () => {
+      window.clearTimeout(leaving.current);
+      modal.close();
+      document.body.style.overflow = overflow;
+      launcher?.focus({ preventScroll: true });
+    };
+  }, [opener]);
+
+  function startDrag(event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || (event.target as Element).closest("button"))
+      return;
+    // The desktop dialog floats above the dock and is not pulled down.
+    if (window.matchMedia("(min-width: 960px)").matches) return;
+    drag.current = {
+      pointer: event.pointerId,
+      start: event.clientY,
+      offset: 0,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dialog.current!.style.transition = "none";
+  }
+  function moveDrag(event: PointerEvent<HTMLDivElement>) {
+    const current = drag.current;
+    if (current?.pointer !== event.pointerId) return;
+    current.offset = Math.max(0, event.clientY - current.start);
+    dialog.current!.style.transform = `translateY(${current.offset}px)`;
+  }
+  function endDrag(event: PointerEvent<HTMLDivElement>, cancelled: boolean) {
+    const current = drag.current;
+    if (current?.pointer !== event.pointerId) return;
+    drag.current = null;
+    const modal = dialog.current!;
+    modal.style.transition = "";
+    if (cancelled || current.offset < Math.min(96, modal.offsetHeight / 3)) {
+      modal.style.transform = "";
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onClose();
+      return;
+    }
+    modal.style.transform = "translateY(100%)";
+    leaving.current = window.setTimeout(onClose, 180);
+  }
+
+  return (
+    <dialog
+      ref={dialog}
+      id={id}
+      className="upload-sheet"
+      data-centered={centered || undefined}
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom
+        )
+          onClose();
+      }}
+    >
+      <div
+        className="upload-sheet-header"
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={(event) => endDrag(event, false)}
+        onPointerCancel={(event) => endDrag(event, true)}
+      >
+        <span className="upload-sheet-handle" aria-hidden="true" />
+        <h2 id={titleId}>{t("photos.uploadDetails")}</h2>
+        <button
+          ref={closeButton}
+          type="button"
+          className="icon-button"
+          aria-label={t("photos.uploadHideDetails")}
+          onClick={onClose}
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="upload-sheet-list">
+        <UploadItems
+          pendingTransfers={pendingTransfers}
+          jobs={jobs}
+          onAction={() => closeButton.current?.focus()}
+        />
+      </div>
+      {hint && <p className="fine-print">{hint}</p>}
+    </dialog>
   );
 }
 

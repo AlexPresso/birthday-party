@@ -2,9 +2,15 @@ import { openSettingsSection } from "./support/settings";
 import { acceptConfirmation } from "./support/confirm";
 import { reconnectRealtime } from "./support/realtime";
 import {
+  closeUploadDetails,
+  openUploadDetails,
+  uploadSheet,
+} from "./support/uploads";
+import {
   test,
   expect,
   type APIRequestContext,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import {
@@ -288,8 +294,11 @@ test("several media widgets keep separate destinations and queues alongside a pr
     try {
       await expect.poll(() => held).toBe(true);
       await expect(media.nth(0).getByRole("progressbar")).toHaveCount(1);
-      await expect(media.nth(0).locator(".upload-progress-count")).toHaveText(
-        "0 / 1 fichier envoyé",
+      await expect(media.nth(0).locator(".upload-pill-text")).toHaveText(
+        "0 / 1",
+      );
+      await expect(media.nth(0).getByRole("status")).toHaveText(
+        "Envoi en cours. 0 / 1 fichier envoyé",
       );
       await expect(media.nth(1).getByRole("progressbar")).toHaveCount(0);
       await transition("next");
@@ -323,33 +332,31 @@ test("several media widgets keep separate destinations and queues alongside a pr
   });
   expect((await ready(page.request, privateJob.id)).photo).toBeNull();
   expect((await ready(page.request, mainJob.id)).photo).toBeNull();
-  for (const widget of [media.nth(0), media.nth(1)]) {
-    await widget
-      .getByRole("button", { name: "Détail des envois", exact: true })
-      .click();
-  }
-  await expect(media.nth(0).locator(".upload-queue")).toContainText(
-    privateJob.filename,
-  );
-  await expect(media.nth(0).locator(".upload-queue")).not.toContainText(
-    mainJob.filename,
-  );
-  await expect(media.nth(1).locator(".upload-queue")).toContainText(
-    mainJob.filename,
-  );
-  await expect(media.nth(1).locator(".upload-queue")).not.toContainText(
-    privateJob.filename,
-  );
-  for (const widget of [media.nth(0), media.nth(1)]) {
+  // Each widget lists its own file only; the details are modal, one at a time.
+  const expectOwnQueue = async (
+    widget: Locator,
+    own: string,
+    other: string,
+  ) => {
     await expect(widget.getByRole("progressbar")).toHaveCount(1);
     await expect(widget.getByRole("progressbar")).toHaveAttribute(
-      "value",
+      "aria-valuenow",
       "100",
     );
-    await expect(widget.locator(".upload-progress-count")).toHaveText(
-      "1 / 1 fichier envoyé",
+    await expect(widget.locator(".upload-pill-text")).toHaveText(
+      "Préparation…",
     );
-  }
+    await expect(widget.getByRole("status")).toHaveText(
+      "Préparation…. 1 / 1 fichier envoyé",
+    );
+    await openUploadDetails(page, widget);
+    await expect(uploadSheet(page).locator(".upload-item")).toHaveCount(1);
+    await expect(widget.locator(".upload-queue")).toContainText(own);
+    await expect(widget.locator(".upload-queue")).not.toContainText(other);
+    await closeUploadDetails(page);
+  };
+  await expectOwnQueue(media.nth(0), privateJob.filename, mainJob.filename);
+  await expectOwnQueue(media.nth(1), mainJob.filename, privateJob.filename);
   await expect(preview).toHaveAttribute("src", previewURL!);
   const saved = page.waitForResponse(
     (response) =>
@@ -361,29 +368,8 @@ test("several media widgets keep separate destinations and queues alongside a pr
     .click();
   expect((await saved).status()).toBe(200);
   await page.reload();
-  for (const widget of [media.nth(0), media.nth(1)]) {
-    await widget
-      .getByRole("button", { name: "Détail des envois", exact: true })
-      .click();
-  }
-  await expect(media.nth(0).locator(".upload-queue")).toContainText(
-    privateJob.filename,
-  );
-  await expect(media.nth(0).locator(".upload-queue")).not.toContainText(
-    mainJob.filename,
-  );
-  await expect(media.nth(1).locator(".upload-queue")).toContainText(
-    mainJob.filename,
-  );
-  await expect(media.nth(1).locator(".upload-queue")).not.toContainText(
-    privateJob.filename,
-  );
-  await expect(media.nth(0).locator(".upload-progress-count")).toHaveText(
-    "1 / 1 fichier envoyé",
-  );
-  await expect(media.nth(1).locator(".upload-progress-count")).toHaveText(
-    "1 / 1 fichier envoyé",
-  );
+  await expectOwnQueue(media.nth(0), privateJob.filename, mainJob.filename);
+  await expectOwnQueue(media.nth(1), mainJob.filename, privateJob.filename);
   await expect(profile.locator(".avatar img")).toBeVisible();
   await page.setViewportSize({ width: 320, height: 740 });
   await expectNoHorizontalOverflow(page);
@@ -396,24 +382,24 @@ test("several media widgets keep separate destinations and queues alongside a pr
     path: test.info().outputPath("welcome-widgets-guest-desktop.png"),
     fullPage: true,
   });
+  // Open details hold a finished queue until the guest closes them.
+  await openUploadDetails(page, media.nth(0));
   preparing.delete(privateJob.filename);
   await reconnectRealtime(page);
-  await expect(media.nth(0).locator(".upload-queue")).toContainText(
+  await expect(media.nth(0).locator(".upload-pill-text")).toHaveText(
     "1 fichier ajouté",
   );
   await expect(media.nth(0).getByRole("progressbar")).toHaveCount(0);
-  await media
-    .nth(0)
-    .getByRole("button", { name: "Masquer le détail", exact: true })
-    .click();
+  await closeUploadDetails(page);
   await page.keyboard.press("Tab");
   await expect(media.nth(0).locator(".upload-queue")).toHaveCount(0);
+  await expect(page.getByRole("progressbar")).toHaveCount(1);
+  await expect(media.nth(1).getByRole("status")).toHaveText(
+    "Préparation…. 1 / 1 fichier envoyé",
+  );
+  await openUploadDetails(page, media.nth(1));
   await expect(media.nth(1).locator(".upload-queue")).toContainText(
     mainJob.filename,
-  );
-  await expect(page.getByRole("progressbar")).toHaveCount(1);
-  await expect(media.nth(1).locator(".upload-progress-count")).toHaveText(
-    "1 / 1 fichier envoyé",
   );
   await Promise.all([
     page.waitForResponse(
@@ -427,10 +413,10 @@ test("several media widgets keep separate destinations and queues alongside a pr
   );
   preparing.delete(mainJob.filename);
   await reconnectRealtime(page);
-  await media
-    .nth(1)
-    .getByRole("button", { name: "Masquer le détail", exact: true })
-    .click();
+  await expect(media.nth(1).locator(".upload-pill-text")).toHaveText(
+    "1 fichier ajouté",
+  );
+  await closeUploadDetails(page);
   await page.keyboard.press("Tab");
   await expect(media.nth(1).locator(".upload-queue")).toHaveCount(0);
   expect((await page.request.get("/api/photos")).status()).toBe(423);
@@ -681,6 +667,8 @@ test("a private welcome upload survives reload and stays inaccessible until the 
     path: test.info().outputPath("media-categories-welcome-mobile-390.png"),
     fullPage: true,
   });
+  // The details are modal: close them before using the step again.
+  await closeUploadDetails(page);
   for (const path of [
     "/api/photos",
     "/api/media-categories",

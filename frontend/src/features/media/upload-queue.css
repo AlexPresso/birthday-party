@@ -13,16 +13,18 @@
       font-size: 12px;
     }
   }
+  /* The floating queue: a pill centered above the dock, as wide as its text. */
   .upload-overlay {
     position: fixed;
     inset-inline: 20px;
     bottom: calc(92px + env(safe-area-inset-bottom));
     z-index: 8;
-    width: min(420px, calc(100% - 40px));
-    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     pointer-events: none;
   }
-
   .upload-overlay > * {
     pointer-events: auto;
   }
@@ -31,7 +33,11 @@
       bottom: calc(96px + env(safe-area-inset-bottom));
     }
   }
+  /* A welcome widget keeps its queue in the step, under its picker. */
   .upload-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     margin-top: 16px;
   }
   .upload-inline:empty {
@@ -39,39 +45,38 @@
   }
   .upload-queue {
     min-width: 0;
+    max-width: 100%;
     padding: 0;
     margin: 0;
+    animation: upload-pill-enter 180ms ease-out;
   }
 
-  .upload-banner,
-  .upload-queue-details,
-  .upload-overlay > .upload-error {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: var(--shadow);
-  }
-
-  .upload-banner {
+  /* The pill borrows the dock's surface, border, shadow and rounding. */
+  .upload-pill {
     display: flex;
-    align-items: center;
-    min-height: 76px;
+    align-items: stretch;
+    max-width: 100%;
+    min-height: 48px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--nav-background);
+    box-shadow: var(--shadow);
+    color: var(--text);
   }
-  .upload-banner-main {
+  .upload-inline .upload-pill {
+    box-shadow: none;
+  }
+  .upload-pill-main {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
-    min-height: 74px;
-    width: 100%;
-    padding: 12px;
-    border-radius: var(--radius-small);
-    background: transparent;
-    color: var(--text);
-    text-align: start;
+    padding: 6px 14px 6px 6px;
+    border-radius: inherit;
   }
-  .upload-banner-toggle {
+  /* One button covers the ring, the text and the chevron. */
+  .upload-pill-toggle {
     position: absolute;
     inset: 0;
     z-index: 1;
@@ -79,89 +84,213 @@
     border-radius: inherit;
     background: transparent;
   }
-  .upload-banner-toggle:focus-visible {
-    outline-offset: -3px;
+  .upload-pill-toggle:focus-visible {
+    outline-offset: 3px;
   }
-  .upload-preview {
+  .upload-pill-text {
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  .upload-pill-count {
+    white-space: nowrap;
+  }
+  .upload-pill-chevron {
+    flex-shrink: 0;
+    color: var(--muted);
+    transition: color 0.15s;
+  }
+  @media (hover: hover) {
+    .upload-pill-main:hover .upload-pill-chevron {
+      color: var(--text);
+    }
+  }
+  .upload-retry {
+    flex: 0 1 auto;
+    padding: 4px 16px 4px 12px;
+    border-left: 1px solid var(--border);
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .upload-retry:focus-visible {
+    outline-offset: 3px;
+  }
+  /* The longest failure and retry labels share a 320px phone on two lines. */
+  @media (max-width: 360px) {
+    .upload-pill-main {
+      gap: 8px;
+      padding-right: 10px;
+    }
+    .upload-pill-text {
+      font-size: 13px;
+    }
+    .upload-retry {
+      padding-inline: 10px 14px;
+    }
+  }
+
+  /* The ring fills clockwise from the top with the combined progress. */
+  .upload-ring {
+    position: relative;
     display: grid;
     place-items: center;
-    flex: 0 0 40px;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-small);
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+  }
+  .upload-ring > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .upload-ring circle {
+    fill: none;
+    stroke-width: 3;
+  }
+  .upload-ring-track {
+    stroke: var(--border);
+  }
+  .upload-ring-arc {
+    stroke: var(--accent);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 300ms ease;
+  }
+  .upload-ring-core {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    overflow: hidden;
+    border-radius: 50%;
     background: var(--surface-raised);
     color: var(--accent-text);
-    overflow: hidden;
   }
-  .upload-preview img {
+  .upload-ring-core img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-  .upload-preview.done {
-    border-radius: 50%;
-    background: var(--success-soft);
-    color: var(--success);
+  .upload-ring-alert path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.6;
+    stroke-linecap: round;
   }
-  .upload-preview.error {
+  /* Everything is received: a short arc turns while the server prepares. */
+  .upload-queue[data-state="preparing"] .upload-ring > svg {
+    animation: upload-ring-turn 1.6s linear infinite;
+  }
+  .upload-queue[data-state="error"] .upload-ring-track {
+    stroke: var(--danger-border);
+  }
+  .upload-queue[data-state="error"] .upload-ring-arc {
+    stroke: var(--danger);
+  }
+  .upload-queue[data-state="error"] .upload-ring-core {
     background: var(--danger-soft);
     color: var(--danger);
   }
-  .upload-banner-content {
-    display: grid;
-    flex: 1;
-    gap: 5px;
-    min-width: 0;
+  /* The ring closes into a filled disc; accent fills carry dark icons. */
+  .upload-queue[data-state="complete"] .upload-ring-core {
+    width: 34px;
+    height: 34px;
+    background: var(--accent);
+    color: var(--on-accent);
+    animation: upload-ring-close 240ms ease-out;
   }
-  .upload-banner-content strong {
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.35;
-    overflow-wrap: anywhere;
+
+  /* Snowfall particles leave the ring once, without taking any room. */
+  .upload-burst {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+    pointer-events: none;
   }
-  .upload-progress-count {
-    color: var(--muted);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.3;
+  .upload-burst > span {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--highlight-pale);
+    opacity: 0;
+    animation: upload-burst 700ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
   }
-  .upload-banner-content progress {
-    height: 3px;
-    margin: 1px 0 0;
-    background: var(--surface-raised);
+  .upload-burst > .upload-burst-warm {
+    background: var(--highlight);
   }
-  .upload-banner-content progress::-webkit-progress-bar {
-    background: var(--surface-raised);
+  .upload-burst > .upload-burst-accent {
+    background: var(--accent);
   }
-  .upload-queue[data-state="preparing"] progress {
-    animation: upload-preparing 1.4s ease-in-out infinite alternate;
-  }
-  .upload-banner-chevron {
-    color: var(--muted);
+
+  /*
+   * The details sheet repeats the question composer's sheet: backdrop, rounded
+   * top corners and safe-area padding. Its header is also a grab handle.
+   */
+  .upload-sheet {
+    --upload-sheet-rise: 60px;
+    position: fixed;
+    inset: auto 0 0;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 90dvh;
+    padding: 0 20px max(24px, env(safe-area-inset-bottom));
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: var(--radius-large) var(--radius-large) 0 0;
+    color: var(--text);
+    background: var(--background);
+    box-shadow: var(--shadow);
     transition: transform 180ms ease;
   }
-  .upload-banner-main:has([aria-expanded="true"]) .upload-banner-chevron {
-    transform: rotate(90deg);
+  .upload-sheet[open] {
+    display: flex;
+    flex-direction: column;
+    animation: upload-sheet-enter 180ms ease-out;
   }
-  .upload-retry {
+  .upload-sheet::backdrop {
+    background: var(--overlay);
+  }
+  .upload-sheet-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     flex-shrink: 0;
-    padding-inline: 4px 12px;
+    padding: 20px 0 8px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
   }
-  .upload-queue-details {
-    max-height: min(52dvh, 460px);
-    margin-bottom: 8px;
-    padding: 8px 14px 12px;
+  .upload-sheet-handle {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: var(--radius-tiny);
+    background: var(--border-strong);
+  }
+  .upload-sheet-header h2 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .upload-sheet-list {
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .upload-queue-details > .section-row {
-    margin: 0;
-  }
-  .upload-queue-details h2 {
-    margin: 0;
-    font-size: 14px;
-  }
-  .upload-queue-details > .fine-print {
+  .upload-sheet > .fine-print {
+    flex-shrink: 0;
     margin: 12px 0 0;
   }
   .upload-item {
@@ -205,26 +334,102 @@
     text-overflow: ellipsis;
     font-size: 13px;
   }
+  /* From 960px the same details float above the dock as a compact dialog. */
+  @media (min-width: 960px) {
+    .upload-sheet {
+      --upload-sheet-rise: 12px;
+      inset: auto 0 calc(96px + env(safe-area-inset-bottom));
+      margin-inline: auto;
+      width: min(420px, calc(100% - 40px));
+      max-height: min(60dvh, 520px);
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      border-radius: var(--radius-large);
+      background: var(--surface);
+    }
+    /* A welcome step has no dock: center its dialog in the window. */
+    .upload-sheet[data-centered] {
+      inset: 0;
+      margin: auto;
+      height: fit-content;
+    }
+    .upload-sheet-header {
+      padding-top: 12px;
+      cursor: auto;
+      touch-action: auto;
+    }
+    .upload-sheet-handle {
+      display: none;
+    }
+  }
+
   .upload-overlay > .upload-error {
+    width: min(420px, 100%);
     padding: 12px;
-    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
   }
   .upload-error .error-notice {
     margin-top: 0;
   }
-  @keyframes upload-preparing {
+  @keyframes upload-pill-enter {
     from {
-      opacity: 0.45;
+      transform: translateY(6px);
+      opacity: 0;
+    }
+  }
+  @keyframes upload-ring-turn {
+    to {
+      transform: rotate(270deg);
+    }
+  }
+  @keyframes upload-ring-close {
+    from {
+      transform: scale(0.7);
+    }
+  }
+  @keyframes upload-burst {
+    from {
+      transform: translate(
+          calc(-50% + var(--burst-x) * 0.35),
+          calc(-50% + var(--burst-y) * 0.35)
+        )
+        scale(0.5);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
     }
     to {
+      transform: translate(
+        calc(-50% + var(--burst-x)),
+        calc(-50% + var(--burst-y))
+      );
+      opacity: 0;
+    }
+  }
+  @keyframes upload-sheet-enter {
+    from {
+      transform: translateY(var(--upload-sheet-rise));
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
       opacity: 1;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .upload-queue progress {
+    .upload-queue,
+    .upload-sheet[open],
+    .upload-queue[data-state="preparing"] .upload-ring > svg,
+    .upload-queue[data-state="complete"] .upload-ring-core {
       animation: none;
     }
-    .upload-banner-chevron {
+    .upload-sheet,
+    .upload-ring-arc,
+    .upload-pill-chevron {
       transition: none;
     }
   }
