@@ -154,7 +154,7 @@ export function PartyEditor({
       </div>
       <ErrorNotice message={error} />
       <div className="form-actions">
-        <span className="success-notice" role="status">
+        <span className="status-notice" role="status">
           {autosave.saving ? t("admin.saving") : ""}
         </span>
         <SavedAnnouncement

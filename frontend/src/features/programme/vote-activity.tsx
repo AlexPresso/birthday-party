@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Check, Pencil, Trash2, Trophy } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { useConfirm } from "@/components/confirm-dialog";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api";
 import type { MessageKey } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n-context";
@@ -452,16 +452,17 @@ export function VoteActivity({
               </fieldset>
               <div className="vote-confirm">
                 <ErrorNotice message={ballotError} />
-                <p
-                  className={`vote-confirm-status ${lost ? "muted" : "success-notice"}`}
-                  role="status"
-                >
-                  {lost
-                    ? t("errors.invalid_vote_option")
-                    : recorded && mine
-                      ? t("activities.saved", { name: mine.label })
-                      : ""}
+                <p className="vote-confirm-status muted" role="status">
+                  {lost ? t("errors.invalid_vote_option") : ""}
                 </p>
+                {/* The option marked as the guest's shows the recorded vote. */}
+                <SavedAnnouncement
+                  message={
+                    !lost && recorded && mine
+                      ? t("activities.saved", { name: mine.label })
+                      : ""
+                  }
+                />
                 <button className="button primary" disabled={busy || !canCast}>
                   {casting
                     ? t("activities.saving")

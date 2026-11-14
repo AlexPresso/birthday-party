@@ -324,7 +324,7 @@ export function ConfigurationEditor({
       </fieldset>
       <ErrorNotice message={error} />
       <div className="configuration-save">
-        <span className="success-notice" role="status">
+        <span className="status-notice" role="status">
           {autosave.saving ? t("configuration.saving") : ""}
         </span>
         <SavedAnnouncement

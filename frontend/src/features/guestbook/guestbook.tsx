@@ -13,8 +13,9 @@ import { api, errorMessage, remove } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { entrySchema, entriesSchema, type EntryPage } from "./contracts";
 import { formatDate } from "@/lib/dates";
+import { useCopiedCue } from "@/lib/use-copied-cue";
 import { type Guest } from "@/features/guests/contracts";
-import { PageHeading, ErrorNotice } from "@/components/ui";
+import { PageHeading, ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
 import "./guestbook.css";
@@ -41,7 +42,8 @@ export function Guestbook({
   const [error, setError] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [copiedEntryId, setCopiedEntryId] = useState<number | null>(null);
+  // The copy action of a message confirms by itself for a moment.
+  const [copiedEntryId, markCopied] = useCopiedCue<number>();
   const text = useRef<HTMLTextAreaElement>(null);
 
   async function publish(event: React.FormEvent) {
@@ -114,7 +116,7 @@ export function Guestbook({
     setError(null);
     try {
       await navigator.clipboard.writeText(message);
-      setCopiedEntryId(id);
+      markCopied(id);
     } catch {
       setError(t("guestbookDesign.copyFailed"));
     }
@@ -183,9 +185,8 @@ export function Guestbook({
                 : t("guestbook.signed", { name: guest.name })}
             </p>
           </form>
-          <p className="success-notice" role="status">
-            {notice}
-          </p>
+          {/* The new message tops the list; only screen readers are told. */}
+          <SavedAnnouncement message={notice ?? ""} />
         </section>
         <section aria-label={t("guestbook.entries")}>
           <ErrorNotice message={error} />

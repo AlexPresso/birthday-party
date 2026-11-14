@@ -15,6 +15,7 @@ import {
   type Guest,
 } from "./support/party";
 import { acceptConfirmation } from "./support/confirm";
+import { expectSavedAnnouncement } from "./support/settings";
 import {
   addAvatar,
   castVote,
@@ -347,11 +348,12 @@ test("guests reach a vote only once it is open and unlocked, then vote on its pa
   await page.evaluate(() => window.scrollTo(0, 120));
   const scrolled = await page.evaluate(() => window.scrollY);
   await submit.click();
-  await expect(
-    page.getByText(`Ton vote pour ${camille.guest.name} est enregistré.`, {
-      exact: true,
-    }),
-  ).toBeVisible();
+  // No visible confirmation: the option is marked and screen readers are told.
+  await expectSavedAnnouncement(
+    page,
+    `Ton vote pour ${camille.guest.name} est enregistré.`,
+  );
+  await expect(page.locator(".vote-confirm-status")).toBeHidden();
   await expect(page).toHaveURL(votePath);
   // The browser may shift by a card's growth to keep what is on screen still.
   expect(
@@ -388,11 +390,10 @@ test("guests reach a vote only once it is open and unlocked, then vote on its pa
   await radio(page, robin.guest.name).press("Space");
   await expect(change).toBeEnabled();
   await change.click();
-  await expect(
-    page.getByText(`Ton vote pour ${robin.guest.name} est enregistré.`, {
-      exact: true,
-    }),
-  ).toBeVisible();
+  await expectSavedAnnouncement(
+    page,
+    `Ton vote pour ${robin.guest.name} est enregistré.`,
+  );
   await expect(votes(page, robin.guest.name)).toHaveText("3 voix");
   await expect(votes(page, camille.guest.name)).toHaveText("0 voix");
   await expect(

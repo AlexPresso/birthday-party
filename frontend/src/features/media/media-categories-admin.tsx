@@ -21,8 +21,8 @@ export function MediaCategoriesAdmin({
   const [isPublic, setPublic] = useState(false);
   const [busy, setBusy] = useState<number | "create" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState("");
-  // A changed visibility shows on its row; only screen readers are told.
+  // The list shows a new category and a changed visibility; only screen
+  // readers are told.
   const [announcement, setAnnouncement] = useState("");
 
   async function create(event: React.FormEvent) {
@@ -30,7 +30,6 @@ export function MediaCategoriesAdmin({
     if (busy !== null) return;
     setBusy("create");
     setError(null);
-    setNotice("");
     setAnnouncement("");
     try {
       const category = await api(
@@ -41,7 +40,7 @@ export function MediaCategoriesAdmin({
       onSaved(category);
       setName("");
       setPublic(false);
-      setNotice(t("categories.created"));
+      setAnnouncement(t("categories.created"));
     } catch (cause) {
       setError(errorMessage(cause, t));
     } finally {
@@ -60,7 +59,6 @@ export function MediaCategoriesAdmin({
       return;
     setBusy(category.id);
     setError(null);
-    setNotice("");
     setAnnouncement("");
     try {
       const saved = await api(
@@ -158,9 +156,6 @@ export function MediaCategoriesAdmin({
       ) : (
         <p className="fine-print">{t("categories.empty")}</p>
       )}
-      <p className="fine-print" role="status">
-        {notice}
-      </p>
       <SavedAnnouncement message={announcement} />
       <ErrorNotice message={error} />
     </section>

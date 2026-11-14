@@ -1,4 +1,7 @@
-import { openSettingsSection } from "./support/settings";
+import {
+  expectSavedAnnouncement,
+  openSettingsSection,
+} from "./support/settings";
 import {
   test,
   expect,
@@ -1778,9 +1781,7 @@ test("a welcome profile action becomes available only for its step and keeps the
   expect(saved.status()).toBe(200);
   const avatarURL = (await saved.json()).guest.avatarUrl as string;
   await expect(widget.locator(".avatar img")).toHaveAttribute("src", avatarURL);
-  await expect(
-    widget.getByText("Photo de profil enregistrée.", { exact: true }),
-  ).toBeVisible();
+  await expectSavedAnnouncement(widget, "Photo de profil enregistrée.");
   await expect(page).toHaveURL(/\/attente$/);
   await expect(page.getByRole("navigation")).toHaveCount(0);
   expect((await page.request.get(avatarURL)).status()).toBe(200);

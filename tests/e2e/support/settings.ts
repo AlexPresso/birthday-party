@@ -1,8 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * Settings show no "saved" message: a finished save is announced to screen
- * readers only, through a visually hidden status.
+ * The app shows no "saved" or "sent" message: a finished action is announced
+ * to screen readers only, through a visually hidden status.
  */
 export async function expectSavedAnnouncement(
   scope: Page | Locator,

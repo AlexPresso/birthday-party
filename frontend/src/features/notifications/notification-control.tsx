@@ -264,7 +264,7 @@ export function NotificationControl({
           </h3>
           <p
             id={`${heading}-status`}
-            className={`notification-status ${!compact && state === "enabled" ? "success-notice" : "muted"}`}
+            className="notification-status muted"
             role="status"
           >
             {!compact && !busy && state === "enabled" && (

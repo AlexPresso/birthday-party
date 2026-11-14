@@ -217,14 +217,8 @@ export function ProfilePhotoEditor({
           ) : null}
         </div>
         <ErrorNotice message={error} />
-        <p
-          className={
-            profileLayout && pending === "save"
-              ? "visually-hidden"
-              : "success-notice"
-          }
-          role="status"
-        >
+        {/* The avatar shows the result; only screen readers are told. */}
+        <p className="visually-hidden" role="status">
           {profileLayout && pending === "save" ? t("profile.saving") : notice}
         </p>
       </div>

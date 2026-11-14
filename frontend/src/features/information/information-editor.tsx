@@ -76,8 +76,6 @@ export function InformationEditor({
   const dirty = enabled !== state.enabled || !sameTabs(tabs, state.tabs);
   const locked = !!busy || conflict;
   const draftKept = notice === t("information.draftKept");
-  // A finished save is announced to screen readers only.
-  const savedNotice = notice === t("information.saved");
   const { flush, saving, onBlur } = useAutosave({ save });
   const structure = draft.map(({ key }) => key).join();
   const previousStructure = useRef(structure);
@@ -401,10 +399,12 @@ export function InformationEditor({
           )}
         </div>
 
+        {/* Only a running save and a kept draft are shown; a finished save
+            or reload is announced to screen readers. */}
         <p className="information-notice" role="status">
-          {saving ? t("admin.saving") : savedNotice ? "" : notice}
+          {saving ? t("admin.saving") : draftKept ? notice : ""}
         </p>
-        <SavedAnnouncement message={!saving && savedNotice ? notice : ""} />
+        <SavedAnnouncement message={saving || draftKept ? "" : notice} />
         <ErrorNotice message={error} />
         {(conflict || (dirty && (error || draftKept))) && (
           <div className="form-actions">

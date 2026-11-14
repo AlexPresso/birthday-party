@@ -98,15 +98,6 @@
     margin-top: 6px;
   }
 
-  .guestbook-compose .success-notice {
-    margin: 14px 0 0;
-    font-size: 13px;
-  }
-
-  .guestbook-compose .success-notice:empty {
-    margin: 0;
-  }
-
   .guestbook-entry {
     padding: 30px 0 32px;
     border-top: 1px solid var(--border);

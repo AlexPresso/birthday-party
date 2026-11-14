@@ -62,9 +62,6 @@
   .question-feedback .notice {
     margin-bottom: 0;
   }
-  .question-notice:empty {
-    display: none;
-  }
   .question-layout {
     display: grid;
     gap: 20px;

@@ -314,8 +314,8 @@
     flex-shrink: 0;
   }
   .upload-status.done {
-    background: var(--success-soft);
-    color: var(--success);
+    background: var(--accent);
+    color: var(--on-accent);
   }
   .upload-status.error {
     background: var(--danger-soft);

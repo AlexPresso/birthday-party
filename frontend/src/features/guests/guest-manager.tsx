@@ -4,8 +4,9 @@ import { Plus, Copy, Check, Link2, Trash2, X } from "lucide-react";
 import { api, remove, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { formatDate } from "@/lib/dates";
+import { useCopiedCue } from "@/lib/use-copied-cue";
 import { invitationSchema, newGuestSchema, type Guest } from "./contracts";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
 import "./guests.css";
@@ -32,12 +33,13 @@ export function GuestManager({
     expiresAt: string;
     name: string;
   } | null>(null);
-  const [copied, setCopied] = useState(false);
+  // The copy button confirms by itself for a moment.
+  const [copied, markCopied] = useCopiedCue<true>();
   async function create(event: React.FormEvent) {
     event.preventDefault();
     setBusy("create");
     setError(null);
-    setCopied(false);
+    markCopied(null);
     try {
       const data = await api("/admin/guests", newGuestSchema, {
         method: "POST",
@@ -55,7 +57,7 @@ export function GuestManager({
   async function invite(guest: Guest) {
     setBusy(`invite-${guest.id}`);
     setError(null);
-    setCopied(false);
+    markCopied(null);
     try {
       const data = await api(
         `/admin/guests/${guest.id}/invitation`,
@@ -92,7 +94,7 @@ export function GuestManager({
     if (!invitation) return;
     try {
       await navigator.clipboard.writeText(invitation.invitationUrl);
-      setCopied(true);
+      markCopied(true);
     } catch {
       setError(t("admin.copyUnavailable"));
     }
@@ -144,6 +146,7 @@ export function GuestManager({
               {copied ? <Check size={16} /> : <Copy size={16} />}
               {copied ? t("admin.linkCopied") : t("admin.copyLink")}
             </button>
+            <SavedAnnouncement message={copied ? t("admin.linkCopied") : ""} />
             <span className="fine-print">
               {t("admin.expiresAt", {
                 date: formatDate(invitation.expiresAt, timezone, true, locale),

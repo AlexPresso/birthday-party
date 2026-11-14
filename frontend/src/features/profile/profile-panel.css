@@ -95,13 +95,8 @@
     font-size: 12px;
   }
 
-  .profile-photo-editor-profile > .notice,
-  .profile-photo-editor-profile > .success-notice {
+  .profile-photo-editor-profile > .notice {
     align-self: stretch;
-  }
-
-  .profile-photo-editor-profile > .success-notice {
-    text-align: center;
   }
 
   .profile-photo-row {

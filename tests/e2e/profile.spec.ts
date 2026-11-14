@@ -12,6 +12,7 @@ import {
   signInGuest,
 } from "./support/party";
 import { canvasImage } from "./support/images";
+import { expectSavedAnnouncement } from "./support/settings";
 
 let host: APIRequestContext;
 
@@ -54,9 +55,8 @@ async function savePhoto(page: Page, trigger: () => Promise<void>) {
   const profile = (await saved.json()) as {
     guest: { id: number; avatarUrl: string };
   };
-  await expect(
-    page.getByText("Photo de profil enregistrée.", { exact: true }),
-  ).toBeVisible();
+  // No visible confirmation: the avatar changes and screen readers are told.
+  await expectSavedAnnouncement(page, "Photo de profil enregistrée.");
   await expect(page.locator(".navigation-profile .avatar img")).toHaveAttribute(
     "src",
     profile.guest.avatarUrl,
@@ -180,9 +180,7 @@ test("choosing a profile photo uploads it immediately and persists replacements 
   await card
     .getByRole("button", { name: "Supprimer la photo", exact: true })
     .click();
-  await expect(
-    card.getByText("Photo de profil supprimée.", { exact: true }),
-  ).toBeVisible();
+  await expectSavedAnnouncement(card, "Photo de profil supprimée.");
   await expect(navigationAvatar.locator("img")).toHaveCount(0);
   await expect(navigationAvatar).toHaveText("C");
   await expect(card.locator(".avatar")).toHaveText("C");

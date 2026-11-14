@@ -271,7 +271,7 @@ export function EventManager({
           </button>
         </div>
       )}
-      <p className="success-notice programme-save-status" role="status">
+      <p className="status-notice programme-save-status" role="status">
         {autosave.saving ? t("admin.saving") : ""}
       </p>
       <SavedAnnouncement message={autosave.saving ? "" : notice} />
