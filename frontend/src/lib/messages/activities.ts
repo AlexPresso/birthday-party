@@ -38,7 +38,6 @@ const en = {
   "activities.participation": "Votes received: {count}",
   "activities.frozen":
     "Voting has started. You can still correct the question.",
-  "activities.rules": "One choice, which you can change until voting closes.",
   "activities.noSelf": "You can’t vote for yourself",
   "activities.inactive": "Unavailable",
   "activities.myVote": "Your vote",
@@ -103,7 +102,6 @@ const fr: ActivityMessages = {
   "activities.participation": "Votes reçus : {count}",
   "activities.frozen":
     "Le vote a commencé. Tu peux encore corriger la question.",
-  "activities.rules": "Un seul choix, modifiable jusqu’à la fermeture.",
   "activities.noSelf": "Tu ne peux pas voter pour toi",
   "activities.inactive": "Indisponible",
   "activities.myVote": "Ton vote",
@@ -168,7 +166,6 @@ const de: ActivityMessages = {
   "activities.participation": "Erhaltene Stimmen: {count}",
   "activities.frozen":
     "Die Abstimmung läuft bereits. Du kannst die Frage noch korrigieren.",
-  "activities.rules": "Eine Stimme, die du bis zum Ende ändern kannst.",
   "activities.noSelf": "Du kannst nicht für dich selbst stimmen",
   "activities.inactive": "Nicht verfügbar",
   "activities.myVote": "Deine Stimme",
@@ -233,7 +230,6 @@ const it: ActivityMessages = {
   "activities.participation": "Voti ricevuti: {count}",
   "activities.frozen":
     "La votazione è iniziata. Puoi ancora correggere la domanda.",
-  "activities.rules": "Una sola scelta, modificabile fino alla chiusura.",
   "activities.noSelf": "Non puoi votare per te",
   "activities.inactive": "Non disponibile",
   "activities.myVote": "Il tuo voto",
@@ -297,7 +293,6 @@ const es: ActivityMessages = {
   "activities.participation": "Votos recibidos: {count}",
   "activities.frozen":
     "La votación ha empezado. Todavía puedes corregir la pregunta.",
-  "activities.rules": "Una sola elección, que puedes cambiar hasta el cierre.",
   "activities.noSelf": "No puedes votar por ti",
   "activities.inactive": "No disponible",
   "activities.myVote": "Tu voto",

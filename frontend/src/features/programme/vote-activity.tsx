@@ -42,7 +42,7 @@ function voteHint(vote: Vote, total: number): MessageKey | null {
   if (vote.status === "draft") return "activities.draftVisibility";
   if (vote.status === "closed")
     return total === 0 ? "activities.noResults" : null;
-  return vote.canVote ? "activities.rules" : "activities.unavailable";
+  return vote.canVote ? null : "activities.unavailable";
 }
 
 function VoteOptionItem({
