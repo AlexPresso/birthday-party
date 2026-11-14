@@ -90,8 +90,11 @@ npm --prefix frontend run format:check
 `npm run check` and `npm run test:e2e` start a throwaway PostgreSQL container,
 so Docker must be running, and they never touch the party's data. Stop
 `npm run dev` before the browser tests or a production build, because they share
-Next.js's build directory. GitHub Actions runs the same checks on every push
-and pull request, and publishes the images only when they pass.
+Next.js's build directory. GitHub Actions runs the same checks once for every
+commit of a pull request and for every push to `main` or a `v*` tag, and
+publishes the images from `main` and tags only when they pass. A branch without
+a pull request is not tested automatically: run the workflow by hand from the
+Actions tab.
 
 Two more checks are worth running before a release. The `go` commands run from
 `backend/`:
