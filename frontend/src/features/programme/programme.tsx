@@ -17,6 +17,7 @@ import { type Party } from "@/features/party/contracts";
 import { PageHeading, EmptyState, ErrorNotice } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 import { VoteStatus } from "./vote-status";
+import { WerewolfStatus } from "./werewolf-status";
 import { ActivityLink } from "./activity-link";
 import {
   type AgendaDay,
@@ -69,6 +70,7 @@ function ProgrammeEvent({
 }) {
   const { locale, t } = useI18n();
   const vote = event.locked ? null : event.vote;
+  const werewolf = event.locked ? null : event.werewolf;
   const questionIsTitle = vote?.question === event.title;
   const title =
     event.locked && !event.title ? t("programme.surprise") : event.title;
@@ -155,6 +157,12 @@ function ProgrammeEvent({
           ) : (
             <>
               {vote && <VoteStatus status={vote.status} />}
+              {werewolf && (
+                <WerewolfStatus
+                  status={werewolf.status}
+                  players={werewolf.players}
+                />
+              )}
               <h2
                 className={
                   vote && !questionIsTitle ? "programme-vote-title" : undefined

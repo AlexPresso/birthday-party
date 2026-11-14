@@ -125,8 +125,41 @@
     min-height: 1.6em;
   }
 
-  .admin-event-list .vote-status {
+  .admin-event-list .vote-status,
+  .admin-event-list .werewolf-status {
     font-size: 12px;
+  }
+
+  /* The game master of a werewolf event (game-master-picker.tsx). */
+  .werewolf-settings {
+    margin: 20px 0;
+    padding: 20px 0;
+    border-block: 1px solid var(--border);
+    min-width: 0;
+  }
+
+  .werewolf-settings select {
+    width: 100%;
+    min-height: 47px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--input-background);
+    color: var(--text);
+    font-size: 16px;
+  }
+
+  .werewolf-settings select:not(:disabled):hover {
+    border-color: var(--border-strong);
+  }
+
+  .werewolf-settings select:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .werewolf-settings .fine-print {
+    margin: 8px 0 0;
   }
 
   .programme-admin-events > li {

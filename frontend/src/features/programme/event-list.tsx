@@ -8,6 +8,7 @@ import { ActivityLink } from "./activity-link";
 import type { PartyEvent, Vote } from "./contracts";
 import { totalVotes, voteTransitions } from "./vote-model";
 import { VoteStatus } from "./vote-status";
+import { WerewolfStatus } from "./werewolf-status";
 
 const previewedCandidates = 8;
 
@@ -71,6 +72,14 @@ export function EventList({
                   <VoteStatus status={event.vote.status} />
                 </div>
               )}
+              {event.werewolf && (
+                <div>
+                  <WerewolfStatus
+                    status={event.werewolf.status}
+                    players={event.werewolf.players}
+                  />
+                </div>
+              )}
               <p className="fine-print">
                 {event.startsAt
                   ? formatDate(event.startsAt, timezone, true, locale)
@@ -90,6 +99,15 @@ export function EventList({
                       })
                     : t("admin.detailsVisible")}
               </span>
+              {event.werewolf && (
+                <p className="fine-print">
+                  {event.werewolf.gameMaster
+                    ? t("werewolf.gameMasterNamed", {
+                        name: event.werewolf.gameMaster.name,
+                      })
+                    : t("werewolf.gameMasterMissing")}
+                </p>
+              )}
             </div>
             <div className="button-row">
               <button

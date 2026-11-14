@@ -14,6 +14,15 @@ const en = {
   write_ins_disabled: "Adding a choice isn’t allowed for this vote.",
   vote_option_limit: "This vote already has the maximum number of choices.",
   invalid_vote_label: "Enter a choice of 1 to 80 characters.",
+  game_master_required: "Only the game master can do this.",
+  invalid_werewolf_roles:
+    "Check the roles: up to 20, each with a name of up to 40 characters, an explanation of up to 600 and a quantity from 0 to 60.",
+  werewolf_roles_mismatch:
+    "The roles don’t add up to the number of players, or fewer than 3 players joined.",
+  werewolf_player_limit: "This game already has the maximum number of players.",
+  invalid_werewolf_player: "This person isn’t playing in this game.",
+  werewolf_message_forbidden: "You can’t send a message right now.",
+  invalid_werewolf_message: "Write a message of up to 280 characters.",
 
   invalid_notification_subscription:
     "Notifications couldn't be set up. Try again.",
@@ -128,6 +137,16 @@ export const errorMessages = {
     write_ins_disabled: "Ce vote n’accepte pas de nouveaux choix.",
     vote_option_limit: "Ce vote a déjà le nombre maximum de choix.",
     invalid_vote_label: "Écris un choix de 1 à 80 caractères.",
+    game_master_required: "Seul le maître du jeu peut faire ça.",
+    invalid_werewolf_roles:
+      "Vérifie les rôles : 20 au maximum, chacun avec un nom de 40 caractères au plus, une explication de 600 au plus et une quantité de 0 à 60.",
+    werewolf_roles_mismatch:
+      "Les rôles ne correspondent pas au nombre de joueurs, ou moins de 3 joueurs ont rejoint la partie.",
+    werewolf_player_limit: "Cette partie a déjà le nombre maximum de joueurs.",
+    invalid_werewolf_player: "Cette personne ne joue pas dans cette partie.",
+    werewolf_message_forbidden:
+      "Tu ne peux pas envoyer de message pour l’instant.",
+    invalid_werewolf_message: "Écris un message de 280 caractères au plus.",
 
     invalid_notification_subscription:
       "Les notifications n’ont pas pu être configurées. Réessaie.",
@@ -251,6 +270,17 @@ export const errorMessages = {
     vote_option_limit:
       "Diese Abstimmung hat bereits die maximale Anzahl an Optionen.",
     invalid_vote_label: "Gib eine Option mit 1 bis 80 Zeichen ein.",
+    game_master_required: "Das kann nur die Spielleitung.",
+    invalid_werewolf_roles:
+      "Prüf die Rollen: höchstens 20, jede mit einem Namen von höchstens 40 Zeichen, einer Erklärung von höchstens 600 Zeichen und einer Anzahl von 0 bis 60.",
+    werewolf_roles_mismatch:
+      "Die Rollen passen nicht zur Zahl der Spieler, oder es sind weniger als 3 Spieler dabei.",
+    werewolf_player_limit:
+      "Dieses Spiel hat schon die maximale Zahl an Spielern.",
+    invalid_werewolf_player: "Diese Person spielt in diesem Spiel nicht mit.",
+    werewolf_message_forbidden: "Du kannst gerade keine Nachricht senden.",
+    invalid_werewolf_message:
+      "Schreib eine Nachricht mit höchstens 280 Zeichen.",
 
     invalid_notification_subscription:
       "Benachrichtigungen konnten nicht eingerichtet werden. Versuch es erneut.",
@@ -374,6 +404,17 @@ export const errorMessages = {
     write_ins_disabled: "In questa votazione non si possono aggiungere scelte.",
     vote_option_limit: "Questa votazione ha già il numero massimo di scelte.",
     invalid_vote_label: "Scrivi una scelta da 1 a 80 caratteri.",
+    game_master_required: "Solo il master del gioco può farlo.",
+    invalid_werewolf_roles:
+      "Controlla i ruoli: al massimo 20, ognuno con un nome di 40 caratteri al massimo, una spiegazione di 600 al massimo e una quantità da 0 a 60.",
+    werewolf_roles_mismatch:
+      "I ruoli non corrispondono al numero di giocatori, oppure i giocatori sono meno di 3.",
+    werewolf_player_limit:
+      "Questa partita ha già il numero massimo di giocatori.",
+    invalid_werewolf_player: "Questa persona non gioca in questa partita.",
+    werewolf_message_forbidden: "Adesso non puoi inviare un messaggio.",
+    invalid_werewolf_message:
+      "Scrivi un messaggio di 280 caratteri al massimo.",
 
     invalid_notification_subscription:
       "Non è stato possibile configurare le notifiche. Riprova.",
@@ -490,6 +531,15 @@ export const errorMessages = {
     write_ins_disabled: "En esta votación no se pueden añadir opciones.",
     vote_option_limit: "Esta votación ya tiene el número máximo de opciones.",
     invalid_vote_label: "Escribe una opción de 1 a 80 caracteres.",
+    game_master_required: "Solo el director de juego puede hacer esto.",
+    invalid_werewolf_roles:
+      "Revisa los roles: 20 como máximo, cada uno con un nombre de hasta 40 caracteres, una explicación de hasta 600 y una cantidad de 0 a 60.",
+    werewolf_roles_mismatch:
+      "Los roles no coinciden con el número de jugadores, o hay menos de 3 jugadores.",
+    werewolf_player_limit: "Esta partida ya tiene el máximo de jugadores.",
+    invalid_werewolf_player: "Esta persona no juega en esta partida.",
+    werewolf_message_forbidden: "Ahora no puedes enviar un mensaje.",
+    invalid_werewolf_message: "Escribe un mensaje de hasta 280 caracteres.",
 
     invalid_notification_subscription:
       "No se han podido configurar las notificaciones. Inténtalo de nuevo.",

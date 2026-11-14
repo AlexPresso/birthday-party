@@ -168,7 +168,8 @@
     overflow-wrap: anywhere;
   }
 
-  .programme-event-content > .vote-status {
+  .programme-event-content > .vote-status,
+  .programme-event-content > .werewolf-status {
     margin-bottom: 9px;
     font-size: 12px;
   }

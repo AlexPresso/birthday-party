@@ -19,6 +19,8 @@ function activityLabels(
   if (event.locked) return null;
   if (event.type === "questions" && event.questions)
     return { label: "questions.view", loading: "questions.loading" };
+  if (event.type === "werewolf" && event.werewolf)
+    return { label: "werewolf.view", loading: "werewolf.loading" };
   if (event.type === "vote" && event.vote) {
     const canVote = event.vote.status === "open" && event.vote.canVote;
     return {

@@ -15,6 +15,7 @@ import type { programmeDesignMessages } from "./messages/programme-design";
 import type { guestbookDesignMessages } from "./messages/guestbook-design";
 import type { settingsMessages } from "./messages/settings";
 import type { informationMessages } from "./messages/information";
+import type { werewolfMessages } from "./messages/werewolf";
 
 export type MessageKey =
   | keyof typeof commonMessages.en
@@ -33,6 +34,7 @@ export type MessageKey =
   | keyof typeof guestbookDesignMessages.en
   | keyof typeof settingsMessages.en
   | keyof typeof informationMessages.en
+  | keyof typeof werewolfMessages.en
   | `errors.${ErrorCode}`;
 export type Messages = Record<MessageKey, string>;
 export type Translator = (

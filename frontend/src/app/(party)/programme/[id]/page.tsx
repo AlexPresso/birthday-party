@@ -1,11 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/features/guests/server";
-import { questionRoundSchema } from "@/features/programme/contracts";
+import {
+  questionRoundSchema,
+  werewolfSchema,
+} from "@/features/programme/contracts";
 import { QuestionActivity } from "@/features/programme/question-activity";
 import { getProgramme } from "@/features/programme/server";
 import { VoteActivity } from "@/features/programme/vote-activity";
+import { WerewolfActivity } from "@/features/programme/werewolf-activity";
 import { ApiError } from "@/lib/api";
 import { serverApi } from "@/lib/server-api";
+import type { z } from "zod";
 import { getI18n } from "@/lib/server-i18n";
 
 type Props = { params: Promise<{ id: string }> };
@@ -31,7 +36,21 @@ export async function generateMetadata({ params }: Props) {
   const type = activity?.event?.type;
   if (type === "vote") return { title: t("activities.voteType") };
   if (type === "questions") return { title: t("questions.name") };
+  if (type === "werewolf") return { title: t("werewolf.name") };
   return { title: t("page.programme") };
+}
+
+/**
+ * Reads what the activity keeps beside its event. Go refuses it to a guest
+ * who may not read the activity; the page then does not exist.
+ */
+async function readDetails<T>(path: string, schema: z.ZodType<T>) {
+  try {
+    return await serverApi(path, schema);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
+  }
 }
 
 export default async function ActivityPage({ params }: Props) {
@@ -55,24 +74,32 @@ export default async function ActivityPage({ params }: Props) {
     );
   }
 
-  // Only a question activity has a round to read, so the request waits for
-  // the event's type. Go still refuses a round the guest may not read.
-  let round;
-  try {
-    round = await serverApi(`/programme/${id}/questions`, questionRoundSchema);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) notFound();
-    throw error;
+  // Only these activities have details to read, so the request waits for
+  // the event's type.
+  const heading = {
+    id: event.id,
+    title: event.title,
+    description: event.description,
+  };
+  if (event.type === "werewolf") {
+    return (
+      <WerewolfActivity
+        key={event.id}
+        event={heading}
+        initial={await readDetails(`/programme/${id}/werewolf`, werewolfSchema)}
+        guestId={guest.id}
+        isAdmin={isAdmin}
+      />
+    );
   }
   return (
     <QuestionActivity
       key={event.id}
-      event={{
-        id: event.id,
-        title: event.title,
-        description: event.description,
-      }}
-      initial={round}
+      event={heading}
+      initial={await readDetails(
+        `/programme/${id}/questions`,
+        questionRoundSchema,
+      )}
       isAdmin={isAdmin}
     />
   );

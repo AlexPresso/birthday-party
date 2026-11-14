@@ -28,6 +28,7 @@ import { errorMessages } from "../src/lib/messages/errors.ts";
 import { activityMessages } from "../src/lib/messages/activities.ts";
 import { questionMessages } from "../src/lib/messages/questions.ts";
 import { informationMessages } from "../src/lib/messages/information.ts";
+import { werewolfMessages } from "../src/lib/messages/werewolf.ts";
 
 test("locale negotiation follows language preferences and region variants", () => {
   const cases = [
@@ -74,6 +75,7 @@ test("all catalogs contain the same nonempty keys and interpolation parameters",
     activityMessages,
     questionMessages,
     informationMessages,
+    werewolfMessages,
     errorMessages,
   ]) {
     const expected = family.en as Record<string, string>;

@@ -6,8 +6,21 @@ import { ErrorNotice } from "@/components/ui";
 import { useI18n } from "@/lib/i18n-context";
 import type { Guest } from "../guests/contracts";
 import type { PartyEvent } from "./contracts";
-import { frozenVote, type EventDraft } from "./event-draft";
+import {
+  editedElsewhere,
+  frozenVote,
+  lockedGameMaster,
+  type EventDraft,
+} from "./event-draft";
+import { GameMasterPicker } from "./game-master-picker";
 import { VoteEditor } from "./vote-editor";
+
+const newEventTitles = {
+  event: "admin.newEvent",
+  vote: "activities.voteType",
+  questions: "questions.name",
+  werewolf: "werewolf.name",
+} as const;
 
 /** The editor of one event draft; its owner saves on blur and on submit. */
 export function EventForm({
@@ -65,15 +78,7 @@ export function EventForm({
       }}
     >
       <div className="section-row">
-        <h3>
-          {draft.id
-            ? t("admin.editEvent")
-            : draft.type === "vote"
-              ? t("activities.voteType")
-              : draft.type === "questions"
-                ? t("questions.name")
-                : t("admin.newEvent")}
-        </h3>
+        <h3>{t(draft.id ? "admin.editEvent" : newEventTitles[draft.type])}</h3>
         <button
           type="button"
           className="icon-button"
@@ -84,7 +89,7 @@ export function EventForm({
           <X size={18} />
         </button>
       </div>
-      {saved && saved.revision !== draft.revision && (
+      {saved && editedElsewhere(draft, saved) && (
         <>
           <p className="fine-print" role="status">
             {t("activities.conflict")}
@@ -117,6 +122,18 @@ export function EventForm({
             guests={guests}
             busy={busy}
             onChange={(vote, commit) => onChange({ vote }, commit)}
+          />
+        )}
+        {draft.werewolf && (
+          <GameMasterPicker
+            gameMasterId={draft.werewolf.gameMasterId}
+            saved={saved?.werewolf?.gameMaster ?? null}
+            locked={lockedGameMaster(saved)}
+            guests={guests}
+            busy={busy}
+            onChange={(gameMasterId) =>
+              onChange({ werewolf: { gameMasterId } }, true)
+            }
           />
         )}
         <label htmlFor="event-description">{t("admin.eventDetails")}</label>

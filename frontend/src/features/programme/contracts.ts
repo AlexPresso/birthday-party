@@ -83,10 +83,105 @@ export const questionRoundSchema = questionSummarySchema.extend({
 });
 export type QuestionRound = z.infer<typeof questionRoundSchema>;
 
+/** The built-in werewolf roles, named and explained by the message catalogs. */
+export const werewolfRoleKeys = [
+  "werewolf",
+  "villager",
+  "seer",
+  "witch",
+  "hunter",
+  "cupid",
+  "guard",
+] as const;
+
+const werewolfStatusSchema = z.enum(["lobby", "running", "finished"]);
+
+/**
+ * A built-in role has a key and is named from it; its description stays null
+ * until the game master rewrites it. A custom role has no key and carries its
+ * own name and description.
+ */
+const roleCardShape = {
+  key: z.enum(werewolfRoleKeys).nullable(),
+  name: z.string().nullable(),
+  description: z.string().nullable(),
+};
+const customRoleHasName = (role: { key: string | null; name: string | null }) =>
+  role.key !== null || Boolean(role.name);
+const roleCardSchema = z.object(roleCardShape).refine(customRoleHasName);
+const werewolfRoleSchema = z
+  .object({ ...roleCardShape, id, count: z.number().int().nonnegative() })
+  .refine(customRoleHasName);
+
+const ghostMessageSchema = z.object({
+  from: authorSchema,
+  text: z.string().min(1),
+});
+
+export const werewolfSummarySchema = z.object({
+  status: werewolfStatusSchema,
+  gameMaster: authorSchema.nullable(),
+  /** How many guests joined. */
+  players: z.number().int().nonnegative(),
+});
+
+/** A werewolf game as one viewer may see it. */
+export const werewolfSchema = z
+  .object({
+    status: werewolfStatusSchema,
+    /** Changes with every game master command. */
+    revision: z.number().int().nonnegative(),
+    gameMaster: authorSchema.nullable(),
+    isGameMaster: z.boolean(),
+    /** The viewer is a player. */
+    joined: z.boolean(),
+    hideRolesOfDead: z.boolean(),
+    ghostMessages: z.boolean(),
+    phase: z.enum(["day", "night"]),
+    /** In join order. */
+    players: z.array(
+      authorSchema.extend({
+        alive: z.boolean(),
+        mayor: z.boolean(),
+        /** Null whenever this viewer may not see it. */
+        role: roleCardSchema.nullable(),
+      }),
+    ),
+    myRole: roleCardSchema.nullable(),
+    canWriteMessage: z.boolean(),
+    myMessage: z.string().nullable(),
+    /** Only for the current mayor, by day. */
+    mayorMessage: ghostMessageSchema.nullable(),
+    /** The role list and every ghost message: the game master's only. */
+    roles: z.array(werewolfRoleSchema).nullable(),
+    messages: z
+      .array(ghostMessageSchema.extend({ delivered: z.boolean() }))
+      .nullable(),
+  })
+  .superRefine((game, ctx) => {
+    const players = new Set(game.players.map((player) => player.id));
+    const roles = new Set(game.roles?.map((role) => role.id));
+    if (
+      players.size !== game.players.length ||
+      roles.size !== (game.roles?.length ?? 0)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Players and roles must be distinct",
+      });
+    }
+    if (game.isGameMaster && (game.roles === null || game.messages === null)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "The game master reads the roles and the ghost messages",
+      });
+    }
+  });
+
 export const eventSchema = z
   .object({
     id,
-    type: z.enum(["event", "vote", "questions"]),
+    type: z.enum(["event", "vote", "questions", "werewolf"]),
     revision: z.number().int().positive(),
     title: z.string(),
     description: z.string(),
@@ -96,6 +191,7 @@ export const eventSchema = z
     locked: z.boolean(),
     vote: voteSchema.nullable(),
     questions: questionSummarySchema.nullable().optional(),
+    werewolf: werewolfSummarySchema.nullable().optional(),
   })
   .superRefine((event, ctx) => {
     if (event.type !== "vote" && event.vote !== null) {
@@ -112,6 +208,16 @@ export const eventSchema = z
         code: "custom",
         message:
           "Only question events contain a question round; unlocked rounds require details",
+      });
+    }
+    if (
+      (event.werewolf && event.type !== "werewolf") ||
+      (event.type === "werewolf" && !event.locked && !event.werewolf)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Only werewolf events contain a game; unlocked games require details",
       });
     }
     if (event.type === "vote" && !event.locked && event.vote === null) {
@@ -132,3 +238,9 @@ export type Vote = z.infer<typeof voteSchema>;
 export type VoteOption = Vote["options"][number];
 /** A vote event whose voting details the viewer may read. */
 export type VoteEvent = PartyEvent & { vote: Vote };
+export type Werewolf = z.infer<typeof werewolfSchema>;
+export type WerewolfSummary = z.infer<typeof werewolfSummarySchema>;
+export type WerewolfPlayer = Werewolf["players"][number];
+export type WerewolfRole = NonNullable<Werewolf["roles"]>[number];
+export type RoleCard = NonNullable<Werewolf["myRole"]>;
+export type WerewolfRoleKey = (typeof werewolfRoleKeys)[number];

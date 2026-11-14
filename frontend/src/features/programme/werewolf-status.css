@@ -1,0 +1,28 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+@layer features {
+  /* The look of the vote status, for a game's three states. */
+  .werewolf-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .werewolf-status[data-status="finished"] {
+    color: var(--muted);
+  }
+
+  .werewolf-status:not([data-status="finished"])::before {
+    content: "";
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+}
