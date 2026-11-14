@@ -248,13 +248,7 @@ export function PhotoGallery({
           icon={<Images size={36} strokeWidth={1.4} />}
           title={t("photos.emptyTitle")}
         >
-          <p>
-            {t(
-              categoryId === null
-                ? "photos.emptyDescription"
-                : "categories.emptyGallery",
-            )}
-          </p>
+          {categoryId !== null && <p>{t("categories.emptyGallery")}</p>}
         </EmptyState>
       ) : (
         <section aria-label={t("photos.all")}>

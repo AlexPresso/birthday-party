@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, Check, Ticket } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { useRealtimeResource } from "@/lib/use-realtime-resource";
-import { ErrorNotice } from "@/components/ui";
+import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
   eventsSchema,
@@ -219,9 +219,8 @@ export function QuestionActivity({
           </button>
         </div>
       )}
-      <p className="question-notice success-notice" role="status">
-        {notice}
-      </p>
+      {/* The sent question shows in the list; only screen readers are told. */}
+      <SavedAnnouncement message={notice} />
       <div className="question-layout">
         <section className="question-board" aria-label={t("questions.view")}>
           <div

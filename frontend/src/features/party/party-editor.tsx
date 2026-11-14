@@ -150,12 +150,11 @@ export function PartyEditor({
             <option value="America/Montreal" />
             <option value="UTC" />
           </datalist>
-          <p className="fine-print">{t("admin.timezoneHint")}</p>
         </div>
       </div>
       <ErrorNotice message={error} />
       <div className="form-actions">
-        <span className="success-notice" role="status">
+        <span className="status-notice" role="status">
           {autosave.saving ? t("admin.saving") : ""}
         </span>
         <SavedAnnouncement

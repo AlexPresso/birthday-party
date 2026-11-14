@@ -166,7 +166,6 @@ export function WelcomeWidgetEditor({
         aria-labelledby={`welcome-palette-${step.key}`}
       >
         <h4 id={`welcome-palette-${step.key}`}>{t("widgets.palette")}</h4>
-        <p className="fine-print">{t("widgets.paletteHint")}</p>
         <div className="welcome-widget-palette-items">
           {types.map((type) => {
             const Icon = icons[type];
@@ -205,7 +204,6 @@ export function WelcomeWidgetEditor({
             );
           })}
         </div>
-        <p className="fine-print welcome-widget-limit">{t("widgets.limit")}</p>
       </aside>
       <div className="welcome-widget-canvas">
         <div className="welcome-widget-canvas-heading">
@@ -227,7 +225,6 @@ export function WelcomeWidgetEditor({
             >
               <Plus size={24} aria-hidden="true" />
               <strong>{t("widgets.empty")}</strong>
-              <p className="fine-print">{t("widgets.emptyHint")}</p>
             </li>
           )}
           {step.widgets.map((widget, index) => {
@@ -319,137 +316,137 @@ export function WelcomeWidgetEditor({
                     </button>
                   </div>
                 </div>
-                <div className="welcome-widget-fields">
-                  {textWidget && (
-                    <>
-                      <label htmlFor={fieldId}>
-                        {t(
-                          widget.type === "title"
-                            ? "widgets.titleField"
-                            : "widgets.textField",
-                          { number: number(index + 1) },
-                        )}
-                      </label>
-                      {widget.type === "title" ? (
-                        <input
-                          id={fieldId}
-                          value={widget.text}
-                          disabled={disabled}
-                          maxLength={240}
-                          required
-                          aria-describedby={`${fieldId}-count`}
-                          onChange={(event) =>
-                            update({ ...widget, text: event.target.value })
-                          }
-                        />
-                      ) : (
-                        <textarea
-                          id={fieldId}
-                          value={widget.text}
-                          disabled={disabled}
-                          rows={4}
-                          maxLength={2000}
-                          required
-                          aria-describedby={`${fieldId}-count`}
-                          onChange={(event) =>
-                            update({ ...widget, text: event.target.value })
-                          }
-                        />
+                {/* Profile photo and notification widgets have no settings. */}
+                {widget.type !== "profile_photo" &&
+                  widget.type !== "enable_notifications" && (
+                    <div className="welcome-widget-fields">
+                      {textWidget && (
+                        <>
+                          <label htmlFor={fieldId}>
+                            {t(
+                              widget.type === "title"
+                                ? "widgets.titleField"
+                                : "widgets.textField",
+                              { number: number(index + 1) },
+                            )}
+                          </label>
+                          {widget.type === "title" ? (
+                            <input
+                              id={fieldId}
+                              value={widget.text}
+                              disabled={disabled}
+                              maxLength={240}
+                              required
+                              aria-describedby={`${fieldId}-count`}
+                              onChange={(event) =>
+                                update({ ...widget, text: event.target.value })
+                              }
+                            />
+                          ) : (
+                            <textarea
+                              id={fieldId}
+                              value={widget.text}
+                              disabled={disabled}
+                              rows={4}
+                              maxLength={2000}
+                              required
+                              aria-describedby={`${fieldId}-count`}
+                              onChange={(event) =>
+                                update({ ...widget, text: event.target.value })
+                              }
+                            />
+                          )}
+                          <p
+                            className="fine-print welcome-character-count"
+                            id={`${fieldId}-count`}
+                          >
+                            {number(Array.from(widget.text).length)} /{" "}
+                            {number(widget.type === "title" ? 120 : 1000)}
+                          </p>
+                        </>
                       )}
-                      <p
-                        className="fine-print welcome-character-count"
-                        id={`${fieldId}-count`}
-                      >
-                        {number(Array.from(widget.text).length)} /{" "}
-                        {number(widget.type === "title" ? 120 : 1000)}
-                      </p>
-                    </>
-                  )}
-                  {widget.type === "profile_photo" && (
-                    <p className="fine-print">{t("widgets.profileHint")}</p>
-                  )}
-                  {widget.type === "enable_notifications" && (
-                    <p className="fine-print">
-                      {t("notifications.widgetHint")}
-                    </p>
-                  )}
-                  {widget.type === "rules" && (
-                    <>
-                      <label htmlFor={fieldId}>
-                        {t("widgets.rulesField", { number: number(index + 1) })}
-                      </label>
-                      <textarea
-                        id={fieldId}
-                        value={widget.rules.join("\n")}
-                        disabled={disabled}
-                        rows={5}
-                        maxLength={5000}
-                        required
-                        aria-describedby={`${fieldId}-count ${fieldId}-hint`}
-                        onChange={(event) =>
-                          update({
-                            ...widget,
-                            rules: event.target.value.split("\n"),
-                          })
-                        }
-                      />
-                      <p
-                        className="fine-print welcome-character-count"
-                        id={`${fieldId}-count`}
-                      >
-                        {number(cleanRules(widget.rules).length)} / {number(12)}
-                      </p>
-                      <p
-                        className="fine-print welcome-rules-hint"
-                        id={`${fieldId}-hint`}
-                      >
-                        {t("widgets.rulesHint")}
-                      </p>
-                    </>
-                  )}
-                  {widget.type === "media_upload" && (
-                    <div className="welcome-media-settings">
-                      <label htmlFor={fieldId}>
-                        {t("categories.uploadDestination")}
-                      </label>
-                      <select
-                        id={fieldId}
-                        disabled={disabled}
-                        value={widget.mediaUpload.categoryId ?? ""}
-                        onChange={(event) =>
-                          update({
-                            ...widget,
-                            mediaUpload: {
-                              categoryId:
-                                event.target.value === ""
-                                  ? null
-                                  : Number(event.target.value),
-                            },
-                          })
-                        }
-                      >
-                        <option value="">{t("categories.main")}</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.isPublic
-                              ? category.name
-                              : t("categories.privateOption", {
-                                  name: category.name,
-                                })}
-                          </option>
-                        ))}
-                      </select>
-                      {(widget.mediaUpload.categoryId === null ||
-                        categories.find(
-                          (category) =>
-                            category.id === widget.mediaUpload.categoryId,
-                        )?.isPublic) && (
-                        <p className="fine-print">{t("categories.mainHint")}</p>
+                      {widget.type === "rules" && (
+                        <>
+                          <label htmlFor={fieldId}>
+                            {t("widgets.rulesField", {
+                              number: number(index + 1),
+                            })}
+                          </label>
+                          <textarea
+                            id={fieldId}
+                            value={widget.rules.join("\n")}
+                            disabled={disabled}
+                            rows={5}
+                            maxLength={5000}
+                            required
+                            aria-describedby={`${fieldId}-count ${fieldId}-hint`}
+                            onChange={(event) =>
+                              update({
+                                ...widget,
+                                rules: event.target.value.split("\n"),
+                              })
+                            }
+                          />
+                          <p
+                            className="fine-print welcome-character-count"
+                            id={`${fieldId}-count`}
+                          >
+                            {number(cleanRules(widget.rules).length)} /{" "}
+                            {number(12)}
+                          </p>
+                          <p
+                            className="fine-print welcome-rules-hint"
+                            id={`${fieldId}-hint`}
+                          >
+                            {t("widgets.rulesHint")}
+                          </p>
+                        </>
                       )}
-                      <p className="fine-print">{t("categories.manageHint")}</p>
+                      {widget.type === "media_upload" && (
+                        <div className="welcome-media-settings">
+                          <label htmlFor={fieldId}>
+                            {t("categories.uploadDestination")}
+                          </label>
+                          <select
+                            id={fieldId}
+                            disabled={disabled}
+                            value={widget.mediaUpload.categoryId ?? ""}
+                            onChange={(event) =>
+                              update({
+                                ...widget,
+                                mediaUpload: {
+                                  categoryId:
+                                    event.target.value === ""
+                                      ? null
+                                      : Number(event.target.value),
+                                },
+                              })
+                            }
+                          >
+                            <option value="">{t("categories.main")}</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.isPublic
+                                  ? category.name
+                                  : t("categories.privateOption", {
+                                      name: category.name,
+                                    })}
+                              </option>
+                            ))}
+                          </select>
+                          {(widget.mediaUpload.categoryId === null ||
+                            categories.find(
+                              (category) =>
+                                category.id === widget.mediaUpload.categoryId,
+                            )?.isPublic) && (
+                            <p className="fine-print">
+                              {t("categories.mainHint")}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
               </li>
             );
           })}

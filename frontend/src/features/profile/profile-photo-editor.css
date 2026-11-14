@@ -58,19 +58,6 @@
     background: var(--background);
   }
 
-  .profile-photo-preview p {
-    margin: 0;
-    min-width: 0;
-  }
-
-  .profile-photo-editor > .success-notice {
-    margin: 0;
-  }
-
-  .profile-photo-editor > .success-notice:not(:empty) {
-    margin-top: 12px;
-  }
-
   @media (max-width: 420px) {
     .profile-photo-actions .button {
       width: 100%;

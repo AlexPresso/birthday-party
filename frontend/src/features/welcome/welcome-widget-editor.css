@@ -21,14 +21,10 @@
     font-weight: 600;
   }
 
-  .welcome-widget-palette > .fine-print {
-    margin: 6px 0 14px;
-    line-height: 1.6;
-  }
-
   .welcome-widget-palette-items {
     display: grid;
     gap: 8px;
+    margin-top: 14px;
   }
 
   .welcome-palette-item {
@@ -143,6 +139,10 @@
     align-items: center;
     flex-wrap: wrap;
     min-height: 48px;
+  }
+
+  /* A widget without settings is its toolbar alone. */
+  .welcome-widget-toolbar:not(:last-child) {
     border-bottom: 1px solid var(--border);
   }
 
@@ -206,10 +206,6 @@
     margin-top: 6px;
   }
 
-  .welcome-widget-limit {
-    line-height: 1.6;
-  }
-
   .welcome-media-settings .fine-print {
     margin: 10px 0 0;
     line-height: 1.6;
@@ -234,11 +230,6 @@
     font-size: 14px;
     line-height: 1.5;
     font-weight: 600;
-  }
-
-  .welcome-widget-empty > p {
-    max-width: 34ch;
-    margin: 0;
   }
 
   .welcome-widget-empty[data-drop] {

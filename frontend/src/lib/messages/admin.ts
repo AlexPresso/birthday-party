@@ -7,7 +7,6 @@ const en = {
   "admin.partyDate": "Party date",
   "admin.dateHint": "Enter the time in your device’s time zone.",
   "admin.partyTimezone": "Party time zone",
-  "admin.timezoneHint": "Guests see all times in this time zone.",
   "admin.saving": "Saving…",
   "admin.partySaved": "Party details saved.",
   "admin.revokeConfirmation":
@@ -18,8 +17,6 @@ const en = {
   "admin.guestNamePlaceholder": "Their first name",
   "admin.creating": "Creating…",
   "admin.createInvitation": "Create invitation",
-  "admin.invitationHint":
-    "Each guest gets a personal link. Copy it and send it to them in a message.",
   "admin.invitationFor": "Invitation for {name}",
   "admin.hideInvitation": "Hide invitation link",
   "admin.personalLink": "Personal link",
@@ -40,8 +37,6 @@ const en = {
   "admin.revokeAccessFor": "Remove access for {name}",
   "admin.programmeSaved": "Schedule saved.",
   "admin.deleteEventConfirmation": "Remove “{name}” from the schedule?",
-  "admin.surpriseHint":
-    "Surprise details stay hidden from guests until the time you choose.",
   "admin.addEvent": "Add an event",
   "admin.editEvent": "Edit event",
   "admin.newEvent": "New event",
@@ -51,9 +46,8 @@ const en = {
   "admin.teaserPlaceholder": "Something you can reveal now",
   "admin.eventStart": "Event starts",
   "admin.eventUnlock": "Reveal details on",
-  "admin.eventDateHint":
-    "Enter times in {zone}. Guests see them in {timezone}. Leave the reveal time empty to show the event immediately.",
-  "admin.emptyProgramme": "No events yet. Add the first one.",
+  "admin.eventDateHint": "Times in {zone}. Guests see them in {timezone}.",
+  "admin.emptyProgramme": "No events yet.",
   "admin.timePending": "Time to be confirmed",
   "admin.revealedAt": "Details revealed on {date}",
   "admin.detailsVisible": "Details visible",
@@ -61,8 +55,6 @@ const en = {
   "admin.deleteNamedEvent": "Delete {name}",
   "settings.logoutConfirmation":
     "Sign out of this device? You’ll need a new link from the host to get back in.",
-  "settings.host": "Host",
-  "settings.guest": "Guest",
   "settings.signingOut": "Signing out…",
   "settings.signOut": "Sign out",
 };
@@ -79,7 +71,6 @@ const fr: AdminMessages = {
   "admin.partyDate": "Date de la fête",
   "admin.dateHint": "Indique l’heure dans le fuseau de ton appareil.",
   "admin.partyTimezone": "Fuseau horaire de la fête",
-  "admin.timezoneHint": "Les invités verront tous les horaires dans ce fuseau.",
   "admin.saving": "Enregistrement…",
   "admin.partySaved": "Les infos de la fête sont enregistrées.",
   "admin.revokeConfirmation":
@@ -90,8 +81,6 @@ const fr: AdminMessages = {
   "admin.guestNamePlaceholder": "Son prénom",
   "admin.creating": "Création…",
   "admin.createInvitation": "Créer l’invitation",
-  "admin.invitationHint":
-    "Chaque invité a son lien personnel. Copie-le et envoie-le-lui par message.",
   "admin.invitationFor": "L’invitation de {name}",
   "admin.hideInvitation": "Masquer le lien d’invitation",
   "admin.personalLink": "Lien personnel",
@@ -112,8 +101,6 @@ const fr: AdminMessages = {
   "admin.revokeAccessFor": "Retirer l’accès de {name}",
   "admin.programmeSaved": "Le programme est enregistré.",
   "admin.deleteEventConfirmation": "Supprimer « {name} » du programme ?",
-  "admin.surpriseHint":
-    "Les détails restent cachés aux invités jusqu’à l’heure que tu choisis.",
   "admin.addEvent": "Ajouter un événement",
   "admin.editEvent": "Modifier l’événement",
   "admin.newEvent": "Nouvel événement",
@@ -124,9 +111,8 @@ const fr: AdminMessages = {
   "admin.eventStart": "Début de l’événement",
   "admin.eventUnlock": "Dévoiler les détails le",
   "admin.eventDateHint":
-    "Indique les horaires en {zone}. Les invités les verront en {timezone}. Laisse la date de dévoilement vide pour afficher l’événement tout de suite.",
-  "admin.emptyProgramme":
-    "Pas encore d’événement. Ajoute le premier au programme.",
+    "Horaires en {zone}. Les invités les verront en {timezone}.",
+  "admin.emptyProgramme": "Pas encore d’événement.",
   "admin.timePending": "Horaire à préciser",
   "admin.revealedAt": "Détails dévoilés le {date}",
   "admin.detailsVisible": "Détails visibles",
@@ -134,8 +120,6 @@ const fr: AdminMessages = {
   "admin.deleteNamedEvent": "Supprimer {name}",
   "settings.logoutConfirmation":
     "Te déconnecter de cet appareil ? Il te faudra un nouveau lien de l’organisateur pour revenir.",
-  "settings.host": "Organisateur",
-  "settings.guest": "Invité",
   "settings.signingOut": "Déconnexion…",
   "settings.signOut": "Se déconnecter",
 };
@@ -150,7 +134,6 @@ const de: AdminMessages = {
   "admin.partyDate": "Datum der Feier",
   "admin.dateHint": "Gib die Uhrzeit in der Zeitzone deines Geräts ein.",
   "admin.partyTimezone": "Zeitzone der Feier",
-  "admin.timezoneHint": "In dieser Zeitzone sehen die Gäste alle Uhrzeiten.",
   "admin.saving": "Wird gespeichert…",
   "admin.partySaved": "Die Angaben sind gespeichert.",
   "admin.revokeConfirmation":
@@ -161,8 +144,6 @@ const de: AdminMessages = {
   "admin.guestNamePlaceholder": "Vorname",
   "admin.creating": "Wird erstellt…",
   "admin.createInvitation": "Einladung erstellen",
-  "admin.invitationHint":
-    "Jeder Gast bekommt einen persönlichen Link. Kopiere ihn und schicke ihn der Person als Nachricht.",
   "admin.invitationFor": "Einladung für {name}",
   "admin.hideInvitation": "Einladungslink ausblenden",
   "admin.personalLink": "Persönlicher Link",
@@ -183,8 +164,6 @@ const de: AdminMessages = {
   "admin.revokeAccessFor": "Zugang für {name} entfernen",
   "admin.programmeSaved": "Das Programm ist gespeichert.",
   "admin.deleteEventConfirmation": "„{name}“ aus dem Programm löschen?",
-  "admin.surpriseHint":
-    "Die Details bleiben für Gäste bis zu dem Zeitpunkt verborgen, den du festlegst.",
   "admin.addEvent": "Programmpunkt hinzufügen",
   "admin.editEvent": "Programmpunkt bearbeiten",
   "admin.newEvent": "Neuer Programmpunkt",
@@ -194,10 +173,8 @@ const de: AdminMessages = {
   "admin.teaserPlaceholder": "Was du schon verraten möchtest",
   "admin.eventStart": "Beginn",
   "admin.eventUnlock": "Details freigeben am",
-  "admin.eventDateHint":
-    "Gib die Uhrzeiten in {zone} ein. Gäste sehen sie in {timezone}. Lass den Freigabezeitpunkt leer, damit der Programmpunkt sofort sichtbar ist.",
-  "admin.emptyProgramme":
-    "Das Programm ist noch leer. Füge den ersten Programmpunkt hinzu.",
+  "admin.eventDateHint": "Uhrzeiten in {zone}. Gäste sehen sie in {timezone}.",
+  "admin.emptyProgramme": "Noch keine Programmpunkte.",
   "admin.timePending": "Uhrzeit noch offen",
   "admin.revealedAt": "Details sichtbar ab {date}",
   "admin.detailsVisible": "Details sichtbar",
@@ -205,8 +182,6 @@ const de: AdminMessages = {
   "admin.deleteNamedEvent": "{name} löschen",
   "settings.logoutConfirmation":
     "Von diesem Gerät abmelden? Du brauchst danach einen neuen Link vom Gastgeber, um dich wieder anzumelden.",
-  "settings.host": "Gastgeber",
-  "settings.guest": "Gast",
   "settings.signingOut": "Wird abgemeldet…",
   "settings.signOut": "Abmelden",
 };
@@ -221,7 +196,6 @@ const it: AdminMessages = {
   "admin.partyDate": "Data della festa",
   "admin.dateHint": "Inserisci l’ora nel fuso orario del tuo dispositivo.",
   "admin.partyTimezone": "Fuso orario della festa",
-  "admin.timezoneHint": "Gli invitati vedono tutti gli orari in questo fuso.",
   "admin.saving": "Salvataggio…",
   "admin.partySaved": "I dettagli sono stati salvati.",
   "admin.revokeConfirmation":
@@ -232,8 +206,6 @@ const it: AdminMessages = {
   "admin.guestNamePlaceholder": "Il suo nome",
   "admin.creating": "Creazione…",
   "admin.createInvitation": "Crea l’invito",
-  "admin.invitationHint":
-    "Ogni invitato ha un link personale. Copialo e mandaglielo con un messaggio.",
   "admin.invitationFor": "L’invito per {name}",
   "admin.hideInvitation": "Nascondi il link d’invito",
   "admin.personalLink": "Link personale",
@@ -254,8 +226,6 @@ const it: AdminMessages = {
   "admin.revokeAccessFor": "Revoca l’accesso a {name}",
   "admin.programmeSaved": "Il programma è stato salvato.",
   "admin.deleteEventConfirmation": "Eliminare «{name}» dal programma?",
-  "admin.surpriseHint":
-    "I dettagli restano nascosti agli invitati fino all’ora che scegli.",
   "admin.addEvent": "Aggiungi un evento",
   "admin.editEvent": "Modifica l’evento",
   "admin.newEvent": "Nuovo evento",
@@ -266,9 +236,8 @@ const it: AdminMessages = {
   "admin.eventStart": "Inizio dell’evento",
   "admin.eventUnlock": "Mostra i dettagli il",
   "admin.eventDateHint":
-    "Inserisci gli orari in {zone}. Gli invitati li vedranno in {timezone}. Lascia vuota la data di rivelazione per mostrare subito l’evento.",
-  "admin.emptyProgramme":
-    "Non ci sono ancora eventi. Aggiungi il primo al programma.",
+    "Orari in {zone}. Gli invitati li vedranno in {timezone}.",
+  "admin.emptyProgramme": "Non ci sono ancora eventi.",
   "admin.timePending": "Orario da definire",
   "admin.revealedAt": "Dettagli visibili dal {date}",
   "admin.detailsVisible": "Dettagli visibili",
@@ -276,8 +245,6 @@ const it: AdminMessages = {
   "admin.deleteNamedEvent": "Elimina {name}",
   "settings.logoutConfirmation":
     "Uscire da questo dispositivo? Per rientrare ti servirà un nuovo link dell’organizzatore.",
-  "settings.host": "Organizzatore",
-  "settings.guest": "Invitato",
   "settings.signingOut": "Disconnessione…",
   "settings.signOut": "Esci",
 };
@@ -292,8 +259,6 @@ const es: AdminMessages = {
   "admin.partyDate": "Fecha de la fiesta",
   "admin.dateHint": "Introduce la hora en la zona horaria de tu dispositivo.",
   "admin.partyTimezone": "Zona horaria de la fiesta",
-  "admin.timezoneHint":
-    "Los invitados ven todos los horarios en esta zona horaria.",
   "admin.saving": "Guardando…",
   "admin.partySaved": "Los detalles están guardados.",
   "admin.revokeConfirmation":
@@ -304,8 +269,6 @@ const es: AdminMessages = {
   "admin.guestNamePlaceholder": "Su nombre",
   "admin.creating": "Creando…",
   "admin.createInvitation": "Crear la invitación",
-  "admin.invitationHint":
-    "Cada invitado tiene un enlace personal. Cópialo y envíaselo en un mensaje.",
   "admin.invitationFor": "La invitación de {name}",
   "admin.hideInvitation": "Ocultar el enlace de invitación",
   "admin.personalLink": "Enlace personal",
@@ -326,8 +289,6 @@ const es: AdminMessages = {
   "admin.revokeAccessFor": "Retirar el acceso a {name}",
   "admin.programmeSaved": "El programa está guardado.",
   "admin.deleteEventConfirmation": "¿Eliminar «{name}» del programa?",
-  "admin.surpriseHint":
-    "Los detalles quedan ocultos para los invitados hasta la hora que elijas.",
   "admin.addEvent": "Añadir un evento",
   "admin.editEvent": "Editar el evento",
   "admin.newEvent": "Nuevo evento",
@@ -338,8 +299,8 @@ const es: AdminMessages = {
   "admin.eventStart": "Inicio del evento",
   "admin.eventUnlock": "Revelar los detalles el",
   "admin.eventDateHint":
-    "Introduce los horarios en {zone}. Los invitados los verán en {timezone}. Deja vacía la fecha de revelación para mostrar el evento inmediatamente.",
-  "admin.emptyProgramme": "El programa aún está vacío. Añade el primer evento.",
+    "Horarios en {zone}. Los invitados los verán en {timezone}.",
+  "admin.emptyProgramme": "Aún no hay eventos.",
   "admin.timePending": "Horario por confirmar",
   "admin.revealedAt": "Detalles visibles a partir del {date}",
   "admin.detailsVisible": "Detalles visibles",
@@ -347,8 +308,6 @@ const es: AdminMessages = {
   "admin.deleteNamedEvent": "Eliminar {name}",
   "settings.logoutConfirmation":
     "¿Cerrar sesión en este dispositivo? Necesitarás un nuevo enlace del organizador para volver.",
-  "settings.host": "Organizador",
-  "settings.guest": "Invitado",
   "settings.signingOut": "Cerrando sesión…",
   "settings.signOut": "Cerrar sesión",
 };

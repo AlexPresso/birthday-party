@@ -75,6 +75,46 @@
     }
   }
 
+  /*
+   * A programme on several days: each day holds its heading and its events.
+   * Padding, not a margin, so the gap after the previous day's last card is
+   * the same in the phone's column and in the desktop grid, where margins do
+   * not collapse.
+   */
+  .programme-day ~ .programme-day {
+    padding-top: 14px;
+  }
+
+  .programme-day-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 12px;
+    font-size: 15px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  /* Centered on the first line of the heading, wrapped or not. */
+  .programme-day-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    margin-top: calc((1.4em - 8px) / 2);
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+
+  [data-party-day] > .programme-day-heading .programme-day-dot {
+    background: var(--accent);
+  }
+
+  .programme-day-events {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
   .programme-admin-actions {
     margin: 4px 0 16px;
   }
@@ -279,7 +319,9 @@
     .programme-list {
       max-width: 960px;
     }
-    .programme-list:has(> .programme-featured):has(> .programme-agenda-item) {
+    .programme-list:has(> .programme-featured):has(
+        > :is(.programme-agenda-item, .programme-day)
+      ) {
       display: grid;
       grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
       column-gap: 48px;
@@ -292,7 +334,8 @@
       margin-bottom: 0;
       min-width: 0;
     }
-    .programme-agenda-item {
+    .programme-agenda-item,
+    .programme-day {
       grid-column: 2;
       min-width: 0;
     }

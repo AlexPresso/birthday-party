@@ -222,7 +222,6 @@ export function EventManager({
   return (
     <div className="admin-form">
       <div className="section-row">
-        <p className="muted">{t("admin.surpriseHint")}</p>
         <button
           className="button secondary"
           disabled={busy || autosave.saving}
@@ -272,7 +271,7 @@ export function EventManager({
           </button>
         </div>
       )}
-      <p className="success-notice programme-save-status" role="status">
+      <p className="status-notice programme-save-status" role="status">
         {autosave.saving ? t("admin.saving") : ""}
       </p>
       <SavedAnnouncement message={autosave.saving ? "" : notice} />

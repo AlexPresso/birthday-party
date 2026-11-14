@@ -1,13 +1,9 @@
 const en = {
   "profile.photo": "Profile photo",
-  "profile.myPhoto": "My photo",
-  "profile.empty": "No photo",
-  "profile.removeAction": "Remove",
   "profile.formats": "JPEG, PNG or WebP, up to {size} MB.",
   "profile.choose": "Choose a photo",
   "profile.change": "Change photo",
   "profile.preview": "Profile photo preview",
-  "profile.cropHint": "Your photo will be cropped around the centre.",
   "profile.save": "Save photo",
   "profile.saving": "Saving…",
   "profile.saved": "Profile photo saved.",
@@ -21,14 +17,10 @@ type ProfileMessages = Record<keyof typeof en, string>;
 
 const fr: ProfileMessages = {
   "profile.photo": "Photo de profil",
-  "profile.myPhoto": "Ma photo",
-  "profile.empty": "Aucune photo",
-  "profile.removeAction": "Supprimer",
   "profile.formats": "JPEG, PNG ou WebP, jusqu’à {size} Mo.",
   "profile.choose": "Choisir une photo",
   "profile.change": "Changer de photo",
   "profile.preview": "Aperçu de ta photo de profil",
-  "profile.cropHint": "Ta photo sera recadrée autour du centre.",
   "profile.save": "Enregistrer la photo",
   "profile.saving": "Enregistrement…",
   "profile.saved": "Photo de profil enregistrée.",
@@ -40,14 +32,10 @@ const fr: ProfileMessages = {
 
 const de: ProfileMessages = {
   "profile.photo": "Profilfoto",
-  "profile.myPhoto": "Mein Foto",
-  "profile.empty": "Kein Foto",
-  "profile.removeAction": "Entfernen",
   "profile.formats": "JPEG, PNG oder WebP, bis zu {size} MB.",
   "profile.choose": "Foto auswählen",
   "profile.change": "Foto ändern",
   "profile.preview": "Vorschau deines Profilfotos",
-  "profile.cropHint": "Dein Foto wird mittig zugeschnitten.",
   "profile.save": "Foto speichern",
   "profile.saving": "Wird gespeichert…",
   "profile.saved": "Profilfoto gespeichert.",
@@ -59,14 +47,10 @@ const de: ProfileMessages = {
 
 const it: ProfileMessages = {
   "profile.photo": "Foto del profilo",
-  "profile.myPhoto": "La mia foto",
-  "profile.empty": "Nessuna foto",
-  "profile.removeAction": "Rimuovi",
   "profile.formats": "JPEG, PNG o WebP, fino a {size} MB.",
   "profile.choose": "Scegli una foto",
   "profile.change": "Cambia foto",
   "profile.preview": "Anteprima della tua foto del profilo",
-  "profile.cropHint": "La foto verrà ritagliata intorno al centro.",
   "profile.save": "Salva foto",
   "profile.saving": "Salvataggio…",
   "profile.saved": "Foto del profilo salvata.",
@@ -78,14 +62,10 @@ const it: ProfileMessages = {
 
 const es: ProfileMessages = {
   "profile.photo": "Foto de perfil",
-  "profile.myPhoto": "Mi foto",
-  "profile.empty": "Sin foto",
-  "profile.removeAction": "Eliminar",
   "profile.formats": "JPEG, PNG o WebP, hasta {size} MB.",
   "profile.choose": "Elegir una foto",
   "profile.change": "Cambiar foto",
   "profile.preview": "Vista previa de tu foto de perfil",
-  "profile.cropHint": "Tu foto se recortará alrededor del centro.",
   "profile.save": "Guardar foto",
   "profile.saving": "Guardando…",
   "profile.saved": "Foto de perfil guardada.",

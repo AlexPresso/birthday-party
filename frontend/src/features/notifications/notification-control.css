@@ -46,44 +46,67 @@
     min-width: 0;
   }
 
+  /*
+   * Profile's row: a surface card with the icon, the label and the switch on
+   * one line, in the sizes of the sign-out row beside it. What the switch
+   * cannot show comes under that line, only when it applies.
+   */
   .notification-control-compact {
     padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--surface);
   }
 
   .notification-control-compact .notification-summary {
-    display: grid;
-    grid-template-columns: 30px minmax(0, 1fr) 60px;
+    display: flex;
     align-items: center;
-    gap: 20px;
-    min-height: 94px;
-    padding-block: 18px;
+    gap: 16px;
+    min-height: 56px;
+    padding: 6px 18px;
   }
 
-  .notification-control-compact .notification-summary > svg {
-    width: 30px;
-    height: 30px;
-  }
-
-  .notification-control-compact h3 {
-    margin-bottom: 3px;
+  .notification-control-compact h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
     font-size: 16px;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 1.4;
+    letter-spacing: 0;
     overflow-wrap: anywhere;
   }
 
-  .notification-control-compact .notification-status {
-    margin: 0;
+  .notification-control-compact
+    > :is(
+      .notification-status,
+      .fine-print,
+      .notice,
+      .notification-actions:has(button)
+    ) {
+    margin: 0 18px 14px;
+  }
+
+  .notification-control-compact > .notification-status {
     font-size: 14px;
     line-height: 1.5;
   }
 
-  .notification-control-compact > .notification-actions:has(button) {
-    margin-bottom: 18px;
-  }
+  @media (max-width: 360px) {
+    .notification-control-compact .notification-summary {
+      gap: 11px;
+      padding-inline: 12px;
+    }
 
-  .notification-control-compact > .notice {
-    margin-top: 0;
+    .notification-control-compact
+      > :is(
+        .notification-status,
+        .fine-print,
+        .notice,
+        .notification-actions:has(button)
+      ) {
+      margin-inline: 12px;
+    }
   }
 
   .notification-switch {

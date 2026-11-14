@@ -238,11 +238,9 @@ export function WaitingRoom({
               ? t("welcome.moving")
               : rulesPending
                 ? t("welcome.rulesPending")
-                : state.canNext
-                  ? t("welcome.nextDescription")
-                  : !state.canFinish && state.step
-                    ? t("welcome.nextLocked")
-                    : null}
+                : !state.canNext && !state.canFinish && state.step
+                  ? t("welcome.nextLocked")
+                  : null}
         </p>
         {failed && (
           <div className="welcome-connection">

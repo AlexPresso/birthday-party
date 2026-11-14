@@ -14,9 +14,6 @@
   .invite-form > button {
     flex-shrink: 0;
   }
-  .invite-form + p {
-    margin: 12px 0 0;
-  }
   .invitation-result {
     border: 1px solid var(--border-strong);
     padding: 18px;

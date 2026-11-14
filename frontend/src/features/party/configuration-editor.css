@@ -59,7 +59,7 @@
     margin-top: 12px;
   }
 
-  .configuration-save > .success-notice:not(:empty) {
+  .configuration-save > .status-notice:not(:empty) {
     margin-top: 10px;
   }
 }

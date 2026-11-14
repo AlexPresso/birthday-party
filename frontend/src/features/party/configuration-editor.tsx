@@ -299,13 +299,11 @@ export function ConfigurationEditor({
                   <legend className="visually-hidden">
                     {t(`configuration.${scope}`)}
                   </legend>
-                  <p className="fine-print">
-                    {t(
-                      scope === "shared"
-                        ? "configuration.defaultHint"
-                        : "configuration.languageHint",
-                    )}
-                  </p>
+                  {scope !== "shared" && (
+                    <p className="fine-print">
+                      {t("configuration.languageHint")}
+                    </p>
+                  )}
                   <div className="configuration-copy-fields">
                     <CopyField
                       name={`${prefix}.title`}
@@ -326,7 +324,7 @@ export function ConfigurationEditor({
       </fieldset>
       <ErrorNotice message={error} />
       <div className="configuration-save">
-        <span className="success-notice" role="status">
+        <span className="status-notice" role="status">
           {autosave.saving ? t("configuration.saving") : ""}
         </span>
         <SavedAnnouncement

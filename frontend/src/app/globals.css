@@ -732,12 +732,13 @@
   .error-text {
     color: var(--danger);
   }
-  .success-notice {
-    color: var(--success);
+  /* A neutral line for a running save; a finished one is not shown. */
+  .status-notice {
+    color: var(--muted);
     font-size: 13px;
     margin-bottom: 0;
   }
-  .success-notice:empty {
+  .status-notice:empty {
     display: none;
   }
   .empty-state {
@@ -767,6 +768,9 @@
     font-size: 21px;
     margin-bottom: 8px;
     max-width: 28ch;
+  }
+  .empty-state h2:last-child {
+    margin-bottom: 0;
   }
   .empty-state .muted {
     font-size: 14px;
@@ -833,13 +837,10 @@
     font-size: 11px;
     margin: 8px 0 0;
   }
-  .admin-form > .section-row > p {
-    font-size: 13px;
-  }
   .admin-form > .section-row > .button {
     flex-shrink: 0;
   }
-  .admin-form > .success-notice {
+  .admin-form > .status-notice {
     margin-top: 15px;
   }
   /*

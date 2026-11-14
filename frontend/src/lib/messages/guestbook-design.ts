@@ -1,5 +1,5 @@
 const en = {
-  "guestbookDesign.description": "A few words to celebrate turning {age}.",
+  "guestbookDesign.description": "Feel like leaving a note? Telling a story?",
   "guestbookDesign.placeholder": "Your message…",
   "guestbookDesign.publish": "Post",
   "guestbookDesign.actions": "Message options",
@@ -14,7 +14,8 @@ type Key = keyof typeof en;
 export const guestbookDesignMessages = {
   en,
   fr: {
-    "guestbookDesign.description": "Un mot pour les {age} ans.",
+    "guestbookDesign.description":
+      "Envie de laisser un petit mot ? Raconter une anecdote ?",
     "guestbookDesign.placeholder": "Ton message…",
     "guestbookDesign.publish": "Publier",
     "guestbookDesign.actions": "Options du message",
@@ -24,7 +25,8 @@ export const guestbookDesignMessages = {
     "guestbookDesign.copyFailed": "Impossible de copier le message. Réessaie.",
   },
   de: {
-    "guestbookDesign.description": "Ein paar Worte zum {age}. Geburtstag.",
+    "guestbookDesign.description":
+      "Lust, ein paar Worte dazulassen? Eine Anekdote zu erzählen?",
     "guestbookDesign.placeholder": "Deine Nachricht…",
     "guestbookDesign.publish": "Veröffentlichen",
     "guestbookDesign.actions": "Nachrichtenoptionen",
@@ -36,7 +38,8 @@ export const guestbookDesignMessages = {
       "Die Nachricht konnte nicht kopiert werden. Versuche es erneut.",
   },
   it: {
-    "guestbookDesign.description": "Un pensiero per i {age} anni.",
+    "guestbookDesign.description":
+      "Ti va di lasciare due righe? Di raccontare un aneddoto?",
     "guestbookDesign.placeholder": "Il tuo messaggio…",
     "guestbookDesign.publish": "Pubblica",
     "guestbookDesign.actions": "Opzioni del messaggio",
@@ -47,7 +50,8 @@ export const guestbookDesignMessages = {
       "Non è stato possibile copiare il messaggio. Riprova.",
   },
   es: {
-    "guestbookDesign.description": "Unas palabras para los {age} años.",
+    "guestbookDesign.description":
+      "¿Te apetece dejar unas palabras? ¿Contar una anécdota?",
     "guestbookDesign.placeholder": "Tu mensaje…",
     "guestbookDesign.publish": "Publicar",
     "guestbookDesign.actions": "Opciones del mensaje",

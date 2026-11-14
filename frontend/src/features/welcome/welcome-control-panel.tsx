@@ -26,6 +26,7 @@ export function WelcomeControlPanel({
   const number = (value: number) => new Intl.NumberFormat(locale).format(value);
   const hasNext = state.currentStep < state.steps.length;
   const currentStep = state.steps[state.currentStep - 1];
+  const currentLabel = !state.open && currentStep ? stepLabel(currentStep) : "";
 
   return (
     <>
@@ -41,16 +42,7 @@ export function WelcomeControlPanel({
                     total: number(state.steps.length),
                   })}
           </h3>
-          <p className="muted">
-            {state.open
-              ? t("adminWelcome.accessOpenDescription")
-              : state.currentStep === 0
-                ? t("adminWelcome.waitingDescription")
-                : currentStep && stepLabel(currentStep)}
-          </p>
-          {!state.open && !hasNext && state.currentStep > 0 && (
-            <p className="fine-print">{t("adminWelcome.allShown")}</p>
-          )}
+          {currentLabel && <p className="muted">{currentLabel}</p>}
         </div>
         <div className="welcome-control-actions">
           {state.open ? (

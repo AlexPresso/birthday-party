@@ -330,6 +330,13 @@ test("an existing browser subscription is not silently assigned to another guest
   await expect(toggle).toBeEnabled();
   await expect(toggle).not.toBeChecked();
   expect(saves).toBe(0);
+  // A switch that works needs no line under its row: its scope is read to
+  // screen readers only.
+  await expect(toggle).toHaveAccessibleDescription("Sur cet appareil");
+  await expect(
+    control.getByText("Sur cet appareil", { exact: true }),
+  ).toHaveClass("visually-hidden");
+  await expect(control.locator(".notification-status")).toHaveCount(0);
   await toggle.press("Space");
   await expect(toggle).toBeChecked();
   expect(await status(page, fixture.endpoint)).toBe(true);

@@ -283,6 +283,8 @@ export function WelcomeAdmin({
     }
   }
 
+  const draftKept = notice === t("adminWelcome.draftKept");
+
   return (
     <section
       className="welcome-admin"
@@ -291,7 +293,6 @@ export function WelcomeAdmin({
       data-dirty={dirty || undefined}
     >
       <div className="admin-form">
-        <p className="muted welcome-admin-intro">{t("adminWelcome.intro")}</p>
         <WelcomeControlPanel
           state={state}
           pending={busy === "reload" || busy === "discard" ? null : busy}
@@ -300,18 +301,16 @@ export function WelcomeAdmin({
           onRequiredChange={(required) => void updateRequired(required)}
         />
 
+        {/* Only a running save and a kept draft are shown; a finished save,
+            refresh or discard is announced to screen readers. */}
         <p className="welcome-admin-notice" role="status">
-          {saving
-            ? t("adminWelcome.saving")
-            : notice === t("adminWelcome.saved")
-              ? ""
-              : notice}
+          {saving ? t("adminWelcome.saving") : draftKept ? notice : ""}
         </p>
         <SavedAnnouncement
           message={
-            !saving && !dirty && notice === t("adminWelcome.saved")
-              ? notice
-              : ""
+            saving || draftKept || (dirty && notice === t("adminWelcome.saved"))
+              ? ""
+              : notice
           }
         />
 
@@ -356,19 +355,17 @@ export function WelcomeAdmin({
                   : t("adminWelcome.discard")}
               </button>
             )}
-            {dirty &&
-              !conflict &&
-              (error || notice === t("adminWelcome.draftKept")) && (
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={!!busy || saving}
-                  onClick={() => void flush()}
-                >
-                  <RefreshCw size={17} aria-hidden="true" />
-                  {t("common.retry")}
-                </button>
-              )}
+            {dirty && !conflict && (error || draftKept) && (
+              <button
+                type="button"
+                className="button secondary"
+                disabled={!!busy || saving}
+                onClick={() => void flush()}
+              >
+                <RefreshCw size={17} aria-hidden="true" />
+                {t("common.retry")}
+              </button>
+            )}
           </div>
         )}
       </div>

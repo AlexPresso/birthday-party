@@ -45,11 +45,13 @@ test("guests open their profile from the final navigation icon and cannot access
   await profile.press("Enter");
   await expect(page).toHaveURL(/\/profil$/);
   await expect(profile).toHaveAttribute("aria-current", "page");
+  // The guest's name is the page title; the photo carries its own menu.
+  await expect(page).toHaveTitle(/^Profil/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Profile Navigation Guest",
+  );
   await expect(
-    page.getByRole("heading", { name: "Profil", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Choisir une photo", exact: true }),
+    page.getByRole("button", { name: "Photo de profil", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".notification-control")).toBeVisible();
   await expect(
@@ -102,14 +104,17 @@ test("administrators have separate settings and personal profile controls", asyn
     animations: "disabled",
     style: "nextjs-portal { visibility: hidden; }",
   });
-  await expect(page.locator(".profile-photo-editor")).toHaveCount(0);
+  await expect(page.locator(".profile-identity")).toHaveCount(0);
   await expect(page.locator(".notification-control")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Se déconnecter", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("link", { name: /^Profil:/ }).press("Enter");
   await expect(page).toHaveURL(/\/profil$/);
-  await expect(page.locator(".profile-photo-editor")).toBeVisible();
+  await expect(page.locator(".profile-identity")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Photo de profil", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".notification-control")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Se déconnecter", exact: true }),

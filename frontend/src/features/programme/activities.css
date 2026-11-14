@@ -75,8 +75,8 @@
       min-width: 36px;
     }
   }
-  .success-notice.programme-save-status,
-  .success-notice.programme-save-status:empty {
+  .status-notice.programme-save-status,
+  .status-notice.programme-save-status:empty {
     display: block;
     min-height: 1.6em;
   }

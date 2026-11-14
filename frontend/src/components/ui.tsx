@@ -11,9 +11,9 @@ export function ErrorNotice({ message }: { message: string | null }) {
 }
 
 /**
- * Tells screen readers that a save went through. Sighted hosts get no
- * message: the fields they left keep their values, and only a running save,
- * an error or a conflict is shown.
+ * Tells screen readers that an action went through: a save, a sent message, a
+ * recorded vote. Sighted people get no message, because the page already
+ * shows the result; only a running request, an error or a conflict is shown.
  */
 export function SavedAnnouncement({ message }: { message: string }) {
   return (
@@ -55,7 +55,7 @@ export function EmptyState({
 }: {
   icon: ReactNode;
   title: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <div className="empty-state">
@@ -63,7 +63,7 @@ export function EmptyState({
         {icon}
       </div>
       <h2>{title}</h2>
-      <div className="muted">{children}</div>
+      {children && <div className="muted">{children}</div>}
     </div>
   );
 }

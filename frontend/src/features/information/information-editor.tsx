@@ -71,11 +71,11 @@ export function InformationEditor({
     body: body.trim(),
   }));
   const incompleteIndex = tabs.findIndex(({ title, body }) => !title || !body);
+  // Switched on without a saved tab, the page is still hidden from guests.
+  const noTabs = enabled && state.tabs.length === 0;
   const dirty = enabled !== state.enabled || !sameTabs(tabs, state.tabs);
   const locked = !!busy || conflict;
   const draftKept = notice === t("information.draftKept");
-  // A finished save is announced to screen readers only.
-  const savedNotice = notice === t("information.saved");
   const { flush, saving, onBlur } = useAutosave({ save });
   const structure = draft.map(({ key }) => key).join();
   const previousStructure = useRef(structure);
@@ -283,18 +283,16 @@ export function InformationEditor({
               role="switch"
               checked={enabled}
               disabled={locked}
-              aria-describedby={`${id}-switch-hint`}
+              aria-describedby={noTabs ? `${id}-switch-hint` : undefined}
               onChange={(event) => toggle(event.target.checked)}
             />
             {t("information.enabled")}
           </label>
-          <p id={`${id}-switch-hint`} className="fine-print">
-            {t(
-              enabled && state.tabs.length === 0
-                ? "information.noTabs"
-                : "information.enabledHint",
-            )}
-          </p>
+          {noTabs && (
+            <p id={`${id}-switch-hint`} className="fine-print">
+              {t("information.noTabs")}
+            </p>
+          )}
         </div>
 
         <ol className="information-tab-list" ref={list}>
@@ -401,10 +399,12 @@ export function InformationEditor({
           )}
         </div>
 
+        {/* Only a running save and a kept draft are shown; a finished save
+            or reload is announced to screen readers. */}
         <p className="information-notice" role="status">
-          {saving ? t("admin.saving") : savedNotice ? "" : notice}
+          {saving ? t("admin.saving") : draftKept ? notice : ""}
         </p>
-        <SavedAnnouncement message={!saving && savedNotice ? notice : ""} />
+        <SavedAnnouncement message={saving || draftKept ? "" : notice} />
         <ErrorNotice message={error} />
         {(conflict || (dirty && (error || draftKept))) && (
           <div className="form-actions">
