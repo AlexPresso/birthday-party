@@ -4,9 +4,8 @@
 
 # Birthday Party
 
-A small web app made for a 30th birthday. Guests open a personal link on their
-phone to share photos, follow the evening and play a couple of games. It can be
-reused for another party: one installation per party, on your own server.
+A small app made for my 30th birthday, feel free to host and use it too, it was
+designed to be reusable and highly customizable!
 
 <p align="center">
   <img src="docs/screenshots/invitation.webp" width="32%" alt="Invitation page: a large 30 in an orange ring and an Enter button">
