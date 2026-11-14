@@ -57,7 +57,7 @@ var apiErrors = map[string]apiError{
 	"invalid_timezone":      {http.StatusBadRequest, "Choose a time zone such as Europe/Zurich."},
 	"unknown_timezone":      {http.StatusBadRequest, "This time zone was not found. Try Europe/Zurich."},
 	"invalid_date":          {http.StatusBadRequest, "Choose the date and time again, then save."},
-	"invalid_configuration": {http.StatusBadRequest, "Choose an age from 1 to 150 and upload limits from 1 to 1024 MiB. Invitation titles allow 200 characters and descriptions 2000."},
+	"invalid_configuration": {http.StatusBadRequest, "Choose an age from 1 to 150, upload limits from 1 to 1024 MiB and a colour such as #ff6a1f. Invitation titles allow 200 characters and descriptions 2000."},
 
 	// Information page.
 	"invalid_information":  {http.StatusBadRequest, "Add up to 8 tabs. Each needs a title of up to 40 characters and a text of up to 4,000."},

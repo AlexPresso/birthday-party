@@ -20,10 +20,28 @@ type InvitationCopy struct {
 	Locales map[string]InvitationText `json:"locales"`
 }
 
+// Theme names the app's base look.
+type Theme string
+
+const (
+	ThemeDark  Theme = "dark"
+	ThemeLight Theme = "light"
+)
+
+// Appearance is the look the host picks for the whole app.
+type Appearance struct {
+	Theme  Theme  `json:"theme"`
+	Accent string `json:"accent"` // "#rrggbb", lower case
+}
+
+// DefaultAccent is the orange the app was designed with.
+const DefaultAccent = "#ff6a1f"
+
 // PublicConfiguration contains only content displayed before invitation activation.
 type PublicConfiguration struct {
 	Age        int            `json:"age"`
 	Invitation InvitationCopy `json:"invitation"`
+	Appearance Appearance     `json:"appearance"`
 }
 
 type Configuration struct {
@@ -66,9 +84,12 @@ func DefaultConfiguration() Configuration {
 		locales[tag] = InvitationText{}
 	}
 	return Configuration{
-		PublicConfiguration: PublicConfiguration{Age: 30, Invitation: InvitationCopy{Locales: locales}},
-		ImageSizeMB:         15,
-		VideoSizeMB:         100,
+		PublicConfiguration: PublicConfiguration{
+			Age: 30, Invitation: InvitationCopy{Locales: locales},
+			Appearance: Appearance{Theme: ThemeDark, Accent: DefaultAccent},
+		},
+		ImageSizeMB: 15,
+		VideoSizeMB: 100,
 	}
 }
 
@@ -85,6 +106,11 @@ func normalizeConfiguration(input Configuration, restrictText bool) (Configurati
 	if input.Age < 1 || input.Age > 150 || input.ImageSizeMB < 1 || input.ImageSizeMB > 1024 || input.VideoSizeMB < 1 || input.VideoSizeMB > 1024 {
 		return input, ErrInvalidConfiguration
 	}
+	appearance, ok := normalizeAppearance(input.Appearance)
+	if !ok {
+		return input, ErrInvalidConfiguration
+	}
+	input.Appearance = appearance
 	text, err := normalizeInvitationText(input.Invitation.InvitationText, restrictText)
 	if err != nil {
 		return input, err
@@ -108,6 +134,22 @@ func normalizeConfiguration(input Configuration, restrictText bool) (Configurati
 	}
 	input.Invitation.Locales = locales
 	return input, nil
+}
+
+func normalizeAppearance(input Appearance) (Appearance, bool) {
+	if input.Theme != ThemeDark && input.Theme != ThemeLight {
+		return input, false
+	}
+	accent := strings.ToLower(input.Accent)
+	if len(accent) != 7 || accent[0] != '#' {
+		return input, false
+	}
+	for _, digit := range accent[1:] {
+		if !strings.ContainsRune("0123456789abcdef", digit) {
+			return input, false
+		}
+	}
+	return Appearance{Theme: input.Theme, Accent: accent}, true
 }
 
 func normalizeInvitationText(input InvitationText, restrictText bool) (InvitationText, error) {

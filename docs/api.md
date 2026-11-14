@@ -72,14 +72,21 @@ single Go process; durable upload and push-notification workers remain server-si
 
 `InvitationCopy = { title: string | null, description: string | null }`
 
-`PublicConfiguration = { age: number, invitation: InvitationCopy & { locales: { en: InvitationCopy, fr: InvitationCopy, de: InvitationCopy, it: InvitationCopy, es: InvitationCopy } } }`
+`Appearance = { theme: "dark" | "light", accent: string }`
+
+`PublicConfiguration = { age: number, invitation: InvitationCopy & { locales: { en: InvitationCopy, fr: InvitationCopy, de: InvitationCopy, it: InvitationCopy, es: InvitationCopy } }, appearance: Appearance }`
 
 `Configuration = PublicConfiguration & { imageSizeMB: number, videoSizeMB: number }`
 
 - `GET /api/config` -> `PublicConfiguration` (200), available without a session.
-  This contains only birthday age and public invitation text. Private party
-  details, upload settings, guests and deployment secrets are excluded.
+  This contains only birthday age, public invitation text and the appearance
+  the invitation page needs. Private party details, upload settings, guests and
+  deployment secrets are excluded.
 - `GET /api/admin/config` -> `Configuration` (200), administrators only.
+- The appearance is the host's choice of theme and main colour for the whole
+  app. `accent` is `#` and six hexadecimal digits, saved in lower case; an
+  unknown theme or another colour format returns 400 `invalid_configuration`.
+  The defaults, dark and `#ff6a1f`, are the look the app was designed with.
 - `PUT /api/admin/config` with a complete `Configuration` -> saved `Configuration`
   (200). Rechecks active administrator and session inside the save transaction.
   Missing fields or unsupported structure return 400 `invalid_body`;
