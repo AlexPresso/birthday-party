@@ -92,19 +92,23 @@ Do not invent party details, guest contributions, dates, or activity counts.
   thumbnail strip that suggests a grouped carousel. Keep the view switch flat.
   Keep upload limits
   in the accessible Add description and validation, without a technical paragraph
-  above the feed. Follow the approved [upload component](upload-reference.png):
-  a compact banner with a 40px preview, a single thin progress bar and a sent/total
-  count. Float it 12px above the dock, with 20px side gutters,
-  throughout the party tabs. Keep welcome widget queues inline and independent.
-  An explicit click expands file details, errors and retry/removal controls.
+  above the feed. Show uploads in a pill centered above the dock, in the
+  dock's own shape and surface: an accent ring that fills around the file's
+  preview, the sent/total count, and a chevron. It is as wide as its content
+  and floats throughout the party tabs. Keep welcome widget queues inline and
+  independent, with the same pill. Touching the pill raises a bottom sheet
+  with each file's status, errors and retry/removal controls; from 960px the
+  sheet becomes a compact dialog above the dock.
   Keep sending and server preparation distinct. Only when every file is ready,
-  show a checkmark and the added count, then dismiss after two seconds with a
-  short fade. Keep expanded details open until the guest closes them, and pause
-  dismissal while a control has keyboard focus; cancel
-  pending dismissal when another file arrives. Failures remain visible and
-  retryable. Persist bounded dismissed upload IDs in session storage so completed
-  banners do not reappear after reload. Respect reduced motion and never fetch
-  private media merely to decorate a queue.
+  close the ring into an accent disc with a dark check, show the added count
+  and let a brief burst of the snowfall's particles rise from the ring, then
+  dismiss after two seconds with a short fade. Keep the open sheet until the
+  guest closes it, and pause dismissal while a control has keyboard focus;
+  cancel pending dismissal when another file arrives. Failures remain visible
+  and retryable from the pill. Persist bounded dismissed upload IDs in session
+  storage so completed pills do not reappear after reload. Skip the burst and
+  the slides under reduced motion, and never fetch private media merely to
+  decorate a queue.
 - Put the first available open vote in a compact card with its real question,
   its three leading options (avatars for guests, short labels for free-text
   choices) and a Vote action that opens the vote's own page. Present the remaining

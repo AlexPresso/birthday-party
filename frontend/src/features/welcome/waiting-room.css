@@ -139,13 +139,6 @@
     padding-top: 24px;
     border-top: 1px solid var(--border);
   }
-  .welcome-media .upload-queue {
-    padding: 16px;
-    margin-bottom: 0;
-  }
-  .welcome-media .upload-item {
-    gap: 10px;
-  }
   /* One class more than the picker's own rule, whichever file loads first. */
   .welcome-media .media-picker .photo-privacy {
     line-height: 1.6;
