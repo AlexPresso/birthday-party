@@ -2,6 +2,50 @@
 @layer base, components, features;
 
 @layer features {
+  /* The notification setting above the events (notifications-switch.tsx). */
+  .programme-notifications {
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .programme-notifications .checkbox-field {
+    width: fit-content;
+    max-width: 100%;
+    gap: 12px;
+    margin-bottom: 0;
+  }
+  /* The same switch as the welcome's Required setting. */
+  .programme-notifications input {
+    appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 42px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-muted);
+  }
+  .programme-notifications input::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .programme-notifications input:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .programme-notifications input:checked::before {
+    transform: translateX(18px);
+    background: var(--background);
+  }
+  .programme-notifications .notice {
+    margin: 10px 0 12px;
+  }
   /* The host's event editor and event list (event-manager.tsx). */
   .event-editor {
     padding: 22px;

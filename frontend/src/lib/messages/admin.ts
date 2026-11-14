@@ -36,6 +36,8 @@ const en = {
   "admin.reinvite": "Invite again",
   "admin.revokeAccessFor": "Remove access for {name}",
   "admin.programmeSaved": "Schedule saved.",
+  "admin.programmeNotifications":
+    "Notify guests when an event starts and when a surprise is revealed",
   "admin.deleteEventConfirmation": "Remove “{name}” from the schedule?",
   "admin.addEvent": "Add an event",
   "admin.editEvent": "Edit event",
@@ -100,6 +102,8 @@ const fr: AdminMessages = {
   "admin.reinvite": "Réinviter",
   "admin.revokeAccessFor": "Retirer l’accès de {name}",
   "admin.programmeSaved": "Le programme est enregistré.",
+  "admin.programmeNotifications":
+    "Notifier le début des événements et les surprises dévoilées",
   "admin.deleteEventConfirmation": "Supprimer « {name} » du programme ?",
   "admin.addEvent": "Ajouter un événement",
   "admin.editEvent": "Modifier l’événement",
@@ -163,6 +167,8 @@ const de: AdminMessages = {
   "admin.reinvite": "Erneut einladen",
   "admin.revokeAccessFor": "Zugang für {name} entfernen",
   "admin.programmeSaved": "Das Programm ist gespeichert.",
+  "admin.programmeNotifications":
+    "Gäste benachrichtigen, wenn ein Programmpunkt beginnt und wenn eine Überraschung enthüllt wird",
   "admin.deleteEventConfirmation": "„{name}“ aus dem Programm löschen?",
   "admin.addEvent": "Programmpunkt hinzufügen",
   "admin.editEvent": "Programmpunkt bearbeiten",
@@ -225,6 +231,8 @@ const it: AdminMessages = {
   "admin.reinvite": "Invita di nuovo",
   "admin.revokeAccessFor": "Revoca l’accesso a {name}",
   "admin.programmeSaved": "Il programma è stato salvato.",
+  "admin.programmeNotifications":
+    "Avvisa gli invitati quando inizia un evento e quando viene svelata una sorpresa",
   "admin.deleteEventConfirmation": "Eliminare «{name}» dal programma?",
   "admin.addEvent": "Aggiungi un evento",
   "admin.editEvent": "Modifica l’evento",
@@ -288,6 +296,8 @@ const es: AdminMessages = {
   "admin.reinvite": "Volver a invitar",
   "admin.revokeAccessFor": "Retirar el acceso a {name}",
   "admin.programmeSaved": "El programa está guardado.",
+  "admin.programmeNotifications":
+    "Avisar a los invitados cuando empieza un evento y cuando se revela una sorpresa",
   "admin.deleteEventConfirmation": "¿Eliminar «{name}» del programa?",
   "admin.addEvent": "Añadir un evento",
   "admin.editEvent": "Editar el evento",

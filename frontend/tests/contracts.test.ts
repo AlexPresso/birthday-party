@@ -9,7 +9,10 @@ import {
   mediaCategoriesSchema,
 } from "../src/features/media/contracts.ts";
 import { uploadProblem } from "../src/features/media/upload-validation.ts";
-import { eventsSchema } from "../src/features/programme/contracts.ts";
+import {
+  eventsSchema,
+  programmeNotificationsSchema,
+} from "../src/features/programme/contracts.ts";
 import { sessionSchema } from "../src/features/guests/contracts.ts";
 import { entrySchema } from "../src/features/guestbook/contracts.ts";
 import {
@@ -256,6 +259,27 @@ test("notification contracts require a public application key and persisted succ
     notificationSavedSchema.safeParse({ subscribed: true }).success,
     true,
   );
+});
+
+test("the programme notification setting is one explicit boolean", () => {
+  for (const enabled of [true, false]) {
+    assert.deepEqual(programmeNotificationsSchema.parse({ enabled }), {
+      enabled,
+    });
+  }
+  for (const invalid of [
+    null,
+    {},
+    { enabled: null },
+    { enabled: "true" },
+    { enabled: 1 },
+    { notifications: true },
+  ]) {
+    assert.equal(
+      programmeNotificationsSchema.safeParse(invalid).success,
+      false,
+    );
+  }
 });
 
 const defaultLimits = {

@@ -29,12 +29,16 @@ type Error struct{ Code string }
 
 func (e *Error) Error() string { return e.Code }
 
-// Kind is the generic event a push message announces; it carries no content.
+// Kind is the event a push message announces. Welcome kinds carry no content;
+// programme kinds carry the event's name as guests see it, and nothing else
+// the host wrote.
 type Kind string
 
 const (
-	KindWelcomeStep Kind = "welcome_step"
-	KindWelcomeOpen Kind = "welcome_open"
+	KindWelcomeStep     Kind = "welcome_step"
+	KindWelcomeOpen     Kind = "welcome_open"
+	KindProgrammeStart  Kind = "programme_start"
+	KindProgrammeUnlock Kind = "programme_unlock"
 )
 
 type BrowserKeys struct {
@@ -84,6 +88,11 @@ type Pending struct {
 	Locale              string
 	Attempts            int
 	ExpiresAt           time.Time
+	// The fields below are set for programme kinds only. ProgrammeOutboxID
+	// identifies the queued row; Title may be empty for a locked event.
+	ProgrammeOutboxID int64
+	EventID           int64
+	Title             string
 }
 
 type Delivery uint8

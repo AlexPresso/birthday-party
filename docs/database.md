@@ -63,6 +63,14 @@ information page: the host's switch, a revision and the tabs as a JSON array of
 at most eight `{ title, body }` objects. A save matches the revision in its
 `WHERE` clause and advances it, so a stale editor updates no row.
 
+`0005_programme_notifications.sql` adds the programme's notifications.
+`programme_notifications` is a single row with the host's switch and
+`announced_through`, the instant up to which starts and reveals have been
+handled; the worker moves it forward under a row lock. `programme_notification_outbox`
+queues one row per subscription, event and moment, with the event's name as
+guests saw it when it was queued. Rows leave with their subscription or their
+event.
+
 Conventions for new tables and columns:
 
 - Flags are `BOOLEAN`; instants are `TIMESTAMPTZ`. The API renders instants as
@@ -87,7 +95,7 @@ same limits: a statement that needs longer must start with
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
-   `0005_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
+   `0006_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
 2. Put the schema change in that file, with any necessary data backfill. Do not add
    DDL to request handlers or change an already applied migration.
 3. Run `npm run check` against its disposable PostgreSQL instance. Include tests

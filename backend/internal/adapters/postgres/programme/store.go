@@ -13,11 +13,15 @@ import (
 type Store struct {
 	db  *sql.DB
 	now func() time.Time
+	// announce queues notifications inside the announcement transaction.
+	announce func(context.Context, *sql.Tx, []programme.Announcement) error
 }
 
 var _ programme.Repository = (*Store)(nil)
 
-func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: now} }
+func New(db *sql.DB, now func() time.Time, announce func(context.Context, *sql.Tx, []programme.Announcement) error) *Store {
+	return &Store{db: db, now: now, announce: announce}
+}
 
 func (s *Store) List(ctx context.Context, limit int, guestID int64, admin bool, now time.Time) ([]programme.Event, error) {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
@@ -30,13 +34,6 @@ func (s *Store) List(ctx context.Context, limit int, guestID int64, admin bool, 
 		return nil, err
 	}
 	return items, tx.Commit()
-}
-
-// NextUnlock returns the earliest unlock after the given instant, or the zero time.
-func (s *Store) NextUnlock(ctx context.Context, after time.Time) (time.Time, error) {
-	var next sql.NullTime
-	err := s.db.QueryRowContext(ctx, "SELECT MIN(unlock_at) FROM events WHERE unlock_at>$1", after).Scan(&next)
-	return next.Time, err
 }
 
 // Create commits the event, its settings and options together.

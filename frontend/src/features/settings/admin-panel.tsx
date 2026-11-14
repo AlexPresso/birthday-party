@@ -107,6 +107,7 @@ export function AdminPanel({
   party: initialParty,
   guests: initialGuests,
   events,
+  programmeNotifications,
   configuration: initialConfiguration,
   welcome,
   information,
@@ -116,6 +117,7 @@ export function AdminPanel({
   party: Party;
   guests: Guest[];
   events: PartyEvent[];
+  programmeNotifications: boolean;
   configuration: Configuration;
   welcome: AdminWelcome;
   information: AdminInformation;
@@ -214,6 +216,7 @@ export function AdminPanel({
         return (
           <EventManager
             initial={events}
+            notifications={programmeNotifications}
             timezone={party.timezone}
             guests={guests}
           />

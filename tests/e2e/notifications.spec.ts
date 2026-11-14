@@ -520,3 +520,30 @@ test("the manifest and icons support standalone installation without private off
     expect((await localized.json()).lang).toBe(locale);
   }
 });
+
+test("only hosts can read or change the programme notification setting", async ({
+  page,
+}) => {
+  const path = "/api/admin/programme/notifications";
+  await signInGuest(host, page, "Programme Notification Guest");
+  expect((await page.request.get(path)).status()).toBe(403);
+  expect(
+    (
+      await page.request.put(path, {
+        headers: mutationHeaders,
+        data: { enabled: false },
+      })
+    ).status(),
+  ).toBe(403);
+
+  // Notifications are on until a host turns them off.
+  const saved = await host.get(path);
+  expect(saved.status()).toBe(200);
+  expect(await saved.json()).toEqual({ enabled: true });
+  for (const data of [{}, { enabled: null }, { enabled: "false" }]) {
+    const refused = await host.put(path, { data });
+    expect(refused.status()).toBe(400);
+    expect((await refused.json()).code).toBe("invalid_body");
+  }
+  expect(await (await host.get(path)).json()).toEqual({ enabled: true });
+});

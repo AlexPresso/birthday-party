@@ -124,6 +124,9 @@ export const eventSchema = z
 
 export const eventsSchema = z.object({ items: z.array(eventSchema) });
 
+/** Whether guests are notified of event starts and revealed surprises. */
+export const programmeNotificationsSchema = z.object({ enabled: z.boolean() });
+
 export type PartyEvent = z.infer<typeof eventSchema>;
 export type Vote = z.infer<typeof voteSchema>;
 export type VoteOption = Vote["options"][number];

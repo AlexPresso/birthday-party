@@ -109,9 +109,14 @@ func (event Event) View(now time.Time, private bool) Event {
 // including current authorization and persistence of each event's vote settings.
 type Repository interface {
 	List(context.Context, int, int64, bool, time.Time) ([]Event, error)
-	// NextUnlock returns the earliest unlock instant after the given one, or
-	// the zero time when no later unlock is scheduled.
-	NextUnlock(ctx context.Context, after time.Time) (time.Time, error)
+	// NextMoment returns the earliest start or unlock after the given instant,
+	// or the zero time when nothing later is scheduled.
+	NextMoment(ctx context.Context, after time.Time) (time.Time, error)
+	// Announce queues notifications for the moments reached since its last
+	// call, each exactly once, and reports how many announcements it queued.
+	Announce(ctx context.Context, now time.Time) (int, error)
+	NotificationsEnabled(context.Context) (bool, error)
+	SetNotificationsEnabled(context.Context, bool) error
 	Create(context.Context, Actor, Input, int) (Event, error)
 	Update(context.Context, Actor, int64, Input) (Event, error)
 	Delete(context.Context, Actor, int64) error
@@ -201,9 +206,4 @@ func (s *Service) Update(ctx context.Context, actor Actor, id int64, input Input
 // Delete removes an event, returning ErrNotFound when it is absent.
 func (s *Service) Delete(ctx context.Context, actor Actor, id int64) error {
 	return s.repository.Delete(ctx, actor, id)
-}
-
-// NextUnlock returns the next scheduled unlock after now, or the zero time.
-func (s *Service) NextUnlock(ctx context.Context, now time.Time) (time.Time, error) {
-	return s.repository.NextUnlock(ctx, now)
 }
