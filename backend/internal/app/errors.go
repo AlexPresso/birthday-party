@@ -57,7 +57,7 @@ var apiErrors = map[string]apiError{
 	"invalid_timezone":      {http.StatusBadRequest, "Choose a time zone such as Europe/Zurich."},
 	"unknown_timezone":      {http.StatusBadRequest, "This time zone was not found. Try Europe/Zurich."},
 	"invalid_date":          {http.StatusBadRequest, "Choose the date and time again, then save."},
-	"invalid_configuration": {http.StatusBadRequest, "Choose an age from 1 to 150 and upload limits from 1 to 1024 MiB. Invitation titles allow 200 characters and descriptions 2000."},
+	"invalid_configuration": {http.StatusBadRequest, "Choose an age from 1 to 150, upload limits from 1 to 1024 MiB and a colour such as #ff6a1f. Invitation titles allow 200 characters and descriptions 2000."},
 
 	// Information page.
 	"invalid_information":  {http.StatusBadRequest, "Add up to 8 tabs. Each needs a title of up to 40 characters and a text of up to 4,000."},
@@ -73,7 +73,8 @@ var apiErrors = map[string]apiError{
 	"invalid_notification_subscription": {http.StatusBadRequest, "Notifications couldn't be set up. Try again."},
 	"notification_subscription_limit":   {http.StatusConflict, "You've reached the notification device limit. Turn notifications off on another device first."},
 
-	// Programme, votes and questions.
+	// Programme, votes and questions. invalid_vote_option also answers an
+	// unknown or revoked guest picked as a werewolf game master.
 	"invalid_event":          {http.StatusBadRequest, "Add a title (up to 160 characters). The description and hint are optional (up to 4000 and 160 characters)."},
 	"event_limit_reached":    {http.StatusConflict, "You’ve reached the limit of 200 events."},
 	"invalid_activity":       {http.StatusBadRequest, "Add a question of up to 240 characters and 2 to 200 different choices."},
@@ -88,6 +89,15 @@ var apiErrors = map[string]apiError{
 	"questions_closed":       {http.StatusConflict, "Questions and upvotes are closed."},
 	"question_limit_reached": {http.StatusConflict, "This activity has reached its limit of 200 questions."},
 	"no_jokers_left":         {http.StatusConflict, "Both jokers have already been used."},
+
+	// Werewolf games.
+	"game_master_required":       {http.StatusForbidden, "Only the game master can do this."},
+	"invalid_werewolf_roles":     {http.StatusBadRequest, "Check the roles: up to 20, each with a name of up to 40 characters, an explanation of up to 600 and a quantity from 0 to 60."},
+	"werewolf_roles_mismatch":    {http.StatusConflict, "The roles don’t add up to the number of players, or fewer than 3 players joined."},
+	"werewolf_player_limit":      {http.StatusConflict, "This game already has the maximum number of players."},
+	"invalid_werewolf_player":    {http.StatusBadRequest, "This person isn’t playing in this game."},
+	"werewolf_message_forbidden": {http.StatusForbidden, "You can’t send a message right now."},
+	"invalid_werewolf_message":   {http.StatusBadRequest, "Write a message of up to 280 characters."},
 
 	// Guestbook.
 	"invalid_message":          {http.StatusBadRequest, "Your message must contain between 1 and 2000 characters."},

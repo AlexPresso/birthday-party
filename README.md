@@ -70,6 +70,16 @@ A question game. Guests send anonymous questions and upvote the ones they want
 to hear. The host answers out loud and has two jokers for the whole game to
 skip a question. The questions are anonymous for everyone, the host included.
 
+### Werewolf
+
+A companion for the hidden-role game everyone knows, played out loud. Guests
+join from their phone, a game master chosen by the host sets the roles, and
+each player then finds their own role on their screen, with what it does. The
+game master sees everyone's role, names the mayor and records who dies; the
+nights, the debates and the votes stay around the table. Two optional twists:
+deaths that keep their role secret, and ghosts who whisper a message to the
+mayor at night.
+
 ### Guestbook
 
 Guests leave a message, signed or anonymous. An anonymous message hides its
@@ -95,7 +105,8 @@ The host is a guest with one more tab, **Settings**. From there you:
 - add guests, copy their links, and replace or withdraw a link when needed. The
   app sends no email and no text message, so you pass the links on yourself;
 - write the text of the invitation page, in several languages if you like;
-- build the schedule, with its surprises, votes and question games;
+- build the schedule, with its surprises, votes, question games and werewolf
+  games;
 - write an information page, split into tabs, and show it when it is ready;
 - create media categories and decide whether guests can see each of them;
 - choose how large a photo or a video may be.

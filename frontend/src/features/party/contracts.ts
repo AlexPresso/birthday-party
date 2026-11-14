@@ -15,6 +15,13 @@ const invitationCopySchema = z.object({
   description: z.string().nullable(),
 });
 
+export const appearanceSchema = z.object({
+  theme: z.enum(["dark", "light"]),
+  accent: z.string().regex(/^#[0-9a-f]{6}$/i),
+});
+
+export type Appearance = z.infer<typeof appearanceSchema>;
+
 export const publicConfigurationSchema = z.object({
   age: z.number().int().min(1).max(150),
   invitation: invitationCopySchema.extend({
@@ -26,6 +33,7 @@ export const publicConfigurationSchema = z.object({
       es: invitationCopySchema,
     }),
   }),
+  appearance: appearanceSchema,
 });
 
 export const configurationSchema = publicConfigurationSchema.extend({

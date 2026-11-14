@@ -72,6 +72,11 @@ func (s *Store) Create(ctx context.Context, actor programme.Actor, input program
 			return programme.Event{}, err
 		}
 	}
+	if input.Type == programme.TypeWerewolf {
+		if err := createWerewolf(ctx, tx.Tx, id, input.Werewolf); err != nil {
+			return programme.Event{}, err
+		}
+	}
 	return s.finish(ctx, tx, actor, id, true)
 }
 
@@ -93,6 +98,11 @@ func (s *Store) Update(ctx context.Context, actor programme.Actor, id int64, inp
 			return programme.Event{}, err
 		}
 	}
+	if input.Werewolf != nil && event.Werewolf.ChangesGameMaster(*input.Werewolf) {
+		if err := setGameMaster(ctx, tx.Tx, id, input.Werewolf.GameMasterID); err != nil {
+			return programme.Event{}, err
+		}
+	}
 	_, err = tx.ExecContext(ctx, `UPDATE events SET title=$1,description=$2,teaser=$3,starts_at=$4::timestamptz,unlock_at=$5::timestamptz
  WHERE id=$6`, input.Title, input.Description, input.Teaser, input.StartsAt, input.UnlockAt, id)
 	if err != nil {
@@ -104,11 +114,16 @@ func (s *Store) Update(ctx context.Context, actor programme.Actor, id int64, inp
 	return s.finish(ctx, tx, actor, id, true)
 }
 
+// inputCandidates names the guests an event's settings refer to, so begin can
+// lock them: the candidates of a vote, or the game master of a werewolf game.
 func inputCandidates(input programme.Input) []int64 {
-	if input.Vote == nil {
-		return nil
+	switch {
+	case input.Vote != nil:
+		return input.Vote.CandidateIDs
+	case input.Werewolf != nil && input.Werewolf.GameMasterID != nil:
+		return []int64{*input.Werewolf.GameMasterID}
 	}
-	return input.Vote.CandidateIDs
+	return nil
 }
 
 func (s *Store) Delete(ctx context.Context, actor programme.Actor, id int64) error {

@@ -38,7 +38,7 @@
   }
   .confirm-dialog-actions > .confirm-dialog-danger {
     background: var(--danger);
-    color: var(--on-accent);
+    color: var(--on-danger);
   }
   .confirm-dialog-actions > .confirm-dialog-danger:hover {
     filter: brightness(1.08);

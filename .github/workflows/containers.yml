@@ -1,9 +1,13 @@
 name: Tests and container images
 
+# A pull request runs the tests on every commit pushed to it. Pushes run them
+# only on main and version tags, which also publish the images, so a branch
+# with an open pull request is not tested twice. Run the workflow by hand to
+# test a branch without one.
 on:
   pull_request:
   push:
-    branches: ["**"]
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 

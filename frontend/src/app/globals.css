@@ -203,7 +203,7 @@
   }
   ::selection {
     background: var(--accent);
-    color: var(--background);
+    color: var(--on-accent);
   }
   progress {
     display: block;
@@ -326,7 +326,7 @@
     padding: 8px 2px;
   }
   .text-button:hover {
-    color: var(--accent-hover);
+    color: var(--accent-text-hover);
   }
   .icon-button {
     display: inline-flex;

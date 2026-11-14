@@ -9,6 +9,7 @@ import {
   DoorOpen,
   Info,
   Upload,
+  Palette,
   ChevronRight,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
@@ -24,6 +25,7 @@ import { PartyEditor } from "../party/party-editor";
 import { GuestManager } from "../guests/guest-manager";
 import { EventManager } from "../programme/event-manager";
 import { ConfigurationEditor } from "../party/configuration-editor";
+import { AppearanceEditor } from "../party/appearance-editor";
 import { WelcomeAdmin } from "../welcome/welcome-admin";
 import { MediaCategoriesAdmin } from "../media/media-categories-admin";
 import type { AdminWelcome } from "../welcome/contracts";
@@ -45,6 +47,12 @@ const groups = [
         title: "configuration.partyDetails",
         description: "settings.partyDescription",
         Icon: Cake,
+      },
+      {
+        section: "appearance",
+        title: "appearance.title",
+        description: "appearance.description",
+        Icon: Palette,
       },
       {
         section: "programme",
@@ -159,6 +167,17 @@ export function AdminPanel({
             : "configuration.ageOther",
           { age: number.format(configuration.age) },
         );
+      case "appearance":
+        return (
+          <>
+            <span
+              className="settings-swatch"
+              style={{ background: configuration.appearance.accent }}
+              aria-hidden="true"
+            />
+            {t(`appearance.${configuration.appearance.theme}`)}
+          </>
+        );
       case "invitation":
         return t("configuration.textLanguages");
       case "uploads":
@@ -193,6 +212,13 @@ export function AdminPanel({
             />
             <PartyEditor party={party} onSave={setParty} />
           </div>
+        );
+      case "appearance":
+        return (
+          <AppearanceEditor
+            initial={configuration.appearance}
+            onSave={saveConfiguration}
+          />
         );
       case "invitation":
       case "uploads":

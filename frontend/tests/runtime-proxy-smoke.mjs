@@ -92,6 +92,7 @@ test(
                     ]),
                   ),
                 },
+                appearance: { theme: "dark", accent: "#ff6a1f" },
               }),
             );
             return;

@@ -20,12 +20,14 @@ const configuration = {
       es: { title: null, description: null },
     },
   },
+  appearance: { theme: "light", accent: "#3e63dd" },
 };
 
 test("configuration responses preserve defaults, hidden text and authored translations", () => {
   assert.deepEqual(configurationSchema.parse(configuration), configuration);
   const publicConfiguration = publicConfigurationSchema.parse(configuration);
   assert.deepEqual(publicConfiguration.invitation, configuration.invitation);
+  assert.deepEqual(publicConfiguration.appearance, configuration.appearance);
   assert.equal("imageSizeMB" in publicConfiguration, false);
   assert.equal("videoSizeMB" in publicConfiguration, false);
   assert.equal(
@@ -63,5 +65,33 @@ test("configuration responses reject unsupported ages and upload limits", () => 
         true,
       );
     }
+  }
+});
+
+test("configuration responses require a known theme and a six-digit colour", () => {
+  for (const appearance of [
+    undefined,
+    { theme: "dark" },
+    { accent: "#ff6a1f" },
+    { theme: "sepia", accent: "#ff6a1f" },
+    { theme: "dark", accent: "#fff" },
+    { theme: "dark", accent: "ff6a1f" },
+    { theme: "dark", accent: "#ff6a1g" },
+  ]) {
+    assert.equal(
+      publicConfigurationSchema.safeParse({ ...configuration, appearance })
+        .success,
+      false,
+      JSON.stringify(appearance),
+    );
+  }
+  for (const accent of ["#ff6a1f", "#FFC53D"]) {
+    assert.equal(
+      configurationSchema.safeParse({
+        ...configuration,
+        appearance: { theme: "dark", accent },
+      }).success,
+      true,
+    );
   }
 });

@@ -1,12 +1,20 @@
+import type { CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
-import { getBirthdayConfig } from "@/features/party/birthday-config";
+import { accentProperties } from "@/features/party/appearance";
+import {
+  getAppearance,
+  getBirthdayConfig,
+} from "@/features/party/birthday-config";
 import { getI18n } from "@/lib/server-i18n";
 import { I18nProvider } from "@/lib/i18n-context";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { title, description } = await getBirthdayConfig();
-  const { t } = await getI18n();
+  const [{ title, description }, { theme }, { t }] = await Promise.all([
+    getBirthdayConfig(),
+    getAppearance(),
+    getI18n(),
+  ]);
   return {
     title: title
       ? { default: title, template: `%s · ${title}` }
@@ -16,7 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: {
       capable: true,
       title: title || t("birthday.fallback"),
-      statusBarStyle: "black-translucent",
+      // Light text over the page in the dark theme, dark text in the light one.
+      statusBarStyle: theme === "light" ? "default" : "black-translucent",
     },
     icons: {
       icon: "/icons/app.svg",
@@ -25,22 +34,36 @@ export async function generateMetadata(): Promise<Metadata> {
     robots: { index: false, follow: false },
   };
 }
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-  themeColor: "#100f0e",
-  colorScheme: "dark",
-};
+
+export async function generateViewport(): Promise<Viewport> {
+  const { theme } = await getAppearance();
+  return {
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover",
+    // The page background of the theme (tokens.css).
+    themeColor: theme === "light" ? "#f7f3ee" : "#100f0e",
+    colorScheme: theme,
+  };
+}
 
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { locale, messages } = await getI18n();
+  const [{ locale, messages }, { theme, accent }] = await Promise.all([
+    getI18n(),
+    getAppearance(),
+  ]);
+  // Rendered with the document, so the first paint already has the host's
+  // theme and colour. The style-src policy allows style attributes.
   return (
-    <html lang={locale}>
+    <html
+      lang={locale}
+      data-theme={theme}
+      style={accentProperties(accent, theme) as CSSProperties}
+    >
       <head>
         <link
           rel="preload"

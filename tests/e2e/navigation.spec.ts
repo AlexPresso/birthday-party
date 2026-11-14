@@ -144,6 +144,7 @@ test("grouped settings save edits and preserve creation drafts through browser h
   }
   const sections = [
     "party",
+    "appearance",
     "programme",
     "welcome",
     "information",

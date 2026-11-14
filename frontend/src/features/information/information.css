@@ -123,7 +123,7 @@
   }
   @media (hover: hover) {
     .information-text a:hover {
-      color: var(--accent-hover);
+      color: var(--accent-text-hover);
     }
   }
   @media (max-width: 360px) {

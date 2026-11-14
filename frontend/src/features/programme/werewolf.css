@@ -1,0 +1,665 @@
+/* Every stylesheet repeats the layer order, so load order never matters. */
+@layer base, components, features;
+
+/* The werewolf page (werewolf-activity.tsx and its views). */
+@layer features {
+  /*
+   * Day and night crossfade the whole app while the page is open: the root
+   * carries data-phase, and night swaps the registered tokens (tokens.css).
+   * Under reduced motion they switch at once.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-phase] {
+      transition-property:
+        --background, --surface, --surface-muted, --surface-raised, --text,
+        --muted, --accent, --accent-hover, --accent-text, --on-accent,
+        --accent-soft, --highlight, --highlight-pale, --featured-background,
+        --border, --border-strong, --input-background, --placeholder,
+        --nav-background, --overlay, --avatar-neutral-background,
+        --avatar-neutral-foreground;
+      transition-duration: 0.6s;
+      transition-timing-function: ease-in-out;
+    }
+  }
+
+  .werewolf-page {
+    min-width: 0;
+  }
+
+  .werewolf-heading {
+    margin-bottom: 24px;
+  }
+
+  .werewolf-heading h1 {
+    margin-bottom: 12px;
+    text-wrap: balance;
+  }
+
+  .werewolf-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin: 0;
+  }
+
+  /* Day or night: what a player glances at first. */
+  .werewolf-phase {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 13px 4px 11px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--highlight);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .werewolf-description {
+    margin: 12px 0 0;
+    color: var(--muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-master {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    margin: 18px 0 0;
+  }
+
+  .werewolf-master .avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+  }
+
+  .werewolf-master > span:last-child {
+    display: grid;
+    min-width: 0;
+    line-height: 1.35;
+  }
+
+  .werewolf-master-label {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .werewolf-master strong {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .werewolf-heading > .werewolf-note {
+    margin-top: 18px;
+  }
+
+  .werewolf-heading > .button {
+    margin-top: 12px;
+  }
+
+  .werewolf-feedback {
+    margin-bottom: 20px;
+  }
+
+  .werewolf-feedback .notice {
+    margin-bottom: 0;
+  }
+
+  .werewolf-join {
+    width: 100%;
+    margin-bottom: 26px;
+  }
+
+  .werewolf-manage {
+    margin-top: 30px;
+  }
+
+  .werewolf-layout,
+  .werewolf-main,
+  .werewolf-side {
+    display: grid;
+    align-content: start;
+    gap: 28px;
+    min-width: 0;
+  }
+
+  /* Receives the focus when a player's control leaves with its row. */
+  .werewolf-main:focus-visible,
+  .werewolf-ghost:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 5px;
+    border-radius: var(--radius);
+  }
+
+  .werewolf-section {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .werewolf-list-heading,
+  .werewolf-variants > legend {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+    padding: 0;
+    color: var(--muted);
+  }
+
+  .werewolf-list-heading h2,
+  .werewolf-variants > legend {
+    margin-top: 0;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .werewolf-list-heading h2 {
+    margin-bottom: 0;
+  }
+
+  .werewolf-list-heading > span {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .werewolf-empty {
+    margin: 0;
+    padding: 28px 18px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* The players: one column on a phone, several where the width allows. */
+  .werewolf-players {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+    column-gap: 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .werewolf-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    min-height: 62px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .werewolf-portrait {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .werewolf-portrait .avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+  }
+
+  /* The dead keep their place under their own heading, marked by a skull. */
+  .werewolf-skull {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--background);
+    color: var(--text);
+  }
+
+  .werewolf-player[data-dead] .avatar {
+    filter: grayscale(1);
+    opacity: 0.55;
+  }
+
+  .werewolf-player[data-dead] .werewolf-player-name {
+    color: var(--muted);
+  }
+
+  .werewolf-player-text {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .werewolf-player-name {
+    font-size: 15px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-player-notes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 10px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .werewolf-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+  }
+
+  .werewolf-mayor {
+    color: var(--highlight);
+  }
+
+  .werewolf-player-role {
+    color: var(--text);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-player-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .werewolf-player-actions .icon-button {
+    border: 1px solid var(--border);
+  }
+
+  /* The mayor's crown: a filled accent always carries dark text. */
+  .werewolf-player-actions .icon-button[data-active],
+  .werewolf-player-actions .icon-button[data-active]:hover {
+    border-color: transparent;
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  /* A player's screen while the game runs (werewolf-player.tsx). */
+  .werewolf-play {
+    display: grid;
+    align-content: start;
+    gap: 24px;
+    min-width: 0;
+    max-width: 560px;
+  }
+
+  /* The player's own state: dead or mayor, with its icon. */
+  .werewolf-self {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    margin: 0;
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .werewolf-self svg {
+    color: var(--muted);
+  }
+
+  .werewolf-self[data-state="mayor"] svg {
+    color: var(--highlight);
+  }
+
+  /* The viewer's own role: closed until asked for (werewolf-player.tsx). */
+  .werewolf-role-card {
+    display: grid;
+    gap: 18px;
+    padding: 20px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius-large);
+  }
+
+  .werewolf-role-card[data-shown] {
+    border: 1.5px solid transparent;
+    background: var(--surface);
+  }
+
+  .werewolf-role-card .button {
+    width: 100%;
+  }
+
+  .werewolf-role-name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(24px, 8vw, 32px);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-role-text {
+    margin: 12px 0 0;
+    font-size: 16px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* The game master's role list (werewolf-role-editor.tsx). */
+  .werewolf-role-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .werewolf-role {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .werewolf-role-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    min-height: 58px;
+  }
+
+  .werewolf-role-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-stepper {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .werewolf-stepper .icon-button {
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+  }
+
+  .werewolf-stepper .icon-button[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .werewolf-quantity {
+    min-width: 36px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  .werewolf-role-fields {
+    padding: 2px 0 14px;
+  }
+
+  .werewolf-role-fields label {
+    margin-top: 12px;
+  }
+
+  .werewolf-role-fields textarea {
+    min-height: 96px;
+  }
+
+  .werewolf-role-fields .text-button {
+    margin: 4px 20px 0 0;
+  }
+
+  .werewolf-field-error {
+    margin: 6px 0 0;
+    color: var(--danger);
+    font-size: 13px;
+  }
+
+  .werewolf-field-error:empty,
+  .werewolf-count-line:empty,
+  .werewolf-counter:empty {
+    display: none;
+  }
+
+  .werewolf-danger,
+  .werewolf-danger:hover {
+    color: var(--danger);
+  }
+
+  .werewolf-roles > .fine-print {
+    margin: 0;
+  }
+
+  /* The running save shows beside the add button, so nothing below moves. */
+  .werewolf-roles-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 16px;
+    min-height: 44px;
+  }
+
+  .werewolf-roles-footer .status-notice {
+    margin: 0;
+  }
+
+  .werewolf-roles > .notice {
+    margin: 4px 0 12px;
+  }
+
+  /* The two variants, with the switch of the welcome's Required setting. */
+  .werewolf-variants .checkbox-field {
+    gap: 12px;
+    min-height: 48px;
+    margin-bottom: 0;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .werewolf-variants input {
+    appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 42px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-muted);
+  }
+
+  .werewolf-variants input::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+
+  .werewolf-variants input:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+
+  .werewolf-variants input:checked::before {
+    transform: translateX(18px);
+    background: var(--background);
+  }
+
+  .werewolf-variants .fine-print {
+    margin: 0 0 0 54px;
+  }
+
+  /* What stands between the game master and the start. */
+  .werewolf-start {
+    display: grid;
+    gap: 12px;
+  }
+
+  .werewolf-count-line {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .werewolf-start-hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .werewolf-start .button,
+  .werewolf-phase-control .button,
+  .werewolf-finish {
+    width: 100%;
+  }
+
+  /* Ghost messages: the game master's list, the mayor's and the writer's. */
+  .werewolf-messages {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .werewolf-message,
+  .werewolf-mayor-message,
+  .werewolf-ghost {
+    min-width: 0;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .werewolf-mayor-message h2,
+  .werewolf-ghost h2,
+  .werewolf-ghost label {
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .werewolf-message-author {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    min-width: 0;
+    margin: 0 0 8px;
+    font-size: 14px;
+  }
+
+  .werewolf-message-author .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .werewolf-message-author strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-message-author .werewolf-tag {
+    font-size: 13px;
+  }
+
+  .werewolf-message-text {
+    margin: 0;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .werewolf-mayor-message .fine-print,
+  .werewolf-ghost .fine-print {
+    margin: 10px 0 0;
+  }
+
+  .werewolf-ghost textarea {
+    min-height: 88px;
+  }
+
+  .werewolf-counter {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .werewolf-ghost textarea[aria-invalid="true"] ~ .werewolf-counter {
+    color: var(--danger);
+  }
+
+  .werewolf-ghost-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  @media (min-width: 960px) {
+    .werewolf-heading {
+      margin-bottom: 30px;
+    }
+
+    .werewolf-layout {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      column-gap: 48px;
+      align-items: start;
+    }
+
+    /* The players stay on the left; what the viewer acts on, on the right. */
+    .werewolf-main {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+    }
+
+    .werewolf-side,
+    .werewolf-phase-control {
+      grid-column: 2;
+    }
+
+    .werewolf-join {
+      width: auto;
+    }
+  }
+}

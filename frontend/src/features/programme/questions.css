@@ -176,7 +176,7 @@
     justify-content: flex-start;
   }
   .question-host-actions > button:hover {
-    color: var(--accent-hover);
+    color: var(--accent-text-hover);
   }
   .question-empty {
     padding: 28px 10px;

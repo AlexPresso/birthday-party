@@ -46,6 +46,7 @@ type App struct {
 	identity            *identity.Service
 	programme           *programme.Service
 	questions           *programme.QuestionService
+	werewolf            *programme.WerewolfService
 	guestbook           *guestbook.Service
 	welcome             *welcome.Service
 	profile             *profile.Service
@@ -149,6 +150,7 @@ func Open(config Config) (*App, error) {
 	programmeStore := pgprogramme.New(db, clock, notificationStore.EnqueueProgramme)
 	a.programme = programme.New(programmeStore)
 	a.questions = programme.NewQuestions(programmeStore)
+	a.werewolf = programme.NewWerewolf(programmeStore)
 	a.profile = profile.New(pgprofile.New(db, clock), avatar.New())
 	a.mediaStore = pgmedia.New(db, clock)
 	a.mediaFiles = mediafiles.New(config.DataDir)

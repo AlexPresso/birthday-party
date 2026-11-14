@@ -215,7 +215,7 @@ test("the host writes the information page, an unfinished tab never unpublishes 
             ),
           ),
         ),
-    ).toEqual(["party", "programme", "welcome", "information"]);
+    ).toEqual(["party", "appearance", "programme", "welcome", "information"]);
     await expect(row.locator(".lucide-info")).toBeVisible();
     await expect(row.locator(".settings-menu-label > span")).toHaveText(
       "Informations",

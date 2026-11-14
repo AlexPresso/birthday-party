@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
+  Moon,
   Plus,
   Vote as VoteIcon,
   MessageCircle,
@@ -20,6 +21,7 @@ import { useLatestState } from "@/lib/use-latest-state";
 import { useAutosave } from "@/lib/autosave";
 import {
   draftProblem,
+  editedElsewhere,
   eventDraft,
   eventRequestBody,
   frozenVote,
@@ -106,10 +108,13 @@ export function EventManager({
     setEditorKey((value) => value + 1);
     const latest = event && latestEvents().find((item) => item.id === event.id);
     if (latest) editor.open(eventDraft(latest));
-    else if (type === "questions")
+    else if (type === "questions" || type === "werewolf")
       // The suggested name is an unsaved change, so the first save creates it.
       editor.open(
-        newEventDraft(type, t("questions.name")),
+        newEventDraft(
+          type,
+          t(type === "questions" ? "questions.name" : "werewolf.name"),
+        ),
         newEventDraft(type),
       );
     else editor.open(newEventDraft(type));
@@ -143,8 +148,7 @@ export function EventManager({
     }
     // Autosave never replaces a newer version on its own: it can run from a
     // blur or a background tab. The conflict notice offers the explicit action.
-    if (saved && saved.revision !== submitted.revision && !overwriting)
-      return false;
+    if (editedElsewhere(submitted, saved) && !overwriting) return false;
     setError(null);
     setNotice("");
     try {
@@ -258,6 +262,13 @@ export function EventManager({
             <span>
               <strong>{t("activities.voteType")}</strong>
               <span>{t("activities.voteDescription")}</span>
+            </span>
+          </button>
+          <button type="button" onClick={() => edit(undefined, "werewolf")}>
+            <Moon size={22} aria-hidden="true" />
+            <span>
+              <strong>{t("werewolf.name")}</strong>
+              <span>{t("werewolf.description")}</span>
             </span>
           </button>
         </div>

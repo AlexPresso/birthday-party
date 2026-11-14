@@ -59,7 +59,7 @@ func TestConfigurationAccessPersistenceAndPublicProjection(t *testing.T) {
 	if err := json.Unmarshal(public.Body.Bytes(), &exposed); err != nil {
 		t.Fatal(err)
 	}
-	if len(exposed) != 2 || exposed["age"] == nil || exposed["invitation"] == nil {
+	if len(exposed) != 3 || exposed["age"] == nil || exposed["invitation"] == nil || string(exposed["appearance"]) != `{"theme":"dark","accent":"#ff6a1f"}` {
 		t.Fatalf("public configuration exposed unexpected fields: %s", public.Body.String())
 	}
 	status(t, request(t, a, "GET", "/api/admin/config", nil, nil), 401)
@@ -336,4 +336,62 @@ func TestConfigurationLimitChangesPreserveAcceptedUploads(t *testing.T) {
 	status(t, request(t, a, "PUT", "/api/admin/config", configuration, host), 200)
 	status(t, queuedUpload(t, a, host, "", data), 202)
 	status(t, uploadAvatar(t, a, host, data), 200)
+}
+
+func TestAppearanceIsPublicAndValidated(t *testing.T) {
+	a := testApp(t)
+	host, _ := admin(t, a)
+	visitor, _, _ := guest(t, a, host, "Visitor")
+	read := func() party.Configuration {
+		t.Helper()
+		response := request(t, a, "GET", "/api/admin/config", nil, host)
+		status(t, response, 200)
+		var configuration party.Configuration
+		if err := json.Unmarshal(response.Body.Bytes(), &configuration); err != nil {
+			t.Fatal(err)
+		}
+		return configuration
+	}
+	configuration := read()
+	if configuration.Appearance != (party.Appearance{Theme: party.ThemeDark, Accent: party.DefaultAccent}) {
+		t.Fatalf("default appearance=%+v", configuration.Appearance)
+	}
+
+	configuration.Appearance = party.Appearance{Theme: party.ThemeLight, Accent: "#3E63DD"}
+	saved := request(t, a, "PUT", "/api/admin/config", configuration, host)
+	status(t, saved, 200)
+	if !strings.Contains(saved.Body.String(), `"appearance":{"theme":"light","accent":"#3e63dd"}`) {
+		t.Fatalf("saved appearance=%s", saved.Body.String())
+	}
+	public := request(t, a, "GET", "/api/config", nil, nil)
+	status(t, public, 200)
+	if !strings.Contains(public.Body.String(), `"appearance":{"theme":"light","accent":"#3e63dd"}`) {
+		t.Fatalf("the invitation page cannot read the appearance: %s", public.Body.String())
+	}
+	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/config", configuration, visitor), 403, "admin_required")
+
+	for name, appearance := range map[string]party.Appearance{
+		"unknown theme":   {Theme: "sepia", Accent: "#3e63dd"},
+		"short colour":    {Theme: party.ThemeDark, Accent: "#36d"},
+		"named colour":    {Theme: party.ThemeDark, Accent: "orange"},
+		"no hash":         {Theme: party.ThemeDark, Accent: "3e63dd00"},
+		"not hexadecimal": {Theme: party.ThemeDark, Accent: "#3e63dg"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := configuration
+			invalid.Appearance = appearance
+			assertWelcomeError(t, request(t, a, "PUT", "/api/admin/config", invalid, host), 400, "invalid_configuration")
+		})
+	}
+	var body map[string]any
+	if err := json.Unmarshal(saved.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	delete(body["appearance"].(map[string]any), "accent")
+	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/config", body, host), 400, "invalid_body")
+	delete(body, "appearance")
+	assertWelcomeError(t, request(t, a, "PUT", "/api/admin/config", body, host), 400, "invalid_body")
+	if kept := read(); kept.Appearance != (party.Appearance{Theme: party.ThemeLight, Accent: "#3e63dd"}) {
+		t.Fatalf("a rejected save changed the appearance: %+v", kept.Appearance)
+	}
 }

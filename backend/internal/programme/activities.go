@@ -190,6 +190,16 @@ func (event Event) CheckEdit(input Input) error {
 	if (event.Vote != nil || event.Questions != nil) && event.Revision != input.Revision {
 		return ErrActivityConflict
 	}
+	// A werewolf event needs no revision: its game moves with every command of
+	// the game master, and only the game master setting depends on the game.
+	if input.Werewolf != nil {
+		if event.Werewolf == nil {
+			return ErrActivityConflict
+		}
+		if event.Werewolf.Status == WerewolfRunning && event.Werewolf.ChangesGameMaster(*input.Werewolf) {
+			return ErrActivityConflict
+		}
+	}
 	if input.Vote == nil {
 		return nil
 	}

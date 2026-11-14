@@ -5,7 +5,9 @@ on:
     paths:
       - charts/birthday-party/**
       - .github/workflows/helm.yml
+  # Pull requests cover other branches, so they are not checked twice.
   push:
+    branches: [main]
     paths:
       - charts/birthday-party/**
       - .github/workflows/helm.yml

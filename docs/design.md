@@ -21,7 +21,7 @@ new decision; do not revisit the rejected directions without a reason.
 - Interface language follows the phone/browser's preferred supported language:
   French, English, German, Italian or Spanish, with English as the fallback.
 
-## Selected direction: "K · Neige", dark with one orange accent
+## Selected direction: "K · Neige", one accent on a dark or light base
 
 On 2026-11-12 the host chose a single dark theme, meant to suit any party so
 other hosts can reuse the app. It replaces the cream and dark plum themes. Every
@@ -29,13 +29,21 @@ reference image in this folder was drawn in those previous colors: use them for
 layout only. Photographs, names and messages in any mockup are
 illustrative and must not be seeded into the application.
 
-- **Theme.** Dark only; do not follow the device's light preference. Background
-  `#100F0E`, surfaces `#1B1917` and `#292623`, borders `#33302C`, text `#F5F1EA`,
-  secondary text `#A29B92`.
-- **Accent.** Orange `#FF6A1F`, with amber `#FFB547` for times and the ring
-  gradient. A filled accent always carries dark text, so another party can swap
-  `--accent` in `frontend/src/app/tokens.css` without losing contrast. Use the
-  accent for the one main action on a screen and for the current tab.
+- **Theme.** The host picks it in Settings → La fête → Apparence; it never
+  follows the device's preference. Dark (the default): background `#100F0E`,
+  surfaces `#1B1917` and `#292623`, borders `#33302C`, text `#F5F1EA`,
+  secondary text `#A29B92`. Light: background `#F7F3EE`, surfaces `#FFFDFA`
+  and `#EBE5DD`, borders `#E4DDD4`, text `#1B1917`, secondary text `#6B645C`.
+  The theme and the accent apply everywhere, from the invitation page on, in
+  the first server render.
+- **Accent.** Orange `#FF6A1F` by default, with amber for times and the ring
+  gradient; the host may pick one of eight swatches or any colour. The shades
+  (hover, soft tint, accent text, highlight, snow, glow) are derived from it
+  and kept readable on the theme's surfaces. A filled accent carries whichever
+  of dark or white text contrasts more; say so once in the editor when neither
+  reaches AA. Use the accent for the one main action on a screen and for the
+  current tab. The slideshow stays a dark viewer, and the Loup-garou night is
+  the same moonlit blue in both themes.
 - **Type.** Unbounded for page titles, the age, times and the featured vote
   question; Figtree for everything else. Do not use italics or uppercase,
   letter-spaced labels for emphasis.
@@ -118,6 +126,21 @@ Do not invent party details, guest contributions, dates, or activity counts.
   party's day and a neutral one otherwise. Never write "today" or "tomorrow".
   A programme held on one day shows no day heading. Show only the
   authorized teaser and unlock information for locked events.
+- The "Loup-garou" activity has its own page at `/programme/[id]` and is made
+  for a phone glanced at during a game played aloud. In the lobby, guests see
+  who joined and one button to join; the game master edits roles with
+  steppers, switches the variants and starts. Say how many roles there are
+  for how many players only when the numbers differ, with one action to
+  complete with villagers. During the game, a player's screen keeps to what
+  they need: day or night, their role hidden until they ask to see it, their
+  own state (dead, mayor), the ghost message when it applies, and the list of
+  the dead. Living players and the mayor are said aloud, not shown. Mark the
+  dead and the mayor with more than colour. The game master's board shows
+  every role with the two actions per player and the day/night control;
+  killing asks for confirmation. At night the page's glow, background, snow
+  and accent crossfade to a cool moonlit blue-grey, and back by day; skip the
+  transition under reduced motion. Never
+  render, cache or log a role the server did not send for that viewer.
 - Question activities ("Sans filtre") have their own page at `/programme/[id]`,
   linked from the agenda and programme settings. Follow the approved
   [activity mockup](questions-reference.png): a Programme back link, large title,

@@ -71,6 +71,47 @@ queues one row per subscription, event and moment, with the event's name as
 guests saw it when it was queued. Rows leave with their subscription or their
 event.
 
+`0006_werewolf.sql` adds the werewolf game, a third activity type, and lets
+`programme_activities.type` be `werewolf`. Everything hangs from the activity,
+so deleting the event removes the game with its roles, players and messages.
+
+`0007_werewolf_nights.sql` lets a game be in the night whether or not ghost
+messages are on: players see the phase in every game. A game in the lobby is
+still always in the day.
+
+`0008_appearance.sql` adds `theme` and `accent` to `product_configuration`,
+with checks for the two themes and a lower-case `#rrggbb` colour. The defaults
+keep the dark theme and the orange the app was designed with.
+
+- `programme_werewolf_games` has one row per werewolf event: the game master
+  (a guest, or null while undecided), the `status` (`lobby`, `running`,
+  `finished`), the `phase` (`day`, `night`) and the two variants. Every command
+  locks this row together with the activity, whose `revision` it shares with
+  the other activity types. A check keeps `night` for a started game with ghost
+  messages on.
+- `programme_werewolf_roles` is the game master's list. A row is either a
+  built-in role (`role_key`, one of seven keys, unique per game) or a custom
+  one (`name`, 1 to 40 characters), never both; `description` is null until
+  written (1 to 600 characters) and `quantity` goes from 0 to 60. `position`
+  orders the list: its range of 0 to 19 and its uniqueness per game bound a
+  game to 20 roles. That constraint is deferrable, so one update can reorder
+  the list.
+- `programme_werewolf_players` holds the seats. `id` grows in join order;
+  `(activity_id, guest_id)` is unique. `role_id` is the dealt role, null in the
+  lobby; its composite foreign key keeps it on a role of the same game and
+  refuses to remove a role somebody holds. Checks keep a mayor alive and, while
+  no role is dealt, everybody alive without a mayor; a partial unique index
+  allows one mayor per game. The limit of 60 players is enforced under the
+  game lock.
+- `programme_werewolf_messages` holds the ghosts' messages for the mayor: at
+  most one per player, through its primary key `(activity_id, guest_id)`, of 1
+  to 280 characters. It references the player, so a message leaves with its
+  seat. `delivered` marks the message drawn at daybreak; a partial unique index
+  allows one per game.
+
+Roles and messages are secrets. They are only read by the game's own queries,
+which build a response per viewer; no other table or outbox copies them.
+
 Conventions for new tables and columns:
 
 - Flags are `BOOLEAN`; instants are `TIMESTAMPTZ`. The API renders instants as
@@ -95,7 +136,7 @@ same limits: a statement that needs longer must start with
 ## Adding a schema change
 
 1. Add the next sequential file in `backend/internal/app/migrations/`, for example
-   `0006_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
+   `0009_add_media_captions.sql`. Write PostgreSQL SQL; migrations are embedded in Go.
 2. Put the schema change in that file, with any necessary data backfill. Do not add
    DDL to request handlers or change an already applied migration.
 3. Run `npm run check` against its disposable PostgreSQL instance. Include tests

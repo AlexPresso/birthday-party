@@ -34,6 +34,8 @@ export type EventDraft = {
   startsAt: string;
   unlockAt: string;
   vote: VoteDraft | null;
+  /** The setting of a werewolf game: who leads it, if already decided. */
+  werewolf: { gameMasterId: number | null } | null;
 };
 
 /** The translated message that says why a draft cannot be saved. */
@@ -78,6 +80,7 @@ export function newEventDraft(
             allowWriteIns: false,
           }
         : null,
+    werewolf: type === "werewolf" ? { gameMasterId: null } : null,
   };
 }
 
@@ -108,6 +111,10 @@ export function eventDraft(event: PartyEvent): EventDraft {
     startsAt: localInput(event.startsAt),
     unlockAt: localInput(event.unlockAt),
     vote: event.vote ? voteDraft(event.vote) : null,
+    werewolf:
+      event.type === "werewolf"
+        ? { gameMasterId: event.werewolf?.gameMaster?.id ?? null }
+        : null,
   };
 }
 
@@ -173,7 +180,33 @@ export function mergeSavedDraft(
       vote.allowWriteIns = saved.vote.allowWriteIns;
     merged.vote = vote;
   }
+  if (
+    saved.werewolf &&
+    current.werewolf?.gameMasterId === submitted.werewolf?.gameMasterId
+  )
+    merged.werewolf = saved.werewolf;
   return merged;
+}
+
+/**
+ * Whether the event changed elsewhere since the draft was read. A werewolf
+ * event's revision moves with every command of its game master, and Go does
+ * not check it on an edit, so it never makes a conflict.
+ */
+export function editedElsewhere(
+  draft: EventDraft,
+  saved: PartyEvent | undefined,
+) {
+  return (
+    saved !== undefined &&
+    draft.type !== "werewolf" &&
+    saved.revision !== draft.revision
+  );
+}
+
+/** The game master cannot change while the game is being played. */
+export function lockedGameMaster(event: PartyEvent | undefined) {
+  return event?.werewolf?.status === "running";
 }
 
 /** The source, the choices and their rules are fixed once a vote has opened. */
@@ -258,6 +291,16 @@ export function eventRequestBody(
             : { ...draft.vote, candidateIds },
         )
       : null,
+    ...(draft.werewolf
+      ? {
+          werewolf: {
+            // A running game resubmits its saved game master with the rest.
+            gameMasterId: lockedGameMaster(saved)
+              ? (saved?.werewolf?.gameMaster?.id ?? null)
+              : draft.werewolf.gameMasterId,
+          },
+        }
+      : {}),
   };
 }
 

@@ -59,6 +59,7 @@ test("public configuration excludes upload settings and guests cannot read or ch
     expect(await publicResponse.json()).toEqual({
       age: original.age,
       invitation: original.invitation,
+      appearance: original.appearance,
     });
     expect((await visitor.get("/api/admin/config")).status()).toBe(401);
     expect(
