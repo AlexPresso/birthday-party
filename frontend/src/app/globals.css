@@ -549,18 +549,6 @@
     outline: 2px solid var(--profile-ring);
     outline-offset: 3px;
   }
-  .navigation-pending {
-    position: absolute;
-    inset-inline: 14px;
-    bottom: 5px;
-    height: 2px;
-    border-radius: var(--radius-tiny);
-    background: currentColor;
-    opacity: 0;
-  }
-  .navigation-pending[data-pending] {
-    opacity: 1;
-  }
   /*
    * Five tabs need a tighter dock to keep the current tab's label on phones.
    * Six tabs, for a host who shows the information page, need it as well.
@@ -954,7 +942,7 @@
   ::view-transition-group(nav-dock) {
     z-index: 1;
   }
-  /* The dock's surface does not change; only the old pending mark would fade. */
+  /* The dock's surface does not change: show the new one at once. */
   ::view-transition-old(nav-dock) {
     animation: none;
     opacity: 0;

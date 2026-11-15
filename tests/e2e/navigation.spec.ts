@@ -519,7 +519,7 @@ test("icon navigation keeps the dark theme and its touch targets on phones and d
   await expect(page).toHaveURL(/\/profil$/);
 });
 
-test("a slow tab shows immediate feedback and does not block another tab", async ({
+test("a slow tab keeps the current page and does not block another tab", async ({
   page,
 }) => {
   await signInGuest(host, page, "Pending Navigation Guest");
@@ -552,33 +552,27 @@ test("a slow tab shows immediate feedback and does not block another tab", async
     });
     await programme.press("Enter", { noWaitAfter: true });
     await expect.poll(() => requestHeld).toBe(true);
-    const pending = programme.locator(".navigation-pending[data-pending]");
     const loading = page.locator('.page-loading[role="status"]');
-    async function expectNavigationFeedback() {
-      await expect(pending).toHaveCSS("opacity", "1");
+    async function expectCurrentPageKept() {
       await expect(mediaHeading).toBeVisible();
       await expect(loading).toHaveCount(0);
       await expect(
         navigation.getByRole("link", { name: "Médias", exact: true }),
       ).toHaveAttribute("aria-current", "page");
     }
-    await expectNavigationFeedback();
-    await expect(programme.locator(".navigation-pending")).toHaveAttribute(
-      "aria-hidden",
-      "true",
-    );
+    await expectCurrentPageKept();
     await expect(
       page.getByRole("heading", { name: "Programme", exact: true }),
     ).toHaveCount(0);
     await page.screenshot({
-      path: test.info().outputPath("navigation-feedback-mobile.png"),
+      path: test.info().outputPath("slow-tab-mobile.png"),
       fullPage: true,
       caret: "initial",
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await expectNavigationFeedback();
+    await expectCurrentPageKept();
     await page.screenshot({
-      path: test.info().outputPath("navigation-feedback-desktop.png"),
+      path: test.info().outputPath("slow-tab-desktop.png"),
       fullPage: true,
       caret: "initial",
     });
@@ -587,7 +581,6 @@ test("a slow tab shows immediate feedback and does not block another tab", async
       .click();
     await expect(page).toHaveURL(/\/livre-d-or$/);
     await expect(page.getByLabel("Ton message", { exact: true })).toBeVisible();
-    await expect(pending).toHaveCount(0);
   } finally {
     releaseResponse();
     await page.unrouteAll({ behavior: "wait" });

@@ -1,5 +1,5 @@
 "use client";
-import Link, { useLinkStatus } from "next/link";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Image as ImageIcon,
@@ -33,17 +33,6 @@ const tabs: readonly Tab[] = [
   },
   { href: "/parametres", label: "nav.settings", Icon: Settings },
 ];
-
-function NavigationPending() {
-  const { pending } = useLinkStatus();
-  return (
-    <span
-      className="navigation-pending"
-      data-pending={pending || undefined}
-      aria-hidden="true"
-    />
-  );
-}
 
 export function Navigation({
   isAdmin,
@@ -108,7 +97,6 @@ export function Navigation({
               {t(label)}
             </span>
           </span>
-          <NavigationPending />
         </Link>
       ))}
       <Link
@@ -125,7 +113,6 @@ export function Navigation({
         >
           <Avatar name={guestName} avatarUrl={avatarUrl} />
         </span>
-        <NavigationPending />
       </Link>
     </nav>
   );
