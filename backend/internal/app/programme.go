@@ -52,7 +52,21 @@ func (a *App) events(w http.ResponseWriter, r *http.Request, viewer access.Viewe
 		failError(w, err)
 		return
 	}
-	respond(w, http.StatusOK, map[string]any{"items": items})
+	respondCompressed(w, r, http.StatusOK, map[string]any{"items": items})
+}
+
+// readEvent returns one event with every vote option, for an activity page.
+func (a *App) readEvent(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	event, err := a.programme.Event(r.Context(), a.now, viewer.Guest.ID, id, viewer.Guest.IsAdmin())
+	if err != nil {
+		failError(w, err)
+		return
+	}
+	respondCompressed(w, r, http.StatusOK, event)
 }
 
 func (a *App) createEvent(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {

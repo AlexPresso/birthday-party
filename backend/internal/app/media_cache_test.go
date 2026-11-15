@@ -56,6 +56,7 @@ func assertRevalidated(t *testing.T, a *App, cookie *http.Cookie, url string) (e
 }
 
 func TestCachedMediaIsRevalidatedOnlyAfterAuthorization(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	owner, identity, _ := guest(t, a, host, "Media owner")
@@ -128,6 +129,7 @@ func TestCachedMediaIsRevalidatedOnlyAfterAuthorization(t *testing.T) {
 }
 
 func TestVideoRangesWorkWithValidators(t *testing.T) {
+	t.Parallel()
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	host, _ := admin(t, a)

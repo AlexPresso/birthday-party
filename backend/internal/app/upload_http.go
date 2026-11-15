@@ -60,16 +60,22 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, viewer access.
 			return
 		}
 	}
-	release, ok := a.acquireReceiver(w, r)
-	if !ok {
-		return
-	}
-	defer release()
 	limits, ok := a.currentUploadLimits(w, r)
 	if !ok {
 		return
 	}
-	boundReception(w, r, max(limits.ImageBytes, limits.VideoBytes)+multipartOverhead)
+	bodyLimit := max(limits.ImageBytes, limits.VideoBytes) + multipartOverhead
+	release, ok := a.acquireReceiver(w, r, viewer.Guest.ID, bodyLimit)
+	if !ok {
+		return
+	}
+	defer release()
+	// Decide before reading the body, counting every reception in progress.
+	if err = a.checkStorage(r.Context(), limits); err != nil {
+		failError(w, err)
+		return
+	}
+	boundReception(w, r, bodyLimit)
 	reader, err := r.MultipartReader()
 	if err != nil {
 		fail(w, "photo_required")
@@ -87,5 +93,6 @@ func (a *App) uploadPhoto(w http.ResponseWriter, r *http.Request, viewer access.
 		return
 	}
 	a.mediaWake.notify()
+	a.watchStorage(r.Context())
 	respond(w, http.StatusAccepted, job)
 }

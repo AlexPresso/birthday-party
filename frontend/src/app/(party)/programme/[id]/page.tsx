@@ -5,7 +5,7 @@ import {
   werewolfSchema,
 } from "@/features/programme/contracts";
 import { QuestionActivity } from "@/features/programme/question-activity";
-import { getProgramme } from "@/features/programme/server";
+import { getEvent } from "@/features/programme/server";
 import { VoteActivity } from "@/features/programme/vote-activity";
 import { WerewolfActivity } from "@/features/programme/werewolf-activity";
 import { ApiError } from "@/lib/api";
@@ -20,11 +20,11 @@ const isEventId = (id: string) =>
 
 /** The viewer and the event of this page, if the viewer's programme has it. */
 async function readActivity(id: string) {
-  const { guest } = await getSession();
-  const isAdmin = guest.role === "admin";
-  const events = await getProgramme(isAdmin);
-  const event = events.items.find((item) => item.id === Number(id));
-  return { guest, isAdmin, event };
+  const [{ guest }, event] = await Promise.all([
+    getSession(),
+    getEvent(Number(id)),
+  ]);
+  return { guest, isAdmin: guest.role === "admin", event };
 }
 
 export async function generateMetadata({ params }: Props) {

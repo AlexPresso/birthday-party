@@ -152,6 +152,7 @@ test("grouped settings save edits and preserve creation drafts through browser h
     "invitation",
     "categories",
     "uploads",
+    "storage",
   ];
   expect(
     await page

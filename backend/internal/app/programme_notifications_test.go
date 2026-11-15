@@ -58,6 +58,7 @@ func announce(t *testing.T, a *App, want int) {
 }
 
 func TestProgrammeNotificationsAnnounceStartsAndRevealsOnce(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	base := a.now()
 	now := base
@@ -189,6 +190,7 @@ func TestProgrammeNotificationsAnnounceStartsAndRevealsOnce(t *testing.T) {
 }
 
 func TestProgrammeWorkerWaitsForStartsAsWellAsReveals(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	start, unlock := a.now().Add(2*time.Hour), a.now().Add(time.Hour)

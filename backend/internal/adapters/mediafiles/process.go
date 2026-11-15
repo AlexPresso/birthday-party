@@ -31,7 +31,7 @@ func (f *Files) Prepare(ctx context.Context, job media.Pending) (media.Output, e
 		if openErr != nil {
 			return media.Output{}, openErr
 		}
-		prepared, err = prepareImage(input, filepath.Join(workDir, "thumb.jpg"))
+		prepared, err = prepareImage(ctx, f.budget, input, filepath.Join(workDir, "thumb.jpg"))
 		input.Close()
 	}
 	if err != nil {

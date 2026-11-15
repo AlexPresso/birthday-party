@@ -5,7 +5,13 @@ import {
   declineConfirmation,
 } from "./support/confirm";
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { activate, baseURL, bootstrapHost, invite } from "./support/party";
+import {
+  activate,
+  baseURL,
+  bootstrapHost,
+  invite,
+  mutationHeaders,
+} from "./support/party";
 
 const unlockAt = new Date(
   Date.UTC(new Date().getUTCFullYear() + 1, 10, 23, 17),
@@ -206,7 +212,14 @@ for (const language of languages) {
       await page.goto("/invitation#token=invalid");
       const invalid = await invalidResponse;
       expect(invalid.status()).toBe(401);
-      expect((await invalid.json()).code).toBe("invalid_invitation");
+      // The dev server may reload a freshly compiled page, which discards the
+      // browser's copy of the body: ask the API for the code directly.
+      const direct = await page.request.post("/api/invitations/preview", {
+        headers: mutationHeaders,
+        data: { token: "invalid" },
+      });
+      expect(direct.status()).toBe(401);
+      expect((await direct.json()).code).toBe("invalid_invitation");
       await expect(
         page.getByRole("alert").filter({ hasText: language.invalidInvitation }),
       ).toHaveText(language.invalidInvitation);

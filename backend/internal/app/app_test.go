@@ -30,7 +30,7 @@ import (
 
 func testApp(t *testing.T) *App {
 	t.Helper()
-	a, err := Open(Config{PublicURL: "http://localhost:3000", DataDir: t.TempDir(), DatabaseURL: testDatabaseURL(t)})
+	a, err := Open(Config{PublicURL: "http://localhost:3000", DataDir: t.TempDir(), DatabaseURL: testDatabaseURL(t), databaseConnections: testDatabaseConnections})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,6 +119,7 @@ func guest(t *testing.T, a *App, host *http.Cookie, name string) (*http.Cookie, 
 }
 
 func TestInvitationLifecycle(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	link, err := a.InviteAdmin(context.Background(), "Camille")
 	if err != nil {
@@ -149,6 +150,7 @@ func TestInvitationLifecycle(t *testing.T) {
 }
 
 func TestInvitationExpiresAndSessionExpires(t *testing.T) {
+	t.Parallel()
 	t.Run("invitation", func(t *testing.T) {
 		a := testApp(t)
 		link, err := a.InviteAdmin(context.Background(), "Camille")
@@ -169,6 +171,7 @@ func TestInvitationExpiresAndSessionExpires(t *testing.T) {
 }
 
 func TestConcurrentInvitationOnlyAcceptedOnce(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	link, err := a.InviteAdmin(context.Background(), "Camille")
 	if err != nil {
@@ -196,6 +199,7 @@ func TestConcurrentInvitationOnlyAcceptedOnce(t *testing.T) {
 }
 
 func TestCSRFAndAuthorization(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Léa")
@@ -220,6 +224,7 @@ func TestCSRFAndAuthorization(t *testing.T) {
 }
 
 func TestRenewAndRevokePreserveIdentity(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, hostGuest := admin(t, a)
 	visitor, identity, _ := guest(t, a, host, "Léa")
@@ -269,6 +274,7 @@ func TestRenewAndRevokePreserveIdentity(t *testing.T) {
 }
 
 func TestUnlockBoundaryAndPrivateContent(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Léa")
@@ -315,6 +321,7 @@ func TestUnlockBoundaryAndPrivateContent(t *testing.T) {
 func ptr(value string) *string { return &value }
 
 func TestGuestbookPaginationOwnershipAndValidation(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	one, _, _ := guest(t, a, host, "Léa")
@@ -388,6 +395,7 @@ func pngBytes(t *testing.T) []byte {
 }
 
 func TestPhotoProtectionValidationOwnershipAndPersistence(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	one, _, _ := guest(t, a, host, "Léa")
@@ -443,6 +451,7 @@ func TestPhotoProtectionValidationOwnershipAndPersistence(t *testing.T) {
 }
 
 func TestPartyTimezoneAndUTC(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	for _, zone := range []string{"Local", "", "Europe/Unknown"} {
@@ -456,7 +465,13 @@ func TestPartyTimezoneAndUTC(t *testing.T) {
 }
 
 func TestInvitationRateLimit(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
+	host, _ := admin(t, a)
+	// Guests opening valid links at the same moment never spend the budget.
+	for index := range 130 {
+		guest(t, a, host, "Arrival "+strconv.Itoa(index))
+	}
 	for range 120 {
 		status(t, request(t, a, "POST", "/api/invitations/preview", map[string]string{"token": "invalid"}, nil), 401)
 	}
@@ -467,6 +482,7 @@ func TestInvitationRateLimit(t *testing.T) {
 }
 
 func TestJPEGPhoneOrientation(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	var encoded bytes.Buffer
@@ -497,6 +513,7 @@ func TestJPEGPhoneOrientation(t *testing.T) {
 }
 
 func TestRenewalInvalidatesPendingLinkAndSessionsAreBounded(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, hostGuest := admin(t, a)
 	path := "/api/admin/guests/" + strconv.FormatInt(hostGuest.ID, 10) + "/invitation"

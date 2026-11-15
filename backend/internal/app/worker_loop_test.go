@@ -9,6 +9,7 @@ import (
 )
 
 func TestWorkerRetriesFailedStepsInsteadOfStopping(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	results := []error{errors.New("database unavailable"), errors.New("database unavailable"), nil, nil}
@@ -43,6 +44,7 @@ func TestWorkerRetriesFailedStepsInsteadOfStopping(t *testing.T) {
 }
 
 func TestIdleWorkerSleepsUntilWokenOrPolled(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name string
 		poll time.Duration
@@ -90,6 +92,7 @@ func TestIdleWorkerSleepsUntilWokenOrPolled(t *testing.T) {
 }
 
 func TestRetryDelayIsJitteredAndBounded(t *testing.T) {
+	t.Parallel()
 	longest := map[time.Duration]bool{}
 	for failures := 1; failures <= 60; failures++ {
 		delay := retryDelay(failures)

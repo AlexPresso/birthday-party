@@ -58,6 +58,7 @@ func setWelcomeRequired(t *testing.T, a *App, host *http.Cookie, state welcomeSt
 }
 
 func TestGuestWelcomeProgressRemainsIndependentOfHostUnlocks(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, firstIdentity, _ := guest(t, a, host, "First participant")
@@ -122,6 +123,7 @@ func TestGuestWelcomeProgressRemainsIndependentOfHostUnlocks(t *testing.T) {
 }
 
 func TestRequiredWelcomeAppliesToLateGuestsAndPersistsCompletion(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	photo := finishCategoryUpload(t, a, performMediaUpload(a, mediaUploadRequest(t, host, nil, nil, "")))
@@ -180,6 +182,7 @@ func TestRequiredWelcomeAppliesToLateGuestsAndPersistsCompletion(t *testing.T) {
 }
 
 func TestOptionalWelcomeLateArrivalAndRequiredToggle(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	steps := []welcomeStep{testWelcomeStep("One", ""), testWelcomeStep("Two", "")}
@@ -208,6 +211,7 @@ func TestOptionalWelcomeLateArrivalAndRequiredToggle(t *testing.T) {
 }
 
 func TestConcurrentGuestWelcomeNavigationAcceptsOneCommand(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Concurrent participant")

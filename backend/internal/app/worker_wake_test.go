@@ -15,6 +15,7 @@ import (
 const wakeDeadline = workerFallbackPoll / 2
 
 func TestCommittedWorkWakesIdleWorkers(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _, state, _ := queuedTestNotification(t, a)
 	delivered := make(chan struct{}, 4)

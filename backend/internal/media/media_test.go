@@ -254,19 +254,55 @@ func TestWelcomeUploadRequiresStableSelectedWidgetAndDestination(t *testing.T) {
 }
 
 func TestQueueAndAlbumCapacityBoundaries(t *testing.T) {
-	if err := ValidateQueueCapacity(MaxQueuedUploads-1, MaxGuestUploads-1, MaxQueuedBytes-1, 1); err != nil {
+	if err := ValidateQueueCapacity(MaxQueuedUploads-1, MaxGuestUploads-1); err != nil {
 		t.Fatal(err)
 	}
-	for _, err := range []error{ValidateQueueCapacity(MaxQueuedUploads, 0, 0, 1), ValidateQueueCapacity(0, MaxGuestUploads, 0, 1), ValidateQueueCapacity(0, 0, MaxQueuedBytes, 1)} {
+	for _, err := range []error{ValidateQueueCapacity(MaxQueuedUploads, 0), ValidateQueueCapacity(0, MaxGuestUploads)} {
 		if err == nil {
 			t.Fatal("queue overflow accepted")
 		}
 	}
-	if err := ValidateAlbumCapacity(4999, MaxStoredBytes-1, 1); err != nil {
+	if err := ValidateAlbumCapacity(MaxGalleryFiles - 1); err != nil {
 		t.Fatal(err)
 	}
-	if ValidateAlbumCapacity(5000, 0, 1) == nil || ValidateAlbumCapacity(1, MaxStoredBytes, 1) == nil {
+	if ValidateAlbumCapacity(MaxGalleryFiles) == nil {
 		t.Fatal("album overflow accepted")
+	}
+}
+
+func TestStorageKeepsRoomForPublishing(t *testing.T) {
+	const mib = 1 << 20
+	disk := Storage{TotalBytes: 20 << 30}
+	keep := disk.KeepFree(15*mib, 100*mib)
+	if keep != 712*mib+1024*mib {
+		t.Fatalf("keep free on 20 GiB=%d MiB", keep/mib)
+	}
+	if large := (Storage{TotalBytes: 1 << 40}).KeepFree(15*mib, 100*mib); large != 712*mib+10<<30 {
+		t.Fatalf("keep free on 1 TiB=%d MiB", large/mib)
+	}
+	disk.AvailableBytes = keep + 10*mib
+	if err := CheckStorage(disk, keep, 10*mib); err != nil {
+		t.Fatalf("a fitting file was refused: %v", err)
+	}
+	if err := CheckStorage(disk, keep, 10*mib+1); err == nil || err.(*Error).Code != "storage_full" {
+		t.Fatalf("a file eating into the reserve error=%v", err)
+	}
+}
+
+func TestStorageWarningHasHysteresis(t *testing.T) {
+	for _, test := range []struct {
+		usedPercent      int64
+		warning, cleared bool
+	}{
+		{0, false, true}, {74, false, true}, {75, false, false}, {79, false, false}, {80, true, false}, {100, true, false},
+	} {
+		disk := Storage{TotalBytes: 100 << 20, AvailableBytes: (100 - test.usedPercent) << 20}
+		if disk.Warning() != test.warning || disk.WarningCleared() != test.cleared {
+			t.Errorf("%d%% used: warning=%v cleared=%v", test.usedPercent, disk.Warning(), disk.WarningCleared())
+		}
+	}
+	if (Storage{}).Warning() {
+		t.Fatal("an unknown disk size warned")
 	}
 }
 

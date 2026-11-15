@@ -65,6 +65,7 @@ func TestUploadLimitsFromEnvironment(t *testing.T) {
 }
 
 func TestOpenValidatesUploadLimitsAndGalleryExposesThem(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		name                   string
 		imageBytes, videoBytes int64
@@ -140,6 +141,7 @@ func uploadStream(t *testing.T, a *App, cookie *http.Cookie, data io.Reader) *ht
 }
 
 func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	setTestUploadLimits(t, a, 16, 1)
 	host, _ := admin(t, a)
@@ -161,6 +163,7 @@ func TestConfiguredImageLimitCanExceedVideoLimitAndOldDefault(t *testing.T) {
 }
 
 func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
+	t.Parallel()
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	setTestUploadLimits(t, a, 1, 101)
@@ -185,6 +188,7 @@ func TestConfiguredVideoLimitCanExceedOldDefault(t *testing.T) {
 }
 
 func TestConfiguredVideoLimitPreservesInputWithoutTranscoding(t *testing.T) {
+	t.Parallel()
 	data := videoFixtureDuration(t, "mp4", "90")
 	if len(data) >= 1<<20 {
 		t.Fatalf("input fixture must fit the configured 1 MiB limit: %d bytes", len(data))

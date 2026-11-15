@@ -14,6 +14,9 @@ import (
 const (
 	workerQueryTimeout = media.QueryTimeout
 	mediaWorkers       = 2
+	// decodeMemory bounds the full-size images decoded at once by the gallery
+	// workers and profile photos together; the Helm chart gives Go 2 GiB.
+	decodeMemory = 512 << 20
 	// The lock connection is checked often enough to stop a second owner early.
 	workerLeaseCheck    = 5 * time.Second
 	uploadHistoryPeriod = time.Minute
@@ -110,6 +113,8 @@ func (a *App) maintainWorkers(ctx context.Context) {
 			if err := a.media.CleanHistory(ctx); err != nil && ctx.Err() == nil {
 				log.Printf("clean upload history: %v", err)
 			}
+			// Anything on the disk may fill it, not only uploads.
+			a.watchStorage(ctx)
 			lastCleanup = time.Now()
 		}
 	}

@@ -17,6 +17,7 @@ import (
 )
 
 func TestEveryFeatureErrorHasOneAPIEntry(t *testing.T) {
+	t.Parallel()
 	rejections := []error{
 		access.ErrInvitation, access.ErrExpired, access.ErrAdmin, access.ErrWelcome,
 		welcome.ErrInvalidSteps, welcome.ErrInvalidAction, welcome.ErrConflict, welcome.ErrTransition, welcome.ErrCategoryNotFound,
@@ -46,6 +47,7 @@ func TestEveryFeatureErrorHasOneAPIEntry(t *testing.T) {
 }
 
 func TestErrorWriterKeepsStatusesAndHidesInternalCauses(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		err    error
 		status int

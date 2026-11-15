@@ -25,6 +25,7 @@ func createTestCategory(t *testing.T, a *App, host *http.Cookie, name string, pu
 }
 
 func TestMediaCategoryQueryRejectsMalformedDestinations(t *testing.T) {
+	t.Parallel()
 	for _, query := range []string{"categoryId=%zz", "categoryId=1;categoryId=2", "categoryId=", "categoryId=0", "categoryId=-1", "categoryId=1&categoryId=2"} {
 		t.Run(query, func(t *testing.T) {
 			r := httptest.NewRequest("GET", "/api/photos", nil)
@@ -79,6 +80,7 @@ func finishCategoryUpload(t *testing.T, a *App, response *httptest.ResponseRecor
 }
 
 func TestMediaCategoriesValidateAndEnforceHostPermissions(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Category guest")
@@ -140,6 +142,7 @@ func TestMediaCategoriesValidateAndEnforceHostPermissions(t *testing.T) {
 }
 
 func TestMediaCategoryFiltersAndPrivacyApplyToEveryResource(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Uploader")
@@ -209,6 +212,7 @@ func TestMediaCategoryFiltersAndPrivacyApplyToEveryResource(t *testing.T) {
 }
 
 func TestMediaCategoryCoversUsePublishedMediaAndCurrentVisibility(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Category viewer")
@@ -279,6 +283,7 @@ func TestMediaCategoryCoversUsePublishedMediaAndCurrentVisibility(t *testing.T) 
 }
 
 func TestMediaCategoryPrivacyAndSessionRecheckedAfterReception(t *testing.T) {
+	t.Parallel()
 	for _, ending := range []string{"private", "logout", "revoke"} {
 		t.Run(ending, func(t *testing.T) {
 			a := testApp(t)

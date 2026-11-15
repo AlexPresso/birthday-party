@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"time"
 
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
@@ -25,6 +26,9 @@ func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: n
 
 var _ media.Repository = (*Store)(nil)
 
+const photoPage = `SELECT p.id,p.category_id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END
+ FROM photos p JOIN guests g ON p.guest_id=g.id WHERE `
+
 func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *int64, before int64, limit int) ([]media.Photo, error) {
 	if categoryID != nil {
 		var id int64
@@ -36,10 +40,19 @@ func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *in
 			return nil, err
 		}
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT p.id,p.category_id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END FROM photos p JOIN guests g ON p.guest_id=g.id
- LEFT JOIN media_categories c ON c.id=p.category_id
- WHERE ($1::bigint=0 OR p.id<$1) AND p.category_id IS NOT DISTINCT FROM $3::bigint
- AND (p.category_id IS NULL OR c.is_public OR $4) ORDER BY p.id DESC LIMIT $2`, before, limit+1, categoryID, guest.IsAdmin())
+	if before == 0 {
+		before = math.MaxInt64
+	}
+	// Each filter is a plain equality on category_id so PostgreSQL walks the
+	// photos_category_page index backwards instead of sorting the whole gallery.
+	query := photoPage + "p.category_id IS NULL AND p.id<$1 ORDER BY p.id DESC LIMIT $2"
+	args := []any{before, limit + 1}
+	if categoryID != nil {
+		query = photoPage + `p.category_id=$3 AND p.id<$1
+ AND EXISTS (SELECT 1 FROM media_categories c WHERE c.id=$3 AND (c.is_public OR $4)) ORDER BY p.id DESC LIMIT $2`
+		args = append(args, *categoryID, guest.IsAdmin())
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -32,11 +32,10 @@ func (s *Store) Publish(ctx context.Context, job media.Pending, output media.Out
 		return false, &media.Error{Code: "access_revoked"}
 	}
 	var count int
-	var stored int64
-	if err = tx.QueryRowContext(ctx, "SELECT COUNT(*),COALESCE(SUM(byte_size),0) FROM photos").Scan(&count, &stored); err != nil {
+	if err = tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM photos").Scan(&count); err != nil {
 		return false, err
 	}
-	if err := media.ValidateAlbumCapacity(count, stored, output.Bytes); err != nil {
+	if err := media.ValidateAlbumCapacity(count); err != nil {
 		return false, err
 	}
 	now := s.now()

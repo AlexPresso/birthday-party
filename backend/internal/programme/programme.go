@@ -119,7 +119,11 @@ func (event Event) View(now time.Time, private bool) Event {
 // Repository returns audience views from one snapshot and owns complete writes,
 // including current authorization and persistence of each event's vote settings.
 type Repository interface {
-	List(context.Context, int, int64, bool, time.Time) ([]Event, error)
+	// List reads the programme. A positive preview keeps only that many
+	// leading options per vote, without the viewer's choice.
+	List(ctx context.Context, limit int, guestID int64, admin bool, now time.Time, preview int) ([]Event, error)
+	// Event reads one event as List would show it, with every vote option.
+	Event(ctx context.Context, id, guestID int64, admin bool, now time.Time) (Event, error)
 	// NextMoment returns the earliest start or unlock after the given instant,
 	// or the zero time when nothing later is scheduled.
 	NextMoment(ctx context.Context, after time.Time) (time.Time, error)
@@ -142,6 +146,11 @@ type Repository interface {
 // eventLimit bounds the programme; creation enforces it transactionally.
 const eventLimit = 200
 
+// previewOptions is how many leading options a vote shows in a guest's
+// programme list, which every open screen refetches after any change. The
+// vote's own page reads the whole vote through Event.
+const previewOptions = 3
+
 // Service validates event changes and controls when authored content becomes visible.
 type Service struct{ repository Repository }
 
@@ -149,13 +158,25 @@ type Service struct{ repository Repository }
 func New(repository Repository) *Service { return &Service{repository: repository} }
 
 // List orders the bounded programme by start time and applies reveal rules.
+// List returns the programme. The host's list is complete; a guest's carries
+// only the leading options of each vote.
 func (s *Service) List(ctx context.Context, clock func() time.Time, guestID int64, private bool) ([]Event, error) {
 	now := clock()
-	items, err := s.repository.List(ctx, eventLimit, guestID, private, now)
+	preview := previewOptions
+	if private {
+		preview = 0
+	}
+	items, err := s.repository.List(ctx, eventLimit, guestID, private, now, preview)
 	if err != nil {
 		return nil, err
 	}
 	return sortByStart(items), nil
+}
+
+// Event returns one event with every vote option, as the viewer may read it:
+// an administrator sees drafts and locked details, a guest does not.
+func (s *Service) Event(ctx context.Context, clock func() time.Time, guestID, id int64, admin bool) (Event, error) {
+	return s.repository.Event(ctx, id, guestID, admin, clock())
 }
 
 // sortByStart orders events by start time and then ID. Unscheduled events

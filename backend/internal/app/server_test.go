@@ -36,6 +36,7 @@ func (b *slowBody) Read(p []byte) (int, error) {
 }
 
 func TestMediaRoutesOutliveOrdinaryRequestDeadlines(t *testing.T) {
+	t.Parallel()
 	const ordinary, pause = 500 * time.Millisecond, 1500 * time.Millisecond
 	a := testApp(t)
 	setTestUploadLimits(t, a, 64, 64)

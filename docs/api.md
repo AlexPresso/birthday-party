@@ -27,6 +27,9 @@ so link previews cannot consume it. Raw tokens are returned only at issuance,
 stored hashed, single use, and expire. New invitations preserve guest identity.
 Invitation lifetime is 7 days; session lifetime is 90 days. The HttpOnly cookie
 uses path `/` so both Next.js server rendering and API requests receive it.
+After 120 failed previews or acceptances in a minute, across all clients, both
+routes return 429 `too_many_attempts` with `Retry-After` until the minute ends.
+Successful ones never count, so guests opening their links together are not held.
 
 ## Realtime updates
 
@@ -49,7 +52,9 @@ names or authored content. The browser fetches current data from the existing
 authorized HTTP endpoints. Welcome changes notify connected participants;
 individual progress and upload changes target the affected guest. Programme
 changes and scheduled unlocks notify viewers with full access. Signals are
-coalesced and emitted after successful commits. They are not a replayable event log.
+coalesced and emitted after successful commits; a socket receives at most one
+invalidation per second, carrying every topic changed meanwhile. They are not a
+replayable event log.
 
 Each browser tab shares one connection across mounted consumers. `ready`
 resynchronizes active views, including changes missed while disconnected.
@@ -124,9 +129,11 @@ Configuration responses use `no-store`. The frontend proxy permits 1024 MiB plus
 Images accept JPEG, PNG and WebP, with the same saved image size limit and
 40-megapixel input limits as the gallery. Go inspects the file, applies EXIF
 orientation, crops the center to a 256×256 square and encodes a JPEG without
-original metadata. Originals are discarded. The upload is received first; only
-decoding is exclusive. One profile image is decoded at a time; a busy decoder
-returns 429 with `Retry-After` and the client retains the selection for retry.
+original metadata. Originals are discarded. The upload is received first, then
+waits for decode memory shared with gallery processing: ordinary phone photos
+decode side by side, very large ones take turns. After 20 seconds of waiting it
+returns 429 `profile_photo_busy` with `Retry-After`, and the client retains
+the selection for retry.
 
 The normalized JPEG is at most 128 KiB and stored in PostgreSQL alongside the
 profile. This small bound allows atomic replacement/removal without coordinating
@@ -388,9 +395,34 @@ push payload may carry: descriptions, venues, names, media and tokens never
 travel. The service worker shows the name with a short translated line, and a
 click opens same-origin `/programme`.
 
+### Storage alerts
+
+Administrators' subscribed devices are told when the media disk becomes more
+than 80% full, once per crossing: the alert comes again only after usage has
+dropped below 75%. They are also told when files are refused for lack of room,
+at most once an hour. The worker checks the disk after each accepted upload and
+every minute, since anything on the disk may fill it. The payload is
+`{ type: "storage_warning" | "storage_full", locale }`, without content; it
+stays deliverable for 12 hours, and a click opens `/parametres?section=storage`.
+
 Push delivery validates HTTPS endpoints, resolves and pins public destination
 addresses, and disables redirects and proxy forwarding. Endpoints and subscription
 keys are private and must not appear in logs or error responses.
+
+## Storage
+
+The disk holding `DATA_DIR` bounds the gallery, not a fixed quota. Before reading
+an upload's body, Go compares the space left on that disk with what the upload
+and every reception in progress may still write (their announced size, or the
+size limit). The upload must leave twice the largest configured photo or video
+size plus 512 MiB free, so both workers can copy an original into the gallery
+while publishing it, and 5% of the disk, up to 10 GiB, for whatever else lives
+on it: with Docker Compose, PostgreSQL shares that disk and must not be starved
+by uploads. Otherwise it returns 409 `storage_full` before the file is sent. Profile photos are never stored on disk and are not refused this way.
+
+- `GET /api/admin/storage` -> `{ totalBytes, availableBytes, warning }`,
+  administrators only. `warning` is true from 80% used. Settings show it as a
+  bar under Photos and videos.
 
 ## Party
 
@@ -496,8 +528,8 @@ stay authenticated, survive restart recovery and are removed together.
 The UI uploads a bounded queue with one combined progress bar, a sent/total file
 counter and per-file status and retry. Server acceptance counts as sent;
 preparation can continue afterward. Thumbnails
-are at most 720 pixels per side. The gallery is capped at 5000 files and
-10 GiB; new upload accounting includes the image/video original and thumbnail.
+are at most 720 pixels per side. The gallery is capped at 5000 files. Its size
+is bounded by the disk itself; see [storage](#storage).
 `UploadJob = { id, clientUploadId, categoryId: number | null, welcomeRevision: number | null, welcomeWidgetIndex: number | null, status: "queued" | "processing" | "ready" | "failed", filename, kind: "image" | "video", createdAt, errorCode: string | null, photo: Photo | null }`
 
 202 confirms the raw input and queue record have been saved. Preparation continues
@@ -514,11 +546,15 @@ for a video or `photo_upload_failed` for an image, and its input is discarded.
 Reusing an existing upload ID returns the same job instead of adding another file,
 after validating its original destination, revision, widget index and current permissions.
 
-Two background workers prepare queued files; up to four request bodies are read
-at a time independently. An accepted upload wakes the workers at once; they also
-check the queue every five seconds. The durable queue allows 100 active jobs per guest,
-1000 globally and 10 GiB of pending input. Capacity failures return 409
-`upload_queue_full`; two busy processors alone do not reject an upload.
+Two background workers prepare queued files. Request bodies are read two at a
+time per guest and 24 at a time overall; further uploads wait for a place, so
+a slow connection only delays its own guest. An accepted upload wakes the
+workers at once; they also check the queue every five seconds. The durable
+queue allows 100 active jobs per guest and 1000 globally. Capacity failures
+return 409 `upload_queue_full`; two busy processors alone do not reject an
+upload. Queued and processing files count toward the gallery limit, so a full
+gallery returns 409 `album_full` before the file is sent rather than after its
+preparation.
 Terminal job history expires after 24 hours, while ready media remains in the gallery.
 FFmpeg runs with limited threads, protocols, formats and processing time.
 Interrupted jobs resume on server startup; failed inputs and temporary outputs
@@ -531,8 +567,15 @@ settings for that type; there is no nested activity collection.
 
 `Event = { id, type: "event" | "vote" | "questions" | "werewolf", revision, title, description, teaser, startsAt: string | null, unlockAt: string | null, locked: boolean, vote: Vote | null, questions: QuestionSummary | null, werewolf: WerewolfSummary | null }`
 
-- `GET /api/programme` -> `{ items: Event[] }`.
-- `GET /api/admin/programme` -> `{ items: Event[] }`, including drafts and locked content.
+- `GET /api/programme` -> `{ items: Event[] }`, gzip-compressed when the client accepts it.
+  Every open screen refetches it after any change, so each vote carries only
+  its three leading options there, with `myOptionId: null`; `canVote` still
+  tells whether the guest can vote.
+- `GET /api/programme/{id}` -> `Event` with the whole vote: every option, the
+  viewer's choice and `canVote`. Administrators get the host's view, drafts
+  and locked details included; for a guest a draft is 404 and a locked event
+  has no activity details.
+- `GET /api/admin/programme` -> `{ items: Event[] }`, including drafts and locked content and whole votes.
 - `POST /api/admin/programme { type, title, description, teaser, startsAt, unlockAt, vote?, werewolf? }` -> `Event` (201).
 - `PUT /api/admin/programme/{id}` accepts the same body plus `revision` for vote and question events -> `Event`.
 - `DELETE /api/admin/programme/{id}` -> 204, including its votes, questions, upvotes and werewolf game.

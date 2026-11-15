@@ -15,6 +15,7 @@ import (
 )
 
 func TestMissingProcessingStorageKeepsUploadForRetry(t *testing.T) {
+	t.Parallel()
 	for _, directory := range []string{"tmp", "photos"} {
 		t.Run(directory, func(t *testing.T) {
 			a := testApp(t)
@@ -58,6 +59,7 @@ func TestMissingProcessingStorageKeepsUploadForRetry(t *testing.T) {
 }
 
 func TestMissingOriginalFailsUpload(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	response := queuedUpload(t, a, host, "", pngBytes(t))
@@ -112,6 +114,7 @@ func TestRetryableUploadDoesNotStarveLaterJobs(t *testing.T) {
 }
 
 func TestWorkerQueriesHaveDeadlines(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -141,6 +144,7 @@ func TestWorkerQueriesHaveDeadlines(t *testing.T) {
 }
 
 func TestFailedWorkerStartupReleasesOwnership(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	tx, err := a.db.BeginTx(t.Context(), nil)
 	if err != nil {
@@ -169,6 +173,7 @@ func TestFailedWorkerStartupReleasesOwnership(t *testing.T) {
 }
 
 func TestFailedWorkerUnlockDiscardsConnection(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	conn, err := a.db.Conn(t.Context())
 	if err != nil {
@@ -209,6 +214,7 @@ func TestFailedWorkerUnlockDiscardsConnection(t *testing.T) {
 }
 
 func TestUploadThatKeepsFailingStopsAfterItsLastAttempt(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, identity := admin(t, a)
 	response := queuedUpload(t, a, host, "", pngBytes(t))

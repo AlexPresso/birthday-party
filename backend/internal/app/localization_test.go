@@ -12,6 +12,7 @@ import (
 )
 
 func TestErrorCodesRemainStableAcrossRequestLanguages(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Léa")
@@ -62,6 +63,7 @@ func TestErrorCodesRemainStableAcrossRequestLanguages(t *testing.T) {
 }
 
 func TestUnknownErrorCodeUsesSafeFallback(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	fail(w, "private diagnostic")
 	status(t, w, http.StatusInternalServerError)
@@ -78,6 +80,7 @@ func TestUnknownErrorCodeUsesSafeFallback(t *testing.T) {
 }
 
 func TestLockedEventWithoutTeaserHasNoLanguageSpecificTitle(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Léa")
@@ -110,6 +113,7 @@ func TestLockedEventWithoutTeaserHasNoLanguageSpecificTitle(t *testing.T) {
 }
 
 func TestPartyTitleCanUseLocalizedDefaultWithoutLosingDetails(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	readParty := func(application *App) Party {
@@ -164,6 +168,7 @@ func TestPartyTitleCanUseLocalizedDefaultWithoutLosingDetails(t *testing.T) {
 }
 
 func TestOptionalPartyTitleStillEnforcesCharacterLimits(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	input := Party{

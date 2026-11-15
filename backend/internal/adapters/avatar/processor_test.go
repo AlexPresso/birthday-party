@@ -9,7 +9,9 @@ import (
 	"image/jpeg"
 	"image/png"
 	"testing"
+	"time"
 
+	"birthday-party/backend/internal/adapters/preview"
 	"birthday-party/backend/internal/profile"
 )
 
@@ -51,7 +53,7 @@ func TestProfilePhotoNormalizesDimensionsOrientationAndMetadata(t *testing.T) {
 		{"WebP", webp, 256, 256},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			data, err := New().Prepare(t.Context(), bytes.NewReader(test.data))
+			data, err := processor().Prepare(t.Context(), bytes.NewReader(test.data))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -74,7 +76,7 @@ func TestProfilePhotoNormalizesDimensionsOrientationAndMetadata(t *testing.T) {
 	}
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := New().Prepare(cancelled, bytes.NewReader(large.Bytes())); err != context.Canceled {
+	if _, err := processor().Prepare(cancelled, bytes.NewReader(large.Bytes())); err != context.Canceled {
 		t.Fatalf("cancelled processing error=%v", err)
 	}
 }
@@ -85,7 +87,7 @@ func TestProfilePhotoExtremeAspectRatiosStayBounded(t *testing.T) {
 		if err := png.Encode(&input, image.NewRGBA(image.Rect(0, 0, dimensions.X, dimensions.Y))); err != nil {
 			t.Fatal(err)
 		}
-		data, err := New().Prepare(t.Context(), bytes.NewReader(input.Bytes()))
+		data, err := processor().Prepare(t.Context(), bytes.NewReader(input.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,5 +95,50 @@ func TestProfilePhotoExtremeAspectRatiosStayBounded(t *testing.T) {
 		if err != nil || config.Width != 256 || config.Height != 256 || len(data) > profile.MaxAvatarBytes {
 			t.Fatalf("unexpected normalization for %v: config=%+v size=%d error=%v", dimensions, config, len(data), err)
 		}
+	}
+}
+
+func processor() *Processor { return New(preview.NewDecodeBudget(256 << 20)) }
+
+func TestProfilePhotosWaitForDecodeMemory(t *testing.T) {
+	var input bytes.Buffer
+	if err := png.Encode(&input, image.NewRGBA(image.Rect(0, 0, 64, 48))); err != nil {
+		t.Fatal(err)
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(input.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A one-byte budget admits a single decode at a time.
+	budget := preview.NewDecodeBudget(1)
+	_, release, err := budget.Decode(t.Context(), bytes.NewReader(input.Bytes()), config, "png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting := New(budget)
+	done := make(chan error, 1)
+	go func() {
+		_, err := waiting.Prepare(t.Context(), bytes.NewReader(input.Bytes()))
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("photo was not held while memory was in use: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	release()
+	if err := <-done; err != nil {
+		t.Fatalf("waiting photo failed once memory was free: %v", err)
+	}
+
+	_, release, err = budget.Decode(t.Context(), bytes.NewReader(input.Bytes()), config, "png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	impatient := New(budget)
+	impatient.wait = time.Millisecond
+	if _, err := impatient.Prepare(t.Context(), bytes.NewReader(input.Bytes())); err != profile.Error("profile_photo_busy") {
+		t.Fatalf("long wait error=%v", err)
 	}
 }

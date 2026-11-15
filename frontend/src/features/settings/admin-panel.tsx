@@ -10,6 +10,7 @@ import {
   Info,
   Upload,
   Palette,
+  HardDrive,
   ChevronRight,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
@@ -29,7 +30,8 @@ import { AppearanceEditor } from "../party/appearance-editor";
 import { WelcomeAdmin } from "../welcome/welcome-admin";
 import { MediaCategoriesAdmin } from "../media/media-categories-admin";
 import type { AdminWelcome } from "../welcome/contracts";
-import type { MediaCategory } from "../media/contracts";
+import type { MediaCategory, Storage } from "../media/contracts";
+import { StorageUsage, formatStorage } from "../media/storage-usage";
 import { InformationEditor } from "../information/information-editor";
 import type { AdminInformation } from "../information/contracts";
 import {
@@ -106,6 +108,12 @@ const groups = [
         description: "settings.uploadsDescription",
         Icon: Upload,
       },
+      {
+        section: "storage",
+        title: "settings.storage",
+        description: "settings.storageDescription",
+        Icon: HardDrive,
+      },
     ],
   },
 ] as const;
@@ -120,6 +128,7 @@ export function AdminPanel({
   welcome,
   information,
   categories: initialCategories,
+  storage,
 }: {
   guest: Guest;
   party: Party;
@@ -130,6 +139,7 @@ export function AdminPanel({
   welcome: AdminWelcome;
   information: AdminInformation;
   categories: MediaCategory[];
+  storage: Storage;
 }) {
   const { t, locale } = useI18n();
   const [party, setParty] = useState(initialParty);
@@ -188,6 +198,10 @@ export function AdminPanel({
           .join(" / ");
       case "information":
         return t(informationEnabled ? "information.on" : "information.off");
+      case "storage":
+        return t("storage.available", {
+          available: formatStorage(storage.availableBytes, locale),
+        });
       default:
         return null;
     }
@@ -256,6 +270,8 @@ export function AdminPanel({
             onSaved={({ enabled }) => setInformationEnabled(enabled)}
           />
         );
+      case "storage":
+        return <StorageUsage storage={storage} />;
       case "categories":
         return (
           <MediaCategoriesAdmin

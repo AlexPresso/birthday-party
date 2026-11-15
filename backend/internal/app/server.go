@@ -39,32 +39,33 @@ func transferAllowance(size int64) time.Duration {
 	return transferGrace + time.Duration(size/minTransferRate)*time.Second
 }
 
-// acquireReceiver waits for one of the bounded request-body slots. Nothing is
-// read or written while waiting, so the server's short deadlines are lifted
-// until boundReception sets the ones for the transfer. It reports false when
-// the client gave up first; otherwise the caller must call release.
-func (a *App) acquireReceiver(w http.ResponseWriter, r *http.Request) (release func(), ok bool) {
+// acquireReceiver waits for one of the guest's bounded request-body slots and
+// reserves disk room for a body of at most limit bytes. Nothing is read or
+// written while waiting, so the server's short deadlines are lifted until
+// boundReception sets the ones for the transfer. It reports false when the
+// client gave up first; otherwise the caller must call release.
+func (a *App) acquireReceiver(w http.ResponseWriter, r *http.Request, guestID, limit int64) (release func(), ok bool) {
 	connection := http.NewResponseController(w)
 	// Deadline support is absent on test recorders; a real connection that
 	// rejects a deadline is already closed and fails at the next read or write.
 	_ = connection.SetReadDeadline(time.Time{})
 	_ = connection.SetWriteDeadline(time.Time{})
-	select {
-	case a.receivers <- struct{}{}:
-		return func() { <-a.receivers }, true
-	case <-r.Context().Done():
-		return nil, false
+	return a.receivers.acquire(r.Context(), guestID, receptionSize(r, limit))
+}
+
+// receptionSize is the announced body size, or limit when the client sends
+// none or announces more than will be read.
+func receptionSize(r *http.Request, limit int64) int64 {
+	if r.ContentLength >= 0 && r.ContentLength < limit {
+		return r.ContentLength
 	}
+	return limit
 }
 
 // boundReception caps the request body at limit bytes and gives the connection
 // the time needed to deliver them, plus the time to answer afterwards.
 func boundReception(w http.ResponseWriter, r *http.Request, limit int64) {
-	expected := limit
-	if r.ContentLength >= 0 && r.ContentLength < limit {
-		expected = r.ContentLength
-	}
-	received := time.Now().Add(transferAllowance(expected))
+	received := time.Now().Add(transferAllowance(receptionSize(r, limit)))
 	connection := http.NewResponseController(w)
 	_ = connection.SetReadDeadline(received)
 	_ = connection.SetWriteDeadline(received.Add(responseWriteTimeout))

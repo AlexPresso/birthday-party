@@ -39,6 +39,18 @@ const (
 	KindWelcomeOpen     Kind = "welcome_open"
 	KindProgrammeStart  Kind = "programme_start"
 	KindProgrammeUnlock Kind = "programme_unlock"
+	// Storage kinds reach administrators only and carry no content.
+	KindStorageWarning Kind = "storage_warning"
+	KindStorageFull    Kind = "storage_full"
+)
+
+const (
+	// StorageAlertLifetime keeps a storage alert worth delivering to a host
+	// whose phone stays offline for a while.
+	StorageAlertLifetime = 12 * time.Hour
+	// storageFullRepeat spaces the alerts for refused files: one per episode,
+	// not one per refused file.
+	storageFullRepeat = time.Hour
 )
 
 type BrowserKeys struct {
@@ -93,6 +105,8 @@ type Pending struct {
 	ProgrammeOutboxID int64
 	EventID           int64
 	Title             string
+	// StorageOutboxID identifies a queued storage alert.
+	StorageOutboxID int64
 }
 
 type Delivery uint8
@@ -118,6 +132,12 @@ type Repository interface {
 	Save(context.Context, identity.Guest, string, Subscription) error
 	Next(context.Context, time.Time) (Pending, bool, error)
 	Complete(context.Context, Pending, Completion) error
+	// SetStorageWarning records whether the disk is in its warning range and
+	// queues KindStorageWarning for administrators when that starts. It
+	// reports whether it queued anything.
+	SetStorageWarning(ctx context.Context, warning bool, now time.Time) (bool, error)
+	// StorageFull queues KindStorageFull unless one was queued after since.
+	StorageFull(ctx context.Context, now, since time.Time) (bool, error)
 }
 
 // Sender delivers a generic notification without exposing transport details.
@@ -169,6 +189,31 @@ func (s *Service) Save(ctx context.Context, guest identity.Guest, sessionHash st
 	return s.repository.Save(ctx, guest, sessionHash, input)
 }
 
+// lifetime is how long a notification of kind stays worth delivering.
+func lifetime(kind Kind) time.Duration {
+	if kind == KindStorageWarning || kind == KindStorageFull {
+		return StorageAlertLifetime
+	}
+	return Lifetime
+}
+
+// StorageLevel follows the disk's usage: warning when it is full enough to
+// tell the host, cleared once it dropped far enough to tell them again later.
+// It reports whether an alert was queued.
+func (s *Service) StorageLevel(ctx context.Context, warning, cleared bool) (bool, error) {
+	if !warning && !cleared {
+		return false, nil
+	}
+	return s.repository.SetStorageWarning(ctx, warning, s.now())
+}
+
+// StorageFull tells the host that files were refused for lack of room, at
+// most once per storageFullRepeat. It reports whether an alert was queued.
+func (s *Service) StorageFull(ctx context.Context) (bool, error) {
+	now := s.now()
+	return s.repository.StorageFull(ctx, now, now.Add(-storageFullRepeat))
+}
+
 // normalizeKeys accepts padded or unpadded URL-safe base64 and requires an
 // uncompressed P-256 point with a 16-byte authentication secret.
 func normalizeKeys(input BrowserKeys) (BrowserKeys, bool) {
@@ -203,7 +248,7 @@ func (s *Service) ProcessNext(ctx context.Context) (bool, error) {
 	result := DiscardDelivery
 	if now := s.now(); s.endpointAllowed(pending.Endpoint) && pending.ExpiresAt.After(now) {
 		send, cancelSend := context.WithTimeout(ctx, sendTimeout)
-		result = s.sender.Send(send, pending, min(Lifetime, pending.ExpiresAt.Sub(now)))
+		result = s.sender.Send(send, pending, min(lifetime(pending.Kind), pending.ExpiresAt.Sub(now)))
 		cancelSend()
 	}
 	if ctx.Err() != nil {

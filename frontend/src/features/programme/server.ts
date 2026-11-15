@@ -1,12 +1,19 @@
 import "server-only";
 import { cache } from "react";
+import { ApiError } from "@/lib/api";
 import { serverApi } from "@/lib/server-api";
-import { eventsSchema } from "./contracts";
+import { eventSchema } from "./contracts";
 
 /**
- * The programme as its viewer may read it: the host's list includes drafts,
- * a guest's leaves them out. An activity page and its metadata share one read.
+ * One event with its whole vote, as its viewer may read it: the host sees
+ * drafts, a guest does not and gets null. An activity page and its metadata
+ * share one read.
  */
-export const getProgramme = cache((asHost: boolean) =>
-  serverApi(asHost ? "/admin/programme" : "/programme", eventsSchema),
-);
+export const getEvent = cache(async (id: number) => {
+  try {
+    return await serverApi(`/programme/${id}`, eventSchema);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+});

@@ -27,6 +27,7 @@ const (
 	realtimeMaxConnections                             = 512
 	realtimeMaxSessionConnections                      = 8
 	realtimeHeartbeat                                  = 20 * time.Second
+	realtimeMinInterval                                = time.Second
 )
 
 type realtimeClient struct {
@@ -183,6 +184,8 @@ func (a *App) connectRealtime(w http.ResponseWriter, r *http.Request, viewer acc
 	defer expiry.Stop()
 	heartbeat := time.NewTicker(realtimeHeartbeat)
 	defer heartbeat.Stop()
+	var sent time.Time
+	var throttle <-chan time.Time
 	for {
 		select {
 		case <-ctx.Done():
@@ -207,28 +210,52 @@ func (a *App) connectRealtime(w http.ResponseWriter, r *http.Request, viewer acc
 				return
 			}
 		case <-client.wake:
-			topics := a.realtime.take(client)
-			_, programme, err := a.realtimeAccess(ctx, client)
-			if !closeRealtimeOnAuthError(connection, err) {
-				return
-			}
-			if !programme {
-				topics &^= realtimeProgramme
-			}
-			message := realtimeMessage{Type: "invalidate"}
-			for _, topic := range []struct {
-				flag realtimeTopics
-				name string
-			}{{realtimeWelcome, "welcome"}, {realtimeUploads, "uploads"}, {realtimeProgramme, "programme"}} {
-				if topics&topic.flag != 0 {
-					message.Topics = append(message.Topics, topic.name)
+			// Signals arriving within realtimeMinInterval of the last one wait
+			// and leave together, so a live vote does not make every open
+			// screen refetch after each ballot.
+			if wait := realtimeMinInterval - time.Since(sent); wait > 0 {
+				if throttle == nil {
+					throttle = time.After(wait)
 				}
+				continue
 			}
-			if len(message.Topics) > 0 && !writeRealtime(ctx, connection, message) {
+			if !a.sendInvalidations(ctx, connection, client) {
 				return
 			}
+			sent = time.Now()
+		case <-throttle:
+			throttle = nil
+			if !a.sendInvalidations(ctx, connection, client) {
+				return
+			}
+			sent = time.Now()
 		}
 	}
+}
+
+// sendInvalidations writes the client's pending topics that it may still read.
+func (a *App) sendInvalidations(ctx context.Context, connection *websocket.Conn, client *realtimeClient) bool {
+	topics := a.realtime.take(client)
+	if topics == 0 {
+		return true
+	}
+	_, programme, err := a.realtimeAccess(ctx, client)
+	if !closeRealtimeOnAuthError(connection, err) {
+		return false
+	}
+	if !programme {
+		topics &^= realtimeProgramme
+	}
+	message := realtimeMessage{Type: "invalidate"}
+	for _, topic := range []struct {
+		flag realtimeTopics
+		name string
+	}{{realtimeWelcome, "welcome"}, {realtimeUploads, "uploads"}, {realtimeProgramme, "programme"}} {
+		if topics&topic.flag != 0 {
+			message.Topics = append(message.Topics, topic.name)
+		}
+	}
+	return len(message.Topics) == 0 || writeRealtime(ctx, connection, message)
 }
 
 func closeRealtimeOnAuthError(connection *websocket.Conn, err error) bool {

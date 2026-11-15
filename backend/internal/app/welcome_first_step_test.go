@@ -11,6 +11,7 @@ import (
 )
 
 func TestWelcomeRestoresWaitingProgressAtFirstStepAfterMissedUnlocks(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Returning waiting guest")
@@ -46,6 +47,7 @@ func TestWelcomeRestoresWaitingProgressAtFirstStepAfterMissedUnlocks(t *testing.
 }
 
 func TestWelcomeOpeningFromWaitingAutomaticallySelectsFirstStep(t *testing.T) {
+	t.Parallel()
 	for _, required := range []bool{false, true} {
 		name := "optional"
 		if required {
@@ -71,6 +73,7 @@ func TestWelcomeOpeningFromWaitingAutomaticallySelectsFirstStep(t *testing.T) {
 }
 
 func TestWelcomeEmptySequenceWaitsUntilFirstStepIsAvailable(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Waiting for a new step")
@@ -94,6 +97,7 @@ func TestWelcomeEmptySequenceWaitsUntilFirstStepIsAvailable(t *testing.T) {
 }
 
 func TestConcurrentWelcomeRefreshSelectsFirstStepOnlyOnce(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Concurrent waiting guest")
@@ -127,6 +131,7 @@ func TestConcurrentWelcomeRefreshSelectsFirstStepOnlyOnce(t *testing.T) {
 }
 
 func TestWelcomeFirstStepRefreshConsumesOnlyItsUnlockNotification(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, visitor, state, _ := queuedTestNotification(t, a)
 	first := readGuestWelcome(t, a, visitor)

@@ -71,9 +71,17 @@ func programmeEvents(t *testing.T, a *App, cookie *http.Cookie, admin bool) []pr
 	return result.Items
 }
 
-// voteOf returns the vote of one event as the viewer's programme shows it.
+// voteOf returns the whole vote of one event: as a guest's vote page reads
+// it, or as the host's settings list shows it.
 func voteOf(t *testing.T, a *App, cookie *http.Cookie, admin bool, eventID int64) *programme.Vote {
 	t.Helper()
+	if !admin {
+		event := eventResponse(t, request(t, a, "GET", fmt.Sprintf("/api/programme/%d", eventID), nil, cookie))
+		if event.Vote == nil {
+			t.Fatalf("event %d shows no vote", eventID)
+		}
+		return event.Vote
+	}
 	for _, event := range programmeEvents(t, a, cookie, admin) {
 		if event.ID == eventID {
 			if event.Vote == nil {
@@ -153,6 +161,7 @@ func countRows(t *testing.T, a *App, query string, args ...any) int {
 }
 
 func TestGuestVotesShowLiveCountsAndKeepVotersPrivate(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, hostGuest := admin(t, a)
 	first, firstGuest, _ := guest(t, a, host, "First")
@@ -223,6 +232,7 @@ func TestGuestVotesShowLiveCountsAndKeepVotersPrivate(t *testing.T) {
 }
 
 func TestProgrammeVoteRejectsLockedWelcomeAndRevokedCandidates(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, h := admin(t, a)
 	visitor, g, _ := guest(t, a, host, "Voter")
@@ -264,6 +274,7 @@ func TestProgrammeVoteRejectsLockedWelcomeAndRevokedCandidates(t *testing.T) {
 }
 
 func TestProgrammeEventEditsPreserveVotesAndDeleteAtomically(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, h := admin(t, a)
 	visitor, g, _ := guest(t, a, host, "Voter")
@@ -311,6 +322,7 @@ func TestProgrammeEventEditsPreserveVotesAndDeleteAtomically(t *testing.T) {
 }
 
 func TestProgrammeVoteCreationRollsBackInvalidCandidatesAndSharesEventLimit(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, h := admin(t, a)
 	_, g, _ := guest(t, a, host, "Candidate")
@@ -336,6 +348,7 @@ func TestProgrammeVoteCreationRollsBackInvalidCandidatesAndSharesEventLimit(t *t
 }
 
 func TestVoteSettingsAreValidatedAndReplaceableWhileDraft(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, h := admin(t, a)
 	_, g, _ := guest(t, a, host, "Candidate")
@@ -401,6 +414,7 @@ func numberedLabels(count int) []string {
 }
 
 func TestCustomVoteOrdersOptionsByVotesThenLabelForEveryViewer(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First")
@@ -463,6 +477,7 @@ func TestCustomVoteOrdersOptionsByVotesThenLabelForEveryViewer(t *testing.T) {
 }
 
 func TestWriteInsFindOrCreateOptionsWhateverTheCase(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, firstGuest, _ := guest(t, a, host, "First")
@@ -518,6 +533,7 @@ func TestWriteInsFindOrCreateOptionsWhateverTheCase(t *testing.T) {
 }
 
 func TestHostRemovesWriteInsButKeepsOwnOptions(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First")
@@ -567,6 +583,7 @@ func TestHostRemovesWriteInsButKeepsOwnOptions(t *testing.T) {
 }
 
 func TestWriteInsStopAtTheOptionLimit(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	first, _, _ := guest(t, a, host, "First")
@@ -588,6 +605,7 @@ func TestWriteInsStopAtTheOptionLimit(t *testing.T) {
 }
 
 func TestConcurrentWriteInsOfOneLabelCreateOneOption(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	event := voteState(t, a, host, customVote(t, a, host, true), "open")
@@ -631,6 +649,7 @@ func TestConcurrentWriteInsOfOneLabelCreateOneOption(t *testing.T) {
 }
 
 func TestVoteChangesInvalidateTheProgrammeOnlyWhenCommitted(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	voter, _, _ := guest(t, a, host, "Live voter")
@@ -667,6 +686,7 @@ func TestVoteChangesInvalidateTheProgrammeOnlyWhenCommitted(t *testing.T) {
 }
 
 func TestProgrammeConcurrentVotesRemainUniqueAndCloseAtomically(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, h := admin(t, a)
 	first, g, _ := guest(t, a, host, "First")
@@ -710,6 +730,7 @@ func TestProgrammeConcurrentVotesRemainUniqueAndCloseAtomically(t *testing.T) {
 }
 
 func TestProgrammeVoteRechecksSessionAfterVoteLockWait(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	var clock atomic.Int64
 	clock.Store(a.now().Unix())
@@ -772,6 +793,7 @@ func TestProgrammeVoteRechecksSessionAfterVoteLockWait(t *testing.T) {
 
 // The second migration runs against rows written in the baseline's shape.
 func TestVoteOptionsMigrationConvertsCandidatesAndBallots(t *testing.T) {
+	t.Parallel()
 	databaseURL := testDatabaseURL(t)
 	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
@@ -857,4 +879,45 @@ INSERT INTO programme_ballots(activity_id,guest_id,candidate_id)
 	assertTally(t, votes[1].Vote, "Bo=1 Ada=0")
 	status(t, castVote(t, a, host, votes[0].ID, optionLabeled(t, votes[0].Vote, "Ada").ID), 200)
 	assertTally(t, voteOf(t, a, host, false, votes[0].ID), "Ada=2 Cy=2")
+}
+
+func TestGuestProgrammePreviewsVotesAndTheEventCarriesThemWhole(t *testing.T) {
+	t.Parallel()
+	a := testApp(t)
+	host, _ := admin(t, a)
+	visitor, _, _ := guest(t, a, host, "Voter")
+	event := voteState(t, a, host, customVote(t, a, host, false, "Apple", "Banana", "Cherry", "Damson", "Elder"), "open")
+	damson := optionLabeled(t, event.Vote, "Damson")
+	status(t, castVote(t, a, visitor, event.ID, damson.ID), 200)
+	path := fmt.Sprintf("/api/programme/%d", event.ID)
+
+	listed := programmeEvents(t, a, visitor, false)[0].Vote
+	labels := []string{}
+	for _, option := range listed.Options {
+		labels = append(labels, option.Label)
+	}
+	if strings.Join(labels, ",") != "Damson,Apple,Banana" || listed.MyOptionID != nil || !listed.CanVote {
+		t.Fatalf("guest list vote: options=%v mine=%v canVote=%v", labels, listed.MyOptionID, listed.CanVote)
+	}
+	if hosted := voteOf(t, a, host, true, event.ID); len(hosted.Options) != 5 {
+		t.Fatalf("the host's list kept %d options", len(hosted.Options))
+	}
+	whole := eventResponse(t, request(t, a, "GET", path, nil, visitor)).Vote
+	if len(whole.Options) != 5 || whole.MyOptionID == nil || *whole.MyOptionID != damson.ID || !whole.CanVote {
+		t.Fatalf("the vote page's event=%+v", whole)
+	}
+
+	// A draft does not exist for guests, and a locked event shows no vote.
+	draft := customVote(t, a, host, false, "Secret plan", "Other plan")
+	status(t, request(t, a, "GET", fmt.Sprintf("/api/programme/%d", draft.ID), nil, visitor), 404)
+	status(t, request(t, a, "GET", fmt.Sprintf("/api/programme/%d", draft.ID), nil, host), 200)
+	future := stamp(a.now().Add(time.Hour))
+	status(t, request(t, a, "PUT", "/api/admin"+strings.TrimPrefix(path, "/api"), programme.Input{Title: "Secret", UnlockAt: &future, Revision: event.Revision}, host), 200)
+	locked := request(t, a, "GET", path, nil, visitor)
+	status(t, locked, 200)
+	if body := locked.Body.String(); strings.Contains(body, "Damson") || !strings.Contains(body, `"vote":null`) || !strings.Contains(body, `"locked":true`) {
+		t.Fatalf("locked event leaked its vote: %s", body)
+	}
+	status(t, request(t, a, "GET", "/api/programme/999999", nil, visitor), 404)
+	status(t, request(t, a, "GET", path, nil, nil), 401)
 }

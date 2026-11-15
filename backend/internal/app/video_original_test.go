@@ -40,6 +40,7 @@ func assertMediaDownload(t *testing.T, a *App, cookie *http.Cookie, photo Photo,
 }
 
 func TestVideoOriginalDownloadRespectsCategoryWelcomeAndSessionAccess(t *testing.T) {
+	t.Parallel()
 	original := videoFixture(t, "webm")
 	a := testApp(t)
 	host, _ := admin(t, a)
@@ -89,6 +90,7 @@ func TestVideoOriginalDownloadRespectsCategoryWelcomeAndSessionAccess(t *testing
 }
 
 func TestVideoOriginalSurvivesRestartRecoveryAndIsDeletedWithThumbnail(t *testing.T) {
+	t.Parallel()
 	original := videoFixture(t, "mov")
 	a := testApp(t)
 	host, _ := admin(t, a)
@@ -125,28 +127,20 @@ func TestVideoOriginalSurvivesRestartRecoveryAndIsDeletedWithThumbnail(t *testin
 	status(t, request(t, reopened, "GET", photo.URL+"?download=1", nil, host), 404)
 }
 
-func TestVideoOriginalCountsTowardTheAlbumQuota(t *testing.T) {
+func TestVideoOriginalNeedsRoomOnTheDisk(t *testing.T) {
+	t.Parallel()
 	original := videoFixture(t, "mp4")
 	a := testApp(t)
 	host, _ := admin(t, a)
 	status(t, upload(t, a, host, original), 201)
-	var thumbnail string
-	if err := a.db.QueryRow("SELECT thumbnail FROM photos").Scan(&thumbnail); err != nil {
-		t.Fatal(err)
-	}
-	info, err := os.Stat(filepath.Join(a.config.DataDir, "photos", thumbnail))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Leave room for another thumbnail, but not its original video.
-	if _, err := a.db.Exec("UPDATE photos SET byte_size=$1", maxStoredPhotoBytes-info.Size()); err != nil {
-		t.Fatal(err)
-	}
-	assertWelcomeError(t, upload(t, a, host, original), 409, "album_full")
+	// Leave room for the reserve only: the original video does not fit.
+	diskWithRoom(a, 1<<40, defaultKeepFree(1<<40))
+	assertWelcomeError(t, upload(t, a, host, original), 409, "storage_full")
 	assertMediaFiles(t, a, 2)
 }
 
 func TestImageDownloadsPreserveOriginalBytes(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	original := pngBytes(t)

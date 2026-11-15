@@ -14,6 +14,7 @@ import (
 )
 
 func TestMediaRejectsSessionsExpiringWhileWaitingForGuestLock(t *testing.T) {
+	t.Parallel()
 	for _, operation := range []string{"inspect", "accept"} {
 		t.Run(operation, func(t *testing.T) {
 			a := testApp(t)

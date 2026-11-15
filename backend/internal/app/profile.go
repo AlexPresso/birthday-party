@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,13 +32,13 @@ func respondProfile(w http.ResponseWriter, guest identity.Guest, imageBytes int6
 }
 
 func (a *App) updateAvatar(w http.ResponseWriter, r *http.Request, viewer access.Viewer) {
-	release, ok := a.acquireReceiver(w, r)
+	limits, ok := a.currentUploadLimits(w, r)
 	if !ok {
 		return
 	}
-	limits, ok := a.currentUploadLimits(w, r)
+	// The photo is spooled to disk briefly; it never stays there.
+	release, ok := a.acquireReceiver(w, r, viewer.Guest.ID, limits.ImageBytes+multipartOverhead)
 	if !ok {
-		release()
 		return
 	}
 	boundReception(w, r, limits.ImageBytes+multipartOverhead)
@@ -51,18 +52,13 @@ func (a *App) updateAvatar(w http.ResponseWriter, r *http.Request, viewer access
 		input.Close()
 		os.Remove(input.Name())
 	}()
-	// One decoder at a time bounds decoded memory without queueing behind gallery
-	// workers. The image has already been received, so a slow connection cannot
-	// keep this slot from other guests.
-	select {
-	case a.avatarProcessors <- struct{}{}:
-	default:
-		w.Header().Set("Retry-After", "2")
-		fail(w, "profile_photo_busy")
-		return
-	}
+	// The image has already been received, so a slow connection cannot hold
+	// decode memory; the processor waits its turn for it and reports a busy
+	// server only after a long wait.
 	data, err := a.profile.Prepare(r.Context(), input)
-	<-a.avatarProcessors
+	if errors.Is(err, profile.Error("profile_photo_busy")) {
+		w.Header().Set("Retry-After", "5")
+	}
 	if err != nil {
 		failError(w, err)
 		return

@@ -17,10 +17,9 @@ import (
 )
 
 const MaxPhotoPixels = 40_000_000
-const MaxStoredBytes int64 = 10 << 30
+const MaxGalleryFiles = 5000
 const MaxGuestUploads = 100
 const MaxQueuedUploads = 1000
-const MaxQueuedBytes int64 = 10 << 30
 const HistoryTTL = 24 * time.Hour
 const QueryTimeout = 5 * time.Second
 
@@ -261,18 +260,64 @@ func (s *Service) DeletePhoto(ctx context.Context, guest identity.Guest, id int6
 	return nil
 }
 
-func ValidateQueueCapacity(total, owned int, bytes, incoming int64) error {
-	if total >= MaxQueuedUploads || owned >= MaxGuestUploads || incoming > MaxQueuedBytes-bytes {
+func ValidateQueueCapacity(total, owned int) error {
+	if total >= MaxQueuedUploads || owned >= MaxGuestUploads {
 		return &Error{Code: "upload_queue_full"}
 	}
 	return nil
 }
 
-func ValidateAlbumCapacity(count int, bytes, incoming int64) error {
-	if count >= 5000 || incoming > MaxStoredBytes-bytes {
+// ValidateAlbumCapacity bounds the gallery to MaxGalleryFiles so its pages
+// stay fast. Disk space is checked separately, against the real disk.
+func ValidateAlbumCapacity(count int) error {
+	if count >= MaxGalleryFiles {
 		return &Error{Code: "album_full"}
 	}
 	return nil
+}
+
+// Storage describes the disk that holds the private media directory, shared
+// with whatever else the host keeps on it.
+type Storage struct {
+	TotalBytes     int64 `json:"totalBytes"`
+	AvailableBytes int64 `json:"availableBytes"`
+}
+
+// KeepFree is the room an upload must leave on the disk. Each of the two
+// workers copies an original into the gallery before removing its input, so
+// both may briefly need the largest accepted size again; thumbnails and
+// temporary files need a little more. A share of the disk, 5% up to 10 GiB,
+// also stays free for what else lives on it: with Docker Compose, PostgreSQL
+// shares the disk and must never be starved by guests' uploads.
+func (s Storage) KeepFree(imageBytes, videoBytes int64) int64 {
+	publishing := 2*max(imageBytes, videoBytes) + 512<<20
+	return publishing + min(s.TotalBytes/20, 10<<30)
+}
+
+// CheckStorage refuses incoming bytes that would leave less than keepFree.
+func CheckStorage(storage Storage, keepFree, incoming int64) error {
+	if storage.AvailableBytes-incoming < keepFree {
+		return &Error{Code: "storage_full"}
+	}
+	return nil
+}
+
+// The host is warned once the disk is 80% full, and warned again only after
+// it has dropped below 75%, so usage hovering near the line stays quiet.
+const (
+	storageWarningPercent = 80
+	storageClearPercent   = 75
+)
+
+// Warning reports whether the disk is full enough to warn the host.
+func (s Storage) Warning() bool { return s.usedPercentAtLeast(storageWarningPercent) }
+
+// WarningCleared reports whether usage dropped far enough to warn again later.
+func (s Storage) WarningCleared() bool { return !s.usedPercentAtLeast(storageClearPercent) }
+
+func (s Storage) usedPercentAtLeast(percent int64) bool {
+	used := s.TotalBytes - s.AvailableBytes
+	return s.TotalBytes > 0 && used*100 >= s.TotalBytes*percent
 }
 func (s *Service) Categories(ctx context.Context, admin bool) ([]Category, error) {
 	return s.repo.Categories(ctx, admin)

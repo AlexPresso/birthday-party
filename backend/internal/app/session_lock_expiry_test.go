@@ -14,6 +14,7 @@ import (
 )
 
 func TestProfileAndNotificationWritesRejectSessionsExpiringWhileWaitingForGuestLock(t *testing.T) {
+	t.Parallel()
 	for _, operation := range []string{"remove profile photo", "register notification"} {
 		t.Run(operation, func(t *testing.T) {
 			a := testApp(t)

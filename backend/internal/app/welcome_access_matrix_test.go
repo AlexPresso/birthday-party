@@ -16,6 +16,7 @@ import (
 // transactions and pgwelcome.AccessSQL decides in single-statement reads. They
 // must agree for every state, or a guest could read what they may not change.
 func TestWelcomeAccessRuleMatchesItsSQLTwin(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	hostCookie, host := admin(t, a)
 	visitorCookie, visitor, _ := guest(t, a, hostCookie, "Matrix guest")

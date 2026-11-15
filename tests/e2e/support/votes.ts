@@ -87,12 +87,28 @@ export async function eventFrom(
   return event;
 }
 
+/** One event whole, as its activity page reads it. */
+export async function wholeEvent(
+  client: APIRequestContext,
+  id: number,
+): Promise<ProgrammeEvent> {
+  const response = await client.get(`/api/programme/${id}`);
+  expect(response.status()).toBe(200);
+  return response.json();
+}
+
+/**
+ * The whole vote: the host's list carries it, a guest's list only previews
+ * it, so a guest's is read from the event as the vote page does.
+ */
 export async function voteFrom(
   client: APIRequestContext,
   id: number,
   asHost = false,
 ) {
-  const { vote } = await eventFrom(client, id, asHost);
+  const { vote } = asHost
+    ? await eventFrom(client, id, true)
+    : await wholeEvent(client, id);
   if (!vote) throw new Error(`Programme event ${id} has no visible vote.`);
   return vote;
 }

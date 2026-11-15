@@ -15,8 +15,18 @@ type Photo = media.Photo
 type MediaCategory = media.Category
 type UploadJob = media.Upload
 
-const maxQueuedBytes = media.MaxQueuedBytes
-const maxStoredPhotoBytes = media.MaxStoredBytes
+// diskWithRoom makes the media disk report available free bytes out of total.
+func diskWithRoom(a *App, total, available int64) {
+	a.diskSpace = func() (media.Storage, error) {
+		return media.Storage{TotalBytes: total, AvailableBytes: available}, nil
+	}
+}
+
+// defaultKeepFree is the room uploads leave on a disk of total bytes with the
+// default size limits.
+func defaultKeepFree(total int64) int64 {
+	return media.Storage{TotalBytes: total}.KeepFree(15<<20, 100<<20)
+}
 
 type pendingUpload struct {
 	id, guestID          int64

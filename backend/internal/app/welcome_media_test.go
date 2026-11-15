@@ -10,6 +10,7 @@ import (
 )
 
 func TestWelcomeMediaSettingsAreTypedAndValidated(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	for _, test := range []struct{ name, step, code string }{
@@ -41,6 +42,7 @@ func TestWelcomeMediaSettingsAreTypedAndValidated(t *testing.T) {
 }
 
 func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Welcome uploader")
@@ -151,6 +153,7 @@ func TestWelcomeMediaUploadIsScopedPrivateAndPersistent(t *testing.T) {
 }
 
 func TestWelcomeMediaUploadRejectsLateAcceptance(t *testing.T) {
+	t.Parallel()
 	for _, ending := range []string{"plain step", "another upload step", "unlock", "open", "finish", "logout", "revoke"} {
 		t.Run(ending, func(t *testing.T) {
 			a := testApp(t)
@@ -199,6 +202,7 @@ func TestWelcomeMediaUploadRejectsLateAcceptance(t *testing.T) {
 }
 
 func TestMediaCategoryVideoRangesFollowVisibility(t *testing.T) {
+	t.Parallel()
 	data := videoFixture(t, "mp4")
 	a := testApp(t)
 	host, _ := admin(t, a)

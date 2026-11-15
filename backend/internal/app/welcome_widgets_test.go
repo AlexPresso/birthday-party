@@ -10,6 +10,7 @@ import (
 )
 
 func TestWelcomeWidgetsValidateShapesAndBounds(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	for _, test := range []struct{ name, step, code string }{
@@ -76,6 +77,7 @@ func TestWelcomeWidgetsValidateShapesAndBounds(t *testing.T) {
 }
 
 func TestWelcomeWidgetsAcceptMaximumBoundedCollection(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	steps := make([]welcomeStep, 12)
@@ -92,6 +94,7 @@ func TestWelcomeWidgetsAcceptMaximumBoundedCollection(t *testing.T) {
 }
 
 func TestWelcomeWidgetsIsolateUploadDestinationsAndAllowProfileAlongside(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	visitor, _, _ := guest(t, a, host, "Widget guest")

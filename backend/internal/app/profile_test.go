@@ -16,7 +16,6 @@ import (
 	"sync"
 	"testing"
 
-	"birthday-party/backend/internal/adapters/avatar"
 	"birthday-party/backend/internal/guestbook"
 	guestidentity "birthday-party/backend/internal/identity"
 )
@@ -74,6 +73,7 @@ func assertAvatarTempEmpty(t *testing.T, a *App) {
 }
 
 func TestProfilePhotoLifecyclePermissionsAndPersistence(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	owner, identity, _ := guest(t, a, host, "Profile owner")
@@ -160,6 +160,7 @@ func TestProfilePhotoLifecyclePermissionsAndPersistence(t *testing.T) {
 }
 
 func TestProfilePhotoAuthorsAndAnonymousPrivacy(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	owner, _, _ := guest(t, a, host, "Profile author")
@@ -210,6 +211,7 @@ func TestProfilePhotoAuthorsAndAnonymousPrivacy(t *testing.T) {
 }
 
 func TestProfilePhotoValidationKeepsExistingImage(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	setTestUploadLimits(t, a, 1, 100)
 	host, _ := admin(t, a)
@@ -246,6 +248,7 @@ func TestProfilePhotoValidationKeepsExistingImage(t *testing.T) {
 }
 
 func TestProfilePhotoWelcomeAndChangesDuringReception(t *testing.T) {
+	t.Parallel()
 	for _, action := range []string{"close", "revoke", "logout"} {
 		t.Run(action, func(t *testing.T) {
 			a := testApp(t)
@@ -284,7 +287,8 @@ func TestProfilePhotoWelcomeAndChangesDuringReception(t *testing.T) {
 	}
 }
 
-func TestProfilePhotoConcurrencyIsBoundedAndReplacementAtomic(t *testing.T) {
+func TestProfilePhotosQueueAndReplacementIsAtomic(t *testing.T) {
+	t.Parallel()
 	a := testApp(t)
 	host, _ := admin(t, a)
 	owner, identity, _ := guest(t, a, host, "Concurrent profile")
@@ -298,15 +302,20 @@ func TestProfilePhotoConcurrencyIsBoundedAndReplacementAtomic(t *testing.T) {
 	a.Handler().ServeHTTP(w, r)
 	status(t, w, 200)
 	status(t, request(t, a, "GET", *initial.AvatarURL, nil, owner), 404)
-	// Only decoding is exclusive: a busy decoder asks the client to retry.
-	a.avatarProcessors <- struct{}{}
-	busy := uploadAvatar(t, a, host, pngBytes(t))
-	<-a.avatarProcessors
-	status(t, busy, 429)
-	if busy.Header().Get("Retry-After") == "" {
-		t.Fatal("busy response omitted Retry-After")
+	// Guests sending their photos at the same moment wait for decode memory
+	// instead of being refused.
+	var arrivals sync.WaitGroup
+	responses := make(chan *httptest.ResponseRecorder, 12)
+	for index := range 12 {
+		cookie, _, _ := guest(t, a, host, "Arrival "+strconv.Itoa(index))
+		arrivals.Go(func() { responses <- uploadAvatar(t, a, cookie, pngBytes(t)) })
 	}
-	data, err := avatar.New().Prepare(t.Context(), bytes.NewReader(pngBytes(t)))
+	arrivals.Wait()
+	close(responses)
+	for response := range responses {
+		status(t, response, 200)
+	}
+	data, err := a.profile.Prepare(t.Context(), bytes.NewReader(pngBytes(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
