@@ -21,7 +21,7 @@ designed to be modular, reusable and highly customizable!
 
 <p align="center">
   <img src="docs/screenshots/vote.webp" width="32%" alt="A vote on guests, with their photos and live counts">
-  <img src="docs/screenshots/no-filter.webp" width="32%" alt="No Filter: anonymous questions ranked by upvotes, two jokers left">
+  <img src="docs/screenshots/no-filter.webp" width="32%" alt="No Filter as the host: anonymous questions ranked by upvotes, with the answered and joker actions">
   <img src="docs/screenshots/werewolf-role.webp" width="32%" alt="Werewolf at night: a player's own role and the list of the dead">
 </p>
 
@@ -35,7 +35,7 @@ There are no accounts: the host adds guests and sends each one their link. The
 app follows the phone's language (French, English, German, Italian or Spanish),
 and the photos and messages stay on the server it runs on.
 
-<sub>The screenshots show a made-up party; its photos and portraits are drawings made for the demo.</sub>
+<sub>The screenshots show a made-up party; its photos and portraits come from <a href="https://unsplash.com">Unsplash</a>.</sub>
 
 ## Trying it
 
