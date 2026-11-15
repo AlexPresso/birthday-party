@@ -1,5 +1,5 @@
 # Local development and trials on one machine only. Production runs on Kubernetes
-# with charts/birthday-party, which requires the database password in a Secret.
+# with the Helm chart at https://helm.alexpresso.me (see docs/development.md).
 services:
   postgres:
     image: postgres:18-alpine
