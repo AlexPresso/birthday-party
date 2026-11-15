@@ -81,7 +81,12 @@ single Go process; durable upload and push-notification workers remain server-si
 
 `PublicConfiguration = { age: number, invitation: InvitationCopy & { locales: { en: InvitationCopy, fr: InvitationCopy, de: InvitationCopy, it: InvitationCopy, es: InvitationCopy } }, appearance: Appearance }`
 
-`Configuration = PublicConfiguration & { imageSizeMB: number, videoSizeMB: number }`
+`Configuration = PublicConfiguration & { imageSizeMB: number, videoSizeMB: number, whatsappMessage: string | null }`
+
+`whatsappMessage` is the text the host sends with each invitation on WhatsApp, up
+to 1,000 characters, where the interface replaces `{name}` and `{link}`. Null,
+or a blank text, uses the interface message in the host language. It is never
+part of `PublicConfiguration`.
 
 - `GET /api/config` -> `PublicConfiguration` (200), available without a session.
   This contains only birthday age, public invitation text and the appearance
@@ -443,7 +448,7 @@ may contain up to 120 characters and remains in the host's original language.
 
 `Author = { id, name, avatarUrl: string | null }`
 `MediaCategory = { id, name, isPublic: boolean, coverThumbnailUrl?: string | null }`
-`Photo = { id, categoryId: number | null, author: Author, kind: "image" | "video", mimeType, width, height, createdAt, url, thumbnailUrl }`
+`Photo = { id, categoryId: number | null, author: Author | null, kind: "image" | "video", mimeType, width, height, createdAt, url, thumbnailUrl }`
 
 The route and type names retain `photos` for compatibility; the collection
 contains both photos and videos. `mimeType` is `image/jpeg`, `image/png`,
@@ -825,7 +830,11 @@ type Player = Person & {
 // A built-in role has a key and name: null; the interface translates its name
 // and, while description is null, its explanation. A custom role has key: null
 // and its own name. description is null when nothing was written.
-type RoleCard = { key: string | null; name: string | null; description: string | null };
+type RoleCard = {
+  key: string | null;
+  name: string | null;
+  description: string | null;
+};
 type Role = RoleCard & { id: number; count: number };
 ```
 
@@ -894,7 +903,7 @@ stale `revision` on the two commands that carry one.
 
 - `PUT /api/programme/{id}/werewolf/roles { revision, roles: RoleInput[] }`.
   Lobby only. `RoleInput = { id?: number, key: string | null, name: string |
-  null, description: string | null, count: number }`. The list replaces the
+null, description: string | null, count: number }`. The list replaces the
   saved one, in its order: a role sent with the `id` of a current role keeps
   that ID, a role without `id` is added and roles left out are removed. An
   `id` must belong to this game and keep its kind (the same built-in key, or
@@ -997,11 +1006,24 @@ signalled over the WebSocket: the interface reads the page when it renders.
 
 ## Guestbook
 
-`Entry = { id, author: Author | null, anonymous: boolean, canDelete: boolean, body, createdAt }`
+`Entry = { id, author: Author | null, anonymous: boolean, canDelete: boolean, body, voice: Voice | null, createdAt }`
+
+`Voice = { url: "/api/guestbook/{id}/voice", durationMs, peaks: number[48] }`
 
 - `GET /api/guestbook?before=<id>&limit=24` -> `{ items: Entry[], nextCursor: string | null }`.
 - `POST /api/guestbook { body, anonymous?: boolean }` -> `Entry` (201); 1–2000 characters after trimming.
-- `DELETE /api/guestbook/{id}` -> 204, only author or admin.
+- `POST /api/guestbook` as `multipart/form-data`, a `body` field (0–2000 characters)
+  then an `audio` file -> `Entry` (201). A voice note is always signed.
+- `GET /api/guestbook/{id}/voice` -> `audio/mp4` with ranges, for guests with full access.
+- `DELETE /api/guestbook/{id}` -> 204, only author or admin; its voice note goes with it.
+
+A recording is a WebM, Ogg or MP4 file of at most 16 MiB and five minutes,
+recognized from its content. Go re-encodes it with FFmpeg as mono AAC in MP4,
+which every browser plays, and measures its length and waveform (`peaks`, 48
+levels from 0 to 255) from the decoded audio. The entry and its recording are
+stored together in PostgreSQL. Unreadable or longer audio fails with
+`invalid_voice_note`, a larger file with `voice_note_too_large` (413). The
+audio has a strong `ETag` and `Cache-Control: private, no-cache`.
 
 Omitting `anonymous` defaults to `false`. Anonymous entries return `author: null`
 to every viewer, including the original author and administrators. Their owner ID
@@ -1013,16 +1035,31 @@ the private identity.
 ## Host controls
 
 - `GET /api/admin/guests` -> `{ items: Guest[] }`.
-- `POST /api/admin/guests { name }` -> `{ guest: Guest, invitationUrl, expiresAt }` (201).
+- `POST /api/admin/guests { name, phone?: string }` -> `{ guest: Guest, invitationUrl, expiresAt }` (201).
+- `PUT /api/admin/guests/{id} { name, phone }` -> `{ guest: Guest, invitation: { invitationUrl, expiresAt } | null }`;
+  an empty number removes it. Numbers are international (`+41 79 123 45 67` or
+  `0041…`), stored as `+41791234567`; others fail with `invalid_phone`. When the
+  number of a guest with access changes, including its removal, their invitation
+  is replaced in the same transaction: the old link stops working and the new
+  one is returned. Renaming alone, and any edit of a revoked guest, issues none.
 - `POST /api/admin/guests/{id}/invitation {}` -> `{ invitationUrl, expiresAt }`.
   Replaces an unused link and reactivates a revoked guest with the same identity;
   previously revoked browser sessions remain invalid.
 - `DELETE /api/admin/guests/{id}` -> 204; revoke the guest and all their sessions.
   Admins cannot revoke themselves. Existing photos/messages retain attribution.
+- `DELETE /api/admin/guests/{id}/record` -> 204; deletes a revoked guest for good
+  (`guest_active` otherwise). Their messages become anonymous and their media and
+  questions lose their author; their sessions, profile, welcome progress, votes,
+  upvotes, vote option (with its ballots) and werewolf seats are removed. It waits
+  for uploads still in preparation (`guest_uploads_pending`) and refuses while
+  they play or lead a running werewolf game (`guest_in_game`).
+
+Only these administrator responses carry `Guest.phone`.
 
 Host access is created locally with a CLI command or at server startup when
 `PRINT_ADMIN_INVITATION` is enabled (the Compose default). Startup reuses the oldest
 active administrator, creating `Admin` only if none exists; it replaces that
 administrator's invitation while retaining sessions. No public route creates an
-administrator. Invitations are copied by the host for manual sending; the app
-does not send email or WhatsApp messages.
+administrator. The host copies an invitation, or opens WhatsApp with it written
+out for a guest whose number is known (`whatsapp://send`, so the link stays on
+the device); the app itself sends no email, SMS or WhatsApp message.

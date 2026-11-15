@@ -1,12 +1,16 @@
 "use client";
 import { useState } from "react";
-import { Plus, Copy, Check, Link2, Trash2, X } from "lucide-react";
+import { Plus, Link2, Pencil, Trash2 } from "lucide-react";
 import { api, remove, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
-import { formatDate } from "@/lib/dates";
-import { useCopiedCue } from "@/lib/use-copied-cue";
-import { invitationSchema, newGuestSchema, type Guest } from "./contracts";
-import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
+import { GuestPanel } from "./guest-panel";
+import {
+  invitationSchema,
+  newGuestSchema,
+  type Guest,
+  type Invitation,
+} from "./contracts";
+import { ErrorNotice } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
 import "./guests.css";
@@ -14,40 +18,47 @@ import "./guests.css";
 export function GuestManager({
   guests,
   onGuestChange,
+  onGuestRemove,
   currentGuest,
+  whatsappMessage,
   timezone,
 }: {
   guests: Guest[];
   onGuestChange: (guest: Guest) => void;
+  onGuestRemove: (id: number) => void;
   currentGuest: Guest;
+  /** The host's WhatsApp invitation text; null uses the interface's. */
+  whatsappMessage: string | null;
   timezone: string;
 }) {
   const { locale, t } = useI18n();
   const confirm = useConfirm();
   const activeGuestCount = guests.filter((guest) => guest.active).length;
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [invitation, setInvitation] = useState<{
-    invitationUrl: string;
-    expiresAt: string;
-    name: string;
+  // The guest open in the panel, with the link issued in this visit if any.
+  const [open, setOpen] = useState<{
+    guestId: number;
+    invitation: Invitation | null;
   } | null>(null);
-  // The copy button confirms by itself for a moment.
-  const [copied, markCopied] = useCopiedCue<true>();
+  const openGuest = open && guests.find((guest) => guest.id === open.guestId);
+
   async function create(event: React.FormEvent) {
     event.preventDefault();
     setBusy("create");
     setError(null);
-    markCopied(null);
     try {
-      const data = await api("/admin/guests", newGuestSchema, {
-        method: "POST",
-        body: { name: name.trim() },
-      });
-      onGuestChange(data.guest);
-      setInvitation({ ...data, name: data.guest.name });
+      const { guest, ...invitation } = await api(
+        "/admin/guests",
+        newGuestSchema,
+        { method: "POST", body: { name: name.trim(), phone } },
+      );
+      onGuestChange(guest);
+      setOpen({ guestId: guest.id, invitation });
       setName("");
+      setPhone("");
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
@@ -57,15 +68,14 @@ export function GuestManager({
   async function invite(guest: Guest) {
     setBusy(`invite-${guest.id}`);
     setError(null);
-    markCopied(null);
     try {
-      const data = await api(
+      const invitation = await api(
         `/admin/guests/${guest.id}/invitation`,
         invitationSchema,
         { method: "POST", body: {} },
       );
-      setInvitation({ ...data, name: guest.name });
       onGuestChange({ ...guest, active: true });
+      setOpen({ guestId: guest.id, invitation });
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
@@ -83,20 +93,31 @@ export function GuestManager({
     try {
       await remove(`/admin/guests/${guest.id}`);
       onGuestChange({ ...guest, active: false });
-      setInvitation(null);
+      // Revocation removed the link.
+      if (open?.guestId === guest.id) setOpen({ ...open, invitation: null });
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
       setBusy(null);
     }
   }
-  async function copy() {
-    if (!invitation) return;
+  // A guest whose access was removed can then be deleted for good.
+  async function deletePermanently(guest: Guest) {
+    const confirmed = await confirm({
+      message: t("admin.deleteConfirmation", { name: guest.name }),
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setBusy(`delete-${guest.id}`);
+    setError(null);
     try {
-      await navigator.clipboard.writeText(invitation.invitationUrl);
-      markCopied(true);
-    } catch {
-      setError(t("admin.copyUnavailable"));
+      await remove(`/admin/guests/${guest.id}/record`);
+      if (open?.guestId === guest.id) setOpen(null);
+      onGuestRemove(guest.id);
+    } catch (err) {
+      setError(errorMessage(err, t));
+    } finally {
+      setBusy(null);
     }
   }
   return (
@@ -114,6 +135,18 @@ export function GuestManager({
             placeholder={t("admin.guestNamePlaceholder")}
           />
         </div>
+        <div>
+          <label htmlFor="guest-phone">{t("admin.phone")}</label>
+          <input
+            id="guest-phone"
+            type="tel"
+            inputMode="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            autoComplete="off"
+            placeholder="+41 79 123 45 67"
+          />
+        </div>
         <button className="button primary" disabled={!!busy || !name.trim()}>
           <Plus size={18} />
           {busy === "create"
@@ -122,39 +155,20 @@ export function GuestManager({
         </button>
       </form>
       <ErrorNotice message={error} />
-      {invitation && (
-        <div className="invitation-result">
-          <div className="section-row">
-            <h3>{t("admin.invitationFor", { name: invitation.name })}</h3>
-            <button
-              className="icon-button"
-              aria-label={t("admin.hideInvitation")}
-              onClick={() => setInvitation(null)}
-            >
-              <X size={17} />
-            </button>
-          </div>
-          <label htmlFor="invitation-link">{t("admin.personalLink")}</label>
-          <input
-            id="invitation-link"
-            readOnly
-            value={invitation.invitationUrl}
-            onFocus={(event) => event.target.select()}
-          />
-          <div className="form-actions">
-            <button className="button secondary" onClick={copy}>
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-              {copied ? t("admin.linkCopied") : t("admin.copyLink")}
-            </button>
-            <SavedAnnouncement message={copied ? t("admin.linkCopied") : ""} />
-            <span className="fine-print">
-              {t("admin.expiresAt", {
-                date: formatDate(invitation.expiresAt, timezone, true, locale),
-              })}
-            </span>
-          </div>
-          <p className="fine-print">{t("admin.singleUse")}</p>
-        </div>
+      {open && openGuest && (
+        <GuestPanel
+          // A new link starts the panel afresh, its copy cue included.
+          key={`${openGuest.id}-${open.invitation?.invitationUrl ?? ""}`}
+          guest={openGuest}
+          invitation={open.invitation}
+          whatsappMessage={whatsappMessage}
+          timezone={timezone}
+          onGuestChange={onGuestChange}
+          onInvitation={(invitation) =>
+            setOpen({ guestId: openGuest.id, invitation })
+          }
+          onClose={() => setOpen(null)}
+        />
       )}
       <div className="section-row guest-list-heading">
         <h3>{t("admin.guests")}</h3>
@@ -178,12 +192,24 @@ export function GuestManager({
                   : guest.avatarUrl
               }
             />
-            <div className="guest-list-name">
+            <button
+              type="button"
+              className="guest-list-name"
+              onClick={() =>
+                setOpen(
+                  open?.guestId === guest.id
+                    ? open
+                    : { guestId: guest.id, invitation: null },
+                )
+              }
+              aria-label={t("admin.editGuest", { name: guest.name })}
+            >
               <strong>
                 {guest.name}
                 {guest.id === currentGuest.id
                   ? ` (${t("admin.yourself")})`
                   : ""}
+                <Pencil size={13} aria-hidden="true" />
               </strong>
               <span className="fine-print">
                 {!guest.active
@@ -192,7 +218,7 @@ export function GuestManager({
                     ? t("admin.host")
                     : t("admin.guest")}
               </span>
-            </div>
+            </button>
             <div className="guest-actions">
               <button
                 className="text-button"
@@ -215,6 +241,17 @@ export function GuestManager({
                   disabled={!!busy}
                   onClick={() => revoke(guest)}
                   aria-label={t("admin.revokeAccessFor", { name: guest.name })}
+                >
+                  <Trash2 size={17} />
+                </button>
+              )}
+              {!guest.active && (
+                <button
+                  className="icon-button danger permanent"
+                  disabled={!!busy}
+                  onClick={() => deletePermanently(guest)}
+                  aria-label={t("admin.deleteFor", { name: guest.name })}
+                  title={t("admin.deleteFor", { name: guest.name })}
                 >
                   <Trash2 size={17} />
                 </button>

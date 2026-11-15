@@ -18,6 +18,7 @@ type memoryIdentities struct {
 	lookups     int
 	consumed    bool
 	revoked     bool
+	deleted     bool
 	beforeWrite func()
 }
 
@@ -25,7 +26,7 @@ func (repository *memoryIdentities) List(context.Context, int) ([]Guest, error) 
 	return []Guest{repository.pending.Guest}, nil
 }
 
-func (repository *memoryIdentities) CreateGuest(_ context.Context, name string, issue func() (Credential, error), limit int) (Guest, error) {
+func (repository *memoryIdentities) CreateGuest(_ context.Context, name string, _ *string, issue func() (Credential, error), limit int) (Guest, error) {
 	if repository.beforeWrite != nil {
 		repository.beforeWrite()
 	}
@@ -81,6 +82,13 @@ func (repository *memoryIdentities) ConsumeInvitation(_ context.Context, hash st
 
 func (repository *memoryIdentities) Revoke(context.Context, int64) error {
 	repository.revoked = true
+	return nil
+}
+func (repository *memoryIdentities) UpdateGuest(context.Context, int64, string, *string, func() (Credential, error)) (Guest, error) {
+	return Guest{}, nil
+}
+func (repository *memoryIdentities) Delete(context.Context, int64) error {
+	repository.deleted = true
 	return nil
 }
 func (repository *memoryIdentities) Logout(context.Context, string) error { return nil }
@@ -153,13 +161,13 @@ func TestServiceIssuesPrivateHashedInvitationsAndBoundsGuests(t *testing.T) {
 	now := time.Date(2026, 10, 17, 18, 0, 0, 123, time.UTC)
 	repository := &memoryIdentities{}
 	service := New(repository, "https://party.example")
-	if _, _, err := service.Create(t.Context(), " \t", func() time.Time { return now }); !errors.Is(err, ErrInvalidName) {
+	if _, _, err := service.Create(t.Context(), " \t", "", func() time.Time { return now }); !errors.Is(err, ErrInvalidName) {
 		t.Fatalf("invalid name error=%v", err)
 	}
 	if repository.createdName != "" {
 		t.Fatal("invalid name reached persistence")
 	}
-	guest, issued, err := service.Create(t.Context(), "  Camille  ", func() time.Time { return now })
+	guest, issued, err := service.Create(t.Context(), "  Camille  ", "", func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +181,28 @@ func TestServiceIssuesPrivateHashedInvitationsAndBoundsGuests(t *testing.T) {
 	if err := service.Revoke(t.Context(), guest.ID, guest.ID); !errors.Is(err, ErrSelfRevoke) || repository.revoked {
 		t.Fatalf("self revoke reached persistence: error=%v", err)
 	}
+	if err := service.Delete(t.Context(), guest.ID, guest.ID); !errors.Is(err, ErrSelfRevoke) || repository.deleted {
+		t.Fatalf("self deletion reached persistence: error=%v", err)
+	}
+}
+
+func TestNormalizePhoneKeepsInternationalNumbers(t *testing.T) {
+	for input, want := range map[string]string{
+		"+41 79 123 45 67":    "+41791234567",
+		"0041 (79) 123-45-67": "+41791234567",
+		"+33 6.12.34.56.78":   "+33612345678",
+		"  ":                  "",
+	} {
+		number, err := NormalizePhone(input)
+		if err != nil || (want == "" && number != nil) || (want != "" && (number == nil || *number != want)) {
+			t.Fatalf("%q = %v, %v; want %q", input, number, err, want)
+		}
+	}
+	for _, input := range []string{"079 123 45 67", "+0791234567", "+41 79 abc", "+1234567890123456"} {
+		if _, err := NormalizePhone(input); !errors.Is(err, ErrInvalidPhone) {
+			t.Fatalf("%q error = %v", input, err)
+		}
+	}
 }
 
 func TestInvitationIssuanceStartsLifetimeAfterPersistenceWait(t *testing.T) {
@@ -181,7 +211,7 @@ func TestInvitationIssuanceStartsLifetimeAfterPersistenceWait(t *testing.T) {
 		issue func(*Service, func() time.Time) error
 	}{
 		{"guest creation", func(service *Service, clock func() time.Time) error {
-			_, _, err := service.Create(t.Context(), "Camille", clock)
+			_, _, err := service.Create(t.Context(), "Camille", "", clock)
 			return err
 		}},
 		{"startup administrator", func(service *Service, clock func() time.Time) error {

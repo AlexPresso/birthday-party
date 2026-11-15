@@ -27,7 +27,15 @@ func New(db *sql.DB, now func() time.Time) *Store { return &Store{db: db, now: n
 var _ media.Repository = (*Store)(nil)
 
 const photoPage = `SELECT p.id,p.category_id,g.id,g.name,p.width,p.height,p.created_at,p.mime,CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END
- FROM photos p JOIN guests g ON p.guest_id=g.id WHERE `
+ FROM photos p LEFT JOIN guests g ON p.guest_id=g.id WHERE `
+
+// author is null for media whose guest was deleted.
+func author(id sql.NullInt64, name sql.NullString, avatarVersion int64) *identity.Author {
+	if !id.Valid {
+		return nil
+	}
+	return &identity.Author{ID: id.Int64, Name: name.String, AvatarURL: identity.AvatarURL(id.Int64, avatarVersion)}
+}
 
 func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *int64, before int64, limit int) ([]media.Photo, error) {
 	if categoryID != nil {
@@ -61,13 +69,15 @@ func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *in
 	for rows.Next() {
 		var item media.Photo
 		var created time.Time
+		var authorID sql.NullInt64
+		var authorName sql.NullString
 		var avatarVersion int64
-		if err := rows.Scan(&item.ID, &item.CategoryID, &item.Author.ID, &item.Author.Name, &item.Width, &item.Height, &created, &item.MIMEType, &avatarVersion); err != nil {
+		if err := rows.Scan(&item.ID, &item.CategoryID, &authorID, &authorName, &item.Width, &item.Height, &created, &item.MIMEType, &avatarVersion); err != nil {
 			return nil, err
 		}
 		item.CreatedAt = timestamp.Format(created)
 		item.SetURLs()
-		item.Author.AvatarURL = identity.AvatarURL(item.Author.ID, avatarVersion)
+		item.Author = author(authorID, authorName, avatarVersion)
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -75,7 +85,7 @@ func (s *Store) Photos(ctx context.Context, guest identity.Guest, categoryID *in
 
 func (s *Store) PhotoFile(ctx context.Context, guest identity.Guest, id int64) (media.File, error) {
 	var file media.File
-	err := s.db.QueryRowContext(ctx, `SELECT p.filename,p.thumbnail,p.mime,p.guest_id,p.created_at FROM photos p LEFT JOIN media_categories c ON c.id=p.category_id
+	err := s.db.QueryRowContext(ctx, `SELECT p.filename,p.thumbnail,p.mime,COALESCE(p.guest_id,0),p.created_at FROM photos p LEFT JOIN media_categories c ON c.id=p.category_id
  WHERE p.id=$1 AND (p.category_id IS NULL OR c.is_public OR $2)`, id, guest.IsAdmin()).Scan(&file.Filename, &file.Thumbnail, &file.MIME, &file.AuthorID, &file.Created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return file, &media.Error{Code: "photo_not_found"}
@@ -86,7 +96,7 @@ func (s *Store) PhotoFile(ctx context.Context, guest identity.Guest, id int64) (
 func (s *Store) DeletePhoto(ctx context.Context, guest identity.Guest, id int64) (media.File, error) {
 	var file media.File
 	err := s.db.QueryRowContext(ctx, `DELETE FROM photos p WHERE p.id=$1 AND (p.guest_id=$3 OR $2) AND
- (p.category_id IS NULL OR $2 OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public)) RETURNING filename,thumbnail,guest_id`, id, guest.IsAdmin(), guest.ID).Scan(&file.Filename, &file.Thumbnail, &file.AuthorID)
+ (p.category_id IS NULL OR $2 OR EXISTS (SELECT 1 FROM media_categories c WHERE c.id=p.category_id AND c.is_public)) RETURNING filename,thumbnail,COALESCE(guest_id,0)`, id, guest.IsAdmin(), guest.ID).Scan(&file.Filename, &file.Thumbnail, &file.AuthorID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return file, &media.Error{Code: "photo_not_found"}
 	}

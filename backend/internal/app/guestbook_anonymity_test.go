@@ -81,10 +81,11 @@ func assertAnonymousEntry(t *testing.T, raw []byte, ownerName string) {
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		t.Fatal(err)
 	}
-	if string(fields["author"]) != "null" || string(fields["anonymous"]) != "true" || strings.Contains(string(raw), ownerName) {
+	// A voice note is always signed, so an anonymous entry never has one.
+	if string(fields["author"]) != "null" || string(fields["voice"]) != "null" || string(fields["anonymous"]) != "true" || strings.Contains(string(raw), ownerName) {
 		t.Fatalf("anonymous entry disclosed its author: %s", raw)
 	}
-	allowed := map[string]bool{"id": true, "author": true, "anonymous": true, "canDelete": true, "body": true, "createdAt": true}
+	allowed := map[string]bool{"id": true, "author": true, "anonymous": true, "canDelete": true, "body": true, "voice": true, "createdAt": true}
 	for field := range fields {
 		if !allowed[field] {
 			t.Fatalf("anonymous entry includes an unexpected field %q", field)

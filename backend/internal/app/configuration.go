@@ -60,7 +60,7 @@ func completeConfiguration(body json.RawMessage) bool {
 		}
 		return fields
 	}
-	root := object(body, "age", "invitation", "imageSizeMB", "videoSizeMB", "appearance")
+	root := object(body, "age", "invitation", "imageSizeMB", "videoSizeMB", "appearance", "whatsappMessage")
 	if root == nil || object(root["appearance"], "theme", "accent") == nil {
 		return false
 	}

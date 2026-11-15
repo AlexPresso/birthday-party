@@ -21,6 +21,7 @@ const configuration = {
     },
   },
   appearance: { theme: "light", accent: "#3e63dd" },
+  whatsappMessage: "Coucou {name} : {link}",
 };
 
 test("configuration responses preserve defaults, hidden text and authored translations", () => {
@@ -30,6 +31,7 @@ test("configuration responses preserve defaults, hidden text and authored transl
   assert.deepEqual(publicConfiguration.appearance, configuration.appearance);
   assert.equal("imageSizeMB" in publicConfiguration, false);
   assert.equal("videoSizeMB" in publicConfiguration, false);
+  assert.equal("whatsappMessage" in publicConfiguration, false);
   assert.equal(
     configurationSchema.safeParse(publicConfiguration).success,
     false,

@@ -48,7 +48,13 @@ type Configuration struct {
 	PublicConfiguration
 	ImageSizeMB int `json:"imageSizeMB"`
 	VideoSizeMB int `json:"videoSizeMB"`
+	// WhatsAppMessage is the host's text sent with each invitation link, where
+	// {name} and {link} are replaced. Null uses the interface's own message.
+	WhatsAppMessage *string `json:"whatsappMessage"`
 }
+
+// MaxWhatsAppMessage bounds the host's invitation message, in characters.
+const MaxWhatsAppMessage = 1000
 
 type ConfigurationActor struct {
 	GuestID     int64
@@ -133,6 +139,17 @@ func normalizeConfiguration(input Configuration, restrictText bool) (Configurati
 		locales[tag] = normalized
 	}
 	input.Invitation.Locales = locales
+	if input.WhatsAppMessage != nil {
+		// An emptied message falls back to the interface's.
+		message := strings.TrimSpace(*input.WhatsAppMessage)
+		if utf8.RuneCountInString(message) > MaxWhatsAppMessage {
+			return input, ErrInvalidConfiguration
+		}
+		input.WhatsAppMessage = &message
+		if message == "" {
+			input.WhatsAppMessage = nil
+		}
+	}
 	return input, nil
 }
 

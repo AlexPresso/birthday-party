@@ -28,6 +28,7 @@ import (
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
 	"birthday-party/backend/internal/adapters/preview"
 	"birthday-party/backend/internal/adapters/pushtransport"
+	"birthday-party/backend/internal/adapters/voicenote"
 	push "birthday-party/backend/internal/adapters/webpush"
 	"birthday-party/backend/internal/guestbook"
 	"birthday-party/backend/internal/identity"
@@ -59,6 +60,7 @@ type App struct {
 	media               *media.Service
 	mediaStore          *pgmedia.Store
 	mediaFiles          *mediafiles.Files
+	voiceNotes          *voicenote.Encoder
 	config              Config
 	now                 func() time.Time
 	receivers           *receptionSlots
@@ -156,6 +158,7 @@ func Open(config Config) (*App, error) {
 	a.profile = profile.New(pgprofile.New(db, clock), avatar.New(decodeBudget))
 	a.mediaStore = pgmedia.New(db, clock)
 	a.mediaFiles = mediafiles.New(config.DataDir, decodeBudget)
+	a.voiceNotes = voicenote.New(filepath.Join(config.DataDir, "tmp"))
 	a.diskSpace = a.mediaFiles.Space
 	a.media = media.New(a.mediaStore, a.mediaFiles, clock, func(id int64) { a.realtime.notify(id, realtimeUploads) }, log.Printf)
 	keys, err := notificationStore.LoadKeys(ctx, push.GenerateKeys)

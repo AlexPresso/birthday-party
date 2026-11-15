@@ -254,6 +254,11 @@ when it closes.
   must be recreated. See [database changes](../docs/database.md).
 - Guestbook posts can be anonymous. Their owner remains in PostgreSQL for deletion
   permissions, but no API response includes that identity, even for hosts.
+  A post may carry a voice note of up to five minutes, always signed. FFmpeg
+  re-encodes it as mono AAC in MP4 (at most 4 MiB) and measures its waveform;
+  it is stored with its entry in PostgreSQL, so back both up together.
+- A revoked guest can be deleted for good. Their messages, media and questions
+  stay without an author; their votes, upvotes and werewolf seats go.
 - Dates are normalized to UTC. The party starts with `Europe/Zurich` as its
   explicit, editable IANA timezone and an empty title on new databases. Existing
   titles remain unchanged; the frontend supplies a localized title when needed.

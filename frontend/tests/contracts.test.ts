@@ -696,6 +696,7 @@ test("anonymous entries cannot carry an author identity", () => {
     anonymous: true,
     author: null,
     canDelete: false,
+    voice: null,
   };
   assert.equal(entrySchema.safeParse(entry).success, true);
   assert.equal(
@@ -717,6 +718,37 @@ test("anonymous entries cannot carry an author identity", () => {
     entrySchema.safeParse({ ...entry, canDelete: undefined }).success,
     false,
   );
+});
+
+test("voice notes stay on the guestbook API with a complete waveform", () => {
+  const voice = {
+    url: "/api/guestbook/4/voice",
+    durationMs: 12500,
+    peaks: Array.from({ length: 48 }, (_, index) => index * 5),
+  };
+  const entry = {
+    id: 4,
+    body: "",
+    createdAt: "2026-10-14T16:00:00Z",
+    anonymous: false,
+    author: { id: 2, name: "Camille", avatarUrl: null },
+    canDelete: true,
+    voice,
+  };
+  assert.equal(entrySchema.safeParse(entry).success, true);
+  for (const changed of [
+    { url: "https://cdn.example/voice.m4a" },
+    { url: "/api/guestbook/4/voice?download=1" },
+    { peaks: voice.peaks.slice(1) },
+    { peaks: [...voice.peaks.slice(1), 256] },
+    { durationMs: 0 },
+  ]) {
+    assert.equal(
+      entrySchema.safeParse({ ...entry, voice: { ...voice, ...changed } })
+        .success,
+      false,
+    );
+  }
 });
 
 test("API contract rejects ambiguous dates and unrecognized privileges", () => {

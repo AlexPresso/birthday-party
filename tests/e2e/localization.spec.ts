@@ -348,7 +348,7 @@ for (const language of languages) {
         .getByRole("link", { name: language.tabs[2], exact: true })
         .click();
       const message = `Un souvenir écrit en français, gardé tel quel (${language.lang}).`;
-      const anonymous = page.getByRole("checkbox", {
+      const anonymous = page.getByRole("switch", {
         name: language.anonymous,
         exact: true,
       });

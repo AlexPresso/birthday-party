@@ -37,6 +37,12 @@ import { Avatar } from "@/components/avatar";
 import { useCompletedUploads } from "./upload-provider";
 import { MediaPicker } from "./media-picker";
 import { MediaSlideshow } from "./media-slideshow";
+import {
+  authorName,
+  downloadLabel,
+  mediaAlt,
+  openLabel,
+} from "./author-labels";
 import "./gallery.css";
 
 // Mosaic rows are a tenth of a column wide: a square photo spans ten rows.
@@ -317,11 +323,11 @@ export function PhotoGallery({
               >
                 <header className="media-post-author">
                   <Avatar
-                    name={photo.author.name}
-                    avatarUrl={photo.author.avatarUrl}
+                    name={authorName(photo, t)}
+                    avatarUrl={photo.author?.avatarUrl ?? null}
                   />
                   <div>
-                    <strong>{photo.author.name}</strong>
+                    <strong>{authorName(photo, t)}</strong>
                     <time dateTime={photo.createdAt}>
                       {formatDate(photo.createdAt, timezone, true, locale)}
                     </time>
@@ -354,7 +360,7 @@ export function PhotoGallery({
                         <Download size={17} aria-hidden="true" />
                         {t("photos.download")}
                       </a>
-                      {(guest.id === photo.author.id ||
+                      {(guest.id === photo.author?.id ||
                         guest.role === "admin") && (
                         <button
                           type="button"
@@ -373,20 +379,15 @@ export function PhotoGallery({
                   className="photo-tile"
                   type="button"
                   onClick={() => setSelected(photo.id)}
-                  aria-label={t(
-                    photo.kind === "video" ? "photos.openVideo" : "photos.open",
-                    {
-                      name: photo.author.name,
-                      date: formatDate(photo.createdAt, timezone, true, locale),
-                    },
+                  aria-label={openLabel(
+                    photo,
+                    t,
+                    formatDate(photo.createdAt, timezone, true, locale),
                   )}
                 >
                   <img
                     src={photo.thumbnailUrl}
-                    alt={t(
-                      photo.kind === "video" ? "photos.videoAlt" : "photos.alt",
-                      { name: photo.author.name },
-                    )}
+                    alt={mediaAlt(photo, t)}
                     width={photo.width}
                     height={photo.height}
                     loading="lazy"
@@ -403,9 +404,7 @@ export function PhotoGallery({
                     className="icon-button"
                     href={`${photo.url}?download=1`}
                     download
-                    aria-label={t("photos.downloadFrom", {
-                      name: photo.author.name,
-                    })}
+                    aria-label={downloadLabel(photo, t)}
                     title={t("photos.download")}
                   >
                     <Download size={18} aria-hidden="true" />
@@ -458,7 +457,7 @@ export function PhotoGallery({
           <div className="lightbox-content">
             <div className="lightbox-toolbar">
               <div>
-                <strong>{current.author.name}</strong>
+                <strong>{authorName(current, t)}</strong>
                 <p className="fine-print">
                   {formatDate(current.createdAt, timezone, true, locale)}
                 </p>
@@ -484,13 +483,13 @@ export function PhotoGallery({
                 controls
                 playsInline
                 preload="metadata"
-                aria-label={t("photos.videoAlt", { name: current.author.name })}
+                aria-label={mediaAlt(current, t)}
               />
             ) : (
               <img
                 className="lightbox-image"
                 src={current.url}
-                alt={t("photos.alt", { name: current.author.name })}
+                alt={mediaAlt(current, t)}
                 width={current.width}
                 height={current.height}
               />
@@ -523,7 +522,8 @@ export function PhotoGallery({
                 >
                   <Download size={19} />
                 </a>
-                {(guest.id === current.author.id || guest.role === "admin") && (
+                {(guest.id === current.author?.id ||
+                  guest.role === "admin") && (
                   <button
                     className="icon-button danger"
                     onClick={() => deletePhoto(current)}

@@ -51,16 +51,17 @@ const (
 )
 
 type Photo struct {
-	ID           int64           `json:"id"`
-	CategoryID   *int64          `json:"categoryId"`
-	Author       identity.Author `json:"author"`
-	Width        int             `json:"width"`
-	Height       int             `json:"height"`
-	CreatedAt    string          `json:"createdAt"`
-	URL          string          `json:"url"`
-	ThumbnailURL string          `json:"thumbnailUrl"`
-	Kind         Kind            `json:"kind"`
-	MIMEType     string          `json:"mimeType"`
+	ID         int64  `json:"id"`
+	CategoryID *int64 `json:"categoryId"`
+	// Author is null once the guest who shared it was deleted.
+	Author       *identity.Author `json:"author"`
+	Width        int              `json:"width"`
+	Height       int              `json:"height"`
+	CreatedAt    string           `json:"createdAt"`
+	URL          string           `json:"url"`
+	ThumbnailURL string           `json:"thumbnailUrl"`
+	Kind         Kind             `json:"kind"`
+	MIMEType     string           `json:"mimeType"`
 }
 
 func (p *Photo) SetURLs() {
@@ -111,7 +112,8 @@ type Destination struct {
 	SessionHash                                     string
 }
 
-// File locates a published photo's private files. Created is when it was published.
+// File locates a published photo's private files. Created is when it was
+// published; AuthorID is zero once its author was deleted.
 type File struct {
 	Filename, Thumbnail, MIME string
 	AuthorID                  int64
@@ -256,7 +258,9 @@ func (s *Service) DeletePhoto(ctx context.Context, guest identity.Guest, id int6
 	if err := s.files.RemovePublished(file); err != nil {
 		s.logf("remove private photo %d: %v", id, err)
 	}
-	s.notify(file.AuthorID)
+	if file.AuthorID != 0 {
+		s.notify(file.AuthorID)
+	}
 	return nil
 }
 

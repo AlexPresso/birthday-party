@@ -30,6 +30,21 @@
   .invitation-result > .fine-print {
     margin: 12px 0 0;
   }
+  /* The open guest: name and number, then the link they were sent. */
+  .guest-panel-fields {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .guest-panel-fields input {
+    font-size: 15px;
+  }
+  .guest-panel-fields .fine-print {
+    margin: 6px 0 0;
+  }
+  .invitation-result .form-actions {
+    flex-wrap: wrap;
+  }
   .guest-list-heading {
     margin-top: 28px;
     margin-bottom: 12px;
@@ -46,9 +61,23 @@
     padding: 14px 0;
     border-top: 1px solid var(--border);
   }
+  /* The name opens the guest to edit them. */
   .guest-list-name {
     flex: 1;
     min-width: 0;
+    min-height: 44px;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+  }
+  .guest-list-name strong svg {
+    margin-left: 6px;
+    color: var(--muted);
+    vertical-align: -1px;
+  }
+  .guest-list-name:hover strong svg {
+    color: var(--accent-text);
   }
   .guest-list-name strong {
     display: block;
@@ -66,6 +95,10 @@
   }
   .guest-actions .text-button {
     font-size: 12px;
+  }
+  /* Permanent deletion, once access is removed: red before it is pressed. */
+  .guest-actions .icon-button.permanent {
+    color: var(--danger);
   }
   @media (max-width: 1050px) and (min-width: 761px) {
     .invite-form {

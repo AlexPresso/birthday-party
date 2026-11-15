@@ -56,26 +56,26 @@
     font-size: 14px;
   }
 
+  /* The same switch as the welcome's Required setting. */
   .guestbook-compose .checkbox-field input {
     appearance: none;
-    display: grid;
-    place-content: center;
-    width: 20px;
-    height: 20px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-tiny);
-    background: transparent;
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-muted);
   }
 
-  .guestbook-compose .checkbox-field input::after {
+  .guestbook-compose .checkbox-field input::before {
     content: "";
-    width: 10px;
-    height: 6px;
-    margin-top: -3px;
-    border: solid var(--on-accent);
-    border-width: 0 0 2px 2px;
-    transform: rotate(-45deg);
-    opacity: 0;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--muted);
   }
 
   .guestbook-compose .checkbox-field input:checked {
@@ -83,13 +83,40 @@
     background: var(--accent);
   }
 
-  .guestbook-compose .checkbox-field input:checked::after {
-    opacity: 1;
+  .guestbook-compose .checkbox-field input:checked::before {
+    transform: translateX(18px);
+    background: var(--background);
   }
 
   .guestbook-compose .button {
     min-height: 48px;
     font-size: 15px;
+  }
+
+  /* Publish fills the row; the microphone sits at its end. */
+  .compose-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .compose-actions > .button {
+    flex: 1;
+  }
+
+  .compose-record {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+  }
+
+  .compose-record:not(:disabled):hover {
+    background: var(--surface-raised);
   }
 
   .compose-footer {
@@ -160,7 +187,7 @@
       appearance: auto;
     }
 
-    .guestbook-compose .checkbox-field input::after {
+    .guestbook-compose .checkbox-field input::before {
       display: none;
     }
   }
@@ -220,12 +247,157 @@
     text-align: center;
   }
 
-  .guestbook-empty > svg {
-    margin-bottom: 12px;
-    color: var(--accent-text);
-  }
-
   .guestbook-empty h2 {
     font-size: 18px;
+  }
+
+  /* A voice note: play, a waveform that fills and seeks, the time. */
+  .voice-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    width: min(100%, 360px);
+    padding: 6px 14px 6px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+  }
+
+  .guestbook-entry .voice-note {
+    margin-bottom: 12px;
+  }
+
+  .voice-note-play {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .voice-note-wave {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+  }
+
+  .voice-note-bars,
+  .voice-recording-bars {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 100%;
+  }
+
+  .voice-note-bars > span,
+  .voice-recording-bars > span {
+    flex: 1;
+    min-width: 2px;
+    max-width: 4px;
+    border-radius: 2px;
+    background: var(--muted);
+  }
+
+  .voice-note-bars > .played {
+    background: var(--accent);
+  }
+
+  /* The range input lies over the bars: native seeking by touch and keyboard. */
+  .voice-note-wave input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .voice-note-wave:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-tiny);
+  }
+
+  .voice-note-time,
+  .voice-recording-time {
+    flex: none;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+
+  .voice-note-error {
+    flex-basis: 100%;
+    margin: 0 0 4px 8px;
+    color: var(--danger);
+    font-size: 13px;
+  }
+
+  .voice-recording {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 52px;
+    margin: 10px 0 12px;
+    padding: 0 16px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+  }
+
+  .voice-recording-time {
+    color: var(--text);
+  }
+
+  .voice-recording-dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: voice-recording-pulse 1.2s ease-in-out infinite;
+  }
+
+  .voice-recording-bars {
+    flex: 1;
+    justify-content: flex-end;
+    height: 28px;
+  }
+
+  .voice-recording-bars > span {
+    background: var(--accent);
+  }
+
+  @keyframes voice-recording-pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .voice-recording-dot {
+      animation: none;
+    }
+  }
+
+  .voice-draft {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 0;
+  }
+
+  .voice-draft .voice-note {
+    flex: 1;
+  }
+
+  .voice-signed {
+    margin: 10px 0 12px;
   }
 }

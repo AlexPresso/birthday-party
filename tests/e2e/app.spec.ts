@@ -974,7 +974,7 @@ test("anonymous guestbook posts retain their draft on failure and stay anonymous
     .click();
   const message = "Un souvenir anonyme conservé après un nouvel essai.";
   const input = page.getByLabel("Ton message", { exact: true });
-  const anonymous = page.getByRole("checkbox", {
+  const anonymous = page.getByRole("switch", {
     name: "Publier anonymement",
     exact: true,
   });

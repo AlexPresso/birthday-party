@@ -15,6 +15,7 @@ type memoryEntries struct {
 	items          []Record
 	requestedLimit int
 	deleted        bool
+	audio          []byte
 }
 
 func (repository *memoryEntries) List(_ context.Context, _ int64, limit int) ([]Record, error) {
@@ -22,10 +23,15 @@ func (repository *memoryEntries) List(_ context.Context, _ int64, limit int) ([]
 	return repository.items, nil
 }
 
-func (repository *memoryEntries) Create(_ context.Context, record Record) (int64, error) {
+func (repository *memoryEntries) Create(_ context.Context, record Record, audio []byte) (int64, error) {
 	record.ID = int64(len(repository.items) + 1)
 	repository.items = append(repository.items, record)
+	repository.audio = audio
 	return record.ID, nil
+}
+
+func (repository *memoryEntries) VoiceAudio(context.Context, int64) ([]byte, error) {
+	return repository.audio, nil
 }
 
 func (repository *memoryEntries) Owner(_ context.Context, id int64) (int64, error) {
@@ -103,6 +109,38 @@ func TestServiceValidatesMessagesBeforePersistence(t *testing.T) {
 	}
 	if repository.items[0].Author.ID != viewer.ID || repository.items[0].Body != strings.Repeat("é", 2000) {
 		t.Fatal("private persistence lost the owner or trimmed message")
+	}
+}
+
+func TestVoiceNotesAreSignedBoundedAndListed(t *testing.T) {
+	repository := &memoryEntries{}
+	service := New(repository)
+	viewer := identity.Guest{ID: 17, Name: "Camille", Role: "guest"}
+	now := time.Date(2026, 10, 17, 19, 0, 0, 0, time.UTC)
+	peaks := make([]byte, VoicePeaks)
+	peaks[0] = 255
+	for _, voice := range []Voice{
+		{Duration: time.Second, Peaks: peaks},
+		{Audio: []byte("m4a"), Duration: MaxVoiceDuration + time.Millisecond, Peaks: peaks},
+		{Audio: []byte("m4a"), Duration: time.Second, Peaks: peaks[:3]},
+	} {
+		if _, err := service.CreateVoice(t.Context(), viewer, "", voice, now); !errors.Is(err, ErrInvalidVoice) {
+			t.Fatalf("voice %+v error = %v", voice, err)
+		}
+	}
+	if _, err := service.CreateVoice(t.Context(), viewer, strings.Repeat("é", 2001), Voice{Audio: []byte("m4a"), Duration: time.Second, Peaks: peaks}, now); !errors.Is(err, ErrInvalidMessage) {
+		t.Fatalf("long message error = %v", err)
+	}
+	entry, err := service.CreateVoice(t.Context(), viewer, "  ", Voice{Audio: []byte("m4a"), Duration: 1500 * time.Millisecond, Peaks: peaks}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Author == nil || entry.Anonymous || entry.Body != "" || entry.Voice == nil || entry.Voice.DurationMS != 1500 ||
+		entry.Voice.URL != "/api/guestbook/1/voice" || len(entry.Voice.Peaks) != VoicePeaks || entry.Voice.Peaks[0] != 255 {
+		t.Fatalf("voice entry = %+v", entry)
+	}
+	if string(repository.audio) != "m4a" {
+		t.Fatal("the recording did not reach persistence")
 	}
 }
 

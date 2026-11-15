@@ -90,6 +90,7 @@ The adapters provide the concrete infrastructure:
 | `internal/adapters/avatar`             | Bounded profile image decoding and normalization                    |
 | `internal/adapters/preview`            | Flattening onto the theme background and JPEG encoding of previews  |
 | `internal/adapters/mediafiles`         | Private file storage, media inspection, image processing and FFmpeg |
+| `internal/adapters/voicenote`          | Guestbook voice note re-encoding and waveform with FFmpeg           |
 | `internal/adapters/webpush`            | Web Push signing, payload serialization and delivery                |
 | `internal/adapters/pushtransport`      | Restricted outbound HTTPS, DNS validation and connection limits     |
 

@@ -25,6 +25,9 @@ const en = {
   "configuration.languages": "Text by language",
   "configuration.languageHint":
     "A text set for one language replaces the shared text.",
+  "configuration.whatsappMessage": "WhatsApp message",
+  "configuration.whatsappHint":
+    "Only you see it. {name} becomes the guest’s name and {link} their personal link, added at the end if missing.",
   "configuration.titleMode": "Title display",
   "configuration.descriptionMode": "Description display",
   "configuration.default": "Default",
@@ -74,6 +77,9 @@ const fr: ConfigurationMessages = {
   "configuration.languages": "Textes par langue",
   "configuration.languageHint":
     "Un texte défini pour une langue remplace le texte commun.",
+  "configuration.whatsappMessage": "Message WhatsApp",
+  "configuration.whatsappHint":
+    "Toi seul le vois. {name} devient le prénom de l’invité et {link} son lien personnel, ajouté à la fin s’il manque.",
   "configuration.titleMode": "Affichage du titre",
   "configuration.descriptionMode": "Affichage de la description",
   "configuration.default": "Par défaut",
@@ -121,6 +127,9 @@ const de: ConfigurationMessages = {
   "configuration.languages": "Texte nach Sprache",
   "configuration.languageHint":
     "Ein Text für eine Sprache ersetzt den gemeinsamen Text.",
+  "configuration.whatsappMessage": "WhatsApp-Nachricht",
+  "configuration.whatsappHint":
+    "Nur du siehst sie. {name} wird zum Namen des Gasts und {link} zu seinem persönlichen Link, der sonst am Ende steht.",
   "configuration.titleMode": "Titelanzeige",
   "configuration.descriptionMode": "Beschreibungsanzeige",
   "configuration.default": "Standard",
@@ -168,6 +177,9 @@ const it: ConfigurationMessages = {
   "configuration.languages": "Testi per lingua",
   "configuration.languageHint":
     "Un testo impostato per una lingua sostituisce il testo comune.",
+  "configuration.whatsappMessage": "Messaggio WhatsApp",
+  "configuration.whatsappHint":
+    "Lo vedi solo tu. {name} diventa il nome dell’invitato e {link} il suo link personale, aggiunto alla fine se manca.",
   "configuration.titleMode": "Visualizzazione del titolo",
   "configuration.descriptionMode": "Visualizzazione della descrizione",
   "configuration.default": "Predefinito",
@@ -215,6 +227,9 @@ const es: ConfigurationMessages = {
   "configuration.languages": "Textos por idioma",
   "configuration.languageHint":
     "Un texto definido para un idioma sustituye al texto común.",
+  "configuration.whatsappMessage": "Mensaje de WhatsApp",
+  "configuration.whatsappHint":
+    "Solo tú lo ves. {name} se convierte en el nombre del invitado y {link} en su enlace personal, que se añade al final si falta.",
   "configuration.titleMode": "Visualización del título",
   "configuration.descriptionMode": "Visualización de la descripción",
   "configuration.default": "Predeterminado",

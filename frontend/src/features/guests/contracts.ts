@@ -6,12 +6,16 @@ const avatarUrl = z
   .regex(/^\/api\/guests\/[1-9]\d*\/avatar\?v=[1-9]\d*$/)
   .nullable();
 
+export const phoneSchema = z.string().regex(/^\+[1-9]\d{6,14}$/);
+
 export const guestSchema = z.object({
   id,
   name: z.string(),
   role: z.enum(["admin", "guest"]),
   active: z.boolean(),
   avatarUrl,
+  // Only the host's guest list carries a number, in international form.
+  phone: phoneSchema.optional(),
 });
 
 export const sessionSchema = z.object({ guest: guestSchema });
@@ -25,7 +29,15 @@ export const invitationSchema = z.object({
   expiresAt: instant,
 });
 
+export type Invitation = z.infer<typeof invitationSchema>;
+
 export const newGuestSchema = invitationSchema.extend({ guest: guestSchema });
+
+// A changed number of a guest with access comes back with its new link.
+export const guestUpdateSchema = z.object({
+  guest: guestSchema,
+  invitation: invitationSchema.nullable(),
+});
 
 export const previewSchema = z.object({
   guestName: z.string(),

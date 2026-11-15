@@ -34,6 +34,21 @@
     margin-top: 14px;
   }
 
+  /* The private WhatsApp message, apart from the public invitation copy. */
+  .configuration-whatsapp {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .configuration-whatsapp textarea {
+    width: 100%;
+  }
+
+  .configuration-whatsapp .fine-print {
+    margin: 8px 0 0;
+  }
+
   .configuration-editor select {
     width: 100%;
     min-height: 47px;
