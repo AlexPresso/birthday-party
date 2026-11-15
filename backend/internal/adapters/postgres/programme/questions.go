@@ -26,7 +26,7 @@ func (s *Store) questionTransaction(ctx context.Context, actor programme.Actor, 
 	err = tx.QueryRowContext(ctx, `SELECT a.id,a.revision,q.status,q.jokers_used
  FROM programme_activities a JOIN programme_question_rounds q ON q.activity_id=a.id
  WHERE a.event_id=$1`+lock, eventID).Scan(&id, &round.Revision, &round.Status, &round.JokersUsed)
-	if errors.Is(err, sql.ErrNoRows) || err == nil && !admin && round.Status == programme.RoundDraft {
+	if errors.Is(err, sql.ErrNoRows) {
 		err = programme.ErrNotFound
 	}
 	if err != nil {

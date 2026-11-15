@@ -64,7 +64,8 @@ export const voteSchema = z
   });
 
 const questionSummarySchema = z.object({
-  status: z.enum(["draft", "open", "closed"]),
+  // Open from its creation; the host can only close it.
+  status: z.enum(["open", "closed"]),
   // The activity page draws exactly two joker tickets.
   jokersUsed: z.number().int().min(0).max(2),
   questionCount: z.number().int().nonnegative(),

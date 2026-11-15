@@ -32,7 +32,7 @@ func readEvents(ctx context.Context, tx *sql.Tx, eventID int64, limit int, guest
  LEFT JOIN programme_question_rounds q ON q.activity_id=a.id
  LEFT JOIN programme_werewolf_games w ON w.activity_id=a.id
  LEFT JOIN guests m ON m.id=w.game_master_id
- WHERE ($1::bigint=0 OR e.id=$1) AND ($2 OR (COALESCE(v.status,'')<>'draft' AND COALESCE(q.status,'')<>'draft'))
+ WHERE ($1::bigint=0 OR e.id=$1) AND ($2 OR COALESCE(v.status,'')<>'draft')
  ORDER BY e.id LIMIT $3`, eventID, admin, limit)
 	if err != nil {
 		return nil, err

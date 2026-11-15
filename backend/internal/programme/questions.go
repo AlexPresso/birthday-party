@@ -16,11 +16,12 @@ const (
 	ErrNoJokers        ActivityError = "no_jokers_left"
 )
 
-// RoundStatus is the host-controlled phase of a question round.
+// RoundStatus is the phase of a question round. A round is open from its
+// creation, so guests may ask as soon as the event is revealed to them; the
+// host can only close it.
 type RoundStatus string
 
 const (
-	RoundDraft  RoundStatus = "draft"
 	RoundOpen   RoundStatus = "open"
 	RoundClosed RoundStatus = "closed"
 )
@@ -59,14 +60,14 @@ func (round QuestionRound) CheckTransition(status RoundStatus, revision int64) e
 	if revision != round.Revision {
 		return ErrActivityConflict
 	}
-	if round.Status == RoundDraft && status == RoundOpen || round.Status == RoundOpen && status == RoundClosed {
+	if round.Status == RoundOpen && status == RoundClosed {
 		return nil
 	}
 	return ErrActivityConflict
 }
 
 func (round QuestionRound) CheckResolution(current, next QuestionStatus, revision int64) error {
-	if revision != round.Revision || round.Status == RoundDraft || current != QuestionPending {
+	if revision != round.Revision || current != QuestionPending {
 		return ErrActivityConflict
 	}
 	if next != QuestionAnswered && next != QuestionJoker {

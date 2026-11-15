@@ -63,11 +63,10 @@ func (s *Store) Announce(ctx context.Context, now time.Time) (int, error) {
 // earliest first.
 func scheduledBetween(ctx context.Context, tx *sql.Tx, after, now time.Time) ([]programme.Scheduled, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT e.id,e.title,e.teaser,e.starts_at,e.unlock_at,
- COALESCE(v.status='draft' OR q.status='draft',FALSE)
+ COALESCE(v.status='draft',FALSE)
  FROM events e
  LEFT JOIN programme_activities a ON a.event_id=e.id
  LEFT JOIN programme_votes v ON v.activity_id=a.id
- LEFT JOIN programme_question_rounds q ON q.activity_id=a.id
  WHERE (e.starts_at>$1 AND e.starts_at<=$2) OR (e.unlock_at>$1 AND e.unlock_at<=$2)
  ORDER BY LEAST(e.starts_at,e.unlock_at),e.id`, after, now)
 	if err != nil {

@@ -99,20 +99,15 @@ test("the activity page preserves anonymous drafts, live votes and the host's tw
     await expect(editor.locator(".question-description")).toHaveText(
       "Les réponses se donnent à l’oral.",
     );
+    // The round is open from its creation: the host can only close it, and
+    // guests reach it from the programme at once.
     await expect(
-      editor.getByText("Caché jusqu’à l’ouverture des questions."),
+      editor.getByRole("button", { name: "Fermer les questions", exact: true }),
     ).toBeVisible();
-    await page.goto(activityURL);
     await expect(
-      page.getByRole("heading", { name: "Cette page n’existe pas." }),
-    ).toBeVisible();
-    await page.goto("/programme");
-    await expect(
-      page.getByRole("heading", { name: "Sans filtre", exact: true }),
+      editor.getByRole("button", { name: "Ouvrir les questions", exact: true }),
     ).toHaveCount(0);
-    await editor
-      .getByRole("button", { name: "Ouvrir les questions", exact: true })
-      .click();
+    await page.goto("/programme");
     await page.getByRole("link", { name: "Voir les questions" }).click();
     await expect(page).toHaveURL(activityURL);
     await expect(
@@ -383,13 +378,6 @@ test("direct activity links respect authentication and scheduled availability", 
         await page.request.post("/api/invitations/accept", {
           headers: mutationHeaders,
           data: { token: invitationToken(invitation.invitationUrl) },
-        })
-      ).status(),
-    ).toBe(200);
-    expect(
-      (
-        await host.post(`/api/admin/programme/${event.id}/questions/state`, {
-          data: { status: "open", revision: event.revision },
         })
       ).status(),
     ).toBe(200);

@@ -46,13 +46,16 @@ func TestQuestionsAreAnonymousRankedAndLimitedToTwoJokers(t *testing.T) {
 	path := fmt.Sprintf("/api/programme/%d/questions", event.ID)
 	adminPath := fmt.Sprintf("/api/admin/programme/%d/questions", event.ID)
 	status(t, request(t, a, "POST", "/api/admin/programme", programme.Input{Type: "questions", Title: "Forbidden"}, first), 403)
-	if len(programmeEvents(t, a, first, false)) != 0 {
-		t.Fatal("draft round was visible")
+	// A round is open from its creation: guests ask as soon as they see the event.
+	if listed := programmeEvents(t, a, first, false); len(listed) != 1 || listed[0].Questions.Status != programme.RoundOpen {
+		t.Fatalf("a new round is not open to guests: %+v", listed)
 	}
-	status(t, request(t, a, "GET", path, nil, first), 404)
-	status(t, request(t, a, "POST", path, map[string]string{"body": "Draft question"}, first), 404)
-	status(t, request(t, a, "POST", adminPath+"/state", map[string]any{"status": "open", "revision": 1}, first), 403)
-	round := questionState(t, a, host, event.ID, "open", event.Revision)
+	response := request(t, a, "GET", path, nil, first)
+	status(t, response, 200)
+	round := questionRoundResponse(t, response)
+	status(t, request(t, a, "POST", adminPath+"/state", map[string]any{"status": "closed", "revision": round.Revision}, first), 403)
+	// The host can only close it.
+	assertWelcomeError(t, request(t, a, "POST", adminPath+"/state", map[string]any{"status": "open", "revision": round.Revision}, host), 409, "activity_conflict")
 	for _, body := range []string{" ", strings.Repeat("a", 1001)} {
 		assertWelcomeError(t, request(t, a, "POST", path, map[string]string{"body": body}, first), 400, "invalid_question")
 	}
@@ -79,7 +82,7 @@ func TestQuestionsAreAnonymousRankedAndLimitedToTwoJokers(t *testing.T) {
 			t.Fatalf("incorrect ranking or viewer vote: %+v", round.Items)
 		}
 	}
-	response := request(t, a, "PUT", path+"/upvote", map[string]any{"questionId": ids[1], "upvoted": false}, first)
+	response = request(t, a, "PUT", path+"/upvote", map[string]any{"questionId": ids[1], "upvoted": false}, first)
 	status(t, response, 200)
 	if questionRoundResponse(t, response).Items[0].Votes != 1 {
 		t.Fatal("upvote was not removed")
@@ -94,6 +97,7 @@ func TestQuestionsAreAnonymousRankedAndLimitedToTwoJokers(t *testing.T) {
 	round = questionState(t, a, host, event.ID, "closed", round.Revision)
 	assertWelcomeError(t, request(t, a, "POST", path, map[string]string{"body": "Late question"}, second), 409, "questions_closed")
 	assertWelcomeError(t, request(t, a, "PUT", path+"/upvote", map[string]any{"questionId": ids[2], "upvoted": true}, second), 409, "questions_closed")
+	assertWelcomeError(t, request(t, a, "POST", adminPath+"/state", map[string]any{"status": "open", "revision": round.Revision}, host), 409, "activity_conflict")
 	response = request(t, a, "PUT", adminPath+"/resolve", map[string]any{"questionId": ids[2], "status": "answered", "revision": round.Revision}, host)
 	status(t, response, 200)
 	round = questionRoundResponse(t, response)
@@ -118,7 +122,7 @@ func TestQuestionAccessAndConcurrentJokers(t *testing.T) {
 	host, _ := admin(t, a)
 	guestCookie, _, _ := guest(t, a, host, "Guest")
 	event := questionEvent(t, a, host)
-	round := questionState(t, a, host, event.ID, "open", event.Revision)
+	var round programme.QuestionRound
 	path := fmt.Sprintf("/api/programme/%d/questions", event.ID)
 	for _, body := range []string{"One?", "Two?", "Three?"} {
 		response := request(t, a, "POST", path, map[string]string{"body": body}, guestCookie)
@@ -179,7 +183,6 @@ func TestQuestionLimitsWelcomeAndRevocationAreEnforced(t *testing.T) {
 	host, _ := admin(t, a)
 	visitor, viewer, _ := guest(t, a, host, "Question participant")
 	event := questionEvent(t, a, host)
-	questionState(t, a, host, event.ID, "open", event.Revision)
 	path := fmt.Sprintf("/api/programme/%d/questions", event.ID)
 	if _, err := a.db.Exec(`INSERT INTO programme_questions(activity_id,guest_id,body)
  SELECT a.id,$1,'Question '||n FROM programme_activities a CROSS JOIN generate_series(1,200) AS n WHERE a.event_id=$2`, viewer.ID, event.ID); err != nil {
