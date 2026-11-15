@@ -121,13 +121,6 @@ test("a guest's vote, message, question and photo show their result without a su
   expect(created.status()).toBe(201);
   const round = await created.json();
   eventIDs.push(round.id);
-  expect(
-    (
-      await host.post(`/api/admin/programme/${round.id}/questions/state`, {
-        data: { status: "open", revision: round.revision },
-      })
-    ).status(),
-  ).toBe(200);
   await page.goto(`/programme/${round.id}`);
   const question = "Quel est ton meilleur souvenir de cette année ?";
   await page

@@ -31,6 +31,26 @@ func TestQuestionResolutionPreservesTheTwoJokerBudget(t *testing.T) {
 	}
 }
 
+func TestTheHostCanOnlyCloseAnOpenRound(t *testing.T) {
+	for _, tc := range []struct {
+		from, to RoundStatus
+		want     error
+	}{
+		{RoundOpen, RoundClosed, nil},
+		{RoundOpen, RoundOpen, ErrActivityConflict},
+		{RoundClosed, RoundOpen, ErrActivityConflict},
+		{RoundClosed, RoundClosed, ErrActivityConflict},
+	} {
+		round := QuestionRound{QuestionSummary: QuestionSummary{Status: tc.from}, Revision: 2}
+		if err := round.CheckTransition(tc.to, 2); err != tc.want {
+			t.Errorf("%s to %s: got %v, want %v", tc.from, tc.to, err, tc.want)
+		}
+	}
+	if err := (QuestionRound{QuestionSummary: QuestionSummary{Status: RoundOpen}, Revision: 2}).CheckTransition(RoundClosed, 1); err != ErrActivityConflict {
+		t.Errorf("a stale close got %v", err)
+	}
+}
+
 func TestQuestionEventHidesItsRoundUntilUnlock(t *testing.T) {
 	now := time.Date(2026, 11, 5, 20, 0, 0, 0, time.UTC)
 	unlock := now.Add(time.Minute).Format(time.RFC3339)

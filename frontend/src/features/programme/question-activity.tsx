@@ -32,7 +32,6 @@ const emptyLabels = {
   joker: "questions.emptyJokers",
 } as const;
 const statusLabels = {
-  draft: "questions.draftStatus",
   open: "questions.openStatus",
   closed: "questions.closedStatus",
 } as const;
@@ -130,14 +129,10 @@ export function QuestionActivity({
     }
   }
 
-  async function transition() {
-    if (
-      round.status === "open" &&
-      !(await confirm({ message: t("questions.closeConfirm") }))
-    )
-      return;
+  async function close() {
+    if (!(await confirm({ message: t("questions.closeConfirm") }))) return;
     await mutate(`${adminPath}/state`, "POST", {
-      status: round.status === "draft" ? "open" : "closed",
+      status: "closed",
       revision: round.revision,
     });
   }
@@ -369,27 +364,17 @@ export function QuestionActivity({
           {(isAdmin || round.status !== "open") && (
             <div className="question-management">
               <h2>{t(statusLabels[round.status])}</h2>
-              {round.status !== "open" && (
-                <p className="muted">
-                  {t(
-                    round.status === "draft"
-                      ? "questions.draft"
-                      : "questions.closed",
-                  )}
-                </p>
+              {round.status === "closed" && (
+                <p className="muted">{t("questions.closed")}</p>
               )}
-              {isAdmin && round.status !== "closed" && (
+              {isAdmin && round.status === "open" && (
                 <button
                   type="button"
                   className="button secondary"
                   disabled={busy}
-                  onClick={() => void transition()}
+                  onClick={() => void close()}
                 >
-                  {t(
-                    round.status === "draft"
-                      ? "questions.open"
-                      : "questions.close",
-                  )}
+                  {t("questions.close")}
                 </button>
               )}
             </div>

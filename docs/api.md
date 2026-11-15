@@ -379,8 +379,8 @@ is off, so turning it on announces nothing from the past.
 
 - An event whose start and reveal are due together sends one notification, for
   the start.
-- A vote or question activity still in draft sends nothing. A werewolf event
-  has no draft: its start and reveal are announced like an ordinary event's.
+- A vote still in draft sends nothing. Question and werewolf events have no
+  draft: their start and reveal are announced like an ordinary event's.
 - Recipients are devices of administrators and of guests with full app access
   at that moment; guests held in the welcome sequence receive nothing.
 - Each device keeps one queued message per event and moment, with the same
@@ -606,13 +606,14 @@ metadata. The visibility decision uses one instant for the complete response.
 ### Question events (No Filter)
 
 Create with `type: "questions"` and ordinary event metadata; no additional settings
-are required. This creates a draft round atomically. Questions are anonymous to
+are required. This creates an open round atomically: guests may ask and upvote
+as soon as the event is revealed to them, without any step from the host. Questions are anonymous to
 all viewers, including administrators. The database retains the submitting guest
 for access/accounting, but no author name, ID, avatar or voter list is returned.
 
 ```typescript
 type QuestionSummary = {
-  status: "draft" | "open" | "closed";
+  status: "open" | "closed";
   jokersUsed: number; // 0 to 2, shared by the whole activity
   questionCount: number; // 0 to 200
 };
@@ -640,8 +641,8 @@ submit or vote. Each guest may upvote any pending question once, including their
 own; setting `upvoted` is idempotent and false removes it. Counts are visible
 immediately. Pending questions come first, ordered by descending votes, then ID.
 
-Host transitions are `draft` -> `open` -> `closed`. Closing stops submissions and
-votes but still allows answers. The host answers orally and marks a pending
+The only host transition is `open` -> `closed`; a closed round does not
+reopen. Closing stops submissions and votes but still allows answers. The host answers orally and marks a pending
 question `answered`, or spends a joker to mark it `joker`. These are terminal
 states. The whole activity has exactly two jokers, enforced under transaction
 locks and a database constraint. Concurrent actions cannot overspend. Host edits,
@@ -649,7 +650,7 @@ transitions and resolutions increment the revision; submissions and upvotes do
 not. Metadata edits preserve all questions, votes and spent jokers.
 
 Reads and mutations recheck current session, guest and welcome access in their
-transaction. Locked/draft rounds return 404 to guests. Successful mutations emit
+transaction. Locked rounds return 404 to guests. Successful mutations emit
 the shared programme invalidation after commit. Errors include `invalid_question`
 (400), `questions_closed`, `question_limit_reached`, `no_jokers_left` and
 `activity_conflict` (409). Private content never travels in WebSocket messages.
