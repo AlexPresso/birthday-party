@@ -1,11 +1,7 @@
-<p align="center">
-  <img src="docs/banner.png" alt="Birthday Party, with three phone screenshots: the gallery, the schedule and a werewolf game" width="100%">
-</p>
-
 # Birthday Party
 
 A small app made for my 30th birthday, feel free to host and use it too, it was
-designed to be reusable and highly customizable!
+designed to be modular, reusable and highly customizable!
 
 <p align="center">
   <img src="docs/screenshots/invitation.webp" width="32%" alt="Invitation page: a large 30 in an orange ring and an Enter button">
