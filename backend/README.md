@@ -100,6 +100,12 @@ unchanged, running backend does not issue a new invitation; restarting it does.
 Invitation URLs use `PUBLIC_URL`, including any custom browser port. Ordinary
 HTTP request logs never include these tokens.
 
+Each request is logged once answered, with its protocol, method, path without
+the query string, status, duration and peer address, followed by any
+`X-Forwarded-For` chain. Behind a proxy the peer is the proxy; the forwarded
+chain is client-supplied and only logged. A WebSocket is logged with status 101
+when it closes.
+
 ## Behavior and limits
 
 - Invite-only access. No signup or automatic invitation delivery. Hosts manually send

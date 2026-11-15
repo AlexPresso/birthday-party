@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log"
 	"net/http"
 	"time"
 )
@@ -25,7 +26,7 @@ const (
 func (a *App) HTTPServer() *http.Server {
 	return &http.Server{
 		Addr:              a.config.ListenAddr,
-		Handler:           a.Handler(),
+		Handler:           logRequests(a.Handler(), log.Printf),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       requestReadTimeout,
 		WriteTimeout:      responseWriteTimeout,
