@@ -55,7 +55,8 @@ illustrative and must not be seeded into the application.
   is still under reduced motion.
 - **Tab changes.** Pressing a dock tab slides the page towards that tab (48px,
   with a short fade) while the dock stays put and its orange pill glides to
-  the new tab. This uses React's `<ViewTransition>` through
+  the new tab. The page passes under the dock, and a tab's icon takes the
+  pill's colours only while the pill is under it. This uses React's `<ViewTransition>` through
   `components/page-transition.tsx`, wrapped around each party page, and the
   direction each dock link declares. Browser back, refreshes and in-page
   updates do not slide. Under reduced motion the page swaps instantly.

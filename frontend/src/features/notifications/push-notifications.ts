@@ -11,17 +11,22 @@ function applicationKey(publicKey: string) {
   );
 }
 
-export function notificationKeyMatches(
+/**
+ * Whether the browser subscription was made for another application key, as
+ * after restoring a database. A browser that does not report the key (Firefox
+ * for Android, it seems) is not a difference: the server's status decides.
+ */
+export function notificationKeyDiffers(
   subscription: PushSubscription,
   publicKey: string,
 ) {
-  const existing = subscription.options.applicationServerKey;
+  const existing = subscription.options?.applicationServerKey;
   if (!existing) return false;
   const expected = applicationKey(publicKey);
   const actual = new Uint8Array(existing);
   return (
-    actual.length === expected.length &&
-    actual.every((byte, index) => byte === expected[index])
+    actual.length !== expected.length ||
+    actual.some((byte, index) => byte !== expected[index])
   );
 }
 
@@ -87,7 +92,7 @@ export async function enableNotifications({
     signal,
   );
   signal.throwIfAborted();
-  if (subscription && !notificationKeyMatches(subscription, publicKey)) {
+  if (subscription && notificationKeyDiffers(subscription, publicKey)) {
     // A restored database can have another application key. Replace that old
     // browser subscription only during this explicit enable action.
     const removed = await waitForPush(subscription.unsubscribe(), signal);
