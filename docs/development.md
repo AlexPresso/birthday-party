@@ -114,13 +114,27 @@ go test -race ./...
 
 ## Deploy
 
-Production runs on Kubernetes with the Helm chart in
-[charts/birthday-party](../charts/birthday-party/README.md) (guide in French).
+Production runs on Kubernetes with the
+[birthday-party Helm chart](https://github.com/AlexPresso/helm.alexpresso.me/tree/main/charts/birthday-party),
+published at `https://helm.alexpresso.me`:
+
+```sh
+helm repo add alexpresso https://helm.alexpresso.me
+helm install birthday alexpresso/birthday-party --namespace birthday --create-namespace \
+  --set ingress.enable=true --set ingress.host=party.example.com \
+  --set postgresql.password=<generated password>
+kubectl --namespace birthday logs deployment/birthday-backend
+```
+
 It installs the frontend, one Go backend and PostgreSQL, with persistent
 volumes, network policies and an HTTPS Ingress that sends `/api` straight to
-Go. The images are `ghcr.io/alexpresso/birthday-party-backend` and
+Go. Its README lists every value, the Ingress settings uploads need, external
+databases and upgrades. The images are
+`ghcr.io/alexpresso/birthday-party-backend` and
 `ghcr.io/alexpresso/birthday-party-frontend`, built for `linux/amd64` and
-`linux/arm64`; deploy both with the same `sha-<full commit SHA>` tag.
+`linux/arm64`. Pushing a `v<version>` tag publishes them as `<version>`, the
+chart's default; `main` publishes `sha-<full commit SHA>` and `latest`. Deploy
+both with the same tag.
 
 Whatever sits in front of the app has a few things to get right:
 
