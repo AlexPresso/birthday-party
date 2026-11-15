@@ -477,6 +477,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 4px;
+    /* Its own layer in a tab change, so the sliding page passes under it. */
+    view-transition-name: nav-dock;
   }
   .navigation a {
     position: relative;
@@ -494,9 +496,8 @@
     font-weight: 800;
     line-height: 1;
     white-space: nowrap;
-    transition:
-      background 0.15s,
-      color 0.15s;
+    /* Not the colour: the tab change times it with the pill. */
+    transition: background 0.15s;
   }
   @media (hover: hover) {
     .navigation a:not([aria-current="page"]):hover {
@@ -521,6 +522,9 @@
     align-items: center;
     gap: inherit;
     view-transition-class: nav-tab;
+  }
+  .navigation a[aria-current="page"] .navigation-content {
+    view-transition-class: nav-tab nav-current;
   }
   /* Only the current tab spells out its name; the others keep their icon. */
   .navigation-label {
@@ -917,9 +921,52 @@
     width: auto;
     height: 100%;
   }
+  /*
+   * A tab's icon takes the pill's colours only while the pill is under it. The
+   * tab left behind shows its plain icon at once, instead of fading out its
+   * dark one after the pill has gone. A tab's group takes its class from the
+   * new page, so .nav-current is the tab the pill moves to: its plain icon
+   * stays until the pill has mostly arrived.
+   */
+  ::view-transition-old(.nav-tab) {
+    animation: none;
+    opacity: 0;
+  }
+  ::view-transition-new(.nav-tab) {
+    animation: none;
+  }
+  ::view-transition-old(.nav-tab.nav-current) {
+    opacity: 1;
+    animation: 140ms ease-in-out 100ms both page-fade reverse;
+  }
+  ::view-transition-new(.nav-tab.nav-current) {
+    animation: 140ms ease-in-out 100ms both page-fade;
+  }
   ::view-transition-old(nav-indicator),
   ::view-transition-new(nav-indicator) {
     height: 100%;
+  }
+  /*
+   * Layers follow the previous page's paint order, which put the pill above
+   * the tabs on its left. Stack them explicitly: the sliding page, the dock,
+   * the pill, then every tab's icon.
+   */
+  ::view-transition-group(nav-dock) {
+    z-index: 1;
+  }
+  /* The dock's surface does not change; only the old pending mark would fade. */
+  ::view-transition-old(nav-dock) {
+    animation: none;
+    opacity: 0;
+  }
+  ::view-transition-new(nav-dock) {
+    animation: none;
+  }
+  ::view-transition-group(nav-indicator) {
+    z-index: 2;
+  }
+  ::view-transition-group(.nav-tab) {
+    z-index: 3;
   }
   ::view-transition-old(.nav-forward) {
     --slide-offset: -48px;
