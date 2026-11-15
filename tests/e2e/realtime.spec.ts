@@ -186,7 +186,9 @@ test("welcome and media widgets share one socket and refresh only after changes"
   expect(
     (await (await page.request.get(`/api/uploads/${job.id}`)).json()).status,
   ).toBe("ready");
-  expect(network.invalidations("uploads")).toBeGreaterThan(0);
+  // A socket receives at most one invalidation per second, so the signal may
+  // follow the ready state shortly.
+  await expect.poll(() => network.invalidations("uploads")).toBeGreaterThan(0);
   // The details are modal: close the first widget's before the second's.
   await closeUploadDetails(page);
   // A second-device upload has no local transfer callback to refresh this tab.
@@ -389,7 +391,7 @@ test("queue reads retry explicitly and socket receipts recover a lost upload res
       exact: true,
     }),
   ).toHaveCount(0);
-  expect(network.invalidations("uploads")).toBeGreaterThan(0);
+  await expect.poll(() => network.invalidations("uploads")).toBeGreaterThan(0);
 });
 
 test("reconnection shows the first step, preserves position on later unlocks, and handles revocation", async ({
