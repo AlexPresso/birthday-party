@@ -250,11 +250,15 @@ test("a colour no text can be read on is flagged under the swatches", async ({
     "Sur cette couleur, le texte des boutons sera difficile à lire.",
   );
   await expect(warning).toHaveCount(0);
-  await pickColour(
-    editor.getByLabel("Autre couleur", { exact: true }),
-    "#c06000",
-  );
-  await expect(warning).toBeVisible();
+  // Events sent before hydration reach no React handler: pick again until
+  // the editor has taken the colour.
+  await expect(async () => {
+    await pickColour(
+      editor.getByLabel("Autre couleur", { exact: true }),
+      "#c06000",
+    );
+    await expect(warning).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect
     .poll(async () => (await configuration()).appearance.accent)
     .toBe("#c06000");
