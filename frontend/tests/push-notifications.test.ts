@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   enableNotifications,
+  notificationKeyDiffers,
   waitForPush,
 } from "../src/features/notifications/push-notifications.ts";
 
@@ -195,4 +196,38 @@ test("an explicit enable replaces an old application key before saving", async (
     save: async () => assert.equal(created, true),
   });
   assert.equal(result, "enabled");
+});
+
+test("a subscription whose browser hides its application key is kept", async () => {
+  // A browser that reports no key keeps its subscription; the server decides.
+  let saved = false;
+  const hidden = {
+    ...subscription,
+    options: { applicationServerKey: null },
+    unsubscribe: async () => assert.fail("the subscription was replaced"),
+  } as unknown as PushSubscription;
+  assert.equal(notificationKeyDiffers(hidden, publicKey), false);
+  const result = await enableNotifications({
+    requestPermission: async () => "granted",
+    registration: registration(
+      async () => hidden,
+      async () => assert.fail("a second subscription was created"),
+    ),
+    publicKey,
+    locale: "en",
+    signal: new AbortController().signal,
+    save: async () => {
+      saved = true;
+    },
+  });
+  assert.equal(result, "enabled");
+  assert.equal(saved, true);
+});
+
+test("only a known, different application key counts as a difference", () => {
+  assert.equal(notificationKeyDiffers(subscription, publicKey), false);
+  const other = {
+    options: { applicationServerKey: new Uint8Array(65).buffer },
+  } as unknown as PushSubscription;
+  assert.equal(notificationKeyDiffers(other, publicKey), true);
 });

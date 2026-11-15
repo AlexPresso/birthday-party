@@ -11,7 +11,7 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import {
   enableNotifications,
-  notificationKeyMatches,
+  notificationKeyDiffers,
   waitForPush,
 } from "./push-notifications";
 import { ErrorNotice } from "@/components/ui";
@@ -102,7 +102,7 @@ export function NotificationControl({
       if (
         Notification.permission !== "granted" ||
         !subscription ||
-        !notificationKeyMatches(subscription, config.publicKey)
+        notificationKeyDiffers(subscription, config.publicKey)
       ) {
         setState("off");
         return;
