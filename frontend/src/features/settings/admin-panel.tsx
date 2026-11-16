@@ -28,6 +28,7 @@ import { EventManager } from "../programme/event-manager";
 import { ConfigurationEditor } from "../party/configuration-editor";
 import { AppearanceEditor } from "../party/appearance-editor";
 import { WelcomeAdmin } from "../welcome/welcome-admin";
+import { birthdayCopy } from "../party/birthday-copy";
 import { MediaCategoriesAdmin } from "../media/media-categories-admin";
 import type { AdminWelcome } from "../welcome/contracts";
 import type { MediaCategory, Storage } from "../media/contracts";
@@ -267,7 +268,14 @@ export function AdminPanel({
           />
         );
       case "welcome":
-        return <WelcomeAdmin initial={welcome} categories={categories} />;
+        return (
+          <WelcomeAdmin
+            initial={welcome}
+            categories={categories}
+            host={guest}
+            title={birthdayCopy(configuration, locale, t).title}
+          />
+        );
       case "information":
         return (
           <InformationEditor

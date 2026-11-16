@@ -19,7 +19,7 @@ func New(db *sql.DB) *Store { return &Store{db: db} }
 
 // List returns the bounded list of guest identities.
 func (s *Store) List(ctx context.Context, limit int) ([]identity.Guest, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id,name,role,active,CASE WHEN avatar_jpeg IS NOT NULL THEN avatar_version ELSE 0 END,phone FROM guests ORDER BY active DESC,name,id LIMIT $1", limit)
+	rows, err := s.db.QueryContext(ctx, "SELECT id,name,role,active,CASE WHEN avatar_jpeg IS NOT NULL THEN avatar_version ELSE 0 END,phone,joined_at IS NOT NULL FROM guests ORDER BY active DESC,name,id LIMIT $1", limit)
 	if err != nil {
 		return nil, err
 	}
@@ -28,10 +28,12 @@ func (s *Store) List(ctx context.Context, limit int) ([]identity.Guest, error) {
 	for rows.Next() {
 		var guest identity.Guest
 		var version int64
-		if err := rows.Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &version, &guest.Phone); err != nil {
+		var joined bool
+		if err := rows.Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &version, &guest.Phone, &joined); err != nil {
 			return nil, err
 		}
 		guest.AvatarURL = identity.AvatarURL(guest.ID, version)
+		guest.Joined = &joined
 		items = append(items, guest)
 	}
 	return items, rows.Err()

@@ -22,6 +22,7 @@ const configuration = {
   },
   appearance: { theme: "light", accent: "#3e63dd" },
   whatsappMessage: "Coucou {name} : {link}",
+  waitingMessage: null,
 };
 
 test("configuration responses preserve defaults, hidden text and authored translations", () => {

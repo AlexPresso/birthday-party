@@ -294,7 +294,8 @@ test("the five screens adapt to phones and desktops in the dark theme while pres
           data: {
             title: "Les 30 ans",
             timezone: "Europe/Zurich",
-            date: tomorrowAt("18:30"),
+            // No date: a party in the future would keep the guests out.
+            date: null,
             location: "",
           },
         })

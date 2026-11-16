@@ -39,8 +39,8 @@ func (s *Store) InitializeConfiguration(ctx context.Context, initial func() (par
 func (s *Store) Configuration(ctx context.Context) (party.Configuration, error) {
 	var result party.Configuration
 	var copy []byte
-	err := s.db.QueryRowContext(ctx, "SELECT age,invitation,image_size_mb,video_size_mb,theme,accent,whatsapp_message FROM product_configuration WHERE id=1").
-		Scan(&result.Age, &copy, &result.ImageSizeMB, &result.VideoSizeMB, &result.Appearance.Theme, &result.Appearance.Accent, &result.WhatsAppMessage)
+	err := s.db.QueryRowContext(ctx, "SELECT age,invitation,image_size_mb,video_size_mb,theme,accent,whatsapp_message,waiting_message FROM product_configuration WHERE id=1").
+		Scan(&result.Age, &copy, &result.ImageSizeMB, &result.VideoSizeMB, &result.Appearance.Theme, &result.Appearance.Accent, &result.WhatsAppMessage, &result.WaitingMessage)
 	if err != nil {
 		return result, err
 	}
@@ -76,8 +76,8 @@ func (s *Store) SaveConfiguration(ctx context.Context, actor party.Configuration
 	if err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "UPDATE product_configuration SET age=$1,invitation=$2,image_size_mb=$3,video_size_mb=$4,theme=$5,accent=$6,whatsapp_message=$7 WHERE id=1",
-		input.Age, copy, input.ImageSizeMB, input.VideoSizeMB, string(input.Appearance.Theme), input.Appearance.Accent, input.WhatsAppMessage); err != nil {
+	if _, err = tx.ExecContext(ctx, "UPDATE product_configuration SET age=$1,invitation=$2,image_size_mb=$3,video_size_mb=$4,theme=$5,accent=$6,whatsapp_message=$7,waiting_message=$8 WHERE id=1",
+		input.Age, copy, input.ImageSizeMB, input.VideoSizeMB, string(input.Appearance.Theme), input.Appearance.Accent, input.WhatsAppMessage, input.WaitingMessage); err != nil {
 		return err
 	}
 	return tx.Commit()

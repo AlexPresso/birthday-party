@@ -21,8 +21,55 @@
     margin: 22px 0;
     background: var(--accent-soft);
   }
-  .invitation-result .section-row {
+  .invitation-result .section-row,
+  .bulk-whatsapp .section-row {
     margin-bottom: 12px;
+  }
+  .bulk-whatsapp-start {
+    margin-bottom: 22px;
+  }
+  /* Sends the invitations one WhatsApp message after another. */
+  .bulk-whatsapp {
+    margin: 0 0 22px;
+    padding: 18px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-small);
+    background: var(--accent-soft);
+  }
+  .bulk-whatsapp .fine-print,
+  .bulk-whatsapp-missing {
+    margin: 0 0 12px;
+  }
+  .bulk-whatsapp-missing {
+    color: var(--danger);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .bulk-whatsapp-guest {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 54px;
+    margin: 14px 0;
+  }
+  .bulk-whatsapp-guest strong,
+  .bulk-whatsapp-guest .fine-print {
+    display: block;
+    margin: 0;
+  }
+  /* Sending first, across the row; going back and skipping under it. */
+  .bulk-whatsapp-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .bulk-whatsapp-actions > a.button {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+  .bulk-whatsapp-actions a[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
   }
   .invitation-result input {
     font-size: 12px;
@@ -56,10 +103,17 @@
   }
   .guest-list > li {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     padding: 14px 0;
     border-top: 1px solid var(--border);
+  }
+  /* A guest opened from the list unfolds under their own row. */
+  .guest-list > li > .invitation-result {
+    flex-basis: 100%;
+    min-width: 0;
+    margin: 4px 0 0;
   }
   /* The name opens the guest to edit them. */
   .guest-list-name {

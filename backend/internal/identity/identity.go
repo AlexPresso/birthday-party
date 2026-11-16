@@ -35,6 +35,9 @@ type Guest struct {
 	// Phone is private: only the administrators' guest list carries it, in
 	// international form (+41791234567).
 	Phone *string `json:"phone,omitempty"`
+	// Joined, also only in that list, says whether the guest ever opened one
+	// of their invitations.
+	Joined *bool `json:"joined,omitempty"`
 }
 
 // IsAdmin reports whether the guest is a host.

@@ -12,3 +12,18 @@ export function invitationMessage(
     ? message.replaceAll("{link}", link)
     : `${message}\n${link}`;
 }
+
+/**
+ * Opens WhatsApp on the device with the message written out for an
+ * international number (+41791234567). The whatsapp:// scheme is handled by
+ * the app itself, so the invitation never travels in a web address's query.
+ */
+export function whatsappLink(
+  phone: string,
+  template: string,
+  name: string,
+  link: string,
+) {
+  const text = invitationMessage(template, name, link);
+  return `whatsapp://send?phone=${phone.slice(1)}&text=${encodeURIComponent(text)}`;
+}

@@ -25,6 +25,9 @@ const en = {
   "configuration.languages": "Text by language",
   "configuration.languageHint":
     "A text set for one language replaces the shared text.",
+  "configuration.waitingMessage": "Note for guests",
+  "configuration.waitingHint":
+    "Shown on the invitation page, under the date and place, once the link is opened.",
   "configuration.whatsappMessage": "WhatsApp message",
   "configuration.whatsappHint":
     "Only you see it. {name} becomes the guest’s name and {link} their personal link, added at the end if missing.",
@@ -77,6 +80,9 @@ const fr: ConfigurationMessages = {
   "configuration.languages": "Textes par langue",
   "configuration.languageHint":
     "Un texte défini pour une langue remplace le texte commun.",
+  "configuration.waitingMessage": "Mot pour les invités",
+  "configuration.waitingHint":
+    "Affiché sur la page d’invitation, sous la date et le lieu, une fois le lien ouvert.",
   "configuration.whatsappMessage": "Message WhatsApp",
   "configuration.whatsappHint":
     "Toi seul le vois. {name} devient le prénom de l’invité et {link} son lien personnel, ajouté à la fin s’il manque.",
@@ -127,6 +133,9 @@ const de: ConfigurationMessages = {
   "configuration.languages": "Texte nach Sprache",
   "configuration.languageHint":
     "Ein Text für eine Sprache ersetzt den gemeinsamen Text.",
+  "configuration.waitingMessage": "Nachricht an die Gäste",
+  "configuration.waitingHint":
+    "Erscheint auf der Einladungsseite unter Datum und Ort, sobald der Link geöffnet wurde.",
   "configuration.whatsappMessage": "WhatsApp-Nachricht",
   "configuration.whatsappHint":
     "Nur du siehst sie. {name} wird zum Namen des Gasts und {link} zu seinem persönlichen Link, der sonst am Ende steht.",
@@ -177,6 +186,9 @@ const it: ConfigurationMessages = {
   "configuration.languages": "Testi per lingua",
   "configuration.languageHint":
     "Un testo impostato per una lingua sostituisce il testo comune.",
+  "configuration.waitingMessage": "Messaggio per gli invitati",
+  "configuration.waitingHint":
+    "Mostrato nella pagina dell’invito, sotto la data e il luogo, una volta aperto il link.",
   "configuration.whatsappMessage": "Messaggio WhatsApp",
   "configuration.whatsappHint":
     "Lo vedi solo tu. {name} diventa il nome dell’invitato e {link} il suo link personale, aggiunto alla fine se manca.",
@@ -227,6 +239,9 @@ const es: ConfigurationMessages = {
   "configuration.languages": "Textos por idioma",
   "configuration.languageHint":
     "Un texto definido para un idioma sustituye al texto común.",
+  "configuration.waitingMessage": "Mensaje para los invitados",
+  "configuration.waitingHint":
+    "Se muestra en la página de invitación, bajo la fecha y el lugar, una vez abierto el enlace.",
   "configuration.whatsappMessage": "Mensaje de WhatsApp",
   "configuration.whatsappHint":
     "Solo tú lo ves. {name} se convierte en el nombre del invitado y {link} en su enlace personal, que se añade al final si falta.",

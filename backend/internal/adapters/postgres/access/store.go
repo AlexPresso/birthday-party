@@ -23,13 +23,13 @@ func (s *Store) Session(ctx context.Context, session string, now time.Time) (acc
 	var result access.Snapshot
 	var avatarVersion int64
 	guest := &result.Guest
-	err := s.db.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active,`+pgwelcome.AccessSQL+`,
+	err := s.db.QueryRowContext(ctx, `SELECT g.id,g.name,g.role,g.active,COALESCE((SELECT date>$2 FROM party WHERE id=1),false),`+pgwelcome.AccessSQL+`,
  CASE WHEN g.avatar_jpeg IS NOT NULL THEN g.avatar_version ELSE 0 END,
  COALESCE(`+pgwelcome.PositionSQL+` AND w.steps->(p.position-1)->'widgets' @> '[{"type":"profile_photo"}]'::jsonb,false),
  COALESCE(`+pgwelcome.PositionSQL+` AND w.steps->(p.position-1)->'widgets' @> '[{"type":"media_upload"}]'::jsonb,false)
  FROM sessions s JOIN guests g ON g.id=s.guest_id CROSS JOIN welcome w
  LEFT JOIN guest_welcome_progress p ON p.guest_id=g.id
- WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active`, session, now).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &result.Open, &avatarVersion, &result.ProfileWidget, &result.MediaWidget)
+ WHERE w.id=1 AND s.token_hash=$1 AND s.expires_at>$2 AND g.active`, session, now).Scan(&guest.ID, &guest.Name, &guest.Role, &guest.Active, &result.Early, &result.Open, &avatarVersion, &result.ProfileWidget, &result.MediaWidget)
 	if errors.Is(err, sql.ErrNoRows) {
 		return result, access.ErrExpired
 	}

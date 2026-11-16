@@ -333,4 +333,42 @@
       gap: 12px;
     }
   }
+
+  .welcome-preview-action {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 14px;
+  }
+
+  /* The welcome as guests see it, over the whole window. */
+  .welcome-preview {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: auto;
+    background: var(--background);
+    color: var(--text);
+  }
+
+  .welcome-preview::backdrop {
+    background: var(--background);
+  }
+
+  .welcome-preview .welcome-header {
+    gap: 12px;
+  }
+
+  .welcome-preview-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
 }

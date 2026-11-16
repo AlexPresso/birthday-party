@@ -129,6 +129,7 @@ export function ConfigurationEditor({
           : {
               invitation: initial.invitation,
               whatsappMessage: initial.whatsappMessage,
+              waitingMessage: initial.waitingMessage,
             },
     ),
   );
@@ -157,6 +158,8 @@ export function ConfigurationEditor({
       };
       patch.whatsappMessage =
         String(fields.get("whatsappMessage") ?? "").trim() || null;
+      patch.waitingMessage =
+        String(fields.get("waitingMessage") ?? "").trim() || null;
     }
     const snapshot = JSON.stringify(patch);
     if (snapshot === lastSaved.current) {
@@ -324,6 +327,23 @@ export function ConfigurationEditor({
                 </fieldset>
               );
             })}
+            <div className="configuration-whatsapp">
+              <label htmlFor={`${id}-waiting`}>
+                {t("configuration.waitingMessage")}
+              </label>
+              <textarea
+                id={`${id}-waiting`}
+                name="waitingMessage"
+                rows={4}
+                maxLength={2000}
+                defaultValue={initial.waitingMessage ?? ""}
+
+                aria-describedby={`${id}-waiting-hint`}
+              />
+              <p id={`${id}-waiting-hint`} className="fine-print">
+                {t("configuration.waitingHint")}
+              </p>
+            </div>
             <div className="configuration-whatsapp">
               <label htmlFor={`${id}-whatsapp`}>
                 {t("configuration.whatsappMessage")}

@@ -7,13 +7,13 @@ import { formatDate } from "@/lib/dates";
 import { useCopiedCue } from "@/lib/use-copied-cue";
 import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { guestUpdateSchema, type Guest, type Invitation } from "./contracts";
-import { invitationMessage } from "./invitation-message";
+import { whatsappLink } from "./invitation-message";
 
 /**
- * One guest's name and number, saved when a field is left, and their latest
- * invitation: the link, its copy button and WhatsApp with the message written
- * out. The whatsapp:// scheme opens the app on the device itself, so the link
- * never travels in a web address's query.
+ * One guest's name and number, saved when a field is left, and the latest
+ * invitation issued here: the link, its copy button and WhatsApp with the
+ * message written out. It opens under the guest's row, or under the creation
+ * form for a new guest.
  */
 export function GuestPanel({
   guest,
@@ -77,13 +77,12 @@ export function GuestPanel({
 
   const whatsapp =
     invitation && guest.phone && !dirty
-      ? `whatsapp://send?phone=${guest.phone.slice(1)}&text=${encodeURIComponent(
-          invitationMessage(
-            whatsappMessage ?? t("admin.whatsappMessage"),
-            guest.name,
-            invitation.invitationUrl,
-          ),
-        )}`
+      ? whatsappLink(
+          guest.phone,
+          whatsappMessage ?? t("admin.whatsappMessage"),
+          guest.name,
+          invitation.invitationUrl,
+        )
       : null;
   return (
     <section className="invitation-result" aria-labelledby={`${id}-title`}>

@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
-import { Plus, Link2, Pencil, Trash2 } from "lucide-react";
+import { Plus, Link2, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { api, remove, errorMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
 import { GuestPanel } from "./guest-panel";
+import { BulkWhatsApp } from "./bulk-whatsapp";
 import {
   invitationSchema,
   newGuestSchema,
@@ -39,11 +40,32 @@ export function GuestManager({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The guest open in the panel, with the link issued in this visit if any.
+  // A new guest's panel stays under the creation form; any other opens
+  // under its row, where the host clicked.
   const [open, setOpen] = useState<{
     guestId: number;
     invitation: Invitation | null;
+    created: boolean;
   } | null>(null);
+  const [bulk, setBulk] = useState(false);
   const openGuest = open && guests.find((guest) => guest.id === open.guestId);
+
+  function panel(guest: Guest) {
+    if (!open) return null;
+    return (
+      <GuestPanel
+        // A new link starts the panel afresh, its copy cue included.
+        key={`${guest.id}-${open.invitation?.invitationUrl ?? ""}`}
+        guest={guest}
+        invitation={open.invitation}
+        whatsappMessage={whatsappMessage}
+        timezone={timezone}
+        onGuestChange={onGuestChange}
+        onInvitation={(invitation) => setOpen({ ...open, invitation })}
+        onClose={() => setOpen(null)}
+      />
+    );
+  }
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -56,7 +78,7 @@ export function GuestManager({
         { method: "POST", body: { name: name.trim(), phone } },
       );
       onGuestChange(guest);
-      setOpen({ guestId: guest.id, invitation });
+      setOpen({ guestId: guest.id, invitation, created: true });
       setName("");
       setPhone("");
     } catch (err) {
@@ -75,7 +97,7 @@ export function GuestManager({
         { method: "POST", body: {} },
       );
       onGuestChange({ ...guest, active: true });
-      setOpen({ guestId: guest.id, invitation });
+      setOpen({ guestId: guest.id, invitation, created: false });
     } catch (err) {
       setError(errorMessage(err, t));
     } finally {
@@ -122,6 +144,22 @@ export function GuestManager({
   }
   return (
     <div className="admin-form">
+      {bulk ? (
+        <BulkWhatsApp
+          guests={guests}
+          whatsappMessage={whatsappMessage}
+          onClose={() => setBulk(false)}
+        />
+      ) : (
+        <button
+          type="button"
+          className="button secondary bulk-whatsapp-start"
+          onClick={() => setBulk(true)}
+        >
+          <MessageCircle size={17} aria-hidden="true" />
+          {t("admin.bulkStart")}
+        </button>
+      )}
       <form className="invite-form" onSubmit={create}>
         <div>
           <label htmlFor="guest-name">{t("admin.guestName")}</label>
@@ -155,21 +193,7 @@ export function GuestManager({
         </button>
       </form>
       <ErrorNotice message={error} />
-      {open && openGuest && (
-        <GuestPanel
-          // A new link starts the panel afresh, its copy cue included.
-          key={`${openGuest.id}-${open.invitation?.invitationUrl ?? ""}`}
-          guest={openGuest}
-          invitation={open.invitation}
-          whatsappMessage={whatsappMessage}
-          timezone={timezone}
-          onGuestChange={onGuestChange}
-          onInvitation={(invitation) =>
-            setOpen({ guestId: openGuest.id, invitation })
-          }
-          onClose={() => setOpen(null)}
-        />
-      )}
+      {open?.created && openGuest && panel(openGuest)}
       <div className="section-row guest-list-heading">
         <h3>{t("admin.guests")}</h3>
         <span className="fine-print">
@@ -195,11 +219,12 @@ export function GuestManager({
             <button
               type="button"
               className="guest-list-name"
+              aria-expanded={open?.guestId === guest.id && !open.created}
               onClick={() =>
                 setOpen(
-                  open?.guestId === guest.id
-                    ? open
-                    : { guestId: guest.id, invitation: null },
+                  open?.guestId === guest.id && !open.created
+                    ? null
+                    : { guestId: guest.id, invitation: null, created: false },
                 )
               }
               aria-label={t("admin.editGuest", { name: guest.name })}
@@ -257,6 +282,7 @@ export function GuestManager({
                 </button>
               )}
             </div>
+            {open?.guestId === guest.id && !open.created && panel(guest)}
           </li>
         ))}
       </ul>

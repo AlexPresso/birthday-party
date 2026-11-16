@@ -50,3 +50,54 @@ func TestGuestPhonesStayWithTheHost(t *testing.T) {
 		t.Fatal("an empty number did not remove the phone")
 	}
 }
+
+func TestGuestListTellsWhoJoined(t *testing.T) {
+	t.Parallel()
+	a := testApp(t)
+	host, _ := admin(t, a)
+	_, entered, _ := guest(t, a, host, "Entered")
+	status(t, request(t, a, "POST", "/api/admin/guests", map[string]string{"name": "Not yet"}, host), 201)
+	// A new link for someone who already came in does not make them new again.
+	status(t, request(t, a, "POST", fmt.Sprintf("/api/admin/guests/%d/invitation", entered.ID), map[string]string{}, host), 200)
+	listed := request(t, a, "GET", "/api/admin/guests", nil, host)
+	status(t, listed, 200)
+	var result struct {
+		Items []struct {
+			Name   string `json:"name"`
+			Joined *bool  `json:"joined"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(listed.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	joined := map[string]bool{}
+	for _, item := range result.Items {
+		if item.Joined == nil {
+			t.Fatalf("%s has no joined state", item.Name)
+		}
+		joined[item.Name] = *item.Joined
+	}
+	if !joined["Camille"] || !joined["Entered"] || joined["Not yet"] {
+		t.Fatalf("joined = %v", joined)
+	}
+	session := request(t, a, "GET", "/api/session", nil, host)
+	if strings.Contains(session.Body.String(), "joined") {
+		t.Fatalf("the session exposed the joined state: %s", session.Body.String())
+	}
+}
+
+func TestPartyMapLinkIsSavedForGuests(t *testing.T) {
+	t.Parallel()
+	a := testApp(t)
+	host, _ := admin(t, a)
+	visitor, _, _ := guest(t, a, host, "Visitor")
+	details := map[string]any{"title": "", "timezone": "Europe/Zurich", "date": nil, "location": "Salle des fêtes", "mapUrl": "http://maps.example"}
+	assertWelcomeError(t, request(t, a, "PATCH", "/api/admin/party", details, host), 400, "invalid_map_link")
+	details["mapUrl"] = " https://maps.app.goo.gl/abc "
+	status(t, request(t, a, "PATCH", "/api/admin/party", details, host), 200)
+	read := request(t, a, "GET", "/api/party", nil, visitor)
+	status(t, read, 200)
+	if !strings.Contains(read.Body.String(), `"mapUrl":"https://maps.app.goo.gl/abc"`) {
+		t.Fatalf("party = %s", read.Body.String())
+	}
+}

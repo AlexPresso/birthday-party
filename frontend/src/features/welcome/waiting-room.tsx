@@ -3,28 +3,15 @@
 import { NotificationControl } from "@/features/notifications/notification-control";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Cake,
-  DoorOpen,
-  LogOut,
-  RefreshCw,
-} from "lucide-react";
-import {
-  api,
-  ApiError,
-  remove,
-  returnToInvitation,
-  errorMessage,
-} from "@/lib/api";
+import { ArrowLeft, ArrowRight, Cake, DoorOpen, RefreshCw } from "lucide-react";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { welcomeSchema, type Welcome, type WelcomeStep } from "./contracts";
 import { type Guest } from "@/features/guests/contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { useWelcome } from "./use-welcome";
 import { BrandMark } from "@/components/brand-mark";
+import { Snow } from "@/components/snow";
 import { ErrorNotice } from "@/components/ui";
-import { useConfirm } from "@/components/confirm-dialog";
 import { WelcomeProfile } from "./welcome-profile";
 import { WelcomeMedia } from "./welcome-media";
 import { WelcomeRules } from "./welcome-rules";
@@ -42,9 +29,7 @@ export function WaitingRoom({
   title: string;
 }) {
   const { t } = useI18n();
-  const confirm = useConfirm();
   const { welcome, failed, refresh, accept } = useWelcome(initial);
-  const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState<"previous" | "next" | "finish" | null>(
     null,
   );
@@ -69,7 +54,7 @@ export function WaitingRoom({
   );
 
   async function navigate(action: "previous" | "next" | "finish") {
-    if (busy || progressRequest.current) return;
+    if (progressRequest.current) return;
     const controller = new AbortController();
     progressRequest.current = controller;
     setMoving(action);
@@ -103,41 +88,22 @@ export function WaitingRoom({
     }
   }
 
-  async function logout() {
-    const confirmed = await confirm({
-      message: t("settings.logoutConfirmation"),
-      destructive: true,
-    });
-    if (!confirmed) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await remove("/logout", "POST");
-      returnToInvitation();
-    } catch (err) {
-      setError(errorMessage(err, t));
-      setBusy(false);
-    }
-  }
-
   return (
-    <main className="welcome-page">
+    <main
+      className={`welcome-page${state.step ? "" : " welcome-page-waiting"}`}
+    >
+      {/* While nothing is open yet, the page waits in the invitation's snow. */}
+      {!state.step && <Snow count={50} />}
       <header className="welcome-header">
         <div className="brand">
           <BrandMark />
           {title && <strong>{title}</strong>}
         </div>
-        <button
-          className="text-button"
-          onClick={logout}
-          disabled={busy || moving !== null}
-        >
-          <LogOut size={17} aria-hidden="true" />
-          {busy ? t("welcome.signingOut") : t("welcome.signOut")}
-        </button>
       </header>
       <section className="welcome-content" aria-labelledby="welcome-heading">
-        <div className="welcome-stage panel">
+        <div
+          className={`welcome-stage${state.step ? " panel" : " welcome-stage-waiting"}`}
+        >
           {state.step ? (
             <>
               <p
@@ -177,12 +143,9 @@ export function WaitingRoom({
               aria-live="polite"
               aria-atomic="true"
             >
-              <Cake
-                className="welcome-cake"
-                size={36}
-                strokeWidth={1.5}
-                aria-hidden="true"
-              />
+              <span className="welcome-waiting-ring" aria-hidden="true">
+                <Cake size={52} strokeWidth={1.5} />
+              </span>
               <h1 id="welcome-heading" tabIndex={-1}>
                 {t("welcome.heading", { name: guest.name })}
               </h1>
@@ -199,7 +162,7 @@ export function WaitingRoom({
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={busy || moving !== null || !state.canPrevious}
+                  disabled={moving !== null || !state.canPrevious}
                   onClick={() => void navigate("previous")}
                 >
                   <ArrowLeft size={17} aria-hidden="true" />
@@ -210,7 +173,7 @@ export function WaitingRoom({
                 <button
                   type="button"
                   className="button primary"
-                  disabled={busy || moving !== null}
+                  disabled={moving !== null}
                   onClick={() => void navigate("next")}
                 >
                   {t("welcome.next")}
@@ -221,7 +184,7 @@ export function WaitingRoom({
                 <button
                   type="button"
                   className={`button ${state.canNext ? "secondary" : "primary"} welcome-finish`}
-                  disabled={busy || moving !== null}
+                  disabled={moving !== null}
                   onClick={() => void navigate("finish")}
                 >
                   <DoorOpen size={17} aria-hidden="true" />

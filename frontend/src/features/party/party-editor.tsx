@@ -23,6 +23,7 @@ export function PartyEditor({
   const savedRequest = useRef(party);
   const [title, setTitle] = useState(party.title);
   const [location, setLocation] = useState(party.location);
+  const [mapUrl, setMapUrl] = useState(party.mapUrl);
   const [timezone, setTimezone] = useState(party.timezone);
   const [dateDraft, setDateDraft] = useState<string | null>(null);
   // The browser timezone is only available after hydration. Keep the original
@@ -37,30 +38,34 @@ export function PartyEditor({
   const [savedDraft, setSavedDraft] = useState({
     title: party.title,
     location: party.location,
+    mapUrl: party.mapUrl,
     timezone: party.timezone,
     dateDraft: null as string | null,
   });
   const dirty =
     title !== savedDraft.title ||
     location !== savedDraft.location ||
+    mapUrl !== savedDraft.mapUrl ||
     timezone !== savedDraft.timezone ||
     dateDraft !== savedDraft.dateDraft;
   const autosave = useAutosave({ save });
 
   async function save() {
-    const submitted = { title, location, timezone, dateDraft };
+    const submitted = { title, location, mapUrl, timezone, dateDraft };
     setError(null);
     setSaved(false);
     try {
       const body = {
         title: title.trim(),
         location: location.trim(),
+        mapUrl: mapUrl.trim(),
         timezone: timezone.trim(),
         date: dateDraft === null ? party.date : utcInput(dateDraft),
       };
       if (
         body.title === savedRequest.current.title &&
         body.location === savedRequest.current.location &&
+        body.mapUrl === savedRequest.current.mapUrl &&
         body.timezone === savedRequest.current.timezone &&
         body.date === savedRequest.current.date
       ) {
@@ -122,6 +127,19 @@ export function PartyEditor({
             maxLength={240}
             placeholder={t("admin.unspecified")}
             onChange={(event) => setLocation(event.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="party-map">{t("admin.mapLink")}</label>
+          <input
+            id="party-map"
+            type="url"
+            inputMode="url"
+            value={mapUrl}
+            maxLength={500}
+            pattern="https://.+"
+            placeholder="https://maps.app.goo.gl/…"
+            onChange={(event) => setMapUrl(event.target.value)}
           />
         </div>
         <div>

@@ -9,9 +9,9 @@
   .invitation-ring {
     align-self: center;
     flex-shrink: 0;
-    width: 228px;
-    height: 228px;
-    margin: 52px 0 40px;
+    width: 200px;
+    height: 200px;
+    margin: 40px 0 32px;
     padding: 4px;
     border-radius: 50%;
     background: var(--accent-gradient);
@@ -24,7 +24,7 @@
     border-radius: 50%;
     background: var(--background);
     font-family: var(--font-display);
-    font-size: 92px;
+    font-size: 80px;
     font-weight: 800;
     letter-spacing: -0.04em;
     line-height: 1;
@@ -32,14 +32,72 @@
   .invitation-ring-long > span {
     font-size: 64px;
   }
+  /* Everything under the ring stands on one centred axis. */
+  .invitation-card > h1,
+  .invitation-intro,
+  .invitation-message {
+    text-align: center;
+  }
   .invitation-intro {
     margin: 0 0 12px;
     color: var(--muted);
     white-space: pre-line;
     overflow-wrap: anywhere;
   }
+  .invitation-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0 0;
+  }
+  .invitation-date {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .invitation-date svg,
+  .invitation-place svg {
+    flex-shrink: 0;
+    color: var(--accent-text);
+  }
+  /* The place opens the host's map: an outlined pill under the date. */
+  .invitation-place {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 9px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    color: var(--text);
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+  a.invitation-place {
+    border-color: var(--accent);
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+  a.invitation-place:hover {
+    background: var(--accent-soft);
+  }
+  .invitation-message {
+    max-width: 38ch;
+    margin: 20px auto 0;
+    color: var(--muted);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
   .invitation-card > .loading-inline {
-    justify-content: flex-start;
+    justify-content: center;
     margin: 8px 0 0;
   }
   .invitation-actions {
@@ -77,10 +135,17 @@
     background: var(--background);
     color: var(--text);
   }
-  .invitation-actions > .fine-print {
-    margin: 14px 0 0;
-    font-size: 13px;
-    line-height: 1.5;
+  /* Until the party starts, the button's place counts down instead. */
+  .invitation-countdown {
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 700;
+  }
+  .invitation-countdown .invitation-enter-icon {
+    background: var(--accent-soft);
+    color: var(--accent-text);
   }
   .invitation-help {
     margin-top: 16px;
