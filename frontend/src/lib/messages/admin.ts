@@ -3,6 +3,7 @@ const en = {
   "admin.invalidTimezone": "Enter a valid time zone, such as Europe/Zurich.",
   "admin.partyTitle": "Party name",
   "admin.location": "Location",
+  "admin.mapLink": "Map link",
   "admin.unspecified": "To be confirmed",
   "admin.partyDate": "Party date",
   "admin.dateHint": "Enter the time in your device’s time zone.",
@@ -44,6 +45,14 @@ const en = {
   "admin.editGuest": "Edit {name}",
   "admin.phoneRenewsLink":
     "Changing the number creates a new link; the old one stops working.",
+  "admin.bulkStart": "Send the WhatsApp invitations",
+  "admin.bulkTitle": "WhatsApp invitations",
+  "admin.bulkWithoutPhone": "No number: {names}.",
+  "admin.bulkNobody": "Every guest with a number has already come in.",
+  "admin.bulkRenews":
+    "Each message carries a new link: a link sent before stops working.",
+  "admin.bulkPosition": "{current} of {total}",
+  "admin.bulkEnd": "That was the last guest.",
   "admin.whatsappMessage":
     "Hi {name}! Here’s your personal link for the party: {link}",
   "admin.programmeSaved": "Schedule saved.",
@@ -80,6 +89,7 @@ const fr: AdminMessages = {
     "Indique un fuseau horaire valide, par exemple Europe/Zurich.",
   "admin.partyTitle": "Nom de la fête",
   "admin.location": "Lieu",
+  "admin.mapLink": "Lien de la carte",
   "admin.unspecified": "À préciser",
   "admin.partyDate": "Date de la fête",
   "admin.dateHint": "Indique l’heure dans le fuseau de ton appareil.",
@@ -121,6 +131,14 @@ const fr: AdminMessages = {
   "admin.editGuest": "Modifier {name}",
   "admin.phoneRenewsLink":
     "Changer le numéro crée un nouveau lien ; l’ancien ne fonctionne plus.",
+  "admin.bulkStart": "Envoyer les invitations WhatsApp",
+  "admin.bulkTitle": "Invitations WhatsApp",
+  "admin.bulkWithoutPhone": "Sans numéro : {names}.",
+  "admin.bulkNobody": "Tous les invités qui ont un numéro sont déjà entrés.",
+  "admin.bulkRenews":
+    "Chaque message contient un nouveau lien : un lien envoyé avant ne fonctionne plus.",
+  "admin.bulkPosition": "{current} sur {total}",
+  "admin.bulkEnd": "C’était le dernier invité.",
   "admin.whatsappMessage":
     "Salut {name} ! Voici ton lien personnel pour la fête : {link}",
   "admin.programmeSaved": "Le programme est enregistré.",
@@ -156,6 +174,7 @@ const de: AdminMessages = {
     "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Zurich.",
   "admin.partyTitle": "Name der Feier",
   "admin.location": "Ort",
+  "admin.mapLink": "Kartenlink",
   "admin.unspecified": "Noch offen",
   "admin.partyDate": "Datum der Feier",
   "admin.dateHint": "Gib die Uhrzeit in der Zeitzone deines Geräts ein.",
@@ -197,6 +216,14 @@ const de: AdminMessages = {
   "admin.editGuest": "{name} bearbeiten",
   "admin.phoneRenewsLink":
     "Eine neue Nummer erzeugt einen neuen Link, der alte funktioniert nicht mehr.",
+  "admin.bulkStart": "WhatsApp-Einladungen senden",
+  "admin.bulkTitle": "WhatsApp-Einladungen",
+  "admin.bulkWithoutPhone": "Ohne Nummer: {names}.",
+  "admin.bulkNobody": "Alle Gäste mit Nummer sind schon dabei.",
+  "admin.bulkRenews":
+    "Jede Nachricht enthält einen neuen Link: Ein zuvor gesendeter Link funktioniert nicht mehr.",
+  "admin.bulkPosition": "{current} von {total}",
+  "admin.bulkEnd": "Das war der letzte Gast.",
   "admin.whatsappMessage":
     "Hallo {name}! Hier ist dein persönlicher Link für das Fest: {link}",
   "admin.programmeSaved": "Das Programm ist gespeichert.",
@@ -231,6 +258,7 @@ const it: AdminMessages = {
     "Inserisci un fuso orario valido, per esempio Europe/Zurich.",
   "admin.partyTitle": "Nome della festa",
   "admin.location": "Luogo",
+  "admin.mapLink": "Link della mappa",
   "admin.unspecified": "Da definire",
   "admin.partyDate": "Data della festa",
   "admin.dateHint": "Inserisci l’ora nel fuso orario del tuo dispositivo.",
@@ -272,6 +300,14 @@ const it: AdminMessages = {
   "admin.editGuest": "Modifica {name}",
   "admin.phoneRenewsLink":
     "Cambiare il numero crea un nuovo link; il vecchio smette di funzionare.",
+  "admin.bulkStart": "Invia gli inviti WhatsApp",
+  "admin.bulkTitle": "Inviti WhatsApp",
+  "admin.bulkWithoutPhone": "Senza numero: {names}.",
+  "admin.bulkNobody": "Tutti gli invitati con un numero sono già entrati.",
+  "admin.bulkRenews":
+    "Ogni messaggio contiene un nuovo link: un link inviato prima non funziona più.",
+  "admin.bulkPosition": "{current} di {total}",
+  "admin.bulkEnd": "Era l’ultimo invitato.",
   "admin.whatsappMessage":
     "Ciao {name}! Ecco il tuo link personale per la festa: {link}",
   "admin.programmeSaved": "Il programma è stato salvato.",
@@ -307,6 +343,7 @@ const es: AdminMessages = {
     "Indica una zona horaria válida, por ejemplo Europe/Zurich.",
   "admin.partyTitle": "Nombre de la fiesta",
   "admin.location": "Lugar",
+  "admin.mapLink": "Enlace del mapa",
   "admin.unspecified": "Por confirmar",
   "admin.partyDate": "Fecha de la fiesta",
   "admin.dateHint": "Introduce la hora en la zona horaria de tu dispositivo.",
@@ -348,6 +385,14 @@ const es: AdminMessages = {
   "admin.editGuest": "Editar a {name}",
   "admin.phoneRenewsLink":
     "Cambiar el número crea un enlace nuevo; el anterior deja de funcionar.",
+  "admin.bulkStart": "Enviar las invitaciones por WhatsApp",
+  "admin.bulkTitle": "Invitaciones por WhatsApp",
+  "admin.bulkWithoutPhone": "Sin número: {names}.",
+  "admin.bulkNobody": "Todos los invitados con número ya han entrado.",
+  "admin.bulkRenews":
+    "Cada mensaje lleva un enlace nuevo: un enlace enviado antes deja de funcionar.",
+  "admin.bulkPosition": "{current} de {total}",
+  "admin.bulkEnd": "Era el último invitado.",
   "admin.whatsappMessage":
     "¡Hola {name}! Aquí tienes tu enlace personal para la fiesta: {link}",
   "admin.programmeSaved": "El programa está guardado.",

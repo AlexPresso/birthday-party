@@ -81,12 +81,14 @@ single Go process; durable upload and push-notification workers remain server-si
 
 `PublicConfiguration = { age: number, invitation: InvitationCopy & { locales: { en: InvitationCopy, fr: InvitationCopy, de: InvitationCopy, it: InvitationCopy, es: InvitationCopy } }, appearance: Appearance }`
 
-`Configuration = PublicConfiguration & { imageSizeMB: number, videoSizeMB: number, whatsappMessage: string | null }`
+`Configuration = PublicConfiguration & { imageSizeMB: number, videoSizeMB: number, whatsappMessage: string | null, waitingMessage: string | null }`
 
 `whatsappMessage` is the text the host sends with each invitation on WhatsApp, up
 to 1,000 characters, where the interface replaces `{name}` and `{link}`. Null,
 or a blank text, uses the interface message in the host language. It is never
-part of `PublicConfiguration`.
+part of `PublicConfiguration`. `waitingMessage` (up to 2,000 characters) greets
+guests waiting for the welcome's first step; null, or a blank text, keeps the
+interface's line. Neither is public.
 
 - `GET /api/config` -> `PublicConfiguration` (200), available without a session.
   This contains only birthday age, public invitation text and the appearance
@@ -168,6 +170,16 @@ open until the host explicitly starts the welcome, even when `required` is enabl
 `WelcomeStep = { widgets: WelcomeWidget[] }`
 `Welcome = { open: boolean, revision: number, progressRevision: number, step: (WelcomeStep & { position: number }) | null, canPrevious: boolean, canNext: boolean, canFinish: boolean, rulesAccepted: boolean }`
 `AdminWelcome = { open: boolean, revision: number, currentStep: number, required: boolean, steps: WelcomeStep[] }`
+
+- `GET /api/welcome/party` -> `{ started: boolean, message: string | null, date: string | null, timezone, location, mapUrl }`
+  for any signed-in guest, so the invitation page can say when and where the
+  party is before the guest may enter. `started` is Go's decision: true for
+  administrators, without a date, or from the party's date and time.
+
+Until the party's date and time, every request of a guest but the session ones
+(`/api/session`, `/api/welcome*`, `/api/notifications*`, `/api/logout`, the
+realtime socket) answers
+425 `party_not_started`; administrators are never held.
 
 - `GET /api/welcome` -> `Welcome`. Initializes the guest's progress for the current
   run if needed. `open` is this guest's effective access, rather than the host's
@@ -431,10 +443,12 @@ by uploads. Otherwise it returns 409 `storage_full` before the file is sent. Pro
 
 ## Party
 
-`Party = { title, timezone, date: string | null, location }`
+`Party = { title, timezone, date: string | null, location, mapUrl }`
 
 - `GET /api/party` -> `Party`.
-- `PATCH /api/admin/party { title, timezone, date, location }` -> `Party`.
+- `PATCH /api/admin/party { title, timezone, date, location, mapUrl? }` -> `Party`.
+  `mapUrl` is empty or an https address of at most 500 characters, such as a
+  Google Maps link (`invalid_map_link` otherwise); omitting it clears it.
 
 New database defaults: empty title, timezone `Europe/Zurich`, no date or location.
 The frontend uses the configured invitation title or a localized birthday title
@@ -1054,7 +1068,9 @@ the private identity.
   for uploads still in preparation (`guest_uploads_pending`) and refuses while
   they play or lead a running werewolf game (`guest_in_game`).
 
-Only these administrator responses carry `Guest.phone`.
+Only these administrator responses carry `Guest.phone` and `Guest.joined`:
+`joined` is true once the guest opened one of their invitations, even if they
+have since signed out. It decides who the bulk WhatsApp sending skips.
 
 Host access is created locally with a CLI command or at server startup when
 `PRINT_ADMIN_INVITATION` is enabled (the Compose default). Startup reuses the oldest

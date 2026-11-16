@@ -31,6 +31,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/profile/avatar", a.authProfile(a.deleteAvatar))
 	mux.HandleFunc("GET /api/guests/{id}/avatar", a.authProfile(a.serveAvatar))
 	mux.HandleFunc("GET /api/welcome", a.auth(false, a.getWelcome))
+	mux.HandleFunc("GET /api/welcome/party", a.auth(false, a.getWaitingDetails))
 	mux.HandleFunc("POST /api/welcome/progress", a.auth(false, a.transitionGuestWelcome))
 	mux.HandleFunc("PUT /api/welcome/rules", a.auth(false, a.acceptWelcomeRules))
 	mux.HandleFunc("GET /api/welcome/upload-context", a.auth(false, a.getWelcomeUploadContext))

@@ -42,6 +42,7 @@ var apiErrors = map[string]apiError{
 	"access_revoked":      {http.StatusUnauthorized, "You no longer have access to the party. Contact the host."},
 	"admin_required":      {http.StatusForbidden, "Only the host can access this area."},
 	"welcome_required":    {http.StatusLocked, "Complete the welcome before accessing the app."},
+	"party_not_started":   {http.StatusTooEarly, "The party has not started yet."},
 	internalErrorCode:     {http.StatusInternalServerError, "Something went wrong. Try again in a moment."},
 
 	// Invitations and guests.
@@ -61,6 +62,7 @@ var apiErrors = map[string]apiError{
 	"invalid_timezone":      {http.StatusBadRequest, "Choose a time zone such as Europe/Zurich."},
 	"unknown_timezone":      {http.StatusBadRequest, "This time zone was not found. Try Europe/Zurich."},
 	"invalid_date":          {http.StatusBadRequest, "Choose the date and time again, then save."},
+	"invalid_map_link":      {http.StatusBadRequest, "Paste the map’s address, starting with https://."},
 	"invalid_configuration": {http.StatusBadRequest, "Choose an age from 1 to 150, upload limits from 1 to 1024 MiB and a colour such as #ff6a1f. Invitation titles allow 200 characters and descriptions 2000."},
 
 	// Information page.

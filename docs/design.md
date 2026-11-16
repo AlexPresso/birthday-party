@@ -377,8 +377,23 @@ Do not invent party details, guest contributions, dates, or activity counts.
   the composer or a post, is a pill bubble (option A of the owner's choice,
   2026-11-16): an accent play button, a 48-bar waveform that fills in the accent
   colour while it plays and seeks by touch or keyboard, and the time.
-- In the host's guest list, a name (with a small pencil) opens that guest's
-  panel: name and WhatsApp number, saved on leaving a field, with one line saying
+- The invitation page stands on one centred axis: the age ring, "{name}, tu es
+  de la fête.", the public description, the date in the display face, the place
+  as an outlined accent pill that opens the map, then the host's note. Where
+  Enter will be, a surface pill with an hourglass counts down ("Encore 12
+  jours", "C'est demain", "Aujourd'hui à 18:30") until the party starts.
+- The waiting page (`/attente`, before the welcome's first step) has no card
+  and no sign-out:
+  the invitation's snow, an accent arc turning slowly around the cake in the
+  theme colour, centred in the glow where the invitation shows the age, then a
+  large greeting and the muted line.
+- A "Send the WhatsApp invitations" button tops the guest settings: one guest
+  at a time, with their position, Previous, Next and "Send on WhatsApp", which
+  moves on to the next; a line names the guests without a number in danger
+  colour. The programme's location is an underlined accent link with an
+  external-link icon when the host gave a map link.
+- In the host's guest list, a name (with a small pencil) unfolds that guest's
+  panel under the row: name and WhatsApp number, saved on leaving a field, with one line saying
   a new number replaces the link; then the link, Copy and "Send on WhatsApp".
   A revoked guest's second bin is red. The WhatsApp message itself is written in
   the invitation settings, under the public texts, with one line on `{name}`

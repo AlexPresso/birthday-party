@@ -134,23 +134,24 @@ test("a programme on several days shows each day under its heading, then the eve
   page,
 }) => {
   await signInGuest(host, page, "Camille — deux jours");
-  // Saturday 14 June 2031 at 18:00 in Zurich.
-  await setParty("Europe/Zurich", "2031-06-14T16:00:00Z");
+  // Saturday 14 June 2025 at 18:00 in Zurich.
+  await setParty("Europe/Zurich", "2025-06-14T16:00:00Z");
   await createEvent("Le covoiturage", null, {
     description: "On s’organise entre nous.",
   });
-  await createEvent("Le brunch", "2031-06-15T09:00:00Z");
-  await createEvent("Private surprise fixture", "2031-06-15T12:00:00Z", {
+  await createEvent("Le brunch", "2025-06-15T09:00:00Z");
+  await createEvent("Private surprise fixture", "2025-06-15T12:00:00Z", {
     description: "This detail remains private.",
     teaser: "Une surprise",
-    unlockAt: "2031-06-15T12:00:00Z",
+    // Still locked: the party itself, in the past, lets guests in.
+    unlockAt: "2099-06-15T12:00:00Z",
   });
-  await createEvent("On se retrouve", "2031-06-14T16:30:00Z", {
+  await createEvent("On se retrouve", "2025-06-14T16:30:00Z", {
     description: "Un verre pour commencer.",
   });
-  await createEvent("Le gâteau", "2031-06-14T20:00:00Z");
+  await createEvent("Le gâteau", "2025-06-14T20:00:00Z");
   // A draft vote on the Friday: guests do not see it yet.
-  const vote = await createEvent("Le repas de minuit", "2031-06-13T18:00:00Z", {
+  const vote = await createEvent("Le repas de minuit", "2025-06-13T18:00:00Z", {
     type: "vote",
     vote: voteSettings("Qu’est-ce qu’on mange à minuit ?", {
       labels: ["Pizza", "Raclette", "Burgers"],
@@ -263,10 +264,10 @@ test("a programme held on one day keeps its single list without day headings", a
 }) => {
   await signInGuest(host, page, "Camille — un jour");
   // The party is on the Friday, the events on the Saturday.
-  await setParty("Europe/Zurich", "2031-06-13T16:00:00Z");
+  await setParty("Europe/Zurich", "2025-06-13T16:00:00Z");
   await createEvent("Le covoiturage", null);
-  await createEvent("On se retrouve", "2031-06-14T16:30:00Z");
-  await createEvent("Le gâteau", "2031-06-14T20:00:00Z");
+  await createEvent("On se retrouve", "2025-06-14T16:30:00Z");
+  await createEvent("Le gâteau", "2025-06-14T20:00:00Z");
 
   await page.goto("/programme");
   await expectEvents(page.locator(".programme-list"), [
@@ -281,7 +282,7 @@ test("a programme held on one day keeps its single list without day headings", a
   await expect(eventDates(page)).toHaveText(["14 juin", "14 juin"]);
 
   // A second day arrives while the page is open: the days separate live.
-  const brunch = await createEvent("Le brunch", "2031-06-15T09:00:00Z");
+  const brunch = await createEvent("Le brunch", "2025-06-15T09:00:00Z");
   await expect(dayHeadings(page)).toHaveText([
     "Samedi 14 juin",
     "Dimanche 15 juin",
@@ -311,8 +312,8 @@ test("days follow the party's timezone, not the browser's", async ({
   await signInGuest(host, page, "Camille — antipodes");
   // Auckland is ten hours ahead of the browser in June: half an hour past
   // midnight on Sunday there is still Saturday afternoon in Zurich.
-  const beforeMidnight = "2031-06-14T11:30:00Z";
-  const afterMidnight = "2031-06-14T12:30:00Z";
+  const beforeMidnight = "2025-06-14T11:30:00Z";
+  const afterMidnight = "2025-06-14T12:30:00Z";
   await setParty("Pacific/Auckland", afterMidnight);
   await createEvent("Le dernier verre", beforeMidnight);
   await createEvent("Le feu d’artifice", afterMidnight);

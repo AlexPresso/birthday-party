@@ -25,6 +25,10 @@ func TestWelcomeScopesOnlyGrantCurrentOwnCapabilities(t *testing.T) {
 		{"open party", Snapshot{Guest: guest, Open: true}, Request{Scope: Party}, nil},
 		{"guest cannot administer", Snapshot{Guest: guest, Open: true}, Request{Admin: true, Scope: Session}, ErrAdmin},
 		{"revoked admin", Snapshot{Guest: identity.Guest{ID: 1, Role: "admin"}}, Request{Scope: Party}, ErrExpired},
+		{"session before the party", Snapshot{Guest: guest, Early: true, Open: true}, Request{Scope: Session}, nil},
+		{"open app before the party", Snapshot{Guest: guest, Early: true, Open: true}, Request{Scope: Party}, ErrEarly},
+		{"welcome widget before the party", Snapshot{Guest: guest, Early: true, MediaWidget: true}, Request{Scope: Upload}, ErrEarly},
+		{"host before the party", Snapshot{Guest: identity.Guest{ID: 1, Role: "admin", Active: true}, Early: true}, Request{Admin: true, Scope: Party}, nil},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if err := Check(test.snapshot, test.request); !errors.Is(err, test.want) {

@@ -5,6 +5,7 @@ import {
   CalendarDays,
   LockKeyhole,
   MapPin,
+  ExternalLink,
   RefreshCw,
   Pencil,
 } from "lucide-react";
@@ -294,11 +295,19 @@ export function Programme({
           </Link>
         </div>
       )}
-      {party.location && (
+      {(party.location || party.mapUrl) && (
         <div className="programme-party-details">
           <p>
             <MapPin size={19} aria-hidden="true" />
-            <span>{party.location}</span>
+            {party.mapUrl ? (
+              // The host's map opens in the guest's own map app or a new tab.
+              <a href={party.mapUrl} target="_blank" rel="noopener noreferrer">
+                {party.location || t("programme.openMap")}
+                <ExternalLink size={14} aria-hidden="true" />
+              </a>
+            ) : (
+              <span>{party.location}</span>
+            )}
           </p>
         </div>
       )}

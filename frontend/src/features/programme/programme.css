@@ -26,6 +26,20 @@
     color: var(--accent);
   }
 
+  /* The location opens the host's map. */
+  .programme-party-details a {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .programme-party-details a svg {
+    display: inline;
+    margin: 0 0 0 5px;
+    vertical-align: -2px;
+    color: inherit;
+  }
+
   .programme-list {
     padding: 0;
     margin: 0 0 32px;

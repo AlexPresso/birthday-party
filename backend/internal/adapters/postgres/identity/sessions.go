@@ -43,6 +43,9 @@ func (s *Store) ConsumeInvitation(ctx context.Context, hash string, authorize fu
 	if count != 1 {
 		return identity.Guest{}, identity.ErrUsedInvitation
 	}
+	if _, err := tx.ExecContext(ctx, "UPDATE guests SET joined_at=COALESCE(joined_at,$1) WHERE id=$2", grant.CreatedAt, pending.Guest.ID); err != nil {
+		return identity.Guest{}, err
+	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM sessions WHERE expires_at<=$1", grant.CreatedAt); err != nil {
 		return identity.Guest{}, err
 	}

@@ -34,6 +34,7 @@ const en = {
     "Your session has expired. Ask the host for a new invitation.",
   admin_required: "Only the host can access this area.",
   welcome_required: "Complete the welcome before accessing the app.",
+  party_not_started: "The party has not started yet.",
   welcome_conflict:
     "The welcome sequence changed. Refresh it before trying again.",
   invalid_welcome_steps:
@@ -78,6 +79,7 @@ const en = {
   invalid_guest_name: "The name must contain between 1 and 80 characters.",
   invalid_phone:
     "Enter the number with its country code, such as +41 79 123 45 67.",
+  invalid_map_link: "Paste the map’s address, starting with https://.",
   guest_limit_reached: "You’ve reached the limit of 500 guests.",
   self_revoke_forbidden: "You cannot remove your own access.",
   guest_active: "Remove this guest’s access before deleting them.",
@@ -169,6 +171,7 @@ export const errorMessages = {
       "Ta connexion a expiré. Demande un nouveau lien à l’organisateur.",
     admin_required: "Cet espace est réservé à l’organisateur.",
     welcome_required: "Termine l’accueil avant d’accéder à l’application.",
+    party_not_started: "La fête n’a pas encore commencé.",
     welcome_conflict:
       "L’accueil a changé. Actualise son état avant de réessayer.",
     invalid_welcome_steps:
@@ -216,6 +219,7 @@ export const errorMessages = {
     invalid_guest_name: "Le prénom doit contenir entre 1 et 80 caractères.",
     invalid_phone:
       "Indique le numéro avec l’indicatif du pays, par exemple +41 79 123 45 67.",
+    invalid_map_link: "Colle l’adresse de la carte, qui commence par https://.",
     guest_limit_reached: "Tu as atteint la limite de 500 invités.",
     self_revoke_forbidden: "Tu ne peux pas retirer ton propre accès.",
     guest_active: "Retire d’abord l’accès de cette personne.",
@@ -316,6 +320,7 @@ export const errorMessages = {
       "Deine Sitzung ist abgelaufen. Bitte den Gastgeber um eine neue Einladung.",
     admin_required: "Dieser Bereich ist dem Gastgeber vorbehalten.",
     welcome_required: "Schließe die Begrüßung ab, bevor du die App nutzt.",
+    party_not_started: "Das Fest hat noch nicht begonnen.",
     welcome_conflict:
       "Der Empfangsablauf hat sich geändert. Aktualisiere den Status und versuche es erneut.",
     invalid_welcome_steps:
@@ -365,6 +370,8 @@ export const errorMessages = {
     invalid_guest_name: "Der Name muss zwischen 1 und 80 Zeichen enthalten.",
     invalid_phone:
       "Gib die Nummer mit Ländervorwahl ein, zum Beispiel +41 79 123 45 67.",
+    invalid_map_link:
+      "Füge die Adresse der Karte ein, sie beginnt mit https://.",
     guest_limit_reached: "Du hast das Limit von 500 Gästen erreicht.",
     self_revoke_forbidden: "Du kannst deinen eigenen Zugang nicht entfernen.",
     guest_active: "Entferne zuerst den Zugang dieser Person.",
@@ -463,6 +470,7 @@ export const errorMessages = {
       "La tua sessione è scaduta. Chiedi un nuovo invito a chi organizza.",
     admin_required: "Quest’area è riservata a chi organizza.",
     welcome_required: "Completa l’accoglienza prima di accedere all’app.",
+    party_not_started: "La festa non è ancora iniziata.",
     welcome_conflict:
       "L’accoglienza è cambiata. Aggiorna lo stato prima di riprovare.",
     invalid_welcome_steps:
@@ -509,6 +517,8 @@ export const errorMessages = {
     invalid_guest_name: "Il nome deve contenere da 1 a 80 caratteri.",
     invalid_phone:
       "Inserisci il numero con il prefisso del paese, per esempio +41 79 123 45 67.",
+    invalid_map_link:
+      "Incolla l’indirizzo della mappa, che inizia con https://.",
     guest_limit_reached: "Hai raggiunto il limite di 500 invitati.",
     self_revoke_forbidden: "Non puoi rimuovere il tuo accesso.",
     guest_active: "Rimuovi prima l’accesso di questa persona.",
@@ -601,6 +611,7 @@ export const errorMessages = {
     admin_required: "Esta sección está reservada para quien organiza.",
     welcome_required:
       "Completa la bienvenida antes de acceder a la aplicación.",
+    party_not_started: "La fiesta aún no ha empezado.",
     welcome_conflict:
       "La bienvenida ha cambiado. Actualiza el estado antes de volver a intentarlo.",
     invalid_welcome_steps:
@@ -648,6 +659,7 @@ export const errorMessages = {
     invalid_guest_name: "El nombre debe tener entre 1 y 80 caracteres.",
     invalid_phone:
       "Escribe el número con el prefijo del país, por ejemplo +41 79 123 45 67.",
+    invalid_map_link: "Pega la dirección del mapa, que empieza por https://.",
     guest_limit_reached: "Has llegado al límite de 500 invitados.",
     self_revoke_forbidden: "No puedes quitarte tu propio acceso.",
     guest_active: "Quita primero el acceso de esta persona.",

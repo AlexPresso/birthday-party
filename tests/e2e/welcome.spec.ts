@@ -610,7 +610,7 @@ test("the host prepares, reorders and unlocks welcome steps from settings", asyn
   expect((await adminState()).open).toBe(true);
 });
 
-test("a connected guest moves to waiting when the host closes access and can sign out", async ({
+test("a connected guest moves to waiting when the host closes access, with no sign-out there", async ({
   page,
 }) => {
   const invitation = await invite(host, "Jordan Waiting Test");
@@ -631,13 +631,9 @@ test("a connected guest moves to waiting when the host closes access and can sig
       exact: true,
     }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Se déconnecter", exact: true })
-    .click();
-  await acceptConfirmation(page);
-  await expect(page).toHaveURL(/\/invitation$/);
-  await expect(page.getByRole("navigation")).toHaveCount(0);
-  expect((await page.request.get("/api/session")).status()).toBe(401);
+  await expect(
+    page.getByRole("button", { name: "Se déconnecter" }),
+  ).toHaveCount(0);
 });
 
 test("the host keeps a conflicting draft until deliberately discarding it and can continue", async ({

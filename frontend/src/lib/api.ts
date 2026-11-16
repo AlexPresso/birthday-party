@@ -122,6 +122,7 @@ async function send(path: string, options: RequestOptions = {}) {
     if (response.status === 401 && !path.startsWith("/invitations"))
       returnToInvitation();
     if (response.status === 423) returnToWelcome();
+    if (response.status === 425) returnToInvitation();
     return { response, payload };
   } catch (error) {
     // Only the caller's cancellation stays an abort. The deadline and network

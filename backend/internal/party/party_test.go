@@ -3,6 +3,7 @@ package party
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,26 @@ func TestUpdateValidatesAndNormalizesBeforeSaving(t *testing.T) {
 	}
 	if date != "2026-10-30T19:00:00.123+01:00" {
 		t.Fatal("normalization modified the caller date")
+	}
+}
+
+func TestMapLinksAreHTTPSAddresses(t *testing.T) {
+	for link, valid := range map[string]bool{
+		"":                                    true,
+		"  https://maps.app.goo.gl/abc123  ":  true,
+		"https://www.google.com/maps/place/x": true,
+		"http://maps.google.com/?q=1":         false,
+		"javascript:alert(1)":                 false,
+		"https://user:secret@maps.example":    false,
+		"https://":                            false,
+		"https://maps.example/" + strings.Repeat("a", 500): false,
+	} {
+		result, err := Normalize(Party{Timezone: "Europe/Zurich", MapURL: link})
+		if valid != (err == nil) || (!valid && !errors.Is(err, ErrInvalidMapLink)) {
+			t.Fatalf("%q: error = %v", link, err)
+		}
+		if valid && result.MapURL != strings.TrimSpace(link) {
+			t.Fatalf("%q was saved as %q", link, result.MapURL)
+		}
 	}
 }

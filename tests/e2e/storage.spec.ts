@@ -38,15 +38,26 @@ for (const viewport of [
     const panel = page.locator('[data-settings-screen="storage"]');
     const meter = panel.getByRole("meter", { name: "Espace disque utilisé" });
     await expect(meter).toHaveAttribute("aria-valuetext", /utilisés sur/);
-    const percent = Math.round(
-      ((storage.totalBytes - storage.availableBytes) / storage.totalBytes) *
-        100,
+    // Other shards write to the same disk meanwhile: the page shows a reading
+    // taken between the one before it and the one after it.
+    const later = await (await host.get("/api/admin/storage")).json();
+    const percent = (reading: typeof storage) =>
+      Math.round(
+        ((reading.totalBytes - reading.availableBytes) / reading.totalBytes) *
+          100,
+      );
+    const shown = Number(await meter.getAttribute("aria-valuenow"));
+    expect(shown).toBeGreaterThanOrEqual(
+      Math.min(percent(storage), percent(later)),
     );
-    await expect(meter).toHaveAttribute("aria-valuenow", String(percent));
+    expect(shown).toBeLessThanOrEqual(
+      Math.max(percent(storage), percent(later)),
+    );
     await expect(panel.getByText(/libres$/)).toBeVisible();
-    await expect(panel.getByText(/^Presque plein/)).toHaveCount(
-      storage.warning ? 1 : 0,
-    );
+    if (storage.warning === later.warning)
+      await expect(panel.getByText(/^Presque plein/)).toHaveCount(
+        storage.warning ? 1 : 0,
+      );
     await expectNoHorizontalOverflow(page);
   });
 }

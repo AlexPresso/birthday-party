@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw, X } from "lucide-react";
+import { Eye, RefreshCw, X } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useAutosave } from "@/lib/autosave";
 import {
@@ -10,6 +10,7 @@ import {
   type WelcomeStep,
 } from "./contracts";
 import { type MediaCategory } from "@/features/media/contracts";
+import { type Guest } from "@/features/guests/contracts";
 import { useI18n } from "@/lib/i18n-context";
 import { useLatestState } from "@/lib/use-latest-state";
 import { ErrorNotice, SavedAnnouncement } from "@/components/ui";
@@ -20,6 +21,7 @@ import {
 } from "./welcome-control-panel";
 import { WelcomeStepEditor } from "./welcome-step-editor";
 import { focusWidget } from "./welcome-widget-editor";
+import { WelcomePreview } from "./welcome-preview";
 import "./welcome-admin.css";
 
 import { cleanRules, isInvalidWidget, type StepDraft } from "./editor-model";
@@ -31,9 +33,14 @@ import { cleanRules, isInvalidWidget, type StepDraft } from "./editor-model";
 export function WelcomeAdmin({
   initial,
   categories,
+  host,
+  title,
 }: {
   initial: AdminWelcome;
   categories: MediaCategory[];
+  /** The previewing host stands in for the guest in the profile widget. */
+  host: Guest;
+  title: string;
 }) {
   const { t } = useI18n();
   const confirm = useConfirm();
@@ -61,6 +68,7 @@ export function WelcomeAdmin({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [notice, setNotice] = useState("");
+  const [previewing, setPreviewing] = useState(false);
   // Local draft keys never leave the browser.
   const steps: WelcomeStep[] = draft.map((step) => ({
     widgets: step.widgets.map((widget) => {
@@ -314,6 +322,31 @@ export function WelcomeAdmin({
           }
         />
 
+        {draft.length > 0 && (
+          <div className="welcome-preview-action">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setPreviewing(true)}
+            >
+              <Eye size={17} aria-hidden="true" />
+              {t("adminWelcome.preview")}
+            </button>
+          </div>
+        )}
+        {previewing && (
+          <WelcomePreview
+            steps={steps}
+            start={Math.max(
+              0,
+              draft.findIndex((step) => step.key === selectedKey),
+            )}
+            host={host}
+            title={title}
+            categories={categories}
+            onClose={() => setPreviewing(false)}
+          />
+        )}
         <WelcomeStepEditor
           steps={draft}
           selectedKey={selectedKey}

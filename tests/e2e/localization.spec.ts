@@ -207,7 +207,7 @@ for (const language of languages) {
 
       await page.goto("about:blank");
       const invalidResponse = page.waitForResponse((response) =>
-        response.url().endsWith("/api/invitations/preview"),
+        response.url().endsWith("/api/invitations/accept"),
       );
       await page.goto("/invitation#token=invalid");
       const invalid = await invalidResponse;

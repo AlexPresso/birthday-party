@@ -19,5 +19,7 @@ export async function serverApi<T>(
   );
   if (response.status === 401) redirect("/invitation");
   if (response.status === 423) redirect("/attente");
+  // Too early: guests wait on their invitation until the party starts.
+  if (response.status === 425) redirect("/invitation");
   return readResponse(response, schema);
 }

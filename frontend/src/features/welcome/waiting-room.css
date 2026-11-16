@@ -23,9 +23,6 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  .welcome-header .text-button {
-    flex-shrink: 0;
-  }
   .welcome-content {
     width: 100%;
     max-width: 620px;
@@ -43,10 +40,79 @@
     max-width: 36ch;
     margin: 18px auto 0;
   }
-  .welcome-cake {
-    display: block;
+  /* Waiting for the first step: no card, the invitation's snow and glow,
+     and a ring that keeps turning around the cake. */
+  .welcome-page-waiting {
+    --snow-height: 520px;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .welcome-page-waiting .welcome-header {
+    border-bottom: 0;
+  }
+  /* The ring stands where the invitation's age ring stood. */
+  .welcome-page-waiting .welcome-content {
+    margin: 0 auto auto;
+    padding-top: 28px;
+  }
+  .welcome-stage-waiting {
+    padding-inline: 0;
+  }
+  .welcome-stage-waiting h1 {
+    font-size: clamp(30px, 8.5vw, 44px);
+    line-height: 1.1;
+  }
+  .welcome-stage-waiting .welcome-body {
+    font-size: 17px;
+  }
+  .welcome-waiting-ring {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 176px;
+    height: 176px;
+    margin: 0 auto 40px;
+    border-radius: 50%;
     color: var(--accent);
-    margin: 0 auto 24px;
+  }
+  /* The invitation's warm glow, centred on the ring where the age stood. */
+  .welcome-waiting-ring::after {
+    content: "";
+    position: absolute;
+    inset: -124px;
+    z-index: -2;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 70%
+    );
+  }
+  /* An accent arc turning slowly on a faint track, around a dark disc. */
+  .welcome-waiting-ring::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--accent) 0 28%,
+      color-mix(in srgb, var(--accent) 18%, transparent) 28% 100%
+    );
+    -webkit-mask: radial-gradient(circle, transparent 83px, #000 84px);
+    mask: radial-gradient(circle, transparent 83px, #000 84px);
+    animation: welcome-waiting-turn 6s linear infinite;
+  }
+  @keyframes welcome-waiting-turn {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .welcome-waiting-ring::before {
+      animation: none;
+    }
   }
   .welcome-step-number {
     color: var(--accent);

@@ -26,10 +26,14 @@ const (
 	ErrExpired    Error = "session_expired"
 	ErrAdmin      Error = "admin_required"
 	ErrWelcome    Error = "welcome_required"
+	// ErrEarly keeps guests out of the app until the party's date and time.
+	ErrEarly Error = "party_not_started"
 )
 
 type Snapshot struct {
-	Guest         identity.Guest
+	Guest identity.Guest
+	// Early is true before the party's date and time, when it has one.
+	Early         bool
 	Open          bool
 	ProfileWidget bool
 	MediaWidget   bool
@@ -86,7 +90,15 @@ func Check(snapshot Snapshot, request Request) error {
 	if request.Admin && !guest.IsAdmin() {
 		return ErrAdmin
 	}
-	if request.Scope == Session || guest.IsAdmin() || snapshot.Open {
+	if request.Scope == Session || guest.IsAdmin() {
+		return nil
+	}
+	// A guest who opened their invitation keeps their session, but enters
+	// nothing until the party starts, the welcome included.
+	if snapshot.Early {
+		return ErrEarly
+	}
+	if snapshot.Open {
 		return nil
 	}
 	selfProfile := request.Scope == Profile && snapshot.ProfileWidget && (request.TargetGuestID == 0 || request.TargetGuestID == guest.ID)

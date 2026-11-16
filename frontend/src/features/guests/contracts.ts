@@ -16,6 +16,8 @@ export const guestSchema = z.object({
   avatarUrl,
   // Only the host's guest list carries a number, in international form.
   phone: phoneSchema.optional(),
+  // Also only in that list: whether the guest ever opened an invitation.
+  joined: z.boolean().optional(),
 });
 
 export const sessionSchema = z.object({ guest: guestSchema });
@@ -37,11 +39,6 @@ export const newGuestSchema = invitationSchema.extend({ guest: guestSchema });
 export const guestUpdateSchema = z.object({
   guest: guestSchema,
   invitation: invitationSchema.nullable(),
-});
-
-export const previewSchema = z.object({
-  guestName: z.string(),
-  expiresAt: instant,
 });
 
 export type Guest = z.infer<typeof guestSchema>;

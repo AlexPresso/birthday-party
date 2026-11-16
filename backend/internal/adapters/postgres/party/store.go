@@ -22,13 +22,13 @@ var _ party.Repository = (*Store)(nil)
 func (s *Store) Get(ctx context.Context) (party.Party, error) {
 	var details party.Party
 	var date *time.Time
-	err := s.db.QueryRowContext(ctx, "SELECT title,timezone,date,location FROM party WHERE id=1").Scan(&details.Title, &details.Timezone, &date, &details.Location)
+	err := s.db.QueryRowContext(ctx, "SELECT title,timezone,date,location,map_url FROM party WHERE id=1").Scan(&details.Title, &details.Timezone, &date, &details.Location, &details.MapURL)
 	details.Date = timestamp.FormatOptional(date)
 	return details, err
 }
 
 // Save stores a normalized party; its date is already a valid UTC instant.
 func (s *Store) Save(ctx context.Context, input party.Party) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE party SET title=$1,timezone=$2,date=$3::timestamptz,location=$4 WHERE id=1", input.Title, input.Timezone, input.Date, input.Location)
+	_, err := s.db.ExecContext(ctx, "UPDATE party SET title=$1,timezone=$2,date=$3::timestamptz,location=$4,map_url=$5 WHERE id=1", input.Title, input.Timezone, input.Date, input.Location, input.MapURL)
 	return err
 }

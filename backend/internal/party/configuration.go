@@ -51,10 +51,17 @@ type Configuration struct {
 	// WhatsAppMessage is the host's text sent with each invitation link, where
 	// {name} and {link} are replaced. Null uses the interface's own message.
 	WhatsAppMessage *string `json:"whatsappMessage"`
+	// WaitingMessage greets guests who came in before the welcome's first
+	// step. Null keeps the interface's line.
+	WaitingMessage *string `json:"waitingMessage"`
 }
 
-// MaxWhatsAppMessage bounds the host's invitation message, in characters.
-const MaxWhatsAppMessage = 1000
+const (
+	// MaxWhatsAppMessage bounds the host's invitation message, in characters.
+	MaxWhatsAppMessage = 1000
+	// MaxWaitingMessage bounds the waiting message, in characters.
+	MaxWaitingMessage = 2000
+)
 
 type ConfigurationActor struct {
 	GuestID     int64
@@ -139,18 +146,29 @@ func normalizeConfiguration(input Configuration, restrictText bool) (Configurati
 		locales[tag] = normalized
 	}
 	input.Invitation.Locales = locales
-	if input.WhatsAppMessage != nil {
-		// An emptied message falls back to the interface's.
-		message := strings.TrimSpace(*input.WhatsAppMessage)
-		if utf8.RuneCountInString(message) > MaxWhatsAppMessage {
-			return input, ErrInvalidConfiguration
-		}
-		input.WhatsAppMessage = &message
-		if message == "" {
-			input.WhatsAppMessage = nil
-		}
+	if input.WhatsAppMessage, ok = optionalText(input.WhatsAppMessage, MaxWhatsAppMessage); !ok {
+		return input, ErrInvalidConfiguration
+	}
+	if input.WaitingMessage, ok = optionalText(input.WaitingMessage, MaxWaitingMessage); !ok {
+		return input, ErrInvalidConfiguration
 	}
 	return input, nil
+}
+
+// optionalText trims a host's text; an emptied one falls back to the
+// interface's (nil). It reports false over limit characters.
+func optionalText(text *string, limit int) (*string, bool) {
+	if text == nil {
+		return nil, true
+	}
+	trimmed := strings.TrimSpace(*text)
+	if utf8.RuneCountInString(trimmed) > limit {
+		return nil, false
+	}
+	if trimmed == "" {
+		return nil, true
+	}
+	return &trimmed, true
 }
 
 func normalizeAppearance(input Appearance) (Appearance, bool) {
