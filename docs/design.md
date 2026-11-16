@@ -350,8 +350,9 @@ Do not invent party details, guest contributions, dates, or activity counts.
 
 - The invitation shows the configured age inside a large ring with the accent
   gradient, under the snowfall.
-- Every screen starts with the same brand row: the mark (a small cluster of
-  lights) followed by the party name. The age appears only on the invitation.
+- Every screen starts with the same brand row: the mark (three striped
+  birthday candles of different sizes, side by side, with accent flames)
+  followed by the party name. The age appears only on the invitation.
 - Programme and Médias have no visible page title; the dock's current tab names
   the screen. Keep their `h1` for assistive technology and place the party date
   or the round add button at the right of the brand row. Other screens keep a

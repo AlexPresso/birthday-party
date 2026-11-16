@@ -4,7 +4,7 @@ A small app made for my 30th birthday, feel free to host and use it too, it was
 designed to be modular, reusable and highly customizable!
 
 <p align="center">
-  <img src="docs/screenshots/invitation.webp" width="32%" alt="Invitation page: a large 30 in an orange ring and an Enter button">
+  <img src="docs/screenshots/invitation.webp" width="32%" alt="Invitation page: a large 30 in an orange ring, the date, the place with its map link, the host's note and an Enter button">
   <img src="docs/screenshots/gallery.webp" width="32%" alt="Shared gallery: a mosaic of party photos, each with its author">
   <img src="docs/screenshots/schedule.webp" width="32%" alt="Schedule: an open vote at the top, then the evening's events by day">
 </p>

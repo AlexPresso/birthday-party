@@ -2,12 +2,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <rect width="512" height="512" fill="#100F0E"/>
   <!-- Centred, and inside the middle 80% that maskable icons keep visible. -->
-  <g transform="translate(91 139.4) scale(11)">
-    <circle cx="6" cy="13" r="4" fill="#FFB547"/>
-    <circle cx="15.5" cy="8" r="5.5" fill="#FF6A1F"/>
-    <circle cx="24.5" cy="14" r="3.5" fill="#FFE2B0"/>
-    <circle cx="8" cy="4" r="1.8" fill="#FFE2B0"/>
-    <circle cx="24" cy="4.5" r="1.5" fill="#FFB547"/>
-    <circle cx="14" cy="17.5" r="1.2" fill="#FFB547"/>
+  <g transform="translate(130 116) scale(14)">
+    <g transform="translate(4.84 20) scale(0.2) translate(-62.5 -106)">
+      <g transform="translate(0 8)">
+        <path d="M62.5 22C78 42 76 56 62.5 58C49 56 47 42 62.5 22Z" fill="#FF6A1F"/>
+        <path d="M62.5 38C69 47 68 54 62.5 55C57 54 56 47 62.5 38Z" fill="#FFB547"/>
+      </g>
+      <rect x="53" y="72" width="19" height="34" rx="6" fill="#FFE2B0"/>
+      <path d="M54 83.7L71 78.3M54 97.7L71 92.3" stroke="#FF6A1F" stroke-width="4"/>
+    </g>
+    <g transform="translate(9.4 20) scale(0.24) translate(-62.5 -106)">
+      <g transform="translate(0 0)">
+        <path d="M62.5 22C78 42 76 56 62.5 58C49 56 47 42 62.5 22Z" fill="#FF6A1F"/>
+        <path d="M62.5 38C69 47 68 54 62.5 55C57 54 56 47 62.5 38Z" fill="#FFB547"/>
+      </g>
+      <rect x="53" y="64" width="19" height="42" rx="6" fill="#FFE2B0"/>
+      <path d="M54 75.7L71 70.3M54 89.7L71 84.3" stroke="#FF6A1F" stroke-width="4"/>
+    </g>
+    <g transform="translate(13.74 20) scale(0.18) translate(-62.5 -106)">
+      <g transform="translate(0 16)">
+        <path d="M62.5 22C78 42 76 56 62.5 58C49 56 47 42 62.5 22Z" fill="#FF6A1F"/>
+        <path d="M62.5 38C69 47 68 54 62.5 55C57 54 56 47 62.5 38Z" fill="#FFB547"/>
+      </g>
+      <rect x="53" y="80" width="19" height="26" rx="6" fill="#FFE2B0"/>
+      <path d="M54 91.7L71 86.3" stroke="#FF6A1F" stroke-width="4"/>
+    </g>
   </g>
 </svg>
