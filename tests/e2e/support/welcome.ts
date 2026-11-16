@@ -1,4 +1,8 @@
-import { expect, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type APIResponse,
+} from "@playwright/test";
 
 export type WelcomeWidget =
   | { type: "title"; text: string }
@@ -53,31 +57,42 @@ export function welcomeControls(host: () => APIRequestContext) {
     expect(response.status()).toBe(200);
     return response.json();
   }
-  async function transition(
+  /**
+   * Sends a command with the latest revision. An editor page may still be
+   * saving, as when a spec ends right after an edit and its cleanup starts:
+   * that save moves the revision, so a conflict reads it again and retries.
+   */
+  async function command(
+    send: (revision: number) => Promise<APIResponse>,
+  ): Promise<AdminWelcome> {
+    for (let attempt = 1; ; attempt++) {
+      const { revision } = await state();
+      const response = await send(revision);
+      if (response.status() === 409 && attempt < 5) continue;
+      expect(response.status()).toBe(200);
+      return response.json();
+    }
+  }
+  function transition(
     action: "start" | "next" | "open",
   ): Promise<AdminWelcome> {
-    const { revision } = await state();
-    const response = await host().post("/api/admin/welcome/transition", {
-      data: { revision, action },
-    });
-    expect(response.status()).toBe(200);
-    return response.json();
+    return command((revision) =>
+      host().post("/api/admin/welcome/transition", {
+        data: { revision, action },
+      }),
+    );
   }
-  async function saveSteps(steps: WelcomeStep[]): Promise<AdminWelcome> {
-    const { revision } = await state();
-    const response = await host().put("/api/admin/welcome", {
-      data: { revision, steps },
-    });
-    expect(response.status()).toBe(200);
-    return response.json();
+  function saveSteps(steps: WelcomeStep[]): Promise<AdminWelcome> {
+    return command((revision) =>
+      host().put("/api/admin/welcome", { data: { revision, steps } }),
+    );
   }
-  async function setRequired(required: boolean): Promise<AdminWelcome> {
-    const { revision } = await state();
-    const response = await host().patch("/api/admin/welcome/required", {
-      data: { revision, required },
-    });
-    expect(response.status()).toBe(200);
-    return response.json();
+  function setRequired(required: boolean): Promise<AdminWelcome> {
+    return command((revision) =>
+      host().patch("/api/admin/welcome/required", {
+        data: { revision, required },
+      }),
+    );
   }
   /** Leaves the app open with the given steps, whatever a test did before. */
   async function restoreOpen(steps: WelcomeStep[], required = false) {

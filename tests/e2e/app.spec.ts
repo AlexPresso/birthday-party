@@ -1135,14 +1135,18 @@ test("the host can manage party details, named invitations and scheduled events"
     "Les 30 ans — fête de test",
   );
   await openSettingsSection(page, "guests");
-  await page
+  // The new guest's panel opens with fields of the same names.
+  const creation = page.locator(".invite-form");
+  await creation
     .getByLabel("Prénom de l’invité", { exact: true })
     .fill("Invité créé depuis les paramètres");
-  await page
+  await creation
     .getByRole("button", { name: "Créer l’invitation", exact: true })
     .click();
   await expect(
-    page.getByText("Invité créé depuis les paramètres", { exact: true }),
+    page
+      .locator(".guest-list")
+      .getByText("Invité créé depuis les paramètres", { exact: true }),
   ).toBeVisible();
   const guests = await (await admin.get("/api/admin/guests")).json();
   expect(

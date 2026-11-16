@@ -414,9 +414,11 @@ test("guest changes update an open vote editor without reloading settings", asyn
   await openSettingsSection(editor, "guests");
   const names = ["Camille — nouveau candidat", "Robin — nouveau candidat"];
   const excluded = "Alex — candidat retiré";
+  // Each new guest's panel opens with fields of the same names.
+  const creation = editor.locator(".invite-form");
   for (const name of [...names, excluded]) {
-    await editor.getByLabel("Prénom de l’invité", { exact: true }).fill(name);
-    await editor
+    await creation.getByLabel("Prénom de l’invité", { exact: true }).fill(name);
+    await creation
       .getByRole("button", { name: "Créer l’invitation", exact: true })
       .click();
     await expect(

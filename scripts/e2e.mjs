@@ -7,10 +7,10 @@ import { frontend, root } from "./runtime.mjs";
 import { withTestDatabase } from "./test-database.mjs";
 
 // The specs share one party per server, so they run one at a time against it.
-// To use more cores, Playwright's --shard splits the spec files into groups,
+// To use more cores, Playwright's --shard splits the tests into groups,
 // and each group gets its own database, Go server, Next dev server, media
-// folder and ports. Each stack needs about two cores: four on a workstation,
-// two on a 4-core CI runner. E2E_SHARDS overrides the count; a run limited to
+// folder and ports. Each stack needs about two cores: up to four here, while
+// CI gives each runner one shard (tests.yml). E2E_SHARDS overrides the count; a run limited to
 // some specs uses one stack, since starting more would cost more than it saves.
 const args = process.argv.slice(2);
 const requested = Number.parseInt(process.env.E2E_SHARDS ?? "", 10);

@@ -16,7 +16,10 @@ const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: false,
+  // One worker per server, since the specs share its party. Fully parallel
+  // only lets --shard split by test rather than by file, so shards finish
+  // together; every test sets up what it needs.
+  fullyParallel: true,
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },

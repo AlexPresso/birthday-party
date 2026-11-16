@@ -12,6 +12,7 @@ import {
   mutationHeaders,
   signInGuest,
 } from "./support/party";
+import { expectHydrated } from "./support/hydration";
 import { canvasImage } from "./support/images";
 import { expectSavedAnnouncement } from "./support/settings";
 
@@ -31,6 +32,8 @@ async function enterGuest(page: Page, name: string) {
   const guest = await signInGuest(host, page, name);
   await page.goto("/profil");
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  // A file given to the server-rendered input before hydration is never sent.
+  await expectHydrated(page.locator('.profile-panel input[type="file"]'));
   return guest;
 }
 
