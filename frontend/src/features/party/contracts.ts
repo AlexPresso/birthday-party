@@ -39,6 +39,8 @@ export const publicConfigurationSchema = z.object({
 export const configurationSchema = publicConfigurationSchema.extend({
   imageSizeMB: z.number().int().min(1).max(1024),
   videoSizeMB: z.number().int().min(1).max(1024),
+  // The host's WhatsApp invitation text; null uses the interface's message.
+  whatsappMessage: z.string().nullable(),
 });
 
 export type PublicConfiguration = z.infer<typeof publicConfigurationSchema>;

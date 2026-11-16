@@ -1,13 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
 import {
-  PenLine,
   MoreHorizontal,
   Copy,
   Check,
   Trash2,
-  Heart,
   UserRound,
+  Mic,
+  Square,
 } from "lucide-react";
 import { api, errorMessage, remove } from "@/lib/api";
 import { useI18n } from "@/lib/i18n-context";
@@ -18,6 +18,12 @@ import { type Guest } from "@/features/guests/contracts";
 import { PageHeading, ErrorNotice, SavedAnnouncement } from "@/components/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Avatar } from "@/components/avatar";
+import { VoiceNote, formatVoiceTime } from "./voice-note";
+import {
+  maxVoiceMs,
+  useCanRecordVoice,
+  useVoiceRecorder,
+} from "./use-voice-recorder";
 import "./guestbook.css";
 
 export function Guestbook({
@@ -45,11 +51,15 @@ export function Guestbook({
   // The copy action of a message confirms by itself for a moment.
   const [copiedEntryId, markCopied] = useCopiedCue<number>();
   const text = useRef<HTMLTextAreaElement>(null);
+  const recorder = useVoiceRecorder();
+  const recording =
+    recorder.state.status === "recorded" ? recorder.state.recording : null;
+  const canRecord = useCanRecordVoice();
 
   async function publish(event: React.FormEvent) {
     event.preventDefault();
-    if (sending) return;
-    if (!body.trim()) {
+    if (sending || recorder.state.status === "recording") return;
+    if (!body.trim() && !recording) {
       setPublishError(t("guestbookDesign.emptyMessage"));
       text.current?.focus();
       return;
@@ -58,13 +68,22 @@ export function Guestbook({
     setPublishError(null);
     setNotice(null);
     try {
+      let payload: unknown = { body: body.trim(), anonymous };
+      if (recording) {
+        // The message comes first: the server reads it before the recording.
+        const form = new FormData();
+        form.append("body", body.trim());
+        form.append("audio", recording.blob, "voice-note");
+        payload = form;
+      }
       const entry = await api("/guestbook", entrySchema, {
         method: "POST",
-        body: { body: body.trim(), anonymous },
+        body: payload,
       });
       setEntries((items) => [entry, ...items]);
       setBody("");
       setAnonymous(false);
+      recorder.clear();
       setNotice(t("guestbook.published"));
     } catch (err) {
       setPublishError(errorMessage(err, t));
@@ -149,7 +168,7 @@ export function Guestbook({
               }}
               placeholder={t("guestbookDesign.placeholder")}
               aria-describedby="guestbook-visibility"
-              required
+              required={!recording}
               disabled={sending}
             />
             {body.length > 1800 && (
@@ -159,28 +178,129 @@ export function Guestbook({
                 </span>
               </div>
             )}
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={anonymous}
-                onChange={(event) => setAnonymous(event.target.checked)}
-                disabled={sending}
-              />
-              <span>{t("guestbook.postAnonymously")}</span>
-            </label>
+            {recorder.state.status === "recording" && (
+              <div className="voice-recording" role="status">
+                <span className="voice-recording-dot" aria-hidden="true" />
+                <span className="visually-hidden">
+                  {t("guestbookDesign.recording")}
+                </span>
+                <span className="voice-recording-time">
+                  {formatVoiceTime(recorder.state.elapsedMs)}
+                  <span className="muted">
+                    {" "}
+                    / {formatVoiceTime(maxVoiceMs)}
+                  </span>
+                </span>
+                <span className="voice-recording-bars" aria-hidden="true">
+                  {recorder.state.levels.map((level, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        height: `${Math.min(100, 12 + level * 400)}%`,
+                      }}
+                    />
+                  ))}
+                </span>
+              </div>
+            )}
+            {recording && (
+              <div className="voice-draft">
+                <VoiceNote
+                  src={recording.url}
+                  durationMs={recording.durationMs}
+                  peaks={recording.peaks}
+                />
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  onClick={recorder.clear}
+                  disabled={sending}
+                  aria-label={t("guestbookDesign.discardRecording")}
+                  title={t("guestbookDesign.discardRecording")}
+                >
+                  <Trash2 size={18} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            {recording ? (
+              // A voice gives its author away: voice notes are always signed.
+              <p className="fine-print voice-signed">
+                {t("guestbookDesign.voiceSigned")}
+              </p>
+            ) : (
+              recorder.state.status !== "recording" && (
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={anonymous}
+                    onChange={(event) => setAnonymous(event.target.checked)}
+                    disabled={sending}
+                  />
+                  <span>{t("guestbook.postAnonymously")}</span>
+                </label>
+              )
+            )}
+            <ErrorNotice
+              message={
+                recorder.error === "denied"
+                  ? t("guestbookDesign.micDenied")
+                  : recorder.error === "unavailable"
+                    ? t("guestbookDesign.micUnavailable")
+                    : null
+              }
+            />
             <ErrorNotice message={publishError} />
-            <button
-              className="button primary wide"
-              disabled={sending}
-              aria-label={t(
-                sending ? "guestbook.publishing" : "guestbook.publish",
-              )}
-            >
-              {t(sending ? "guestbook.publishing" : "guestbookDesign.publish")}
-            </button>
+            {recorder.state.status === "recording" ? (
+              <div className="compose-actions">
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={recorder.cancel}
+                >
+                  {t("guestbookDesign.cancelRecording")}
+                </button>
+                <button
+                  type="button"
+                  className="button primary"
+                  onClick={recorder.stop}
+                >
+                  <Square size={14} fill="currentColor" aria-hidden="true" />
+                  {t("guestbookDesign.stopRecording")}
+                </button>
+              </div>
+            ) : (
+              <div className="compose-actions">
+                <button
+                  className="button primary"
+                  disabled={sending}
+                  aria-label={t(
+                    sending ? "guestbook.publishing" : "guestbook.publish",
+                  )}
+                >
+                  {t(
+                    sending
+                      ? "guestbook.publishing"
+                      : "guestbookDesign.publish",
+                  )}
+                </button>
+                {canRecord && !recording && (
+                  <button
+                    type="button"
+                    className="compose-record"
+                    onClick={() => void recorder.start()}
+                    disabled={sending}
+                    aria-label={t("guestbookDesign.record")}
+                    title={t("guestbookDesign.record")}
+                  >
+                    <Mic size={20} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            )}
             <p className="visually-hidden" id="guestbook-visibility">
               {t("guestbook.visibility")}{" "}
-              {anonymous
+              {anonymous && !recording
                 ? t("guestbook.signedAnonymously")
                 : t("guestbook.signed", { name: guest.name })}
             </p>
@@ -192,15 +312,7 @@ export function Guestbook({
           <ErrorNotice message={error} />
           {entries.length === 0 ? (
             <div className="guestbook-empty">
-              <Heart size={30} strokeWidth={1.3} aria-hidden="true" />
               <h2>{t("guestbook.emptyTitle")}</h2>
-              <button
-                className="text-button"
-                onClick={() => text.current?.focus()}
-              >
-                <PenLine size={16} />
-                {t("guestbook.write")}
-              </button>
             </div>
           ) : (
             entries.map((entry) => (
@@ -289,7 +401,14 @@ export function Guestbook({
                     </div>
                   </details>
                 </header>
-                <p className="entry-body">{entry.body}</p>
+                {entry.voice && (
+                  <VoiceNote
+                    src={entry.voice.url}
+                    durationMs={entry.voice.durationMs}
+                    peaks={entry.voice.peaks}
+                  />
+                )}
+                {entry.body && <p className="entry-body">{entry.body}</p>}
               </article>
             ))
           )}

@@ -41,7 +41,8 @@ const mediaUrl = z
 export const photoSchema = z.object({
   id,
   categoryId: id.nullable(),
-  author: authorSchema,
+  // Null once the guest who shared it was deleted.
+  author: authorSchema.nullable(),
   kind: z.enum(["image", "video"]),
   // Go labels a stored Matroska container as such; browsers never offer it.
   mimeType: z.enum([...imageMimeTypes, ...videoMimeTypes, "video/x-matroska"]),

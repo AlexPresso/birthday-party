@@ -15,7 +15,7 @@ new decision; do not revisit the rejected directions without a reason.
   shows its label. Translate accessible names and tooltips in the supported
   languages.
 - Events and other content that become available later.
-- A guestbook with named messages and an optional anonymous posting checkbox.
+- A guestbook with named messages and an optional anonymous posting switch.
 - Invite-only access through personal activation links and pre-created profiles.
 - Simple, readable code and a responsive, performant experience.
 - Interface language follows the phone/browser's preferred supported language:
@@ -169,7 +169,7 @@ Do not invent party details, guest contributions, dates, or activity counts.
   size inside the photo menu, as the description of its choose action; errors
   appear under the photo. Preserve the saved avatar on upload
   failure and offer a retry for the selected file.
-- The guestbook has a plain message field, anonymous checkbox and Publish button.
+- The guestbook has a plain message field, anonymous switch and Publish button.
   Hide redundant signature and visibility paragraphs from the default visual
   layout while retaining accessible guidance. Entries use a single reading
   column with dividers and overflow actions. Anonymous entries have a filled
@@ -364,11 +364,25 @@ Do not invent party details, guest contributions, dates, or activity counts.
   Activation is a deliberate action; link previews must not consume invitations.
 - Explain invalid, expired and already used invitations, with a clear route back
   to the host. Keep identity attached to a stable guest ID across new invitations.
-- The guestbook has a welcoming empty state and a clear message composer. Display
+- The guestbook has a clear message composer; its empty state is one line,
+  with no icon or prompt to write. Display
   actual guest names, readable messages and posting dates. Handle submission errors.
-- Place an unchecked anonymous posting checkbox beside the message composer.
+- Place an anonymous posting switch, off by default, under the message field.
   When selected, explain that the name will not appear. Anonymous messages show
   a neutral avatar and translated anonymous label, including to the host.
+- A round microphone button sits beside Publish. Recording replaces both with
+  Cancel and Finish under a pill of a red dot, the time out of 5:00 and live
+  bars; a recorded note shows as its bubble with a bin, and the anonymous switch
+  gives way to one line saying a voice note is always signed. A voice note, in
+  the composer or a post, is a pill bubble (option A of the owner's choice,
+  2026-11-16): an accent play button, a 48-bar waveform that fills in the accent
+  colour while it plays and seeks by touch or keyboard, and the time.
+- In the host's guest list, a name (with a small pencil) opens that guest's
+  panel: name and WhatsApp number, saved on leaving a field, with one line saying
+  a new number replaces the link; then the link, Copy and "Send on WhatsApp".
+  A revoked guest's second bin is red. The WhatsApp message itself is written in
+  the invitation settings, under the public texts, with one line on `{name}`
+  and `{link}`.
 - Profile shows the guest identity and logout, without an About section.
   Choosing a profile photo uploads and saves it immediately. Guests can replace
   or remove it. Use initials when no photo is set. Show

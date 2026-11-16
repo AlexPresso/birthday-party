@@ -126,7 +126,10 @@ export function ConfigurationEditor({
               imageSizeMB: initial.imageSizeMB,
               videoSizeMB: initial.videoSizeMB,
             }
-          : { invitation: initial.invitation },
+          : {
+              invitation: initial.invitation,
+              whatsappMessage: initial.whatsappMessage,
+            },
     ),
   );
   const dirty = revision !== savedRevision;
@@ -152,6 +155,8 @@ export function ConfigurationEditor({
           es: readCopy(fields, "es"),
         },
       };
+      patch.whatsappMessage =
+        String(fields.get("whatsappMessage") ?? "").trim() || null;
     }
     const snapshot = JSON.stringify(patch);
     if (snapshot === lastSaved.current) {
@@ -319,6 +324,23 @@ export function ConfigurationEditor({
                 </fieldset>
               );
             })}
+            <div className="configuration-whatsapp">
+              <label htmlFor={`${id}-whatsapp`}>
+                {t("configuration.whatsappMessage")}
+              </label>
+              <textarea
+                id={`${id}-whatsapp`}
+                name="whatsappMessage"
+                rows={4}
+                maxLength={1000}
+                defaultValue={initial.whatsappMessage ?? ""}
+                placeholder={t("admin.whatsappMessage")}
+                aria-describedby={`${id}-whatsapp-hint`}
+              />
+              <p id={`${id}-whatsapp-hint`} className="fine-print">
+                {t("configuration.whatsappHint")}
+              </p>
+            </div>
           </>
         )}
       </fieldset>

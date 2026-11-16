@@ -35,6 +35,17 @@ const en = {
   "admin.newLink": "New link",
   "admin.reinvite": "Invite again",
   "admin.revokeAccessFor": "Remove access for {name}",
+  "admin.deleteFor": "Delete {name} permanently",
+  "admin.deleteConfirmation":
+    "Delete {name} permanently? Their messages, photos and videos stay, without their name. Their votes and their place in games are removed. This can’t be undone.",
+  "admin.phone": "Phone (WhatsApp)",
+  "admin.sendWhatsApp": "Send on WhatsApp",
+  "admin.closeGuest": "Close",
+  "admin.editGuest": "Edit {name}",
+  "admin.phoneRenewsLink":
+    "Changing the number creates a new link; the old one stops working.",
+  "admin.whatsappMessage":
+    "Hi {name}! Here’s your personal link for the party: {link}",
   "admin.programmeSaved": "Schedule saved.",
   "admin.programmeNotifications":
     "Notify guests when an event starts and when a surprise is revealed",
@@ -101,6 +112,17 @@ const fr: AdminMessages = {
   "admin.newLink": "Nouveau lien",
   "admin.reinvite": "Réinviter",
   "admin.revokeAccessFor": "Retirer l’accès de {name}",
+  "admin.deleteFor": "Supprimer définitivement {name}",
+  "admin.deleteConfirmation":
+    "Supprimer définitivement {name} ? Ses messages, photos et vidéos restent, sans son nom. Ses votes et sa place dans les parties disparaissent. C’est irréversible.",
+  "admin.phone": "Téléphone (WhatsApp)",
+  "admin.sendWhatsApp": "Envoyer sur WhatsApp",
+  "admin.closeGuest": "Fermer",
+  "admin.editGuest": "Modifier {name}",
+  "admin.phoneRenewsLink":
+    "Changer le numéro crée un nouveau lien ; l’ancien ne fonctionne plus.",
+  "admin.whatsappMessage":
+    "Salut {name} ! Voici ton lien personnel pour la fête : {link}",
   "admin.programmeSaved": "Le programme est enregistré.",
   "admin.programmeNotifications":
     "Notifier le début des événements et les surprises dévoilées",
@@ -166,6 +188,17 @@ const de: AdminMessages = {
   "admin.newLink": "Neuer Link",
   "admin.reinvite": "Erneut einladen",
   "admin.revokeAccessFor": "Zugang für {name} entfernen",
+  "admin.deleteFor": "{name} endgültig löschen",
+  "admin.deleteConfirmation":
+    "{name} endgültig löschen? Nachrichten, Fotos und Videos bleiben ohne Namen erhalten. Stimmen und Plätze in Spielen werden entfernt. Das lässt sich nicht rückgängig machen.",
+  "admin.phone": "Telefon (WhatsApp)",
+  "admin.sendWhatsApp": "Auf WhatsApp senden",
+  "admin.closeGuest": "Schließen",
+  "admin.editGuest": "{name} bearbeiten",
+  "admin.phoneRenewsLink":
+    "Eine neue Nummer erzeugt einen neuen Link, der alte funktioniert nicht mehr.",
+  "admin.whatsappMessage":
+    "Hallo {name}! Hier ist dein persönlicher Link für das Fest: {link}",
   "admin.programmeSaved": "Das Programm ist gespeichert.",
   "admin.programmeNotifications":
     "Gäste benachrichtigen, wenn ein Programmpunkt beginnt und wenn eine Überraschung enthüllt wird",
@@ -230,6 +263,17 @@ const it: AdminMessages = {
   "admin.newLink": "Nuovo link",
   "admin.reinvite": "Invita di nuovo",
   "admin.revokeAccessFor": "Revoca l’accesso a {name}",
+  "admin.deleteFor": "Elimina definitivamente {name}",
+  "admin.deleteConfirmation":
+    "Eliminare definitivamente {name}? Messaggi, foto e video restano, senza il nome. I voti e il posto nelle partite vengono rimossi. Non si può annullare.",
+  "admin.phone": "Telefono (WhatsApp)",
+  "admin.sendWhatsApp": "Invia su WhatsApp",
+  "admin.closeGuest": "Chiudi",
+  "admin.editGuest": "Modifica {name}",
+  "admin.phoneRenewsLink":
+    "Cambiare il numero crea un nuovo link; il vecchio smette di funzionare.",
+  "admin.whatsappMessage":
+    "Ciao {name}! Ecco il tuo link personale per la festa: {link}",
   "admin.programmeSaved": "Il programma è stato salvato.",
   "admin.programmeNotifications":
     "Avvisa gli invitati quando inizia un evento e quando viene svelata una sorpresa",
@@ -295,6 +339,17 @@ const es: AdminMessages = {
   "admin.newLink": "Nuevo enlace",
   "admin.reinvite": "Volver a invitar",
   "admin.revokeAccessFor": "Retirar el acceso a {name}",
+  "admin.deleteFor": "Eliminar a {name} definitivamente",
+  "admin.deleteConfirmation":
+    "¿Eliminar a {name} definitivamente? Sus mensajes, fotos y vídeos se quedan, sin su nombre. Sus votos y su lugar en las partidas se eliminan. No se puede deshacer.",
+  "admin.phone": "Teléfono (WhatsApp)",
+  "admin.sendWhatsApp": "Enviar por WhatsApp",
+  "admin.closeGuest": "Cerrar",
+  "admin.editGuest": "Editar a {name}",
+  "admin.phoneRenewsLink":
+    "Cambiar el número crea un enlace nuevo; el anterior deja de funcionar.",
+  "admin.whatsappMessage":
+    "¡Hola {name}! Aquí tienes tu enlace personal para la fiesta: {link}",
   "admin.programmeSaved": "El programa está guardado.",
   "admin.programmeNotifications":
     "Avisar a los invitados cuando empieza un evento y cuando se revela una sorpresa",

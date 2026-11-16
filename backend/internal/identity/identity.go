@@ -32,6 +32,9 @@ type Guest struct {
 	Role      Role    `json:"role"`
 	Active    bool    `json:"active"`
 	AvatarURL *string `json:"avatarUrl"`
+	// Phone is private: only the administrators' guest list carries it, in
+	// international form (+41791234567).
+	Phone *string `json:"phone,omitempty"`
 }
 
 // IsAdmin reports whether the guest is a host.

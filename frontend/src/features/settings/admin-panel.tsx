@@ -214,6 +214,9 @@ export function AdminPanel({
         : [...current, guest],
     );
   }
+  function removeGuest(id: number) {
+    setGuests((current) => current.filter((item) => item.id !== id));
+  }
   function content(section: SettingsSection) {
     switch (section) {
       case "party":
@@ -248,7 +251,9 @@ export function AdminPanel({
           <GuestManager
             guests={guests}
             onGuestChange={updateGuest}
+            onGuestRemove={removeGuest}
             currentGuest={guest}
+            whatsappMessage={configuration.whatsappMessage}
             timezone={party.timezone}
           />
         );

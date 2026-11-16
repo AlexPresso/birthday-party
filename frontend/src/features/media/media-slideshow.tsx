@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { photosSchema, type PhotoPage } from "./contracts";
+import { authorName, mediaAlt } from "./author-labels";
 import { useI18n } from "@/lib/i18n-context";
 import "./media-slideshow.css";
 
@@ -328,7 +329,7 @@ export function MediaSlideshow({
               playsInline
               preload="auto"
               loop={items.length === 1 && !cursor}
-              aria-label={t("photos.videoAlt", { name: current.author.name })}
+              aria-label={mediaAlt(current, t)}
               onLoadedData={() => setLoadedKey(mediaKey)}
               onError={mediaFailed}
               onEnded={() => {
@@ -362,7 +363,7 @@ export function MediaSlideshow({
               src={current.url}
               width={current.width}
               height={current.height}
-              alt={t("photos.alt", { name: current.author.name })}
+              alt={mediaAlt(current, t)}
               onLoad={() => setLoadedKey(mediaKey)}
               onError={mediaFailed}
             />
@@ -387,7 +388,9 @@ export function MediaSlideshow({
           </div>
         )}
         <footer className="slideshow-footer">
-          <span className="slideshow-author">{current?.author.name}</span>
+          <span className="slideshow-author">
+            {current && authorName(current, t)}
+          </span>
           <div className="slideshow-navigation">
             <button
               className="icon-button"

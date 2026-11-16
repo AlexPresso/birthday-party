@@ -4,6 +4,7 @@ package guestbook
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -15,13 +16,40 @@ import (
 const (
 	maxPageSize     = 48
 	maxMessageRunes = 2000
+	// MaxVoiceDuration is five minutes, plus the moment a recorder may add
+	// while stopping.
+	MaxVoiceDuration = 302 * time.Second
+	// VoicePeaks is the number of waveform levels kept for each voice note.
+	VoicePeaks = 48
 )
 
 var (
 	ErrInvalidMessage  = errors.New("message must contain 1–2000 characters")
 	ErrNotFound        = errors.New("message not found")
 	ErrDeleteForbidden = errors.New("message deletion is not permitted")
+	ErrInvalidVoice    = errors.New("voice note must be a readable recording of at most five minutes")
 )
+
+// Voice is a voice note as the server encoded it: the audio file, its length
+// and the waveform levels (0–255) the interface draws.
+type Voice struct {
+	Audio    []byte
+	Duration time.Duration
+	Peaks    []byte
+}
+
+// VoiceSummary describes a stored voice note without its audio.
+type VoiceSummary struct {
+	Duration time.Duration
+	Peaks    []byte
+}
+
+// VoiceView is what viewers receive; the audio is read from URL.
+type VoiceView struct {
+	URL        string `json:"url"`
+	DurationMS int64  `json:"durationMs"`
+	Peaks      []int  `json:"peaks"`
+}
 
 // Entry omits its owner entirely when anonymous, including for administrators.
 type Entry struct {
@@ -30,6 +58,7 @@ type Entry struct {
 	Anonymous bool             `json:"anonymous"`
 	CanDelete bool             `json:"canDelete"`
 	Body      string           `json:"body"`
+	Voice     *VoiceView       `json:"voice"`
 	CreatedAt string           `json:"createdAt"`
 }
 
@@ -39,13 +68,17 @@ type Record struct {
 	Author    identity.Author
 	Anonymous bool
 	Body      string
+	Voice     *VoiceSummary
 	CreatedAt time.Time
 }
 
 // Repository persists entries and retains their owners for permission checks.
 type Repository interface {
 	List(ctx context.Context, beforeID int64, limit int) ([]Record, error)
-	Create(ctx context.Context, record Record) (int64, error)
+	// Create stores the entry and, when audio is not nil, its voice note.
+	Create(ctx context.Context, record Record, audio []byte) (int64, error)
+	// VoiceAudio returns ErrNotFound when the entry has no voice note.
+	VoiceAudio(ctx context.Context, entryID int64) ([]byte, error)
 	Owner(ctx context.Context, entryID int64) (int64, error)
 	Delete(ctx context.Context, entryID int64) (bool, error)
 }
@@ -82,6 +115,17 @@ func (record Record) view(viewer identity.Guest) Entry {
 	if !record.Anonymous {
 		entry.Author = &record.Author
 	}
+	if record.Voice != nil {
+		peaks := make([]int, len(record.Voice.Peaks))
+		for index, level := range record.Voice.Peaks {
+			peaks[index] = int(level)
+		}
+		entry.Voice = &VoiceView{
+			URL:        "/api/guestbook/" + strconv.FormatInt(record.ID, 10) + "/voice",
+			DurationMS: record.Voice.Duration.Milliseconds(),
+			Peaks:      peaks,
+		}
+	}
 	return entry
 }
 
@@ -91,6 +135,23 @@ func (s *Service) Create(ctx context.Context, viewer identity.Guest, body string
 	if length := utf8.RuneCountInString(body); length < 1 || length > maxMessageRunes {
 		return Entry{}, ErrInvalidMessage
 	}
+	return s.create(ctx, viewer, body, anonymous, nil, now)
+}
+
+// CreateVoice stores a voice note with an optional message. A voice note is
+// always signed: the voice would give the author away anyway.
+func (s *Service) CreateVoice(ctx context.Context, viewer identity.Guest, body string, voice Voice, now time.Time) (Entry, error) {
+	body = strings.TrimSpace(body)
+	if utf8.RuneCountInString(body) > maxMessageRunes {
+		return Entry{}, ErrInvalidMessage
+	}
+	if len(voice.Audio) == 0 || voice.Duration <= 0 || voice.Duration > MaxVoiceDuration || len(voice.Peaks) != VoicePeaks {
+		return Entry{}, ErrInvalidVoice
+	}
+	return s.create(ctx, viewer, body, false, &voice, now)
+}
+
+func (s *Service) create(ctx context.Context, viewer identity.Guest, body string, anonymous bool, voice *Voice, now time.Time) (Entry, error) {
 	record := Record{
 		Author: identity.Author{
 			ID:        viewer.ID,
@@ -101,12 +162,22 @@ func (s *Service) Create(ctx context.Context, viewer identity.Guest, body string
 		Body:      body,
 		CreatedAt: now,
 	}
+	var audio []byte
+	if voice != nil {
+		record.Voice = &VoiceSummary{Duration: voice.Duration, Peaks: voice.Peaks}
+		audio = voice.Audio
+	}
 	var err error
-	record.ID, err = s.repository.Create(ctx, record)
+	record.ID, err = s.repository.Create(ctx, record, audio)
 	if err != nil {
 		return Entry{}, err
 	}
 	return record.view(viewer), nil
+}
+
+// VoiceAudio returns an entry's recording to a viewer who may read the guestbook.
+func (s *Service) VoiceAudio(ctx context.Context, entryID int64) ([]byte, error) {
+	return s.repository.VoiceAudio(ctx, entryID)
 }
 
 // Delete permits only the author or an administrator, regardless of anonymity.

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	pgwelcome "birthday-party/backend/internal/adapters/postgres/welcome"
-	"birthday-party/backend/internal/identity"
 	"birthday-party/backend/internal/media"
 	"birthday-party/backend/internal/timestamp"
 )
@@ -35,7 +34,7 @@ func scanUpload(row interface{ Scan(...any) error }) (media.Upload, error) {
 		job.Photo = &media.Photo{
 			ID:         id.Int64,
 			CategoryID: job.CategoryID,
-			Author:     identity.Author{ID: authorID.Int64, Name: authorName.String, AvatarURL: identity.AvatarURL(authorID.Int64, avatarVersion)},
+			Author:     author(authorID, authorName, avatarVersion),
 			Width:      int(width.Int64),
 			Height:     int(height.Int64),
 			CreatedAt:  timestamp.Format(published.Time),

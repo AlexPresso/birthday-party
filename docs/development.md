@@ -90,11 +90,12 @@ npm --prefix frontend run format:check
 `npm run check` and `npm run test:e2e` start a throwaway PostgreSQL container,
 so Docker must be running, and they never touch the party's data. The Go
 integration tests run side by side, each in its own schema. The browser tests
-split their spec files into parallel shards, each with its own database,
+split into parallel shards of tests, each with its own database,
 servers and ports from 3301: about one shard per two cores, up to four, or
 `E2E_SHARDS=n`. Naming spec files runs them on one stack at port 3300. Stop
 `npm run dev` before a single-stack run or a production build, because they
-share Next.js's build directory. GitHub Actions runs the same checks once for every
+share Next.js's build directory. GitHub Actions splits the browser tests across four runners, each one shard,
+and runs the same checks once for every
 commit of a pull request and for every push to `main` or a `v*` tag, and
 publishes the images from `main` and tags only when they pass. A branch without
 a pull request is not tested automatically: run the workflow by hand from the

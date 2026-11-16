@@ -49,8 +49,12 @@ var apiErrors = map[string]apiError{
 	"invitation_unavailable": {http.StatusUnauthorized, "This link is invalid, expired or already used. Ask the host for a new invitation."},
 	"invitation_used":        {http.StatusUnauthorized, "This invitation has already been used. Ask the host for a new one."},
 	"invalid_guest_name":     {http.StatusBadRequest, "The name must contain between 1 and 80 characters."},
+	"invalid_phone":          {http.StatusBadRequest, "Enter the number with its country code, such as +41 79 123 45 67."},
 	"guest_limit_reached":    {http.StatusConflict, "You’ve reached the limit of 500 guests."},
 	"self_revoke_forbidden":  {http.StatusConflict, "You cannot remove your own access."},
+	"guest_active":           {http.StatusConflict, "Remove this guest’s access before deleting them."},
+	"guest_uploads_pending":  {http.StatusConflict, "This guest’s uploads are still being prepared. Try again in a moment."},
+	"guest_in_game":          {http.StatusConflict, "This guest plays or leads a running werewolf game. End it first."},
 
 	// Party details and configuration.
 	"invalid_party":         {http.StatusBadRequest, "The title can contain up to 120 characters and the location up to 240."},
@@ -103,6 +107,8 @@ var apiErrors = map[string]apiError{
 	"invalid_message":          {http.StatusBadRequest, "Your message must contain between 1 and 2000 characters."},
 	"message_not_found":        {http.StatusNotFound, "This message could not be found."},
 	"message_delete_forbidden": {http.StatusForbidden, "You can only delete your own messages."},
+	"invalid_voice_note":       {http.StatusBadRequest, "This voice note couldn’t be read or lasts more than five minutes. Record it again."},
+	"voice_note_too_large":     {http.StatusRequestEntityTooLarge, "This voice note is too large. Record a shorter one."},
 
 	// Media categories, gallery and uploads.
 	"invalid_media_category":     {http.StatusBadRequest, "Choose a category with a name of 1 to 80 characters and a visibility setting."},
@@ -142,13 +148,18 @@ var sentinelCodes = []struct {
 	code string
 }{
 	{identity.ErrInvalidName, "invalid_guest_name"},
+	{identity.ErrInvalidPhone, "invalid_phone"},
 	{identity.ErrInvalidInvitation, "invalid_invitation"},
 	{identity.ErrUnavailableInvitation, "invitation_unavailable"},
 	{identity.ErrUsedInvitation, "invitation_used"},
 	{identity.ErrLimitReached, "guest_limit_reached"},
 	{identity.ErrNotFound, "not_found"},
 	{identity.ErrSelfRevoke, "self_revoke_forbidden"},
+	{identity.ErrGuestActive, "guest_active"},
+	{identity.ErrGuestUploads, "guest_uploads_pending"},
+	{identity.ErrGuestInGame, "guest_in_game"},
 	{guestbook.ErrInvalidMessage, "invalid_message"},
+	{guestbook.ErrInvalidVoice, "invalid_voice_note"},
 	{guestbook.ErrNotFound, "message_not_found"},
 	{guestbook.ErrDeleteForbidden, "message_delete_forbidden"},
 	{programme.ErrInvalidEvent, "invalid_event"},

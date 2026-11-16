@@ -20,6 +20,7 @@ import {
   expectSavedAnnouncement,
   openSettingsSection,
 } from "./support/settings";
+import { expectHydrated } from "./support/hydration";
 import { canvasImage } from "./support/images";
 import {
   closeUploadDetails,
@@ -250,15 +251,12 @@ test("a colour no text can be read on is flagged under the swatches", async ({
     "Sur cette couleur, le texte des boutons sera difficile à lire.",
   );
   await expect(warning).toHaveCount(0);
-  // Events sent before hydration reach no React handler: pick again until
-  // the editor has taken the colour.
-  await expect(async () => {
-    await pickColour(
-      editor.getByLabel("Autre couleur", { exact: true }),
-      "#c06000",
-    );
-    await expect(warning).toBeVisible({ timeout: 1000 });
-  }).toPass();
+  const picker = editor.getByLabel("Autre couleur", { exact: true });
+  // Picked before hydration, the colour would reach no handler, and picking
+  // it again would no longer count as a change.
+  await expectHydrated(picker);
+  await pickColour(picker, "#c06000");
+  await expect(warning).toBeVisible();
   await expect
     .poll(async () => (await configuration()).appearance.accent)
     .toBe("#c06000");

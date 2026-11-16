@@ -76,8 +76,18 @@ const en = {
   invitation_used:
     "This invitation has already been used. Ask the host for a new one.",
   invalid_guest_name: "The name must contain between 1 and 80 characters.",
+  invalid_phone:
+    "Enter the number with its country code, such as +41 79 123 45 67.",
   guest_limit_reached: "You’ve reached the limit of 500 guests.",
   self_revoke_forbidden: "You cannot remove your own access.",
+  guest_active: "Remove this guest’s access before deleting them.",
+  guest_uploads_pending:
+    "This guest’s uploads are still being prepared. Try again in a moment.",
+  guest_in_game:
+    "This guest plays or leads a running werewolf game. End it first.",
+  invalid_voice_note:
+    "This voice note couldn’t be read or lasts more than five minutes. Record it again.",
+  voice_note_too_large: "This voice note is too large. Record a shorter one.",
   upload_queue_full:
     "The upload queue is full. Wait for a few files to finish, then try again.",
   upload_not_found: "This upload could not be found.",
@@ -204,8 +214,19 @@ export const errorMessages = {
     invitation_used:
       "Cette invitation a déjà été utilisée. Demande un nouveau lien à l’organisateur.",
     invalid_guest_name: "Le prénom doit contenir entre 1 et 80 caractères.",
+    invalid_phone:
+      "Indique le numéro avec l’indicatif du pays, par exemple +41 79 123 45 67.",
     guest_limit_reached: "Tu as atteint la limite de 500 invités.",
     self_revoke_forbidden: "Tu ne peux pas retirer ton propre accès.",
+    guest_active: "Retire d’abord l’accès de cette personne.",
+    guest_uploads_pending:
+      "Des envois de cette personne sont encore en préparation. Réessaie dans un moment.",
+    guest_in_game:
+      "Cette personne joue ou mène une partie de loup-garou en cours. Termine-la d’abord.",
+    invalid_voice_note:
+      "Impossible de lire cette note vocale, ou elle dure plus de 5 minutes. Enregistre-la à nouveau.",
+    voice_note_too_large:
+      "Cette note vocale est trop lourde. Enregistres-en une plus courte.",
     upload_queue_full:
       "La file d’envoi est pleine. Attends que quelques fichiers soient prêts, puis réessaie.",
     upload_not_found: "Cet envoi est introuvable.",
@@ -342,8 +363,19 @@ export const errorMessages = {
     invitation_used:
       "Diese Einladung wurde bereits benutzt. Bitte den Gastgeber um einen neuen Link.",
     invalid_guest_name: "Der Name muss zwischen 1 und 80 Zeichen enthalten.",
+    invalid_phone:
+      "Gib die Nummer mit Ländervorwahl ein, zum Beispiel +41 79 123 45 67.",
     guest_limit_reached: "Du hast das Limit von 500 Gästen erreicht.",
     self_revoke_forbidden: "Du kannst deinen eigenen Zugang nicht entfernen.",
+    guest_active: "Entferne zuerst den Zugang dieser Person.",
+    guest_uploads_pending:
+      "Uploads dieser Person werden noch vorbereitet. Versuch es gleich noch einmal.",
+    guest_in_game:
+      "Diese Person spielt oder leitet ein laufendes Werwolf-Spiel. Beende es zuerst.",
+    invalid_voice_note:
+      "Diese Sprachnachricht ist unlesbar oder länger als fünf Minuten. Nimm sie neu auf.",
+    voice_note_too_large:
+      "Diese Sprachnachricht ist zu groß. Nimm eine kürzere auf.",
     upload_queue_full:
       "Die Warteschlange ist voll. Warte, bis einige Dateien fertig sind, und versuche es erneut.",
     upload_not_found: "Dieser Upload wurde nicht gefunden.",
@@ -475,8 +507,19 @@ export const errorMessages = {
     invitation_used:
       "Questo invito è già stato usato. Chiedi un nuovo link a chi organizza.",
     invalid_guest_name: "Il nome deve contenere da 1 a 80 caratteri.",
+    invalid_phone:
+      "Inserisci il numero con il prefisso del paese, per esempio +41 79 123 45 67.",
     guest_limit_reached: "Hai raggiunto il limite di 500 invitati.",
     self_revoke_forbidden: "Non puoi rimuovere il tuo accesso.",
+    guest_active: "Rimuovi prima l’accesso di questa persona.",
+    guest_uploads_pending:
+      "Alcuni caricamenti di questa persona sono ancora in preparazione. Riprova tra poco.",
+    guest_in_game:
+      "Questa persona gioca o conduce una partita di lupo mannaro in corso. Terminala prima.",
+    invalid_voice_note:
+      "Questa nota vocale non è leggibile o dura più di cinque minuti. Registrala di nuovo.",
+    voice_note_too_large:
+      "Questa nota vocale è troppo pesante. Registrane una più breve.",
     upload_queue_full:
       "La coda è piena. Aspetta che alcuni file siano pronti, poi riprova.",
     upload_not_found: "Questo caricamento non è stato trovato.",
@@ -603,8 +646,19 @@ export const errorMessages = {
     invitation_used:
       "Esta invitación ya se ha usado. Pide un nuevo enlace a quien organiza.",
     invalid_guest_name: "El nombre debe tener entre 1 y 80 caracteres.",
+    invalid_phone:
+      "Escribe el número con el prefijo del país, por ejemplo +41 79 123 45 67.",
     guest_limit_reached: "Has llegado al límite de 500 invitados.",
     self_revoke_forbidden: "No puedes quitarte tu propio acceso.",
+    guest_active: "Quita primero el acceso de esta persona.",
+    guest_uploads_pending:
+      "Algunos envíos de esta persona aún se están preparando. Vuelve a intentarlo en un momento.",
+    guest_in_game:
+      "Esta persona juega o dirige una partida de hombres lobo en curso. Termínala primero.",
+    invalid_voice_note:
+      "No se puede leer esta nota de voz o dura más de cinco minutos. Grábala de nuevo.",
+    voice_note_too_large:
+      "Esta nota de voz es demasiado grande. Graba una más corta.",
     upload_queue_full:
       "La cola está llena. Espera a que algunos archivos estén listos y vuelve a intentarlo.",
     upload_not_found: "No se ha encontrado esta subida.",
